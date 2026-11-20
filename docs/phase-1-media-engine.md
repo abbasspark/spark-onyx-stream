@@ -41,47 +41,64 @@ any state -> DELETED
 
 ## Processing pipeline
 
-Each step is a job. A step queues the next one when it succeeds.
+Processing starts by itself when an upload is complete. Each step is a job.
 
-| Step | Job type     | What it does                                                            |
-| ---- | ------------ | ----------------------------------------------------------------------- |
-| 1    | `PROBE`      | Runs ffprobe, stores the raw result and the summary fields on the asset |
-| 2    | (decision)   | Chooses the processing mode. Runs inside the probe job                  |
-| 3a   | `REMUX`      | Copy mode: repackages the source streams without re-encoding            |
-| 3b   | `TRANSCODE`  | Transcode mode: encodes each rendition of the encoding profile          |
-| 4    | `PACKAGE`    | Writes HLS playlists and fMP4 segments, encrypts if enabled             |
-| 5    | `THUMBNAILS` | Poster image, sprite sheet and its WebVTT index                         |
-| 6    | `SUBTITLES`  | Extracts embedded subtitles and converts them to WebVTT                 |
+| Step | Job type     | What it does                                                                                                         |
+| ---- | ------------ | -------------------------------------------------------------------------------------------------------------------- |
+| 1    | `PROBE`      | Reads the file with ffprobe, checks that it is a usable video, samples its keyframes and chooses the processing mode |
+| 2a   | `REMUX`      | Copy mode: repackages the source streams into HLS without re-encoding                                                |
+| 2b   | `TRANSCODE`  | Transcode mode: encodes every quality of the encoding profile and writes HLS, in one FFmpeg run                      |
+| 3    | `THUMBNAILS` | Saves a poster picture. Runs alongside step 2                                                                        |
 
-Steps 5 and 6 run in parallel with step 3. The asset becomes `READY` when step 4 finishes. Missing thumbnails or subtitles do not block playback.
+The asset becomes `READY` when step 2 finishes. A failed thumbnail job does not affect the asset.
 
 ### Decision engine
 
-The mode can be forced at upload time. Otherwise:
+The mode can be forced when the asset is created or reprocessed. Otherwise the source is copied when all of these hold, and transcoded when any does not:
 
-| Condition                                                                                         | Mode        |
-| ------------------------------------------------------------------------------------------------- | ----------- |
-| Video is H.264, audio is AAC, and the keyframe interval is regular and at most the segment length | `COPY`      |
-| Anything else                                                                                     | `TRANSCODE` |
+- the video codec is H.264 with 8-bit 4:2:0 color,
+- every audio stream is AAC, or there is no audio,
+- the video is not stored rotated,
+- keyframes in the first 60 seconds are at most one segment length apart.
 
-`PASSTHROUGH` is never chosen automatically. It is available as a forced mode for files that should be served unchanged.
+The reason for the choice is stored in the output of the probe job.
 
-Copy mode produces a single rendition, so there is no adaptive bitrate. The panel shows this and offers "transcode anyway".
+`PASSTHROUGH` is never chosen automatically. It marks the asset ready without producing anything, for files that are served unchanged.
+
+Copy mode produces a single quality, so there is no adaptive bitrate.
+
+### What is rejected
+
+The probe step fails the asset at once, without retries, when the file has no video stream, is a text file or a picture, or has no playable duration. FFmpeg would otherwise open a text file as "terminal art" and encode it.
 
 ### Transcoding rules
 
-- Renditions taller than the source are skipped. Nothing is upscaled.
-- Every rendition uses the keyframe interval and segment length of the encoding profile, with scene-change keyframes disabled, so segments line up across renditions.
-- The default profile has 1080p, 720p, 480p and 360p renditions in H.264 with AAC audio.
-- CPU encoding (libx264) in phase 1. Hardware encoders are added behind the same interface later.
+- Qualities taller than the source are left out. Nothing is upscaled. A source smaller than every quality is encoded once at its own height.
+- Every quality gets keyframes at the same times, with scene-change keyframes switched off, so segments line up across qualities.
+- The default profile has 1080p, 720p, 480p and 360p in H.264 with AAC audio, 4-second segments and a keyframe every 2 seconds.
+- Encoding uses the CPU (libx264). Hardware encoders can be added behind the same command builder later.
+- One audio stream is used: the default one, or the first.
 
 ### Job handling
 
-- BullMQ drives execution. The `jobs` table mirrors each job for history and for the panel.
-- Failed jobs retry with exponential backoff up to `maxAttempts`.
-- A worker reports progress parsed from FFmpeg output.
-- A job can be cancelled. The worker stops the FFmpeg process and removes partial output.
-- When a worker dies, BullMQ marks its job as stalled and another worker picks it up.
+- BullMQ runs the jobs. The `jobs` table mirrors each one with status, progress, attempts, error and output.
+- A failed attempt is retried with growing delays, up to three attempts. Errors a retry cannot fix fail at once.
+- Progress comes from FFmpeg's own progress output and is written at most every two seconds.
+- A waiting job is cancelled by taking it off the queue. A running job is signalled through Redis, and its worker ends the FFmpeg process and removes the working files.
+- When a worker dies, BullMQ notices the stalled job and another worker takes it.
+- A failed or cancelled job can be retried, which creates a new job. An asset can be reprocessed, which removes its earlier outputs first.
+
+### Workers
+
+A process with the `worker` role runs the jobs. It needs FFmpeg and ffprobe, and a working directory (`PROCESSING_TEMP_PATH`) with room for the outputs. `WORKER_CONCURRENCY` sets how many jobs it runs at once.
+
+### Not built yet
+
+- Seek-bar sprite sheets and extraction of embedded subtitles.
+- AES-128 encryption of segments.
+- Several audio languages as separate HLS audio tracks.
+- Creating and editing encoding profiles through the API. The default profile can be read.
+- Hardware encoding.
 
 ## Storage
 
@@ -146,17 +163,15 @@ A browser on another origin than the API needs that origin listed in `CORS_ORIGI
 All paths are relative to the storage pool root.
 
 ```
-sources/{assetId}/{original filename}
-assets/{assetId}/master.m3u8
-assets/{assetId}/v/{rendition}/playlist.m3u8
-assets/{assetId}/v/{rendition}/init.mp4
-assets/{assetId}/v/{rendition}/seg-00001.m4s
-assets/{assetId}/a/{language}/playlist.m3u8
-assets/{assetId}/subs/{language}.vtt
+sources/{assetId}/{file name}
+assets/{assetId}/hls/master.m3u8
+assets/{assetId}/hls/{quality}/playlist.m3u8
+assets/{assetId}/hls/{quality}/init.mp4          (init_0.mp4, init_1.mp4 ... with several qualities)
+assets/{assetId}/hls/{quality}/seg-00000.m4s
 assets/{assetId}/thumbs/poster.jpg
-assets/{assetId}/thumbs/sprite.jpg
-assets/{assetId}/thumbs/sprite.vtt
 ```
+
+Audio is stored inside each quality's segments. Separate audio tracks and subtitle files get their own folders when they are built.
 
 ## Playback and URL signing
 
@@ -191,19 +206,21 @@ Status shows what exists today.
 | `GET` `POST`            | `/storage-pools`           | List and create storage pools                                     | Built   |
 | `GET` `PATCH`           | `/storage-pools/{id}`      | Read and update a storage pool                                    | Built   |
 | `POST`                  | `/storage-pools/{id}/test` | Write, read and delete a test file to confirm the pool works      | Built   |
-| `GET` `POST`            | `/encoding-profiles`       | List and create encoding profiles                                 | Planned |
+| `GET`                   | `/encoding-profiles`       | List encoding profiles                                            | Built   |
+| `GET`                   | `/encoding-profiles/{id}`  | Read an encoding profile                                          | Built   |
+| `POST`                  | `/encoding-profiles`       | Create an encoding profile                                        | Planned |
 | `PATCH` `DELETE`        | `/encoding-profiles/{id}`  | Update and delete a profile                                       | Planned |
 | `POST`                  | `/assets`                  | Create an asset and get an upload URL                             | Built   |
 | `GET`                   | `/assets`                  | List assets with filters and pagination                           | Built   |
 | `GET` `PATCH` `DELETE`  | `/assets/{id}`             | Read, update and soft-delete an asset                             | Built   |
 | `POST`                  | `/uploads`                 | Start a resumable upload for an asset (tus)                       | Built   |
 | `HEAD` `PATCH` `DELETE` | `/uploads/{assetId}`       | Check progress, send bytes, cancel (tus)                          | Built   |
-| `POST`                  | `/assets/{id}/reprocess`   | Process again, optionally with another mode or profile            | Planned |
+| `POST`                  | `/assets/{id}/reprocess`   | Process again, optionally with another mode or profile            | Built   |
 | `POST`                  | `/assets/{id}/playback`    | Get a signed manifest URL                                         | Planned |
-| `GET`                   | `/jobs`                    | List jobs with filters                                            | Planned |
-| `GET`                   | `/jobs/{id}`               | Read a job                                                        | Planned |
-| `POST`                  | `/jobs/{id}/cancel`        | Cancel a job                                                      | Planned |
-| `POST`                  | `/jobs/{id}/retry`         | Retry a failed job                                                | Planned |
+| `GET`                   | `/jobs`                    | List jobs with filters                                            | Built   |
+| `GET`                   | `/jobs/{id}`               | Read a job                                                        | Built   |
+| `POST`                  | `/jobs/{id}/cancel`        | Cancel a job                                                      | Built   |
+| `POST`                  | `/jobs/{id}/retry`         | Retry a failed job                                                | Built   |
 | `GET`                   | `/keys/{assetId}`          | AES-128 content key (signature required)                          | Planned |
 
 ## Authentication and access control
@@ -260,5 +277,4 @@ These events are recorded with actor, target, time and IP address: setup, sign-i
 ## Open questions
 
 - Whether large uploads go directly from the browser to S3 with multipart upload, or always through the API.
-- Whether packaging is done by FFmpeg alone or by a dedicated packager. FFmpeg alone is the starting point.
 - The exact Nginx mechanism for signature checks: the built-in secure link module or a small script module.

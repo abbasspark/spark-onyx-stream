@@ -77,7 +77,10 @@ describe.skipIf(!TEST_DATABASE_URL)('Assets and uploads (e2e, real database)', (
       .send(bytes);
   }
 
-  /** The file moves into storage shortly after the last byte, so the status is polled. */
+  /**
+   * The file moves into storage shortly after the last byte, and processing is
+   * queued right after that, so the status is polled.
+   */
   async function waitForStatus(assetId: string, status: string) {
     for (let attempt = 0; attempt < 100; attempt += 1) {
       const response = await http().get(`/v1/assets/${assetId}`).set(auth()).expect(200);
@@ -163,7 +166,7 @@ describe.skipIf(!TEST_DATABASE_URL)('Assets and uploads (e2e, real database)', (
 
       await sendBytes(assetId, 80_000, content.subarray(80_000)).expect(204);
 
-      const asset = await waitForStatus(assetId, 'UPLOADED');
+      const asset = await waitForStatus(assetId, 'PROCESSING');
       expect(asset.source).toEqual({
         filename: 'My Film (final).mp4',
         bytes: String(content.length),
@@ -194,7 +197,7 @@ describe.skipIf(!TEST_DATABASE_URL)('Assets and uploads (e2e, real database)', (
 
       await startUpload(assetId, content.length, '../../../etc/cron.d/evil job.mp4').expect(201);
       await sendBytes(assetId, 0, content).expect(204);
-      await waitForStatus(assetId, 'UPLOADED');
+      await waitForStatus(assetId, 'PROCESSING');
 
       expect(await readdir(path.join(storageDirectory, 'sources', assetId))).toEqual([
         'evil_job.mp4',
@@ -206,7 +209,7 @@ describe.skipIf(!TEST_DATABASE_URL)('Assets and uploads (e2e, real database)', (
       const assetId = await createAsset();
       await startUpload(assetId, content.length).expect(201);
       await sendBytes(assetId, 0, content).expect(204);
-      await waitForStatus(assetId, 'UPLOADED');
+      await waitForStatus(assetId, 'PROCESSING');
 
       await startUpload(assetId, content.length).expect(409);
       await sendBytes(assetId, 0, content).expect(410);
@@ -313,7 +316,7 @@ describe.skipIf(!TEST_DATABASE_URL)('Assets and uploads (e2e, real database)', (
       await startUpload(assetId, content.length, 'clip.mov', key).expect(201);
       await sendBytes(assetId, 0, content, key).expect(204);
 
-      const asset = await waitForStatus(assetId, 'UPLOADED');
+      const asset = await waitForStatus(assetId, 'PROCESSING');
       expect(asset.source.bytes).toBe('2000');
     });
   });
