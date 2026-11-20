@@ -10,6 +10,7 @@ import { AppConfig } from './config/app-config.js';
 import { validateEnv } from './config/env.schema.js';
 import { loadEnvFile } from './config/load-env-file.js';
 import { ARTWORK_ROUTE } from './catalog/catalog.views.js';
+import { PUBLIC_CATALOG_ROUTE } from './catalog/public-catalog.controller.js';
 import { MEDIA_ROUTE } from './playback/playback.service.js';
 
 /** Version prefix of every HTTP route. */
@@ -71,6 +72,18 @@ async function bootstrap(): Promise<void> {
           methods: ['GET', 'HEAD', 'OPTIONS'],
           allowedHeaders: ['Range'],
           exposedHeaders: ['Content-Length', 'Content-Range', 'Accept-Ranges'],
+          maxAge: 600,
+        });
+        return;
+      }
+
+      // The public catalog carries no credentials and shows only what is published,
+      // so any site and any app may read it.
+      if (path.startsWith(`/${API_PREFIX}/${PUBLIC_CATALOG_ROUTE}/`)) {
+        callback(null, {
+          origin: '*',
+          methods: ['GET', 'HEAD', 'POST', 'OPTIONS'],
+          allowedHeaders: ['Content-Type'],
           maxAge: 600,
         });
         return;

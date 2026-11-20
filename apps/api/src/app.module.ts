@@ -15,6 +15,7 @@ import { EventsModule } from './events/events.module.js';
 import { HealthModule } from './health/health.module.js';
 import { ProcessingApiModule, ProcessingCoreModule } from './processing/processing.module.js';
 import { QueueModule } from './queue/queue.module.js';
+import { RateLimitModule } from './rate-limit/rate-limit.module.js';
 import { RedisModule } from './redis/redis.module.js';
 import { StatsModule } from './stats/stats.module.js';
 import { StorageModule, StoragePoolsModule } from './storage/storage.module.js';
@@ -56,6 +57,7 @@ export class AppModule {
         ConfigModule.forRoot(config),
         DatabaseModule,
         RedisModule,
+        RateLimitModule,
         EventsModule,
         QueueModule,
         CryptoModule,

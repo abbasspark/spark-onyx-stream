@@ -1,6 +1,6 @@
 # Phase 2: catalog
 
-The catalog turns videos into things a viewer can find: movies and series with names, texts, artwork and categories. This document describes the part that is built, which is the admin side. The public catalog API and the viewer website follow in the same phase.
+The catalog turns videos into things a viewer can find: movies and series with names, texts, artwork and categories. This document describes what is built: the admin side and the public catalog API. The viewer website follows in the same phase.
 
 ## Model
 
@@ -31,7 +31,9 @@ A title is a draft, published or archived. Episodes are a draft or published.
 
 The API returns a checklist with every title. Required points block publishing. Recommended points (poster, synopsis, category) are shown but do not block. The panel shows the same list, so the API and the panel cannot disagree about what is missing.
 
-One case is not blocked: an admin can delete a video in the library while a published title still uses it. The checklist then shows the title as incomplete. The public catalog API, when it is built, must leave such titles out.
+A video "can be played" when it is ready and has a stream. A video stored without processing is ready but has no stream, so it does not count.
+
+One case is not blocked: an admin can delete a video in the library, or process it again, while a published title uses it. The title stays published but is hidden from viewers until it can be played again. The panel marks such a title as hidden and explains why.
 
 ## Artwork
 
@@ -68,16 +70,50 @@ All routes are under `/v1` and need the `catalog:read` or `catalog:write` permis
 
 Changes to the catalog are written to the audit log.
 
+## Public catalog API
+
+The viewer website and the apps read the catalog through `/v1/catalog`. No sign-in is needed.
+
+| Method and path                                | Purpose                                                                                              |
+| ---------------------------------------------- | ---------------------------------------------------------------------------------------------------- |
+| `GET /catalog/home`                            | Rows for the home page: featured, new, then one row per category                                     |
+| `GET /catalog/categories`                      | Categories that have something to show, with the number of titles                                    |
+| `GET /catalog/titles`                          | Page of titles. Filters: `type`, `category` (slug), `featured`, `q`. Sorts: `newest`, `name`, `year` |
+| `GET /catalog/titles/{slug}`                   | One title, for a series with its seasons and episodes                                                |
+| `POST /catalog/titles/{slug}/playback`         | Signed addresses for playing a movie                                                                 |
+| `POST /catalog/titles/{slug}/trailer/playback` | The same for the trailer                                                                             |
+| `POST /catalog/episodes/{id}/playback`         | The same for an episode                                                                              |
+
+- **Only what can be watched is returned.** Every query uses one filter: the title is published, and a movie's video can be played, or a series has at least one published episode whose video can be played. Seasons and episodes without something to watch are left out, and the counts follow.
+- **A draft answers exactly like a title that does not exist.** A request cannot find out which slugs are in use.
+- **The shapes are a contract.** They carry no publishing state and no storage or processing details. Fields are added, not renamed or removed.
+- **Reads may be cached for 30 seconds** by browsers, the gateway and later the edges. A change in the panel reaches viewers within that time. Playback answers are never cached.
+- **Requests are limited per client address:** 600 reads and 120 playback requests a minute. If Redis is unreachable the limit is skipped, so the site stays up.
+- **Any website may read it.** The catalog carries no credentials, so cross-origin requests are allowed.
+
+### Who may play
+
+Viewer accounts are not built yet. Until they are, `CATALOG_PLAYBACK` decides:
+
+| Value  | Meaning                                                               |
+| ------ | --------------------------------------------------------------------- |
+| `open` | Anyone who can reach the site can play every published title. Default |
+| `off`  | Nobody can play through the catalog. Browsing still works             |
+
+With `open`, publishing a title makes it watchable by everyone on the internet who can reach your gateway. Use `off` on a server that is reachable from outside while the content must not be public yet. Admins can always play videos in the panel.
+
 ## Admin panel
 
 - **Titles:** a wall of posters or a table, tabs for movies and series, search, filters for status and category, sorting.
 - **Title editor:** details with one save button and a warning before unsaved changes are lost, videos and artwork that save as they are chosen, seasons and episodes for a series, and a publishing card with the checklist.
 - **Categories:** create, edit, delete and reorder.
 - The dashboard shows the number of titles, and the command palette can start a new title.
+- A published title that viewers cannot see is marked as hidden in the list and explained in the editor. The editor links to the title's public data.
 
 ## Not built yet
 
-- The public catalog API and the viewer website
+- The viewer website
+- Viewer accounts, and with them playback that needs a sign-in or a purchase
 - People and credits (cast, directors)
 - Collections and rows for the home page
 - Importing metadata from outside sources
