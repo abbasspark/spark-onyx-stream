@@ -107,8 +107,39 @@ All code reads and writes files through the `StorageDriver` interface and never 
 
 ### Not built yet
 
-- Quota enforcement and `usedBytes` accounting. They arrive with uploads.
 - Moving assets between pools.
+
+## Uploads
+
+### Flow
+
+1. The client creates the asset with `POST /v1/assets`. The answer contains the upload endpoint and the asset id.
+2. The client starts a tus upload with `POST /v1/uploads`. The `Upload-Metadata` header carries `assetId` and `filename`, and `Upload-Length` carries the file size.
+3. The client sends the bytes with `PATCH /v1/uploads/{assetId}`, in as many requests as it likes.
+4. After a lost connection, `HEAD /v1/uploads/{assetId}` tells the client where to continue.
+5. When the last byte has arrived, the server moves the file into the storage pool as `sources/{assetId}/{file name}`, records its SHA-256 checksum and size, adds the size to the pool's used bytes and sets the asset to `UPLOADED`.
+
+Any tus client library works, for example `tus-js-client` or Uppy in the browser.
+
+### Rules
+
+- An asset has one source file. A second upload for the same asset is refused.
+- The file size must be known when the upload starts and must not exceed `UPLOAD_MAX_BYTES` (50 GiB by default).
+- A file that would exceed the quota of the storage pool is refused before any byte is sent.
+- The stored file name is reduced to letters, digits, dot, dash and underscore. The original name is kept on the asset for display.
+- Uploading needs the `assets:write` permission, with a session or an API key.
+- Deleting an asset during its upload removes the bytes received so far.
+- Unfinished uploads are removed after 48 hours, at the next start of the API.
+
+### Browser access
+
+A browser on another origin than the API needs that origin listed in `CORS_ORIGINS`. The API then answers preflight requests and exposes the tus headers.
+
+### Not built yet
+
+- Checking the file type before processing. Any file is accepted and the probe step decides whether it is usable.
+- Removing the files of deleted assets and reducing the pool's used bytes. This arrives with the cleanup job.
+- Uploading directly from the browser to S3.
 
 ## Storage layout
 
@@ -142,38 +173,38 @@ All endpoints are under `/v1`. Every endpoint needs credentials unless marked pu
 
 Status shows what exists today.
 
-| Method                 | Path                       | Purpose                                                           | Status  |
-| ---------------------- | -------------------------- | ----------------------------------------------------------------- | ------- |
-| `GET`                  | `/health`                  | Readiness with dependency status (public)                         | Built   |
-| `GET`                  | `/health/live`             | Liveness (public)                                                 | Built   |
-| `GET`                  | `/auth/setup`              | Whether first-run setup is still required (public)                | Built   |
-| `POST`                 | `/auth/setup`              | Create the first owner. Works only while no admin exists (public) | Built   |
-| `POST`                 | `/auth/login`              | Start an admin session (public)                                   | Built   |
-| `POST`                 | `/auth/logout`             | End the session                                                   | Built   |
-| `GET`                  | `/auth/me`                 | The authenticated caller and its permissions                      | Built   |
-| `POST`                 | `/auth/password`           | Change your own password                                          | Built   |
-| `GET` `POST`           | `/admins`                  | List and create admins                                            | Built   |
-| `GET` `PATCH` `DELETE` | `/admins/{id}`             | Read, update and deactivate an admin                              | Built   |
-| `GET` `POST`           | `/api-keys`                | List and create API keys                                          | Built   |
-| `DELETE`               | `/api-keys/{id}`           | Revoke an API key                                                 | Built   |
-| `GET`                  | `/audit-logs`              | List audit entries with filters                                   | Built   |
-| `GET` `POST`           | `/storage-pools`           | List and create storage pools                                     | Built   |
-| `GET` `PATCH`          | `/storage-pools/{id}`      | Read and update a storage pool                                    | Built   |
-| `POST`                 | `/storage-pools/{id}/test` | Write, read and delete a test file to confirm the pool works      | Built   |
-| `GET` `POST`           | `/encoding-profiles`       | List and create encoding profiles                                 | Planned |
-| `PATCH` `DELETE`       | `/encoding-profiles/{id}`  | Update and delete a profile                                       | Planned |
-| `POST`                 | `/assets`                  | Create an asset and get an upload URL                             | Planned |
-| `GET`                  | `/assets`                  | List assets with filters and pagination                           | Planned |
-| `GET` `PATCH` `DELETE` | `/assets/{id}`             | Read, update and soft-delete an asset                             | Planned |
-| `POST`                 | `/assets/{id}/reprocess`   | Process again, optionally with another mode or profile            | Planned |
-| `POST`                 | `/assets/{id}/playback`    | Get a signed manifest URL                                         | Planned |
-| `GET`                  | `/jobs`                    | List jobs with filters                                            | Planned |
-| `GET`                  | `/jobs/{id}`               | Read a job                                                        | Planned |
-| `POST`                 | `/jobs/{id}/cancel`        | Cancel a job                                                      | Planned |
-| `POST`                 | `/jobs/{id}/retry`         | Retry a failed job                                                | Planned |
-| `GET`                  | `/keys/{assetId}`          | AES-128 content key (signature required)                          | Planned |
-
-Uploads will use the tus resumable upload protocol on `/v1/uploads`.
+| Method                  | Path                       | Purpose                                                           | Status  |
+| ----------------------- | -------------------------- | ----------------------------------------------------------------- | ------- |
+| `GET`                   | `/health`                  | Readiness with dependency status (public)                         | Built   |
+| `GET`                   | `/health/live`             | Liveness (public)                                                 | Built   |
+| `GET`                   | `/auth/setup`              | Whether first-run setup is still required (public)                | Built   |
+| `POST`                  | `/auth/setup`              | Create the first owner. Works only while no admin exists (public) | Built   |
+| `POST`                  | `/auth/login`              | Start an admin session (public)                                   | Built   |
+| `POST`                  | `/auth/logout`             | End the session                                                   | Built   |
+| `GET`                   | `/auth/me`                 | The authenticated caller and its permissions                      | Built   |
+| `POST`                  | `/auth/password`           | Change your own password                                          | Built   |
+| `GET` `POST`            | `/admins`                  | List and create admins                                            | Built   |
+| `GET` `PATCH` `DELETE`  | `/admins/{id}`             | Read, update and deactivate an admin                              | Built   |
+| `GET` `POST`            | `/api-keys`                | List and create API keys                                          | Built   |
+| `DELETE`                | `/api-keys/{id}`           | Revoke an API key                                                 | Built   |
+| `GET`                   | `/audit-logs`              | List audit entries with filters                                   | Built   |
+| `GET` `POST`            | `/storage-pools`           | List and create storage pools                                     | Built   |
+| `GET` `PATCH`           | `/storage-pools/{id}`      | Read and update a storage pool                                    | Built   |
+| `POST`                  | `/storage-pools/{id}/test` | Write, read and delete a test file to confirm the pool works      | Built   |
+| `GET` `POST`            | `/encoding-profiles`       | List and create encoding profiles                                 | Planned |
+| `PATCH` `DELETE`        | `/encoding-profiles/{id}`  | Update and delete a profile                                       | Planned |
+| `POST`                  | `/assets`                  | Create an asset and get an upload URL                             | Built   |
+| `GET`                   | `/assets`                  | List assets with filters and pagination                           | Built   |
+| `GET` `PATCH` `DELETE`  | `/assets/{id}`             | Read, update and soft-delete an asset                             | Built   |
+| `POST`                  | `/uploads`                 | Start a resumable upload for an asset (tus)                       | Built   |
+| `HEAD` `PATCH` `DELETE` | `/uploads/{assetId}`       | Check progress, send bytes, cancel (tus)                          | Built   |
+| `POST`                  | `/assets/{id}/reprocess`   | Process again, optionally with another mode or profile            | Planned |
+| `POST`                  | `/assets/{id}/playback`    | Get a signed manifest URL                                         | Planned |
+| `GET`                   | `/jobs`                    | List jobs with filters                                            | Planned |
+| `GET`                   | `/jobs/{id}`               | Read a job                                                        | Planned |
+| `POST`                  | `/jobs/{id}/cancel`        | Cancel a job                                                      | Planned |
+| `POST`                  | `/jobs/{id}/retry`         | Retry a failed job                                                | Planned |
+| `GET`                   | `/keys/{assetId}`          | AES-128 content key (signature required)                          | Planned |
 
 ## Authentication and access control
 

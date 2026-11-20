@@ -202,6 +202,12 @@ importers:
       '@onyx/database':
         specifier: workspace:*
         version: link:../../packages/database
+      '@tus/file-store':
+        specifier: ^2.1.2
+        version: 2.1.2
+      '@tus/server':
+        specifier: ^2.4.7
+        version: 2.4.7
       bullmq:
         specifier: ^6.7.8
         version: 6.7.8(ioredis@5.11.1)(pg@8.23.1)
@@ -969,6 +975,18 @@ packages:
       '@types/react':
         optional: true
 
+  '@redis/client@5.12.4':
+    resolution: {integrity: sha512-FggDHx7cDwHmCpDda2rgtDSTjC73fTwL2ldzBsRkGyRFzbv5U1VbIzJNuNjHmBimOAAxzmlNuUsVr6DyUNK05w==}
+    engines: {node: '>= 18.19.0'}
+    peerDependencies:
+      '@node-rs/xxhash': ^1.1.0
+      '@opentelemetry/api': '>=1 <2'
+    peerDependenciesMeta:
+      '@node-rs/xxhash':
+        optional: true
+      '@opentelemetry/api':
+        optional: true
+
   '@rolldown/binding-android-arm-eabi@1.2.19':
     resolution: {integrity: sha512-e+Ebe0WT+9tbXmNKPIiC8YrWAHYwug3m6i4p3rZGGulfZri1jtI4HslT+OZnFf/OIHowWF71DTlHwXBP2SiA7A==}
     engines: {node: ^20.19.0 || >=22.12.0}
@@ -1110,6 +1128,18 @@ packages:
 
   '@tokenizer/token@0.3.0':
     resolution: {integrity: sha512-OvjF+z51L3ov0OyAU0duzsYuvO01PH7x4t6DJx+guahgTnBHkhJdG7soQeTSFLWN3efnHyibZ4Z8l2EuWwJN3A==}
+
+  '@tus/file-store@2.1.2':
+    resolution: {integrity: sha512-YW5pgKJJkqpxgpnrDz+4IyOQdet19SOR6cmDYro6zCmMmToZl7GUESsIntsWR8TcCudBkvPlubakUFs56IV82Q==}
+    engines: {node: '>=20.19.0'}
+
+  '@tus/server@2.4.7':
+    resolution: {integrity: sha512-vEBfRWazXQTsYrxqHw+1ihDHzruOpUFppLk+y7D5fov6+mA1hwSEGr2Q99+/6DADs7+Vz9t8WXyKILlL5+x5Sw==}
+    engines: {node: '>=20.19.0'}
+
+  '@tus/utils@0.7.3':
+    resolution: {integrity: sha512-rVOHNOVkNJLl+FQwzZZK1zOFfwaYuzDYjWKvApcRZQ2eA6k3mgRnyyStpCW1gH/U+jrDTSc9M6dkejiyGwpKBg==}
+    engines: {node: '>=20.19.0'}
 
   '@tybys/wasm-util@0.10.5':
     resolution: {integrity: sha512-dOGOPxlaNV+G046mZzN+9C0dAcQZeSKcXiVaM0TYy/LM4ttTmgSBDxYfovcYI8Em3+eAbiAYpvWLOv8+ZVRJKA==}
@@ -1430,6 +1460,10 @@ packages:
 
   cluster-key-slot@1.1.1:
     resolution: {integrity: sha512-rwHwUfXL40Chm1r08yrhU3qpUvdVlgkKNeyeGPOxnW8/SyVDvgRaed/Uz54AqWNaTCAThlj6QAs3TZcKI0xDEw==}
+    engines: {node: '>=0.10.0'}
+
+  cluster-key-slot@1.1.2:
+    resolution: {integrity: sha512-RMr0FhtfXemyinomL4hrWcYJxmX6deFdCxpJzhDttxgO1+bcCnkk+9drydLVDmAMG7NE6aN/fl4F7ucU/90gAA==}
     engines: {node: '>=0.10.0'}
 
   combined-stream@1.0.8:
@@ -1935,6 +1969,9 @@ packages:
     resolution: {integrity: sha512-v5xlu8eHD1+6r8EHTg6hfmO97LN8ugKtiXcy5e6oN72iD2r6u0RPfLl6fxM+7Wnh2ZRq15o0russMst44WauPA==}
     engines: {node: '>=13.2.0'}
 
+  lodash.throttle@4.1.1:
+    resolution: {integrity: sha512-wIkUCfVKpVsWo3JSZlc+8MB5it+2AN5W8J7YVMST30UrvcQNZ1Okbj+rbVniijTWE6FGYy4XJq/rHkas8qJMLQ==}
+
   lodash@4.18.1:
     resolution: {integrity: sha512-dMInicTPVE8d1e5otfwmmjlxkZoUpiVLwyeTdUsi/Caj/gfzzblBcCE5sRHV/AsjuCmxWrte2TNGSYuCeCq+0Q==}
 
@@ -2383,6 +2420,11 @@ packages:
   sql-escaper@1.9.1:
     resolution: {integrity: sha512-4p522TVYaJXTbMlYgAwacjyg3EJyYe9KYWYlYJVwZG1YjtzxU5m5iSzsZoGI69Po7j3i/2tKlpZQi7uvhTL+WA==}
     engines: {bun: '>=1.0.0', deno: '>=2.0.0', node: '>=12.0.0'}
+
+  srvx@0.11.22:
+    resolution: {integrity: sha512-LqZxxBDMKuMAZzFzJnDCkFOrs9MZQZr0LvHiO/SuSZVdQaXD7xQ5UWTUxheJrQPve1qk9MG2B/yttUvJxw8egQ==}
+    engines: {node: '>=20.16.0'}
+    hasBin: true
 
   stackback@0.0.2:
     resolution: {integrity: sha512-1XMJE5fQo1jGH6Y/7ebnwPOBEkIEnT4QF32d5R1+VXdXveM0IBMJt8zfaxX1P3QhVwrYe+576+jkANtSS2mBbw==}
@@ -3370,6 +3412,11 @@ snapshots:
     optionalDependencies:
       '@types/react': 19.3.0
 
+  '@redis/client@5.12.4':
+    dependencies:
+      cluster-key-slot: 1.1.2
+    optional: true
+
   '@rolldown/binding-android-arm-eabi@1.2.19':
     optional: true
 
@@ -3470,6 +3517,33 @@ snapshots:
       - supports-color
 
   '@tokenizer/token@0.3.0': {}
+
+  '@tus/file-store@2.1.2':
+    dependencies:
+      '@tus/utils': 0.7.3
+      debug: 4.4.3
+    optionalDependencies:
+      '@redis/client': 5.12.4
+    transitivePeerDependencies:
+      - '@node-rs/xxhash'
+      - '@opentelemetry/api'
+      - supports-color
+
+  '@tus/server@2.4.7':
+    dependencies:
+      '@tus/utils': 0.7.3
+      debug: 4.4.3
+      lodash.throttle: 4.1.1
+      srvx: 0.11.22
+    optionalDependencies:
+      '@redis/client': 5.12.4
+      ioredis: 5.11.1
+    transitivePeerDependencies:
+      - '@node-rs/xxhash'
+      - '@opentelemetry/api'
+      - supports-color
+
+  '@tus/utils@0.7.3': {}
 
   '@tybys/wasm-util@0.10.5':
     dependencies:
@@ -3844,6 +3918,9 @@ snapshots:
   cli-width@4.1.0: {}
 
   cluster-key-slot@1.1.1: {}
+
+  cluster-key-slot@1.1.2:
+    optional: true
 
   combined-stream@1.0.8:
     dependencies:
@@ -4293,6 +4370,8 @@ snapshots:
       lightningcss-win32-x64-msvc: 1.33.0
 
   load-esm@1.0.3: {}
+
+  lodash.throttle@4.1.1: {}
 
   lodash@4.18.1: {}
 
@@ -4755,6 +4834,8 @@ snapshots:
   split2@4.2.0: {}
 
   sql-escaper@1.9.1: {}
+
+  srvx@0.11.22: {}
 
   stackback@0.0.2: {}
 
