@@ -1,11 +1,15 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 import {
+  bytesToGigabytes,
+  formatBitrate,
   formatBytes,
   formatDuration,
   formatElapsed,
   formatResolution,
+  gigabytesToBytes,
   humanize,
   titleFromFileName,
+  usagePercent,
 } from './format';
 
 describe('formatBytes', () => {
@@ -63,5 +67,29 @@ describe('small helpers', () => {
     expect(titleFromFileName('My Film.final.mkv')).toBe('My Film.final');
     expect(titleFromFileName('.hidden')).toBe('.hidden');
     expect(titleFromFileName(`${'a'.repeat(300)}.mp4`)).toHaveLength(200);
+  });
+});
+
+describe('storage and bitrate helpers', () => {
+  it('converts between gigabytes and bytes', () => {
+    expect(gigabytesToBytes('1')).toBe('1073741824');
+    expect(gigabytesToBytes('0,5')).toBe('536870912');
+    expect(gigabytesToBytes('5000')).toBe('5368709120000');
+    expect(gigabytesToBytes('')).toBeNull();
+    expect(gigabytesToBytes('abc')).toBeNull();
+    expect(gigabytesToBytes('-2')).toBeNull();
+    expect(bytesToGigabytes('1610612736')).toBe('1.5');
+    expect(bytesToGigabytes(null)).toBe('');
+  });
+
+  it('formats bitrates', () => {
+    expect(formatBitrate(2_800_000)).toBe('2.8 Mbit/s');
+    expect(formatBitrate(128_000)).toBe('128 kbit/s');
+  });
+
+  it('computes how much of a quota is used', () => {
+    expect(usagePercent('50', '200')).toBe(25);
+    expect(usagePercent('500', '200')).toBe(100);
+    expect(usagePercent('50', null)).toBeNull();
   });
 });

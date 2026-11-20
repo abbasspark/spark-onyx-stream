@@ -9,6 +9,12 @@ The admin panel: a single-page app built with Vite and React.
 - Upload: several files at once, resumable, continuing while you move around the panel
 - Asset page: preview player with quality choice, details, rename, process again, delete
 - Jobs: progress of every processing job, cancel and retry
+- Encoding profiles: create, edit, delete and choose the default
+- Storage: add a folder or an S3-compatible bucket, set a limit, test the connection
+- Admins: add people, change roles, set a password, deactivate
+- API keys: create with chosen permissions and expiry, revoke
+- Audit log: who changed what, with filters
+- My account: change your own password
 
 Buttons that change something are shown only to roles that may use them.
 
