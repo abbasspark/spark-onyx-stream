@@ -106,3 +106,17 @@ Assets are packaged as HLS with fragmented MP4 (CMAF) segments.
 - Permissions keep endpoint rules independent of role names, so roles can change without touching controllers.
 
 **Consequence:** `JWT_SECRET` is not used by admin authentication. It is reserved for viewer tokens in phase 2.
+
+## D-012 Storage: pools, drivers and encrypted credentials
+
+**Date:** 2026-11-20
+
+- **A storage pool is one place files live**: a directory or an S3 bucket. Every asset belongs to one pool.
+- **All file access goes through the `StorageDriver` interface.** The core ships a local disk driver and an S3 driver built on the AWS SDK, which also works with S3-compatible services.
+- **Every driver passes the same contract test suite**, so the rest of the code can rely on identical behavior.
+- **S3 secret keys are encrypted with AES-256-GCM under `MASTER_KEY`** before they are stored, and the API never returns them.
+- **A fresh installation gets a local pool automatically** at `STORAGE_LOCAL_PATH`.
+
+**Why:** processing and delivery code must not care where files are, and credentials in a database dump should be useless without the master key.
+
+**Consequence:** losing or changing `MASTER_KEY` makes stored S3 credentials unreadable. They have to be entered again. The master key belongs in every backup plan, stored apart from the database backup.

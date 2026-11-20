@@ -18,7 +18,7 @@ The project is built in phases. Each phase ends with something that works end to
 1. Repository foundation: workspace, database schema, development infrastructure. **Done.**
 2. API skeleton: configuration, roles, health check, database and queue connections. **Done.**
 3. Admin authentication: login, sessions, roles, API keys, audit log. **Done.**
-4. Storage: local and S3-compatible drivers behind one interface.
+4. Storage: local and S3-compatible drivers behind one interface. **Done.**
 5. Upload: resumable upload, source file registration.
 6. Processing pipeline: probe, decision engine, remux, transcode, package, thumbnails.
 7. Playback: signed URLs, Nginx verification, key delivery for AES-128.

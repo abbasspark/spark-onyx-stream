@@ -6,16 +6,18 @@ import { AuditModule } from './audit/audit.module.js';
 import { AuthModule } from './auth/auth.module.js';
 import type { AppConfig } from './config/app-config.js';
 import { ConfigModule } from './config/config.module.js';
+import { CryptoModule } from './crypto/crypto.module.js';
 import { DatabaseModule } from './database/database.module.js';
 import { HealthModule } from './health/health.module.js';
 import { QueueModule } from './queue/queue.module.js';
 import { RedisModule } from './redis/redis.module.js';
+import { StorageModule, StoragePoolsModule } from './storage/storage.module.js';
 import type { AppRole } from './roles/app-role.js';
 import { LiveRoleModule, SchedulerRoleModule, WorkerRoleModule } from './roles/role.modules.js';
 
 /** Modules that are loaded only when the process runs the given role. */
 const ROLE_MODULES: Record<AppRole, Type[]> = {
-  api: [AuthModule, AuditModule, AdminsModule, ApiKeysModule, HealthModule],
+  api: [AuthModule, AuditModule, AdminsModule, ApiKeysModule, StoragePoolsModule, HealthModule],
   worker: [WorkerRoleModule],
   live: [LiveRoleModule],
   scheduler: [SchedulerRoleModule],
@@ -37,6 +39,8 @@ export class AppModule {
         DatabaseModule,
         RedisModule,
         QueueModule,
+        CryptoModule,
+        StorageModule,
         ...roleModules,
       ],
     };

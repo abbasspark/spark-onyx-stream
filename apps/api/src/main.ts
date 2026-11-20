@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 import 'reflect-metadata';
+import path from 'node:path';
 import { Logger } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module.js';
@@ -14,7 +15,10 @@ async function bootstrap(): Promise<void> {
   const logger = new Logger('Bootstrap');
 
   const envFile = loadEnvFile();
-  const config = new AppConfig(validateEnv(process.env));
+  const config = new AppConfig(
+    validateEnv(process.env),
+    envFile ? path.dirname(envFile) : process.cwd(),
+  );
   const rootModule = AppModule.forRoles(config);
 
   logger.log(`Environment: ${config.nodeEnv}${envFile ? ` (loaded ${envFile})` : ''}`);

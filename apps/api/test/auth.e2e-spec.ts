@@ -5,65 +5,11 @@
 //
 // They run only when TEST_DATABASE_URL is set, and they delete all admin data
 // in that database. See the README for how to prepare it.
-import { Global, type INestApplication, Module } from '@nestjs/common';
-import { Test } from '@nestjs/testing';
-import { PrismaClient } from '@onyx/database';
-import request from 'supertest';
-import type { App } from 'supertest/types.js';
 import { AdminsModule } from '../src/admins/admins.module.js';
 import { ApiKeysModule } from '../src/api-keys/api-keys.module.js';
-import { AuditModule } from '../src/audit/audit.module.js';
-import { AuthModule } from '../src/auth/auth.module.js';
 import { MAX_FAILED_LOGINS } from '../src/auth/login-throttle.service.js';
-import { AppConfig } from '../src/config/app-config.js';
-import { ConfigModule } from '../src/config/config.module.js';
-import { validateEnv } from '../src/config/env.schema.js';
-import { DatabaseModule } from '../src/database/database.module.js';
-import { REDIS_CLIENT } from '../src/redis/redis.module.js';
+import { createTestApp, OWNER, TEST_DATABASE_URL, type TestApp } from './support/test-app.js';
 
-const TEST_DATABASE_URL = process.env.TEST_DATABASE_URL;
-
-if (TEST_DATABASE_URL && TEST_DATABASE_URL === process.env.DATABASE_URL) {
-  throw new Error('TEST_DATABASE_URL must not point at the development database');
-}
-
-/** Minimal in-memory stand-in for the Redis commands the login throttle uses. */
-class FakeRedis {
-  private readonly counters = new Map<string, number>();
-
-  async get(key: string): Promise<string | null> {
-    const value = this.counters.get(key);
-    return value === undefined ? null : String(value);
-  }
-
-  async incr(key: string): Promise<number> {
-    const next = (this.counters.get(key) ?? 0) + 1;
-    this.counters.set(key, next);
-    return next;
-  }
-
-  async expire(): Promise<number> {
-    return 1;
-  }
-
-  async ttl(key: string): Promise<number> {
-    return this.counters.has(key) ? 900 : -2;
-  }
-
-  async del(key: string): Promise<number> {
-    return this.counters.delete(key) ? 1 : 0;
-  }
-
-  clear(): void {
-    this.counters.clear();
-  }
-}
-
-const OWNER = {
-  email: 'owner@example.com',
-  displayName: 'Olivia Owner',
-  password: 'owner-password-123',
-};
 const EDITOR = {
   email: 'editor@example.com',
   displayName: 'Eddie Editor',
@@ -72,64 +18,22 @@ const EDITOR = {
 };
 
 describe.skipIf(!TEST_DATABASE_URL)('Authentication (e2e, real database)', () => {
-  let app: INestApplication<App>;
-  let prisma: PrismaClient;
-  const redis = new FakeRedis();
+  let testApp: TestApp;
 
-  const http = () => request(app.getHttpServer());
-  const bearer = (token: string) => ({ Authorization: `Bearer ${token}` });
-
-  async function login(email: string, password: string): Promise<string> {
-    const response = await http().post('/v1/auth/login').send({ email, password }).expect(200);
-    return response.body.token as string;
-  }
+  const http = () => testApp.http();
+  const bearer = (token: string) => testApp.bearer(token);
+  const login = (email: string, password: string) => testApp.login(email, password);
 
   beforeAll(async () => {
-    const config = new AppConfig(
-      validateEnv({
-        NODE_ENV: 'test',
-        APP_ROLE: 'api',
-        DATABASE_URL: TEST_DATABASE_URL,
-        REDIS_URL: 'redis://localhost:6379',
-        JWT_SECRET: 'a'.repeat(64),
-        PLAYBACK_SIGNING_SECRET: 'b'.repeat(64),
-        MASTER_KEY: 'c'.repeat(64),
-      }),
-    );
-
-    @Global()
-    @Module({
-      providers: [{ provide: REDIS_CLIENT, useValue: redis }],
-      exports: [REDIS_CLIENT],
-    })
-    class FakeRedisModule {}
-
-    const moduleRef = await Test.createTestingModule({
-      imports: [
-        ConfigModule.forRoot(config),
-        DatabaseModule,
-        FakeRedisModule,
-        AuthModule,
-        AuditModule,
-        AdminsModule,
-        ApiKeysModule,
-      ],
-    }).compile();
-
-    app = moduleRef.createNestApplication<INestApplication<App>>();
-    app.setGlobalPrefix('v1');
-    await app.init();
-    prisma = app.get(PrismaClient);
+    testApp = await createTestApp([AdminsModule, ApiKeysModule]);
   });
 
   beforeEach(async () => {
-    redis.clear();
-    await prisma.auditLog.deleteMany();
-    await prisma.adminUser.deleteMany();
+    await testApp.resetDatabase();
   });
 
   afterAll(async () => {
-    await app?.close();
+    await testApp?.close();
   });
 
   describe('first-run setup', () => {
@@ -200,7 +104,7 @@ describe.skipIf(!TEST_DATABASE_URL)('Authentication (e2e, real database)', () =>
     it('stores only a hash of the session token', async () => {
       const token = await login(OWNER.email, OWNER.password);
 
-      const sessions = await prisma.adminSession.findMany();
+      const sessions = await testApp.prisma.adminSession.findMany();
       expect(sessions).toHaveLength(1);
       expect(sessions[0]?.tokenHash).not.toBe(token);
       expect(JSON.stringify(sessions)).not.toContain(token);
@@ -294,7 +198,9 @@ describe.skipIf(!TEST_DATABASE_URL)('Authentication (e2e, real database)', () =>
       };
       await http().post('/v1/admins').set(bearer(ownerToken)).send(adminAccount).expect(201);
       const adminToken = await login(adminAccount.email, adminAccount.password);
-      const owner = await prisma.adminUser.findUniqueOrThrow({ where: { email: OWNER.email } });
+      const owner = await testApp.prisma.adminUser.findUniqueOrThrow({
+        where: { email: OWNER.email },
+      });
 
       await http()
         .post('/v1/admins')
@@ -310,7 +216,9 @@ describe.skipIf(!TEST_DATABASE_URL)('Authentication (e2e, real database)', () =>
     });
 
     it('stops admins from deactivating or demoting themselves', async () => {
-      const owner = await prisma.adminUser.findUniqueOrThrow({ where: { email: OWNER.email } });
+      const owner = await testApp.prisma.adminUser.findUniqueOrThrow({
+        where: { email: OWNER.email },
+      });
 
       await http().delete(`/v1/admins/${owner.id}`).set(bearer(ownerToken)).expect(403);
       await http()
@@ -389,7 +297,7 @@ describe.skipIf(!TEST_DATABASE_URL)('Authentication (e2e, real database)', () =>
       expect(list.body[0]).not.toHaveProperty('key');
       expect(list.body[0]).not.toHaveProperty('keyHash');
 
-      const stored = await prisma.apiKey.findMany();
+      const stored = await testApp.prisma.apiKey.findMany();
       expect(JSON.stringify(stored)).not.toContain(created.body.key);
     });
 

@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-only
+import path from 'node:path';
 import type { AppRole } from '../roles/app-role.js';
 import type { Env } from './env.schema.js';
 
@@ -16,9 +17,15 @@ export class AppConfig {
   readonly jwtSecret: string;
   readonly playbackSigningSecret: string;
   readonly masterKey: string;
+  /** Absolute path of the default local storage pool. */
   readonly storageLocalPath: string;
 
-  constructor(env: Env) {
+  /**
+   * @param env Validated environment variables.
+   * @param baseDirectory Directory that relative paths in the configuration are
+   * resolved against: the folder of the loaded .env file, or the working directory.
+   */
+  constructor(env: Env, baseDirectory: string = process.cwd()) {
     this.nodeEnv = env.NODE_ENV;
     this.roles = env.APP_ROLE;
     this.apiHost = env.API_HOST;
@@ -28,7 +35,7 @@ export class AppConfig {
     this.jwtSecret = env.JWT_SECRET;
     this.playbackSigningSecret = env.PLAYBACK_SIGNING_SECRET;
     this.masterKey = env.MASTER_KEY;
-    this.storageLocalPath = env.STORAGE_LOCAL_PATH;
+    this.storageLocalPath = path.resolve(baseDirectory, env.STORAGE_LOCAL_PATH);
   }
 
   get isProduction(): boolean {
