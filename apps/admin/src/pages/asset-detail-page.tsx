@@ -1,32 +1,98 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import {
+  Activity,
+  ArrowLeft,
+  Check,
+  Copy,
+  FileQuestion,
+  Info,
+  Lock,
+  Pencil,
+  RefreshCw,
+  Settings2,
+  Trash2,
+} from 'lucide-react';
 import { type FormEvent, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router';
-import { ApiError } from '../api/client';
-import { assetsApi, jobsApi } from '../api/endpoints';
-import type { Asset, EncryptionMode, ProcessingMode } from '../api/types';
-import { useSession } from '../auth/session';
-import { JobTable } from '../components/job-table';
-import { Player } from '../components/player';
-import { EmptyState, ErrorNote, PageHeader, Spinner, StatusBadge } from '../components/ui';
+import { toast } from 'sonner';
+import { ApiError } from '@/api/client';
+import { assetsApi, jobsApi } from '@/api/endpoints';
+import type { Asset, EncryptionMode } from '@/api/types';
+import { useSession } from '@/auth/session';
+import { useConfirm } from '@/components/confirm';
+import { JobTable } from '@/components/job-table';
+import { Player } from '@/components/player';
+import { Button } from '@/components/ui/button';
+import {
+  Badge,
+  Card,
+  CardContent,
+  CardHeader,
+  EmptyState,
+  ErrorNote,
+  Facts,
+  Skeleton,
+  Spinner,
+  StatusBadge,
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
+} from '@/components/ui/display';
+import { Field, Input, Select } from '@/components/ui/form';
+import { Dialog, DialogBody, DialogContent, DialogFooter, Tooltip } from '@/components/ui/overlay';
 import {
   formatBytes,
   formatDateTime,
   formatDuration,
   formatResolution,
   humanize,
-} from '../lib/format';
+} from '@/lib/format';
 
 const REFRESH_MS = 2000;
 const isBusy = (asset: Asset | undefined) =>
   asset !== undefined && ['UPLOADING', 'UPLOADED', 'PROCESSING'].includes(asset.status);
 
-/** One asset: preview, details, its jobs and the actions on it. */
+/** A value with a button that copies it. */
+function Copyable({ value }: { value: string }) {
+  const [copied, setCopied] = useState(false);
+  const copy = async () => {
+    try {
+      await navigator.clipboard.writeText(value);
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 1500);
+    } catch {
+      toast.error('Copying is blocked by the browser');
+    }
+  };
+  return (
+    <span className="inline-flex max-w-full items-center gap-1.5">
+      <code className="truncate font-mono text-[13px] text-muted-foreground">{value}</code>
+      <Tooltip content={copied ? 'Copied' : 'Copy'}>
+        <button
+          type="button"
+          onClick={() => void copy()}
+          className="rounded p-0.5 text-muted-foreground hover:text-foreground"
+          aria-label="Copy"
+        >
+          {copied ? <Check className="size-3.5 text-success" /> : <Copy className="size-3.5" />}
+        </button>
+      </Tooltip>
+    </span>
+  );
+}
+
+/** One video: preview, details, its jobs and the actions on it. */
 export function AssetDetailPage() {
   const { id = '' } = useParams();
   const { can } = useSession();
+  const mayWrite = can('assets:write');
+  const confirm = useConfirm();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const [renameOpen, setRenameOpen] = useState(false);
+  const [reprocessOpen, setReprocessOpen] = useState(false);
 
   const asset = useQuery({
     queryKey: ['asset', id],
@@ -64,149 +130,265 @@ export function AssetDetailPage() {
     void queryClient.invalidateQueries({ queryKey: ['asset', id] });
     void queryClient.invalidateQueries({ queryKey: ['jobs'] });
     void queryClient.invalidateQueries({ queryKey: ['assets'] });
+    void queryClient.invalidateQueries({ queryKey: ['stats'] });
   };
+
   const remove = useMutation({
     mutationFn: () => assetsApi.remove(id),
     onSuccess: () => {
+      toast.success('Video deleted');
       void queryClient.invalidateQueries({ queryKey: ['assets'] });
+      void queryClient.invalidateQueries({ queryKey: ['stats'] });
       void navigate('/assets');
     },
+    onError: (error: Error) => toast.error(error.message),
   });
 
   if (asset.isPending) {
-    return <Spinner label="Loading the asset" />;
+    return (
+      <div className="grid gap-4">
+        <Skeleton className="h-9 w-72" />
+        <div className="grid gap-4 xl:grid-cols-[minmax(0,5fr)_minmax(0,3fr)]">
+          <Skeleton className="aspect-video rounded-xl" />
+          <Skeleton className="h-80 rounded-xl" />
+        </div>
+      </div>
+    );
   }
   if (asset.isError) {
+    const missing = asset.error instanceof ApiError && asset.error.status === 404;
     return (
-      <>
-        <ErrorNote error={asset.error} />
-        <Link to="/assets">Back to the library</Link>
-      </>
+      <EmptyState
+        icon={FileQuestion}
+        title={missing ? 'This video does not exist' : 'The video could not be loaded'}
+        action={
+          <Button asChild>
+            <Link to="/assets">
+              <ArrowLeft />
+              Back to the library
+            </Link>
+          </Button>
+        }
+      >
+        {missing ? 'It may have been deleted.' : asset.error.message}
+      </EmptyState>
     );
   }
 
   const data = asset.data;
-  const failedJob = jobs.data?.items.find((job) => job.status === 'FAILED');
+  const jobItems = jobs.data?.items ?? [];
+  const failedJob = jobItems.find((job) => job.status === 'FAILED');
+  const runningJob = jobItems.find((job) => job.status === 'RUNNING');
+
+  const askDelete = async () => {
+    const confirmed = await confirm({
+      title: `Delete "${data.title}"?`,
+      description:
+        'The source file and all streams are removed. Viewers can no longer play it. This cannot be undone.',
+      confirmLabel: 'Delete',
+      destructive: true,
+    });
+    if (confirmed) {
+      remove.mutate();
+    }
+  };
 
   return (
     <>
-      <p className="crumbs">
-        <Link to="/assets">Library</Link> / {data.title}
-      </p>
-      <PageHeader title={data.title}>
-        <StatusBadge status={data.status} />
-      </PageHeader>
+      <header className="mb-6 flex flex-wrap items-start justify-between gap-4">
+        <div className="min-w-0">
+          <Link
+            to="/assets"
+            className="mb-2 inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
+          >
+            <ArrowLeft className="size-3.5" aria-hidden="true" />
+            Library
+          </Link>
+          <h1 className="flex flex-wrap items-center gap-3 text-2xl font-semibold tracking-tight break-words">
+            {data.title}
+            <StatusBadge status={data.status} />
+            {data.encryption === 'AES_128' ? (
+              <Badge tone="primary">
+                <Lock className="size-3" aria-hidden="true" />
+                Encrypted
+              </Badge>
+            ) : null}
+          </h1>
+        </div>
+        {mayWrite ? (
+          <div className="flex flex-wrap items-center gap-2">
+            <Button onClick={() => setRenameOpen(true)}>
+              <Pencil />
+              Rename
+            </Button>
+            <Button disabled={busy || !data.source.filename} onClick={() => setReprocessOpen(true)}>
+              <RefreshCw />
+              Process again
+            </Button>
+            <Button
+              variant="destructive-outline"
+              loading={remove.isPending}
+              onClick={() => void askDelete()}
+            >
+              <Trash2 />
+              Delete
+            </Button>
+          </div>
+        ) : null}
+      </header>
 
-      <div className="detail-grid">
-        <section className="card">
-          <h2>Preview</h2>
-          {data.status === 'READY' && data.processingMode === 'PASSTHROUGH' ? (
-            <EmptyState title="No stream">
-              This asset was stored without processing, so there is nothing to play here.
-            </EmptyState>
-          ) : null}
+      <div className="grid gap-4 xl:grid-cols-[minmax(0,5fr)_minmax(0,3fr)]">
+        <Card className="overflow-hidden">
           {data.status === 'READY' && playback.data ? (
             <Player playback={playback.data} title={data.title} />
-          ) : null}
-          {data.status === 'READY' &&
-          playback.isPending &&
-          data.processingMode !== 'PASSTHROUGH' ? (
-            <Spinner label="Preparing playback" />
-          ) : null}
-          <ErrorNote error={playback.error} />
-          {busy ? (
-            <Spinner label={`${humanize(data.status)}. The preview appears when it is ready`} />
-          ) : null}
-          {data.status === 'FAILED' ? (
-            <p className="note note-error" role="alert">
-              Processing failed{failedJob?.error ? `: ${failedJob.error}` : '.'}
-            </p>
-          ) : null}
-        </section>
+          ) : (
+            <div className="flex aspect-video flex-col items-center justify-center gap-3 bg-muted/40 p-6 text-center">
+              {data.status === 'READY' && data.processingMode === 'PASSTHROUGH' ? (
+                <p className="max-w-sm text-sm text-muted-foreground">
+                  This video was stored without processing, so there is no stream to play here.
+                </p>
+              ) : null}
+              {data.status === 'READY' &&
+              playback.isPending &&
+              data.processingMode !== 'PASSTHROUGH' ? (
+                <Spinner label="Preparing playback" />
+              ) : null}
+              <ErrorNote error={playback.error} />
+              {busy ? (
+                <>
+                  <Spinner label={humanize(data.status)} />
+                  {runningJob ? (
+                    <p className="text-sm text-muted-foreground">
+                      {humanize(runningJob.type)}: {Math.round(runningJob.progress)}%
+                    </p>
+                  ) : null}
+                  <p className="text-sm text-muted-foreground">
+                    The preview appears when it is ready.
+                  </p>
+                </>
+              ) : null}
+              {data.status === 'FAILED' ? (
+                <ErrorNote
+                  error={`Processing failed${failedJob?.error ? `: ${failedJob.error}` : '.'}`}
+                  className="max-w-md text-left"
+                />
+              ) : null}
+            </div>
+          )}
+        </Card>
 
-        <section className="card">
-          <h2>Details</h2>
-          <dl className="facts">
-            <dt>Length</dt>
-            <dd>{formatDuration(data.media.durationMs)}</dd>
-            <dt>Picture</dt>
-            <dd>{formatResolution(data.media.width, data.media.height, data.media.frameRate)}</dd>
-            <dt>Codecs</dt>
-            <dd>
-              {[data.media.videoCodec, data.media.audioCodec].filter(Boolean).join(', ') || '–'}
-            </dd>
-            <dt>Processing</dt>
-            <dd>{humanize(data.processingMode)}</dd>
-            <dt>Encryption</dt>
-            <dd>{data.encryption === 'AES_128' ? 'AES-128' : 'None'}</dd>
-            <dt>Source file</dt>
-            <dd>
-              {data.source.filename ?? '–'}
-              {data.source.bytes ? ` (${formatBytes(data.source.bytes)})` : ''}
-            </dd>
-            <dt>Added</dt>
-            <dd>{formatDateTime(data.createdAt)}</dd>
-            <dt>Ready since</dt>
-            <dd>{formatDateTime(data.readyAt)}</dd>
-            <dt>Asset ID</dt>
-            <dd>
-              <code>{data.id}</code>
-            </dd>
-          </dl>
-        </section>
+        <Card>
+          <CardHeader title="Details" />
+          <CardContent>
+            <Facts
+              items={[
+                ['Length', formatDuration(data.media.durationMs)],
+                [
+                  'Picture',
+                  formatResolution(data.media.width, data.media.height, data.media.frameRate),
+                ],
+                [
+                  'Codecs',
+                  [data.media.videoCodec, data.media.audioCodec].filter(Boolean).join(', ') || '–',
+                ],
+                ['Processing', humanize(data.processingMode)],
+                ['Encryption', data.encryption === 'AES_128' ? 'AES-128' : 'None'],
+                ['Source file', data.source.filename ?? '–'],
+                ['Source size', formatBytes(data.source.bytes)],
+                ['Added', formatDateTime(data.createdAt)],
+                ['Ready since', formatDateTime(data.readyAt)],
+                ['ID', <Copyable key="id" value={data.id} />],
+              ]}
+            />
+          </CardContent>
+        </Card>
       </div>
 
-      {can('assets:write') ? (
-        <section className="card">
-          <h2>Actions</h2>
-          <RenameForm asset={data} onDone={refresh} />
-          <ReprocessForm asset={data} disabled={busy} onDone={refresh} />
-          <div className="action-row">
-            <div>
-              <strong>Delete</strong>
-              <p className="muted">
-                Deletes the asset with its source file and streams. Viewers can no longer play it.
-              </p>
-            </div>
-            <button
-              type="button"
-              className="button button-danger"
-              disabled={remove.isPending}
-              onClick={() => {
-                if (window.confirm(`Delete "${data.title}"? This cannot be undone.`)) {
-                  remove.mutate();
-                }
-              }}
-            >
-              Delete asset
-            </button>
-          </div>
-          <ErrorNote error={remove.error} />
-        </section>
-      ) : null}
+      <Tabs defaultValue="jobs" className="mt-6">
+        <TabsList>
+          {can('jobs:read') ? (
+            <TabsTrigger value="jobs">
+              <Activity />
+              Jobs
+              {jobItems.length > 0 ? <Badge>{jobItems.length}</Badge> : null}
+            </TabsTrigger>
+          ) : null}
+          <TabsTrigger value="source">
+            <Info />
+            Source
+          </TabsTrigger>
+        </TabsList>
+        {can('jobs:read') ? (
+          <TabsContent value="jobs">
+            <ErrorNote error={jobs.error} />
+            {jobs.isPending ? <Skeleton className="h-40 rounded-xl" /> : null}
+            {jobs.data && jobItems.length === 0 ? (
+              <EmptyState icon={Activity} title="No jobs yet">
+                Processing starts when the upload is complete.
+              </EmptyState>
+            ) : null}
+            {jobItems.length > 0 ? (
+              <Card className="overflow-hidden">
+                <JobTable jobs={jobItems} showAsset={false} />
+              </Card>
+            ) : null}
+          </TabsContent>
+        ) : null}
+        <TabsContent value="source">
+          <Card>
+            <CardContent>
+              <Facts
+                items={[
+                  ['File name', data.source.filename ?? '–'],
+                  ['Size', formatBytes(data.source.bytes)],
+                  [
+                    'SHA-256',
+                    data.source.checksum ? (
+                      <Copyable key="sum" value={data.source.checksum} />
+                    ) : (
+                      '–'
+                    ),
+                  ],
+                  ['Storage pool', <Copyable key="pool" value={data.storagePoolId} />],
+                ]}
+              />
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
 
-      {can('jobs:read') ? (
-        <section className="card">
-          <h2>Jobs</h2>
-          <ErrorNote error={jobs.error} />
-          {jobs.isPending ? <Spinner label="Loading jobs" /> : null}
-          {jobs.data && jobs.data.items.length === 0 ? (
-            <p className="muted">No jobs yet. They start when the upload is complete.</p>
-          ) : null}
-          {jobs.data && jobs.data.items.length > 0 ? (
-            <JobTable jobs={jobs.data.items} showAsset={false} />
-          ) : null}
-        </section>
-      ) : null}
+      <RenameDialog
+        asset={data}
+        open={renameOpen}
+        onOpenChange={setRenameOpen}
+        onDone={(updated) => refresh(updated)}
+      />
+      <ReprocessDialog
+        asset={data}
+        open={reprocessOpen}
+        onOpenChange={setReprocessOpen}
+        onDone={(updated) => refresh(updated)}
+      />
     </>
   );
 }
 
-function RenameForm({ asset, onDone }: { asset: Asset; onDone: (updated: Asset) => void }) {
+interface AssetDialogProps {
+  asset: Asset;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  onDone: (updated: Asset) => void;
+}
+
+function RenameDialog({ asset, open, onOpenChange, onDone }: AssetDialogProps) {
   const [title, setTitle] = useState(asset.title);
   const rename = useMutation({
     mutationFn: () => assetsApi.rename(asset.id, title.trim()),
-    onSuccess: onDone,
+    onSuccess: (updated) => {
+      toast.success('Title saved');
+      onDone(updated);
+      onOpenChange(false);
+    },
   });
 
   const submit = (event: FormEvent) => {
@@ -215,94 +397,135 @@ function RenameForm({ asset, onDone }: { asset: Asset; onDone: (updated: Asset) 
   };
 
   return (
-    <form className="action-row" onSubmit={submit}>
-      <label className="field grow">
-        Title
-        <input
-          type="text"
-          required
-          maxLength={200}
-          value={title}
-          onChange={(event) => setTitle(event.target.value)}
-        />
-      </label>
-      <button
-        type="submit"
-        className="button"
-        disabled={rename.isPending || !title.trim() || title.trim() === asset.title}
-      >
-        Save title
-      </button>
-      <ErrorNote error={rename.error} />
-    </form>
+    <Dialog
+      open={open}
+      onOpenChange={(next) => {
+        if (next) {
+          setTitle(asset.title);
+          rename.reset();
+        }
+        onOpenChange(next);
+      }}
+    >
+      <DialogContent title="Rename video" size="sm">
+        <form onSubmit={submit} className="contents">
+          <DialogBody>
+            <Field label="Title">
+              {(id) => (
+                <Input
+                  id={id}
+                  required
+                  autoFocus
+                  maxLength={200}
+                  value={title}
+                  onChange={(event) => setTitle(event.target.value)}
+                />
+              )}
+            </Field>
+            <ErrorNote error={rename.error} />
+          </DialogBody>
+          <DialogFooter>
+            <Button onClick={() => onOpenChange(false)}>Cancel</Button>
+            <Button
+              type="submit"
+              variant="primary"
+              loading={rename.isPending}
+              disabled={!title.trim() || title.trim() === asset.title}
+            >
+              Save
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
   );
 }
 
-function ReprocessForm({
-  asset,
-  disabled,
-  onDone,
-}: {
-  asset: Asset;
-  disabled: boolean;
-  onDone: (updated: Asset) => void;
-}) {
-  const [mode, setMode] = useState<ProcessingMode | ''>('');
+function ReprocessDialog({ asset, open, onOpenChange, onDone }: AssetDialogProps) {
+  const [mode, setMode] = useState('AUTO');
   const [encryption, setEncryption] = useState<EncryptionMode>(asset.encryption);
   const reprocess = useMutation({
     mutationFn: () =>
-      assetsApi.reprocess(asset.id, { processingMode: mode || undefined, encryption }),
-    onSuccess: onDone,
+      assetsApi.reprocess(asset.id, {
+        processingMode: mode === 'AUTO' ? undefined : (mode as 'COPY' | 'TRANSCODE'),
+        encryption,
+      }),
+    onSuccess: (updated) => {
+      toast.success('Processing started again');
+      onDone(updated);
+      onOpenChange(false);
+    },
   });
-  const hasSource = asset.source.filename !== null;
 
   const submit = (event: FormEvent) => {
     event.preventDefault();
-    if (window.confirm('Process this asset again? Its current outputs are replaced.')) {
-      reprocess.mutate();
-    }
+    reprocess.mutate();
   };
 
   return (
-    <form className="action-row" onSubmit={submit}>
-      <div className="grow">
-        <strong>Process again</strong>
-        <p className="muted">
-          Builds the stream again from the source file, for example after a failure or to change
-          encryption.
-        </p>
-        <div className="field-row">
-          <label className="field">
-            Processing
-            <select
-              value={mode}
-              onChange={(event) => setMode(event.target.value as ProcessingMode | '')}
-            >
-              <option value="">Automatic</option>
-              <option value="COPY">Copy without re-encoding</option>
-              <option value="TRANSCODE">Transcode into all qualities</option>
-            </select>
-          </label>
-          <label className="field">
-            Encryption
-            <select
-              value={encryption}
-              onChange={(event) => setEncryption(event.target.value as EncryptionMode)}
-            >
-              <option value="NONE">None</option>
-              <option value="AES_128">AES-128</option>
-            </select>
-          </label>
-        </div>
-        <ErrorNote error={reprocess.error} />
-      </div>
-      <button
-        type="submit"
-        className="button"
-        disabled={disabled || !hasSource || reprocess.isPending}
+    <Dialog
+      open={open}
+      onOpenChange={(next) => {
+        if (next) {
+          setMode('AUTO');
+          setEncryption(asset.encryption);
+          reprocess.reset();
+        }
+        onOpenChange(next);
+      }}
+    >
+      <DialogContent
+        title="Process again"
+        description="Builds the streams again from the source file. The current streams are replaced, and the video cannot be played until it is ready again."
       >
-        Process again
-      </button>
-    </form>
+        <form onSubmit={submit} className="contents">
+          <DialogBody>
+            <Field label="Processing">
+              {(id) => (
+                <Select
+                  id={id}
+                  value={mode}
+                  onValueChange={setMode}
+                  options={[
+                    {
+                      value: 'AUTO',
+                      label: 'Automatic',
+                      description: 'Copy when the file allows it, otherwise transcode.',
+                    },
+                    { value: 'COPY', label: 'Copy without re-encoding' },
+                    { value: 'TRANSCODE', label: 'Transcode into all qualities' },
+                  ]}
+                />
+              )}
+            </Field>
+            <Field label="Encryption">
+              {(id) => (
+                <Select
+                  id={id}
+                  value={encryption}
+                  onValueChange={(value) => setEncryption(value as EncryptionMode)}
+                  options={[
+                    { value: 'NONE', label: 'None' },
+                    {
+                      value: 'AES_128',
+                      label: 'AES-128',
+                      description: 'A new key is made for this run.',
+                    },
+                  ]}
+                />
+              )}
+            </Field>
+            <ErrorNote error={reprocess.error} />
+          </DialogBody>
+          <DialogFooter>
+            <Button onClick={() => onOpenChange(false)}>Cancel</Button>
+            <Button type="submit" variant="primary" loading={reprocess.isPending}>
+              <Settings2 />
+              Process again
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
   );
 }

@@ -200,4 +200,38 @@ describe.skipIf(!TEST_DATABASE_URL || !hasFfmpeg)('Playback (e2e, real FFmpeg)',
       .set(auth())
       .expect(404);
   });
+
+  it('gives the poster address and ordering in the asset list', async () => {
+    const list = await http().get('/v1/assets?sort=title&order=asc').set(auth()).expect(200);
+    const asset = list.body.items.find((item: { id: string }) => item.id === assetId);
+
+    expect(asset.posterUrl).toMatch(
+      new RegExp(`^/v1/media/${assetId}/\\d+\\.[A-Za-z0-9_-]{43}/thumbs/poster\\.jpg$`),
+    );
+    const poster = await http().get(asset.posterUrl).expect(200);
+    expect(poster.headers['content-type']).toBe('image/jpeg');
+
+    // The address is stable within the hour, so browsers can keep the picture.
+    const again = await http().get(`/v1/assets/${assetId}`).set(auth()).expect(200);
+    expect(again.body.posterUrl).toBe(asset.posterUrl);
+
+    await http().get('/v1/assets?sort=password').set(auth()).expect(400);
+  });
+
+  it('gives the poster address and ordering in the asset list', async () => {
+    const list = await http().get('/v1/assets?sort=title&order=asc').set(auth()).expect(200);
+    const asset = list.body.items.find((item: { id: string }) => item.id === assetId);
+
+    expect(asset.posterUrl).toMatch(
+      new RegExp(`^/v1/media/${assetId}/\\d+\\.[A-Za-z0-9_-]{43}/thumbs/poster\\.jpg$`),
+    );
+    const poster = await http().get(asset.posterUrl).expect(200);
+    expect(poster.headers['content-type']).toBe('image/jpeg');
+
+    // The address is stable within the hour, so browsers can keep the picture.
+    const again = await http().get(`/v1/assets/${assetId}`).set(auth()).expect(200);
+    expect(again.body.posterUrl).toBe(asset.posterUrl);
+
+    await http().get('/v1/assets?sort=password').set(auth()).expect(400);
+  });
 });

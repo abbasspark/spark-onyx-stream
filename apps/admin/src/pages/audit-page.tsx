@@ -1,10 +1,27 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
-import { useState } from 'react';
-import { adminsApi, auditApi } from '../api/endpoints';
-import { useSession } from '../auth/session';
-import { EmptyState, ErrorNote, PageHeader, Pagination, Spinner } from '../components/ui';
-import { formatDateTime } from '../lib/format';
+import { ChevronDown, ScrollText, Search } from 'lucide-react';
+import { Fragment, useState } from 'react';
+import { adminsApi, auditApi } from '@/api/endpoints';
+import { useSession } from '@/auth/session';
+import { Button } from '@/components/ui/button';
+import {
+  Card,
+  EmptyState,
+  ErrorNote,
+  PageHeader,
+  Pagination,
+  Skeleton,
+  Table,
+  Td,
+  Th,
+  Tr,
+} from '@/components/ui/display';
+import { Input, Select } from '@/components/ui/form';
+import { Tooltip } from '@/components/ui/overlay';
+import { describeAction, subjectOf } from '@/lib/audit';
+import { cn } from '@/lib/cn';
+import { formatDateTime, formatRelative } from '@/lib/format';
 
 const PAGE_SIZE = 50;
 
@@ -23,7 +40,7 @@ const ENTITY_TYPES: Record<string, string> = {
 export function AuditPage() {
   const { can } = useSession();
   const [page, setPage] = useState(1);
-  const [entityType, setEntityType] = useState('');
+  const [entityType, setEntityType] = useState('ALL');
   const [action, setAction] = useState('');
   const [open, setOpen] = useState<string | null>(null);
 
@@ -34,7 +51,7 @@ export function AuditPage() {
         {
           page,
           pageSize: PAGE_SIZE,
-          entityType: entityType || undefined,
+          entityType: entityType === 'ALL' ? undefined : entityType,
           action: action.trim() || undefined,
         },
         signal,
@@ -53,102 +70,144 @@ export function AuditPage() {
 
   return (
     <>
-      <PageHeader title="Audit log" />
-      <div className="toolbar">
-        <select
+      <PageHeader
+        title="Audit log"
+        description="Who changed what, newest first. Entries cannot be edited or deleted."
+      />
+      <div className="mb-4 flex flex-wrap items-center gap-2">
+        <Select
           aria-label="Filter by kind of thing"
+          className="w-48"
           value={entityType}
-          onChange={(event) => {
-            setEntityType(event.target.value);
+          onValueChange={(value) => {
+            setEntityType(value);
             setPage(1);
           }}
-        >
-          <option value="">Everything</option>
-          {Object.entries(ENTITY_TYPES).map(([type, label]) => (
-            <option key={type} value={type}>
-              {label}
-            </option>
-          ))}
-        </select>
-        <input
-          type="search"
-          placeholder="Exact action, for example asset.delete"
-          aria-label="Filter by action"
-          value={action}
-          onChange={(event) => {
-            setAction(event.target.value);
-            setPage(1);
-          }}
+          options={[
+            { value: 'ALL', label: 'Everything' },
+            ...Object.entries(ENTITY_TYPES).map(([value, label]) => ({ value, label })),
+          ]}
         />
+        <div className="relative w-full sm:w-72">
+          <Search
+            className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground"
+            aria-hidden="true"
+          />
+          <Input
+            type="search"
+            placeholder="Exact action, for example asset.delete"
+            aria-label="Filter by action"
+            className="pl-9"
+            value={action}
+            onChange={(event) => {
+              setAction(event.target.value);
+              setPage(1);
+            }}
+          />
+        </div>
       </div>
 
-      <ErrorNote error={entries.error} />
-      {entries.isPending ? <Spinner label="Loading the log" /> : null}
-      {entries.data?.items.length === 0 ? <EmptyState title="No entries match" /> : null}
+      <ErrorNote error={entries.error} className="mb-4" />
+      {entries.isPending ? <Skeleton className="h-64 rounded-xl" /> : null}
+      {entries.data?.items.length === 0 ? (
+        <EmptyState icon={ScrollText} title="No entries match" />
+      ) : null}
 
       {entries.data && entries.data.items.length > 0 ? (
-        <div className="table-wrap">
-          <table>
+        <Card className="overflow-hidden">
+          <Table>
             <thead>
               <tr>
-                <th>When</th>
-                <th>Who</th>
-                <th>Action</th>
-                <th>On</th>
-                <th>From</th>
-                <th aria-label="Details" />
+                <Th>When</Th>
+                <Th>Who</Th>
+                <Th>Action</Th>
+                <Th>On</Th>
+                <Th>From</Th>
+                <Th className="w-10" aria-label="Details" />
               </tr>
             </thead>
             <tbody>
               {entries.data.items.map((entry) => {
                 const hasDetails = entry.metadata !== null && entry.metadata !== undefined;
-                return [
-                  <tr key={entry.id}>
-                    <td>{formatDateTime(entry.createdAt)}</td>
-                    <td>
-                      {entry.adminId
-                        ? (names.get(entry.adminId) ?? <code>{entry.adminId}</code>)
-                        : 'System'}
-                    </td>
-                    <td>
-                      <code>{entry.action}</code>
-                    </td>
-                    <td>
-                      {entry.entityType
-                        ? (ENTITY_TYPES[entry.entityType] ?? entry.entityType)
-                        : '–'}
-                      {entry.entityId ? (
-                        <div>
-                          <code>{entry.entityId}</code>
-                        </div>
-                      ) : null}
-                    </td>
-                    <td>{entry.ipAddress ?? '–'}</td>
-                    <td className="col-actions">
-                      {hasDetails ? (
-                        <button
-                          type="button"
-                          className="button button-quiet"
-                          aria-expanded={open === entry.id}
-                          onClick={() => setOpen(open === entry.id ? null : entry.id)}
-                        >
-                          {open === entry.id ? 'Hide' : 'Details'}
-                        </button>
-                      ) : null}
-                    </td>
-                  </tr>,
-                  open === entry.id ? (
-                    <tr key={`${entry.id}-details`}>
-                      <td colSpan={6}>
-                        <pre className="details">{JSON.stringify(entry.metadata, null, 2)}</pre>
-                      </td>
-                    </tr>
-                  ) : null,
-                ];
+                const isOpen = open === entry.id;
+                return (
+                  <Fragment key={entry.id}>
+                    <Tr>
+                      <Td className="whitespace-nowrap text-muted-foreground">
+                        <Tooltip content={formatDateTime(entry.createdAt)}>
+                          <span>{formatRelative(entry.createdAt)}</span>
+                        </Tooltip>
+                      </Td>
+                      <Td>
+                        {entry.adminId ? (
+                          (names.get(entry.adminId) ?? (
+                            <code className="font-mono text-xs text-muted-foreground">
+                              {entry.adminId}
+                            </code>
+                          ))
+                        ) : (
+                          <span className="text-muted-foreground">System</span>
+                        )}
+                      </Td>
+                      <Td>
+                        <p className={cn(entry.action.endsWith('_failed') && 'text-destructive')}>
+                          {describeAction(entry.action)}
+                          {subjectOf(entry.metadata) ? (
+                            <span className="text-muted-foreground">
+                              {' '}
+                              · {subjectOf(entry.metadata)}
+                            </span>
+                          ) : null}
+                        </p>
+                        <p className="font-mono text-xs text-muted-foreground">{entry.action}</p>
+                      </Td>
+                      <Td>
+                        {entry.entityType
+                          ? (ENTITY_TYPES[entry.entityType] ?? entry.entityType)
+                          : '–'}
+                        {entry.entityId ? (
+                          <p className="font-mono text-xs text-muted-foreground">
+                            {entry.entityId}
+                          </p>
+                        ) : null}
+                      </Td>
+                      <Td className="font-mono text-xs whitespace-nowrap text-muted-foreground">
+                        {entry.ipAddress ?? '–'}
+                      </Td>
+                      <Td>
+                        {hasDetails ? (
+                          <Button
+                            variant="ghost"
+                            size="icon-sm"
+                            aria-expanded={isOpen}
+                            aria-label={isOpen ? 'Hide the details' : 'Show the details'}
+                            onClick={() => setOpen(isOpen ? null : entry.id)}
+                          >
+                            <ChevronDown
+                              className={cn('transition-transform', isOpen && 'rotate-180')}
+                            />
+                          </Button>
+                        ) : null}
+                      </Td>
+                    </Tr>
+                    {isOpen ? (
+                      <tr>
+                        <td colSpan={6} className="border-b bg-muted/40 px-4 py-3">
+                          <pre
+                            className="overflow-x-auto font-mono text-xs"
+                            data-testid="audit-details"
+                          >
+                            {JSON.stringify(entry.metadata, null, 2)}
+                          </pre>
+                        </td>
+                      </tr>
+                    ) : null}
+                  </Fragment>
+                );
               })}
             </tbody>
-          </table>
-        </div>
+          </Table>
+        </Card>
       ) : null}
 
       {entries.data ? (

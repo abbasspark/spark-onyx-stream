@@ -1,8 +1,10 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 import Hls from 'hls.js';
 import { useEffect, useRef, useState } from 'react';
-import { apiUrl } from '../api/client';
-import type { Playback } from '../api/types';
+import { apiUrl } from '@/api/client';
+import type { Playback } from '@/api/types';
+import { ErrorNote } from './ui/display';
+import { Select } from './ui/form';
 
 interface Quality {
   /** Index of the level in hls.js. -1 means automatic. */
@@ -81,36 +83,35 @@ export function Player({ playback, title }: { playback: Playback; title: string 
   };
 
   return (
-    <div className="player">
+    <div>
       <video
         ref={videoRef}
         controls
         playsInline
         poster={playback.posterUrl ? apiUrl(playback.posterUrl) : undefined}
         aria-label={`Preview of ${title}`}
+        className="block aspect-video w-full bg-black"
       />
-      {error ? (
-        <p className="note note-error" role="alert">
-          {error}
-        </p>
-      ) : null}
+      {error ? <ErrorNote error={error} className="m-3" /> : null}
       {qualities.length > 0 ? (
-        <div className="player-bar">
-          <label>
-            Quality{' '}
-            <select
-              value={selected}
-              onChange={(event) => chooseQuality(Number(event.target.value))}
-            >
-              <option value={-1}>Automatic</option>
-              {qualities.map((quality) => (
-                <option key={quality.index} value={quality.index}>
-                  {quality.label}
-                </option>
-              ))}
-            </select>
-          </label>
-          {playing ? <span className="muted">Now playing {playing}</span> : null}
+        <div className="flex items-center justify-between gap-4 border-t px-4 py-2.5 text-sm">
+          <div className="flex items-center gap-2">
+            <span className="text-muted-foreground">Quality</span>
+            <Select
+              aria-label="Quality"
+              className="h-8 w-32"
+              value={String(selected)}
+              onValueChange={(value) => chooseQuality(Number(value))}
+              options={[
+                { value: '-1', label: 'Automatic' },
+                ...qualities.map((quality) => ({
+                  value: String(quality.index),
+                  label: quality.label,
+                })),
+              ]}
+            />
+          </div>
+          {playing ? <span className="text-muted-foreground">Now playing {playing}</span> : null}
         </div>
       ) : null}
     </div>

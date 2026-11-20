@@ -1,11 +1,20 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
+import { Activity } from 'lucide-react';
 import { useSearchParams } from 'react-router';
-import { jobsApi } from '../api/endpoints';
-import { JOB_STATUSES, type JobStatus } from '../api/types';
-import { JobTable } from '../components/job-table';
-import { EmptyState, ErrorNote, PageHeader, Pagination, Spinner } from '../components/ui';
-import { humanize } from '../lib/format';
+import { jobsApi } from '@/api/endpoints';
+import { JOB_STATUSES, type JobStatus } from '@/api/types';
+import { JobTable } from '@/components/job-table';
+import {
+  Card,
+  EmptyState,
+  ErrorNote,
+  PageHeader,
+  Pagination,
+  Skeleton,
+} from '@/components/ui/display';
+import { cn } from '@/lib/cn';
+import { humanize } from '@/lib/format';
 
 const PAGE_SIZE = 25;
 const REFRESH_MS = 2000;
@@ -38,29 +47,39 @@ export function JobsPage() {
 
   return (
     <>
-      <PageHeader title="Jobs" />
-      <div className="toolbar">
-        <select
-          aria-label="Filter by status"
-          value={status}
-          onChange={(event) => change({ status: event.target.value, page: null })}
-        >
-          <option value="">All statuses</option>
-          {JOB_STATUSES.map((value) => (
-            <option key={value} value={value}>
-              {humanize(value)}
-            </option>
-          ))}
-        </select>
+      <PageHeader
+        title="Jobs"
+        description="Every processing step, newest first. The list refreshes by itself."
+      />
+
+      <div className="mb-4 flex flex-wrap gap-1.5" role="group" aria-label="Filter by status">
+        {(['', ...JOB_STATUSES] as const).map((value) => (
+          <button
+            key={value || 'ALL'}
+            type="button"
+            aria-pressed={status === value}
+            onClick={() => change({ status: value || null, page: null })}
+            className={cn(
+              'rounded-full border px-3 py-1 text-[13px] font-medium text-muted-foreground transition-colors hover:text-foreground',
+              status === value && 'border-primary/40 bg-primary/10 text-primary hover:text-primary',
+            )}
+          >
+            {value ? humanize(value) : 'All'}
+          </button>
+        ))}
       </div>
 
-      <ErrorNote error={jobs.error} />
-      {jobs.isPending ? <Spinner label="Loading jobs" /> : null}
+      <ErrorNote error={jobs.error} className="mb-4" />
+      {jobs.isPending ? <Skeleton className="h-64 rounded-xl" /> : null}
       {jobs.data && jobs.data.items.length === 0 ? (
-        <EmptyState title="No jobs">Jobs appear here when a video is uploaded.</EmptyState>
+        <EmptyState icon={Activity} title={status ? 'No jobs with this status' : 'No jobs yet'}>
+          Jobs appear here when a video is uploaded.
+        </EmptyState>
       ) : null}
       {jobs.data && jobs.data.items.length > 0 ? (
-        <JobTable jobs={jobs.data.items} showAsset />
+        <Card className="overflow-hidden">
+          <JobTable jobs={jobs.data.items} showAsset />
+        </Card>
       ) : null}
       {jobs.data ? (
         <Pagination

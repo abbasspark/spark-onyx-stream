@@ -4,6 +4,7 @@ import type {
   Admin,
   ApiKey,
   Asset,
+  AssetSortField,
   AssetStatus,
   AuditEntry,
   CreateAdminInput,
@@ -18,9 +19,11 @@ import type {
   JobStatus,
   LoginResult,
   Me,
+  OverviewStats,
   Page,
   Playback,
   ReprocessInput,
+  SortOrder,
   StoragePool,
   StoragePoolTestResult,
   UpdateAdminInput,
@@ -44,6 +47,8 @@ export interface AssetListQuery {
   pageSize: number;
   status?: AssetStatus;
   q?: string;
+  sort?: AssetSortField;
+  order?: SortOrder;
 }
 
 export const assetsApi = {
@@ -120,4 +125,8 @@ export interface AuditQuery {
 export const auditApi = {
   list: (query: AuditQuery, signal?: AbortSignal) =>
     request<Page<AuditEntry>>('/v1/audit-logs', { query: { ...query }, signal }),
+};
+
+export const statsApi = {
+  overview: (signal?: AbortSignal) => request<OverviewStats>('/v1/stats/overview', { signal }),
 };
