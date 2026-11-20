@@ -1,0 +1,32 @@
+// SPDX-License-Identifier: AGPL-3.0-only
+import react from '@vitejs/plugin-react';
+import { defineConfig, loadEnv } from 'vite';
+
+/**
+ * In development, requests to /v1 are passed on to the API, so the panel and
+ * the API share one origin and no cross-origin setup is needed. In production
+ * a web server in front of both does the same.
+ */
+export default defineConfig(({ mode }) => {
+  const env = loadEnv(mode, process.cwd(), '');
+  const apiTarget = env.ONYX_API_URL ?? 'http://localhost:3000';
+
+  return {
+    plugins: [react()],
+    server: {
+      port: 5174,
+      strictPort: true,
+      proxy: {
+        '/v1': { target: apiTarget, changeOrigin: false },
+      },
+    },
+    build: {
+      sourcemap: true,
+    },
+    test: {
+      globals: true,
+      environment: 'node',
+      include: ['src/**/*.spec.ts'],
+    },
+  };
+});

@@ -63,17 +63,18 @@ pnpm dev                    # starts the API on http://localhost:3000/v1
 
 Check that it runs: `curl http://localhost:3000/v1/health`
 
-### Trying it in a browser
-
-A small development page lets you sign in, upload a video, watch it being processed and play the result:
+### Admin panel
 
 ```bash
-pnpm dev:player             # serves the page on http://localhost:5173
+pnpm dev                    # the API on http://localhost:3000
+pnpm dev:admin              # the admin panel on http://localhost:5174
 ```
 
-Create the first admin once, as described in the [API README](apps/api/README.md#first-run), then open the page and sign in. The page is a development tool and is replaced by the admin panel.
+Open http://localhost:5174. On a fresh installation the panel asks you to create the first admin. After that you can upload videos, watch them being processed, preview them and manage their jobs. See the [admin README](apps/admin/README.md).
 
-The API covers uploads, processing and playback. The admin panel and viewer website are not scaffolded yet. See the [roadmap](docs/roadmap.md).
+There is also a single-page development player (`pnpm dev:player`, http://localhost:5173) for testing the API without the panel. It needs `http://localhost:5173` in `CORS_ORIGINS`.
+
+The viewer website is not scaffolded yet. See the [roadmap](docs/roadmap.md).
 
 ## Documentation
 
