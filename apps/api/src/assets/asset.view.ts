@@ -66,3 +66,39 @@ export function toAssetView(asset: Asset, posterUrl: string | null = null): Asse
     updatedAt: asset.updatedAt,
   };
 }
+
+/** The generated outputs of an asset, as returned by GET /v1/assets/{id}/media. */
+export interface AssetMediaView {
+  /** Qualities, highest first. */
+  renditions: {
+    name: string;
+    width: number;
+    height: number;
+    /** Average bitrate in bits per second. */
+    bitrate: number;
+    frameRate: number | null;
+    /** Codec strings as written in the playlist, for example "avc1.64001f,mp4a.40.2". */
+    codec: string;
+    /** Bytes as text. */
+    sizeBytes: string;
+  }[];
+  subtitles: {
+    id: string;
+    /** Language code, for example "en". */
+    language: string;
+    label: string | null;
+    source: string;
+    isDefault: boolean;
+    isForced: boolean;
+    /** Signed address of the WebVTT file. Null while the asset is not ready. */
+    url: string | null;
+  }[];
+  /** Signed addresses. Null while the asset is not ready or the picture does not exist. */
+  thumbnails: {
+    posterUrl: string | null;
+    spriteUrl: string | null;
+    spriteTrackUrl: string | null;
+  };
+  /** Size of all qualities together, bytes as text. */
+  outputBytes: string;
+}

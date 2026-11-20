@@ -5,12 +5,13 @@ import { AuditService } from '../audit/audit.service.js';
 import type { Principal } from '../auth/principal.js';
 import { type Page, toPage, toSkipTake } from '../common/pagination.js';
 import { AppConfig } from '../config/app-config.js';
+import { EventPublisher } from '../events/event-publisher.js';
 import { PlaybackService } from '../playback/playback.service.js';
 import { PipelineService } from '../processing/pipeline.service.js';
 import { StorageService } from '../storage/storage.service.js';
 import { UPLOAD_ENDPOINT } from '../uploads/uploads.constants.js';
 import { UploadsService } from '../uploads/uploads.service.js';
-import { type AssetView, toAssetView } from './asset.view.js';
+import { type AssetMediaView, type AssetView, toAssetView } from './asset.view.js';
 import type { CreateAssetInput, ListAssetsInput, UpdateAssetInput } from './assets.schemas.js';
 
 /** What a client needs to upload the source file of a new asset. */
@@ -51,6 +52,7 @@ export class AssetsService {
     @Inject(UploadsService) private readonly uploads: UploadsService,
     @Inject(PipelineService) private readonly pipeline: PipelineService,
     @Inject(PlaybackService) private readonly playback: PlaybackService,
+    @Inject(EventPublisher) private readonly events: EventPublisher,
   ) {}
 
   async list(input: ListAssetsInput): Promise<Page<AssetView>> {
@@ -125,6 +127,8 @@ export class AssetsService {
       ipAddress,
     });
 
+    this.events.publish({ type: 'asset', assetId: asset.id, change: 'created' });
+
     return {
       asset: toAssetView(asset),
       upload: {
@@ -161,8 +165,62 @@ export class AssetsService {
       },
       ipAddress,
     });
+    this.events.publish({ type: 'asset', assetId: id, change: 'updated' });
 
     return toAssetView(asset);
+  }
+
+  /**
+   * The generated outputs of an asset: its qualities, subtitle tracks and
+   * pictures, with signed addresses for what can be shown.
+   */
+  async media(id: string): Promise<AssetMediaView> {
+    const asset = await this.prisma.asset.findUnique({
+      where: { id },
+      include: {
+        renditions: { orderBy: { height: 'desc' } },
+        subtitleTracks: { orderBy: { createdAt: 'asc' } },
+        thumbnails: true,
+      },
+    });
+    if (!asset || asset.status === 'DELETED') {
+      throw new NotFoundException('Asset not found');
+    }
+
+    // Addresses are only handed out for an asset that can be played.
+    const sign = (path: string | undefined): string | null =>
+      path && asset.status === 'READY' ? this.playback.signedUrl(asset.id, path) : null;
+    const thumbnail = (type: 'POSTER' | 'SPRITE' | 'SPRITE_VTT') =>
+      asset.thumbnails.find((item) => item.type === type);
+
+    return {
+      renditions: asset.renditions.map((rendition) => ({
+        name: rendition.name,
+        width: rendition.width,
+        height: rendition.height,
+        bitrate: rendition.bitrate,
+        frameRate: rendition.frameRate,
+        codec: rendition.codec,
+        sizeBytes: rendition.sizeBytes.toString(),
+      })),
+      subtitles: asset.subtitleTracks.map((track) => ({
+        id: track.id,
+        language: track.language,
+        label: track.label,
+        source: track.source,
+        isDefault: track.isDefault,
+        isForced: track.isForced,
+        url: sign(track.path),
+      })),
+      thumbnails: {
+        posterUrl: sign(thumbnail('POSTER')?.path),
+        spriteUrl: sign(thumbnail('SPRITE')?.path),
+        spriteTrackUrl: sign(thumbnail('SPRITE_VTT')?.path),
+      },
+      outputBytes: asset.renditions
+        .reduce((total, rendition) => total + rendition.sizeBytes, 0n)
+        .toString(),
+    };
   }
 
   /**
@@ -200,6 +258,7 @@ export class AssetsService {
       metadata: { title: asset.title, previousStatus: asset.status },
       ipAddress,
     });
+    this.events.publish({ type: 'asset', assetId: id, change: 'deleted' });
   }
 
   /** Finds an asset that is not deleted. */

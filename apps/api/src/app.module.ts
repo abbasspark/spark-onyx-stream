@@ -9,6 +9,8 @@ import type { AppConfig } from './config/app-config.js';
 import { ConfigModule } from './config/config.module.js';
 import { CryptoModule } from './crypto/crypto.module.js';
 import { DatabaseModule } from './database/database.module.js';
+import { EventStreamModule } from './events/event-stream.module.js';
+import { EventsModule } from './events/events.module.js';
 import { HealthModule } from './health/health.module.js';
 import { ProcessingApiModule, ProcessingCoreModule } from './processing/processing.module.js';
 import { QueueModule } from './queue/queue.module.js';
@@ -29,6 +31,7 @@ const ROLE_MODULES: Record<AppRole, Type[]> = {
     AssetsModule,
     ProcessingApiModule,
     StatsModule,
+    EventStreamModule,
     HealthModule,
   ],
   worker: [WorkerRoleModule],
@@ -51,6 +54,7 @@ export class AppModule {
         ConfigModule.forRoot(config),
         DatabaseModule,
         RedisModule,
+        EventsModule,
         QueueModule,
         CryptoModule,
         StorageModule,

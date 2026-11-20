@@ -388,6 +388,8 @@ describe.skipIf(!TEST_DATABASE_URL || !hasFfmpeg)('Processing pipeline (e2e, rea
 
     await http().post(`/v1/jobs/${probeId}/cancel`).set(auth()).expect(200);
 
-    expect(testApp.redis.published).toEqual([{ channel: 'onyx:jobs:cancel', message: probeId }]);
+    expect(testApp.redis.published.filter((entry) => entry.channel === 'onyx:jobs:cancel')).toEqual(
+      [{ channel: 'onyx:jobs:cancel', message: probeId }],
+    );
   }, 60_000);
 });

@@ -321,3 +321,34 @@ export interface OverviewStats {
     finishedAt: string | null;
   }[];
 }
+
+/** The generated outputs of an asset, from GET /v1/assets/{id}/media. */
+export interface AssetMedia {
+  /** Qualities, highest first. */
+  renditions: {
+    name: string;
+    width: number;
+    height: number;
+    /** Average bitrate in bits per second. */
+    bitrate: number;
+    frameRate: number | null;
+    codec: string;
+    /** Bytes as text. */
+    sizeBytes: string;
+  }[];
+  subtitles: {
+    id: string;
+    language: string;
+    label: string | null;
+    source: 'EMBEDDED' | 'UPLOADED' | 'GENERATED';
+    isDefault: boolean;
+    isForced: boolean;
+    url: string | null;
+  }[];
+  thumbnails: {
+    posterUrl: string | null;
+    spriteUrl: string | null;
+    spriteTrackUrl: string | null;
+  };
+  outputBytes: string;
+}

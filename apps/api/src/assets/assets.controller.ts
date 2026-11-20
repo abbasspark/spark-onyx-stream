@@ -32,7 +32,7 @@ import {
 } from './assets.schemas.js';
 import { type PlaybackInfo, PlaybackService } from '../playback/playback.service.js';
 import { PipelineService } from '../processing/pipeline.service.js';
-import { type AssetView, toAssetView } from './asset.view.js';
+import { type AssetMediaView, type AssetView, toAssetView } from './asset.view.js';
 import { AssetsService, type CreatedAsset } from './assets.service.js';
 
 @Controller('assets')
@@ -55,6 +55,13 @@ export class AssetsController {
   @RequirePermissions('assets:read')
   get(@Param('id', ParseUUIDPipe) id: string): Promise<AssetView> {
     return this.assets.get(id);
+  }
+
+  /** The generated outputs of an asset: qualities, subtitle tracks and pictures. */
+  @Get(':id/media')
+  @RequirePermissions('assets:read')
+  media(@Param('id', ParseUUIDPipe) id: string): Promise<AssetMediaView> {
+    return this.assets.media(id);
   }
 
   /** Creates the asset and returns what the client needs to upload its source file. */

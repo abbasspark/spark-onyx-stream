@@ -15,13 +15,14 @@ import {
 } from '@/components/ui/display';
 import { cn } from '@/lib/cn';
 import { humanize } from '@/lib/format';
+import { usePollInterval } from '@/live/live';
 
 const PAGE_SIZE = 25;
-const REFRESH_MS = 2000;
 
 /** The job monitor: every processing job, newest first, refreshed while it is open. */
 export function JobsPage() {
   const [params, setParams] = useSearchParams();
+  const pollInterval = usePollInterval();
   const page = Math.max(1, Number(params.get('page')) || 1);
   const status = (params.get('status') ?? '') as JobStatus | '';
 
@@ -30,7 +31,7 @@ export function JobsPage() {
     queryFn: ({ signal }) =>
       jobsApi.list({ page, pageSize: PAGE_SIZE, status: status || undefined }, signal),
     placeholderData: keepPreviousData,
-    refetchInterval: REFRESH_MS,
+    refetchInterval: pollInterval(true),
   });
 
   const change = (values: Record<string, string | null>) => {
@@ -49,7 +50,7 @@ export function JobsPage() {
     <>
       <PageHeader
         title="Jobs"
-        description="Every processing step, newest first. The list refreshes by itself."
+        description="Every processing step, newest first. Progress updates live."
       />
 
       <div className="mb-4 flex flex-wrap gap-1.5" role="group" aria-label="Filter by status">

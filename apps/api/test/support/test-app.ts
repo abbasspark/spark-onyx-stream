@@ -11,6 +11,7 @@ import { AppConfig } from '../../src/config/app-config.js';
 import { ConfigModule } from '../../src/config/config.module.js';
 import { validateEnv } from '../../src/config/env.schema.js';
 import { CryptoModule } from '../../src/crypto/crypto.module.js';
+import { EventsModule } from '../../src/events/events.module.js';
 import { DatabaseModule } from '../../src/database/database.module.js';
 import type { QueuedJobData } from '../../src/jobs/jobs.service.js';
 import { ProcessingCoreModule } from '../../src/processing/processing.module.js';
@@ -170,6 +171,7 @@ export async function createTestApp(
       ConfigModule.forRoot(config),
       DatabaseModule,
       FakeInfrastructureModule,
+      EventsModule,
       CryptoModule,
       AuthModule,
       AuditModule,

@@ -4,6 +4,7 @@ import type {
   Admin,
   ApiKey,
   Asset,
+  AssetMedia,
   AssetSortField,
   AssetStatus,
   AuditEntry,
@@ -55,6 +56,8 @@ export const assetsApi = {
   list: (query: AssetListQuery, signal?: AbortSignal) =>
     request<Page<Asset>>('/v1/assets', { query: { ...query }, signal }),
   get: (id: string, signal?: AbortSignal) => request<Asset>(`/v1/assets/${id}`, { signal }),
+  media: (id: string, signal?: AbortSignal) =>
+    request<AssetMedia>(`/v1/assets/${id}/media`, { signal }),
   create: (body: CreateAssetInput) => request<CreatedAsset>('/v1/assets', { method: 'POST', body }),
   rename: (id: string, title: string) =>
     request<Asset>(`/v1/assets/${id}`, { method: 'PATCH', body: { title } }),
@@ -119,6 +122,7 @@ export interface AuditQuery {
   pageSize: number;
   action?: string;
   entityType?: string;
+  entityId?: string;
   adminId?: string;
 }
 

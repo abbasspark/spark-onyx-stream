@@ -3,23 +3,34 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   Activity,
   ArrowLeft,
+  Captions,
   Check,
   Copy,
   FileQuestion,
+  History,
+  Images,
   Info,
+  Layers,
   Lock,
   Pencil,
   RefreshCw,
   Settings2,
   Trash2,
 } from 'lucide-react';
-import { type FormEvent, useState } from 'react';
+import { type FormEvent, type ReactNode, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router';
 import { toast } from 'sonner';
 import { ApiError } from '@/api/client';
 import { assetsApi, jobsApi } from '@/api/endpoints';
 import type { Asset, EncryptionMode } from '@/api/types';
 import { useSession } from '@/auth/session';
+import {
+  ActivityTab,
+  QualitiesTab,
+  SubtitlesTab,
+  ThumbnailsTab,
+  useAssetMedia,
+} from '@/components/asset-tabs';
 import { useConfirm } from '@/components/confirm';
 import { JobTable } from '@/components/job-table';
 import { Player } from '@/components/player';
@@ -49,8 +60,8 @@ import {
   formatResolution,
   humanize,
 } from '@/lib/format';
+import { usePollInterval } from '@/live/live';
 
-const REFRESH_MS = 2000;
 const isBusy = (asset: Asset | undefined) =>
   asset !== undefined && ['UPLOADING', 'UPLOADED', 'PROCESSING'].includes(asset.status);
 
@@ -91,13 +102,14 @@ export function AssetDetailPage() {
   const confirm = useConfirm();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const pollInterval = usePollInterval();
   const [renameOpen, setRenameOpen] = useState(false);
   const [reprocessOpen, setReprocessOpen] = useState(false);
 
   const asset = useQuery({
     queryKey: ['asset', id],
     queryFn: ({ signal }) => assetsApi.get(id, signal),
-    refetchInterval: (query) => (isBusy(query.state.data) ? REFRESH_MS : false),
+    refetchInterval: (query) => pollInterval(isBusy(query.state.data)),
     retry: (count, error) => !(error instanceof ApiError && error.status === 404) && count < 2,
   });
   const busy = isBusy(asset.data);
@@ -108,9 +120,11 @@ export function AssetDetailPage() {
     enabled: can('jobs:read') && asset.isSuccess,
     // Thumbnails are still made for a moment after the asset is ready.
     refetchInterval: (query) =>
-      busy || query.state.data?.items.some((job) => ['QUEUED', 'RUNNING'].includes(job.status))
-        ? REFRESH_MS
-        : false,
+      pollInterval(
+        busy ||
+          (query.state.data?.items.some((job) => ['QUEUED', 'RUNNING'].includes(job.status)) ??
+            false),
+      ),
   });
 
   // Signed URLs are asked for again whenever the asset was processed anew.
@@ -304,22 +318,10 @@ export function AssetDetailPage() {
         </Card>
       </div>
 
-      <Tabs defaultValue="jobs" className="mt-6">
-        <TabsList>
-          {can('jobs:read') ? (
-            <TabsTrigger value="jobs">
-              <Activity />
-              Jobs
-              {jobItems.length > 0 ? <Badge>{jobItems.length}</Badge> : null}
-            </TabsTrigger>
-          ) : null}
-          <TabsTrigger value="source">
-            <Info />
-            Source
-          </TabsTrigger>
-        </TabsList>
-        {can('jobs:read') ? (
-          <TabsContent value="jobs">
+      <AssetTabs
+        asset={data}
+        jobs={
+          <>
             <ErrorNote error={jobs.error} />
             {jobs.isPending ? <Skeleton className="h-40 rounded-xl" /> : null}
             {jobs.data && jobItems.length === 0 ? (
@@ -332,30 +334,10 @@ export function AssetDetailPage() {
                 <JobTable jobs={jobItems} showAsset={false} />
               </Card>
             ) : null}
-          </TabsContent>
-        ) : null}
-        <TabsContent value="source">
-          <Card>
-            <CardContent>
-              <Facts
-                items={[
-                  ['File name', data.source.filename ?? '–'],
-                  ['Size', formatBytes(data.source.bytes)],
-                  [
-                    'SHA-256',
-                    data.source.checksum ? (
-                      <Copyable key="sum" value={data.source.checksum} />
-                    ) : (
-                      '–'
-                    ),
-                  ],
-                  ['Storage pool', <Copyable key="pool" value={data.storagePoolId} />],
-                ]}
-              />
-            </CardContent>
-          </Card>
-        </TabsContent>
-      </Tabs>
+          </>
+        }
+        jobCount={jobItems.length}
+      />
 
       <RenameDialog
         asset={data}
@@ -370,6 +352,95 @@ export function AssetDetailPage() {
         onDone={(updated) => refresh(updated)}
       />
     </>
+  );
+}
+
+/** The tabs under the player: outputs, jobs, history and the source file. */
+function AssetTabs({ asset, jobs, jobCount }: { asset: Asset; jobs: ReactNode; jobCount: number }) {
+  const { can } = useSession();
+  const media = useAssetMedia(asset);
+  const outputs = media.data;
+  // A video still in processing opens on its jobs, a finished one on its qualities.
+  const [tab, setTab] = useState(
+    asset.status === 'READY' || !can('jobs:read') ? 'qualities' : 'jobs',
+  );
+
+  return (
+    <Tabs value={tab} onValueChange={setTab} className="mt-6">
+      <TabsList className="overflow-x-auto">
+        <TabsTrigger value="qualities">
+          <Layers />
+          Qualities
+          {outputs && outputs.renditions.length > 0 ? (
+            <Badge>{outputs.renditions.length}</Badge>
+          ) : null}
+        </TabsTrigger>
+        <TabsTrigger value="subtitles">
+          <Captions />
+          Subtitles
+          {outputs && outputs.subtitles.length > 0 ? (
+            <Badge>{outputs.subtitles.length}</Badge>
+          ) : null}
+        </TabsTrigger>
+        <TabsTrigger value="thumbnails">
+          <Images />
+          Pictures
+        </TabsTrigger>
+        {can('jobs:read') ? (
+          <TabsTrigger value="jobs">
+            <Activity />
+            Jobs
+            {jobCount > 0 ? <Badge>{jobCount}</Badge> : null}
+          </TabsTrigger>
+        ) : null}
+        {can('audit:read') ? (
+          <TabsTrigger value="activity">
+            <History />
+            Activity
+          </TabsTrigger>
+        ) : null}
+        <TabsTrigger value="source">
+          <Info />
+          Source
+        </TabsTrigger>
+      </TabsList>
+      <TabsContent value="qualities">
+        <QualitiesTab media={media} />
+      </TabsContent>
+      <TabsContent value="subtitles">
+        <SubtitlesTab media={media} />
+      </TabsContent>
+      <TabsContent value="thumbnails">
+        <ThumbnailsTab media={media} />
+      </TabsContent>
+      {can('jobs:read') ? <TabsContent value="jobs">{jobs}</TabsContent> : null}
+      {can('audit:read') ? (
+        <TabsContent value="activity">
+          <ActivityTab assetId={asset.id} />
+        </TabsContent>
+      ) : null}
+      <TabsContent value="source">
+        <Card>
+          <CardContent>
+            <Facts
+              items={[
+                ['File name', asset.source.filename ?? '–'],
+                ['Size', formatBytes(asset.source.bytes)],
+                [
+                  'SHA-256',
+                  asset.source.checksum ? (
+                    <Copyable key="sum" value={asset.source.checksum} />
+                  ) : (
+                    '–'
+                  ),
+                ],
+                ['Storage pool', <Copyable key="pool" value={asset.storagePoolId} />],
+              ]}
+            />
+          </CardContent>
+        </Card>
+      </TabsContent>
+    </Tabs>
   );
 }
 
