@@ -1,20 +1,27 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { Compass } from 'lucide-react';
 import { lazy, Suspense } from 'react';
-import { BrowserRouter, Navigate, Route, Routes } from 'react-router';
+import { BrowserRouter, Link, Route, Routes } from 'react-router';
+import { Toaster } from 'sonner';
 import { ApiError } from './api/client';
 import { SessionProvider, useSession } from './auth/session';
-import { Layout } from './components/layout';
-import { EmptyState, Spinner } from './components/ui';
+import { AppShell } from './components/app-shell';
+import { ConfirmProvider } from './components/confirm';
+import { Button } from './components/ui/button';
+import { EmptyState, Spinner } from './components/ui/display';
+import { TooltipProvider } from './components/ui/overlay';
 import { AccountPage } from './pages/account-page';
 import { AdminsPage } from './pages/admins-page';
 import { ApiKeysPage } from './pages/api-keys-page';
 import { AssetsPage } from './pages/assets-page';
 import { AuditPage } from './pages/audit-page';
+import { DashboardPage } from './pages/dashboard-page';
 import { EncodingProfilesPage } from './pages/encoding-profiles-page';
 import { JobsPage } from './pages/jobs-page';
 import { LoginPage } from './pages/login-page';
 import { StoragePage } from './pages/storage-page';
+import { ThemeProvider, useTheme } from './theme/theme';
 import { UploadsProvider } from './uploads/uploads';
 
 // The asset page brings the video player with it, so it is loaded only when opened.
@@ -38,7 +45,7 @@ function Pages() {
 
   if (state.status === 'loading') {
     return (
-      <div className="login">
+      <div className="grid min-h-dvh place-items-center">
         <Spinner label="Signing in" />
       </div>
     );
@@ -50,8 +57,8 @@ function Pages() {
   return (
     <UploadsProvider>
       <Routes>
-        <Route element={<Layout />}>
-          <Route index element={<Navigate to="/assets" replace />} />
+        <Route element={<AppShell />}>
+          <Route index element={<DashboardPage />} />
           <Route path="assets" element={<AssetsPage />} />
           <Route
             path="assets/:id"
@@ -70,7 +77,19 @@ function Pages() {
           <Route path="account" element={<AccountPage />} />
           <Route
             path="*"
-            element={<EmptyState title="Page not found">This address does not exist.</EmptyState>}
+            element={
+              <EmptyState
+                icon={Compass}
+                title="Page not found"
+                action={
+                  <Button asChild>
+                    <Link to="/">Go to the dashboard</Link>
+                  </Button>
+                }
+              >
+                This address does not exist.
+              </EmptyState>
+            }
           />
         </Route>
       </Routes>
@@ -78,14 +97,40 @@ function Pages() {
   );
 }
 
+/** Message popups, in the colors of the current theme. */
+function ThemedToaster() {
+  const { resolved } = useTheme();
+  return (
+    <Toaster
+      theme={resolved}
+      position="top-right"
+      closeButton
+      toastOptions={{
+        classNames: {
+          toast:
+            'font-sans !rounded-lg !border !border-border !bg-popover !text-popover-foreground !shadow-lg',
+          description: '!text-muted-foreground',
+        },
+      }}
+    />
+  );
+}
+
 export function App() {
   return (
-    <QueryClientProvider client={queryClient}>
-      <BrowserRouter>
-        <SessionProvider>
-          <Pages />
-        </SessionProvider>
-      </BrowserRouter>
-    </QueryClientProvider>
+    <ThemeProvider>
+      <QueryClientProvider client={queryClient}>
+        <TooltipProvider delayDuration={250}>
+          <BrowserRouter>
+            <SessionProvider>
+              <ConfirmProvider>
+                <Pages />
+              </ConfirmProvider>
+            </SessionProvider>
+          </BrowserRouter>
+          <ThemedToaster />
+        </TooltipProvider>
+      </QueryClientProvider>
+    </ThemeProvider>
   );
 }

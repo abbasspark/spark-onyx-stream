@@ -53,6 +53,36 @@ export class PlaybackService {
     @Inject(ContentKeysService) private readonly contentKeys: ContentKeysService,
   ) {}
 
+  /**
+   * Signed address of an asset's poster, for showing it in lists.
+   *
+   * The expiry is rounded up to a full hour, so the address stays the same
+   * between requests and browsers can keep the picture.
+   *
+   * @returns Null when the asset is not ready or has no poster.
+   */
+  posterUrl(asset: {
+    id: string;
+    status: string;
+    thumbnails: readonly { type: string; path: string }[];
+  }): string | null {
+    const poster = asset.thumbnails.find((thumbnail) => thumbnail.type === 'POSTER');
+    if (asset.status !== 'READY' || !poster) {
+      return null;
+    }
+
+    const hour = 3600;
+    const expiresAtSeconds =
+      Math.ceil((Date.now() / 1000 + this.config.playbackUrlTtlSeconds) / hour) * hour;
+    const token = createPlaybackToken(
+      asset.id,
+      expiresAtSeconds,
+      this.config.playbackSigningSecret,
+    );
+    const prefix = `${outputPrefix(asset.id)}/`;
+    return `${this.config.mediaBaseUrl}/v1/${MEDIA_ROUTE}/${asset.id}/${token}/${poster.path.slice(prefix.length)}`;
+  }
+
   /** Issues signed URLs for playing an asset. */
   async createPlayback(assetId: string): Promise<PlaybackInfo> {
     const asset = await this.prisma.asset.findUnique({

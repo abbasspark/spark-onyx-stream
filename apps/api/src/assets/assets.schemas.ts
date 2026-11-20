@@ -48,10 +48,16 @@ export const reprocessAssetSchema = z
   .default({});
 export type ReprocessAssetInput = z.infer<typeof reprocessAssetSchema>;
 
+/** Fields the asset list can be ordered by. */
+export const ASSET_SORT_FIELDS = ['createdAt', 'title', 'durationMs', 'sourceBytes'] as const;
+
 export const listAssetsSchema = paginationSchema.extend({
   /** Left out, deleted assets are hidden. */
   status: z.enum(ASSET_STATUSES).optional(),
   /** Matches part of the title, ignoring case. */
   q: z.string().trim().min(1).max(200).optional(),
+  /** Field the list is ordered by. */
+  sort: z.enum(ASSET_SORT_FIELDS).default('createdAt'),
+  order: z.enum(['asc', 'desc']).default('desc'),
 });
 export type ListAssetsInput = z.infer<typeof listAssetsSchema>;

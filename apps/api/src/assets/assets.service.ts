@@ -5,6 +5,7 @@ import { AuditService } from '../audit/audit.service.js';
 import type { Principal } from '../auth/principal.js';
 import { type Page, toPage, toSkipTake } from '../common/pagination.js';
 import { AppConfig } from '../config/app-config.js';
+import { PlaybackService } from '../playback/playback.service.js';
 import { PipelineService } from '../processing/pipeline.service.js';
 import { StorageService } from '../storage/storage.service.js';
 import { UPLOAD_ENDPOINT } from '../uploads/uploads.constants.js';
@@ -29,6 +30,15 @@ export interface CreatedAsset {
   upload: UploadInstructions;
 }
 
+/** Sort fields that can be empty. Assets without a value come last in either direction. */
+const NULLABLE_SORT_FIELDS: readonly ListAssetsInput['sort'][] = ['durationMs', 'sourceBytes'];
+
+function sortOrder(input: ListAssetsInput): Prisma.AssetOrderByWithRelationInput {
+  return NULLABLE_SORT_FIELDS.includes(input.sort)
+    ? { [input.sort]: { sort: input.order, nulls: 'last' } }
+    : { [input.sort]: input.order };
+}
+
 @Injectable()
 export class AssetsService {
   private readonly logger = new Logger(AssetsService.name);
@@ -40,6 +50,7 @@ export class AssetsService {
     @Inject(AppConfig) private readonly config: AppConfig,
     @Inject(UploadsService) private readonly uploads: UploadsService,
     @Inject(PipelineService) private readonly pipeline: PipelineService,
+    @Inject(PlaybackService) private readonly playback: PlaybackService,
   ) {}
 
   async list(input: ListAssetsInput): Promise<Page<AssetView>> {
@@ -49,15 +60,32 @@ export class AssetsService {
     };
 
     const [assets, total] = await Promise.all([
-      this.prisma.asset.findMany({ where, orderBy: { createdAt: 'desc' }, ...toSkipTake(input) }),
+      this.prisma.asset.findMany({
+        where,
+        // The id breaks ties, so paging stays stable when many rows share a value.
+        orderBy: [sortOrder(input), { id: 'desc' }],
+        include: { thumbnails: { where: { type: 'POSTER' }, take: 1 } },
+        ...toSkipTake(input),
+      }),
       this.prisma.asset.count({ where }),
     ]);
 
-    return toPage(assets.map(toAssetView), total, input);
+    return toPage(
+      assets.map((asset) => toAssetView(asset, this.playback.posterUrl(asset))),
+      total,
+      input,
+    );
   }
 
   async get(id: string): Promise<AssetView> {
-    return toAssetView(await this.findOrThrow(id));
+    const asset = await this.prisma.asset.findUnique({
+      where: { id },
+      include: { thumbnails: { where: { type: 'POSTER' }, take: 1 } },
+    });
+    if (!asset || asset.status === 'DELETED') {
+      throw new NotFoundException('Asset not found');
+    }
+    return toAssetView(asset, this.playback.posterUrl(asset));
   }
 
   /** Creates the asset record. The source file is uploaded afterwards. */
