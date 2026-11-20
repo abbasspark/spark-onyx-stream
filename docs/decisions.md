@@ -87,3 +87,36 @@ PostgreSQL holds all durable state and is accessed through Prisma. Redis runs th
 Assets are packaged as HLS with fragmented MP4 (CMAF) segments.
 
 **Why:** one set of segment files can later serve both HLS and DASH, and it is the format the planned P2P layer and DRM both work with.
+
+## D-011 Admin authentication: opaque tokens, scrypt, permissions
+
+**Date:** 2026-11-20
+
+- **Sessions are opaque random tokens**, sent as `Authorization: Bearer`. The database stores only a SHA-256 hash of each token. Sessions last seven days.
+- **API keys work the same way** and carry a list of scopes.
+- **Passwords are hashed with scrypt** from Node's standard library.
+- **Endpoints declare permissions.** Roles map to permission sets, and an API key holds a subset of its creator's permissions.
+- **The first owner is created through a setup endpoint** that works only while no admin exists.
+
+**Why:**
+
+- Opaque tokens can be revoked at once on logout, password change and deactivation. Signed tokens such as JWT stay valid until they expire.
+- Storing hashes means a database leak exposes no usable credential.
+- scrypt needs no native module, so nothing has to be compiled on the servers the product is installed on.
+- Permissions keep endpoint rules independent of role names, so roles can change without touching controllers.
+
+**Consequence:** `JWT_SECRET` is not used by admin authentication. It is reserved for viewer tokens in phase 2.
+
+## D-012 Storage: pools, drivers and encrypted credentials
+
+**Date:** 2026-11-20
+
+- **A storage pool is one place files live**: a directory or an S3 bucket. Every asset belongs to one pool.
+- **All file access goes through the `StorageDriver` interface.** The core ships a local disk driver and an S3 driver built on the AWS SDK, which also works with S3-compatible services.
+- **Every driver passes the same contract test suite**, so the rest of the code can rely on identical behavior.
+- **S3 secret keys are encrypted with AES-256-GCM under `MASTER_KEY`** before they are stored, and the API never returns them.
+- **A fresh installation gets a local pool automatically** at `STORAGE_LOCAL_PATH`.
+
+**Why:** processing and delivery code must not care where files are, and credentials in a database dump should be useless without the master key.
+
+**Consequence:** losing or changing `MASTER_KEY` makes stored S3 credentials unreadable. They have to be entered again. The master key belongs in every backup plan, stored apart from the database backup.

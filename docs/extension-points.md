@@ -28,13 +28,17 @@ This keeps the core small, lets installs choose what they need, and allows modul
 Each one consists of three parts:
 
 ```ts
-// 1. The interface, defined in the core.
+// 1. The interface, defined in the core (shortened).
 export interface StorageDriver {
-  readonly type: string;
-  write(path: string, data: Readable): Promise<void>;
-  read(path: string): Promise<Readable>;
-  delete(path: string): Promise<void>;
-  exists(path: string): Promise<boolean>;
+  write(key: string, data: Readable | Buffer, options?: WriteOptions): Promise<void>;
+  read(key: string, range?: ReadRange): Promise<Readable>;
+  stat(key: string): Promise<StorageObjectInfo | null>;
+  exists(key: string): Promise<boolean>;
+  delete(key: string): Promise<void>;
+  deletePrefix(prefix: string): Promise<number>;
+  list(prefix: string): AsyncIterable<StorageListEntry>;
+  localPath?(key: string): string;
+  close?(): Promise<void>;
 }
 
 // 2. The registry, provided by the core.
@@ -62,4 +66,4 @@ export class S3StorageModule implements OnModuleInit {
 }
 ```
 
-The interfaces above are sketches. Each one is finalized when its module is built.
+`StorageDriver` exists in `apps/api/src/storage/storage-driver.ts`, with a contract test suite every driver has to pass. Its registry is still a fixed choice between the two built-in drivers and becomes a real registry when the first external driver is needed. The other interfaces are sketches and are finalized when their modules are built.
