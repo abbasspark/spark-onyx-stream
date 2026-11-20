@@ -119,3 +119,39 @@ export function usagePercent(usedBytes: string, quotaBytes: string | null): numb
   }
   return Math.min(100, (Number(usedBytes) / Number(quotaBytes)) * 100);
 }
+
+/** Formats a total playing time in words, for example "3 h 12 min" or "45 min". */
+export function formatHours(milliseconds: number): string {
+  const minutes = Math.round(milliseconds / 60_000);
+  if (minutes < 60) {
+    return `${minutes} min`;
+  }
+  const hours = Math.floor(minutes / 60);
+  return minutes % 60 === 0 ? `${hours} h` : `${hours} h ${minutes % 60} min`;
+}
+
+const relative = new Intl.RelativeTimeFormat(undefined, { numeric: 'auto' });
+
+/** Says how long ago something happened, for example "5 minutes ago" or "yesterday". */
+export function formatRelative(iso: string | null | undefined, now: number = Date.now()): string {
+  if (!iso) {
+    return '–';
+  }
+  const seconds = Math.round((new Date(iso).getTime() - now) / 1000);
+  if (Number.isNaN(seconds)) {
+    return '–';
+  }
+  const steps: [limit: number, size: number, unit: Intl.RelativeTimeFormatUnit][] = [
+    [60, 1, 'second'],
+    [3600, 60, 'minute'],
+    [86_400, 3600, 'hour'],
+    [2_592_000, 86_400, 'day'],
+    [31_536_000, 2_592_000, 'month'],
+  ];
+  for (const [limit, size, unit] of steps) {
+    if (Math.abs(seconds) < limit) {
+      return relative.format(Math.round(seconds / size), unit);
+    }
+  }
+  return relative.format(Math.round(seconds / 31_536_000), 'year');
+}

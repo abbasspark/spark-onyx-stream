@@ -229,3 +229,18 @@ Assets are packaged as HLS with fragmented MP4 (CMAF) segments.
 **Why:** the gateway serves files without asking the database, so removing the files is what actually ends playback. A request can fail halfway when the database or Redis is unreachable for a moment, and a system that only works when every step succeeds the first time needs manual repair.
 
 **Consequence:** there is no restore for deleted assets. A trash with a waiting period can be added later by delaying the cleanup job. Between deletion and cleanup, usually seconds, files of the default local pool can still be fetched through the gateway with a valid playback URL.
+
+## D-021 Admin panel design system: Tailwind and Radix components kept in the repository
+
+**Date:** 2026-11-20
+
+This replaces the "plain CSS without a component library" part of D-018.
+
+- **Styling uses Tailwind CSS 4** with design tokens as CSS variables. Components use token names only, never raw colors, so the light and dark themes and any rebranding change one file.
+- **Interactive components are built on Radix primitives** (dialog, menu, select, tabs, tooltip, checkbox, switch) in the shadcn/ui manner: the component code lives in `apps/admin/src/components/ui` and belongs to the project.
+- **Supporting libraries:** `cmdk` for the command palette, `sonner` for messages, `lucide-react` for icons, Inter as a self-hosted font.
+- **Patterns every page follows:** forms open in dialogs or side sheets, destructive actions ask through one shared confirmation dialog, results are reported with a message popup, lists show skeletons while loading and an explained empty state.
+
+**Why:** the panel is the product's face for the people who run it, and it has to feel like a finished content management system. Radix gives correct keyboard and screen reader behavior for the hard components. Keeping the component code in the repository avoids a dependency on one design library's releases and lets the look be changed freely.
+
+**Consequence:** the panel has more dependencies and a larger first download (about 205 kB compressed, plus the player on the asset page). The content security policy still needs `'unsafe-inline'` for styles, because Radix positions popups with inline styles. Fonts are served from the panel's own origin.

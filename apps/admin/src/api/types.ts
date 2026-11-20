@@ -85,6 +85,8 @@ export interface Asset {
   encodingProfileId: string | null;
   encryption: EncryptionMode;
   p2pEnabled: boolean;
+  /** Signed address of the poster picture. Null until the asset is ready and has one. */
+  posterUrl: string | null;
   readyAt: string | null;
   deletedAt: string | null;
   createdAt: string;
@@ -284,4 +286,38 @@ export interface AuditEntry {
   metadata: unknown;
   ipAddress: string | null;
   createdAt: string;
+}
+
+export const ASSET_SORT_FIELDS = ['createdAt', 'title', 'durationMs', 'sourceBytes'] as const;
+export type AssetSortField = (typeof ASSET_SORT_FIELDS)[number];
+export type SortOrder = 'asc' | 'desc';
+
+/** Figures for the dashboard, from GET /v1/stats/overview. */
+export interface OverviewStats {
+  assets: {
+    total: number;
+    byStatus: Partial<Record<AssetStatus, number>>;
+    readyDurationMs: number;
+  };
+  jobs: {
+    queued: number;
+    running: number;
+    completedLast24h: number;
+    failedLast24h: number;
+  };
+  storage: {
+    pools: number;
+    usedBytes: string;
+    quotaBytes: string | null;
+  };
+  /** Assets created per day, oldest first, in UTC. */
+  uploadsPerDay: { date: string; count: number }[];
+  recentFailures: {
+    jobId: string;
+    type: JobType;
+    assetId: string | null;
+    assetTitle: string | null;
+    error: string | null;
+    finishedAt: string | null;
+  }[];
 }

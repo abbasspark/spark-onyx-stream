@@ -4,19 +4,19 @@ The admin panel: a single-page app built with Vite and React.
 
 ## What it does today
 
-- First-run setup and sign-in
-- Library: list, search and filter assets
-- Upload: several files at once, resumable, continuing while you move around the panel
-- Asset page: preview player with quality choice, details, rename, process again, delete
-- Jobs: progress of every processing job, cancel and retry
-- Encoding profiles: create, edit, delete and choose the default
-- Storage: add a folder or an S3-compatible bucket, set a limit, test the connection
-- Admins: add people, change roles, set a password, deactivate
-- API keys: create with chosen permissions and expiry, revoke
-- Audit log: who changed what, with filters
-- My account: change your own password
+- **Dashboard:** videos, processing, storage, uploads per day, recent failures and activity
+- **Library:** posters in a grid or a table, search, status filter, sorting, bulk actions, drag-and-drop upload
+- **Uploads:** several files at once, resumable, shown in a tray on every page
+- **Video page:** preview player with quality choice, details, jobs, rename, process again, delete
+- **Jobs:** progress of every processing step, cancel and retry
+- **Settings:** encoding profiles, storage pools, admins, API keys, audit log
+- **Everywhere:** light and dark theme, command palette (`Ctrl K` or `Cmd K`), keyboard navigation
 
 Buttons that change something are shown only to roles that may use them.
+
+## Built with
+
+Vite, React, React Router, TanStack Query, Tailwind CSS 4 and Radix primitives. The components in `src/components/ui` follow the shadcn/ui approach: their code lives in this repository. See decision D-021.
 
 ## Run it
 
@@ -44,12 +44,15 @@ The result in `dist/` is static files. Serve them with any web server that answe
 
 ```
 src/
-  api/          API client, endpoint functions and response types
-  auth/         Session state and token storage
-  components/   Layout, player, job table and small building blocks
-  lib/          Formatting helpers
-  pages/        One file per page
-  uploads/      Upload manager shared by all pages
+  api/             API client, endpoint functions and response types
+  auth/            Session state and token storage
+  components/      App shell, command palette, player, upload tray, job table
+  components/ui/   The component library: buttons, forms, dialogs, tables, badges
+  lib/             Formatting, navigation and other helpers
+  pages/           One file per page
+  theme/           Light, dark and system theme
+  uploads/         Upload manager shared by all pages
+  styles.css       Design tokens and Tailwind setup
 ```
 
 ## Checks

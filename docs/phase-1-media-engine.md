@@ -251,41 +251,42 @@ All endpoints are under `/v1`. Every endpoint needs credentials unless marked pu
 
 Status shows what exists today.
 
-| Method                  | Path                               | Purpose                                                                     | Status |
-| ----------------------- | ---------------------------------- | --------------------------------------------------------------------------- | ------ |
-| `GET`                   | `/health`                          | Readiness with dependency status (public)                                   | Built  |
-| `GET`                   | `/health/live`                     | Liveness (public)                                                           | Built  |
-| `GET`                   | `/auth/setup`                      | Whether first-run setup is still required (public)                          | Built  |
-| `POST`                  | `/auth/setup`                      | Create the first owner. Works only while no admin exists (public)           | Built  |
-| `POST`                  | `/auth/login`                      | Start an admin session (public)                                             | Built  |
-| `POST`                  | `/auth/logout`                     | End the session                                                             | Built  |
-| `GET`                   | `/auth/me`                         | The authenticated caller and its permissions                                | Built  |
-| `POST`                  | `/auth/password`                   | Change your own password                                                    | Built  |
-| `GET` `POST`            | `/admins`                          | List and create admins                                                      | Built  |
-| `GET` `PATCH` `DELETE`  | `/admins/{id}`                     | Read, update and deactivate an admin                                        | Built  |
-| `GET` `POST`            | `/api-keys`                        | List and create API keys                                                    | Built  |
-| `DELETE`                | `/api-keys/{id}`                   | Revoke an API key                                                           | Built  |
-| `GET`                   | `/audit-logs`                      | List audit entries with filters                                             | Built  |
-| `GET` `POST`            | `/storage-pools`                   | List and create storage pools                                               | Built  |
-| `GET` `PATCH`           | `/storage-pools/{id}`              | Read and update a storage pool                                              | Built  |
-| `POST`                  | `/storage-pools/{id}/test`         | Write, read and delete a test file to confirm the pool works                | Built  |
-| `GET`                   | `/encoding-profiles`               | List encoding profiles                                                      | Built  |
-| `GET`                   | `/encoding-profiles/{id}`          | Read an encoding profile                                                    | Built  |
-| `POST`                  | `/encoding-profiles`               | Create an encoding profile                                                  | Built  |
-| `PATCH` `DELETE`        | `/encoding-profiles/{id}`          | Update and delete a profile                                                 | Built  |
-| `POST`                  | `/assets`                          | Create an asset and get an upload URL                                       | Built  |
-| `GET`                   | `/assets`                          | List assets with filters and pagination                                     | Built  |
-| `GET` `PATCH` `DELETE`  | `/assets/{id}`                     | Read, update and soft-delete an asset                                       | Built  |
-| `POST`                  | `/uploads`                         | Start a resumable upload for an asset (tus)                                 | Built  |
-| `HEAD` `PATCH` `DELETE` | `/uploads/{assetId}`               | Check progress, send bytes, cancel (tus)                                    | Built  |
-| `POST`                  | `/assets/{id}/reprocess`           | Process again, optionally with another mode or profile                      | Built  |
-| `POST`                  | `/assets/{id}/playback`            | Get a signed manifest URL                                                   | Built  |
-| `GET` `HEAD`            | `/media/{assetId}/{token}/{file}`  | Generated files of an asset. The signed token is the authorization (public) | Built  |
-| `GET`                   | `/jobs`                            | List jobs with filters                                                      | Built  |
-| `GET`                   | `/jobs/{id}`                       | Read a job                                                                  | Built  |
-| `POST`                  | `/jobs/{id}/cancel`                | Cancel a job                                                                | Built  |
-| `POST`                  | `/jobs/{id}/retry`                 | Retry a failed job                                                          | Built  |
-| `GET`                   | `/media/{assetId}/{token}/hls/key` | AES-128 content key of an encrypted asset (signed token in the path)        | Built  |
+| Method                  | Path                               | Purpose                                                                                                      | Status |
+| ----------------------- | ---------------------------------- | ------------------------------------------------------------------------------------------------------------ | ------ |
+| `GET`                   | `/health`                          | Readiness with dependency status (public)                                                                    | Built  |
+| `GET`                   | `/health/live`                     | Liveness (public)                                                                                            | Built  |
+| `GET`                   | `/auth/setup`                      | Whether first-run setup is still required (public)                                                           | Built  |
+| `POST`                  | `/auth/setup`                      | Create the first owner. Works only while no admin exists (public)                                            | Built  |
+| `POST`                  | `/auth/login`                      | Start an admin session (public)                                                                              | Built  |
+| `POST`                  | `/auth/logout`                     | End the session                                                                                              | Built  |
+| `GET`                   | `/auth/me`                         | The authenticated caller and its permissions                                                                 | Built  |
+| `POST`                  | `/auth/password`                   | Change your own password                                                                                     | Built  |
+| `GET` `POST`            | `/admins`                          | List and create admins                                                                                       | Built  |
+| `GET` `PATCH` `DELETE`  | `/admins/{id}`                     | Read, update and deactivate an admin                                                                         | Built  |
+| `GET` `POST`            | `/api-keys`                        | List and create API keys                                                                                     | Built  |
+| `DELETE`                | `/api-keys/{id}`                   | Revoke an API key                                                                                            | Built  |
+| `GET`                   | `/audit-logs`                      | List audit entries with filters                                                                              | Built  |
+| `GET` `POST`            | `/storage-pools`                   | List and create storage pools                                                                                | Built  |
+| `GET` `PATCH`           | `/storage-pools/{id}`              | Read and update a storage pool                                                                               | Built  |
+| `POST`                  | `/storage-pools/{id}/test`         | Write, read and delete a test file to confirm the pool works                                                 | Built  |
+| `GET`                   | `/encoding-profiles`               | List encoding profiles                                                                                       | Built  |
+| `GET`                   | `/encoding-profiles/{id}`          | Read an encoding profile                                                                                     | Built  |
+| `POST`                  | `/encoding-profiles`               | Create an encoding profile                                                                                   | Built  |
+| `PATCH` `DELETE`        | `/encoding-profiles/{id}`          | Update and delete a profile                                                                                  | Built  |
+| `POST`                  | `/assets`                          | Create an asset and get an upload URL                                                                        | Built  |
+| `GET`                   | `/assets`                          | List assets with filters, ordering (`sort`, `order`) and pagination. Ready assets carry a signed `posterUrl` | Built  |
+| `GET` `PATCH` `DELETE`  | `/assets/{id}`                     | Read, update and soft-delete an asset                                                                        | Built  |
+| `POST`                  | `/uploads`                         | Start a resumable upload for an asset (tus)                                                                  | Built  |
+| `HEAD` `PATCH` `DELETE` | `/uploads/{assetId}`               | Check progress, send bytes, cancel (tus)                                                                     | Built  |
+| `POST`                  | `/assets/{id}/reprocess`           | Process again, optionally with another mode or profile                                                       | Built  |
+| `POST`                  | `/assets/{id}/playback`            | Get a signed manifest URL                                                                                    | Built  |
+| `GET` `HEAD`            | `/media/{assetId}/{token}/{file}`  | Generated files of an asset. The signed token is the authorization (public)                                  | Built  |
+| `GET`                   | `/jobs`                            | List jobs with filters                                                                                       | Built  |
+| `GET`                   | `/jobs/{id}`                       | Read a job                                                                                                   | Built  |
+| `POST`                  | `/jobs/{id}/cancel`                | Cancel a job                                                                                                 | Built  |
+| `POST`                  | `/jobs/{id}/retry`                 | Retry a failed job                                                                                           | Built  |
+| `GET`                   | `/media/{assetId}/{token}/hls/key` | AES-128 content key of an encrypted asset (signed token in the path)                                         | Built  |
+| `GET`                   | `/stats/overview`                  | Figures for the dashboard: assets, jobs, storage, uploads per day, recent failures                           | Built  |
 
 ## Authentication and access control
 

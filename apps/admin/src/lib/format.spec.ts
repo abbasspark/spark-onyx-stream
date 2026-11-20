@@ -5,6 +5,8 @@ import {
   formatBytes,
   formatDuration,
   formatElapsed,
+  formatHours,
+  formatRelative,
   formatResolution,
   gigabytesToBytes,
   humanize,
@@ -91,5 +93,25 @@ describe('storage and bitrate helpers', () => {
     expect(usagePercent('50', '200')).toBe(25);
     expect(usagePercent('500', '200')).toBe(100);
     expect(usagePercent('50', null)).toBeNull();
+  });
+});
+
+describe('time in words', () => {
+  it('formats a total playing time', () => {
+    expect(formatHours(0)).toBe('0 min');
+    expect(formatHours(45 * 60_000)).toBe('45 min');
+    expect(formatHours(120 * 60_000)).toBe('2 h');
+    expect(formatHours(192 * 60_000)).toBe('3 h 12 min');
+  });
+
+  it('says how long ago something happened', () => {
+    const now = Date.parse('2026-06-15T12:00:00Z');
+
+    expect(formatRelative('2026-06-15T11:55:00Z', now)).toMatch(/5 minutes ago/);
+    expect(formatRelative('2026-06-15T09:00:00Z', now)).toMatch(/3 hours ago/);
+    expect(formatRelative('2026-06-14T12:00:00Z', now)).toMatch(/yesterday|1 day ago/);
+    expect(formatRelative('2026-03-15T12:00:00Z', now)).toMatch(/3 months ago/);
+    expect(formatRelative(null, now)).toBe('–');
+    expect(formatRelative('nonsense', now)).toBe('–');
   });
 });

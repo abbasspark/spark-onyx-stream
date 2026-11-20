@@ -1,14 +1,34 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 import { useMutation } from '@tanstack/react-query';
+import { Monitor, Moon, Sun } from 'lucide-react';
 import { type FormEvent, useState } from 'react';
-import { authApi } from '../api/endpoints';
-import { useSession } from '../auth/session';
-import { ErrorNote, PageHeader } from '../components/ui';
-import { humanize } from '../lib/format';
+import { toast } from 'sonner';
+import { authApi } from '@/api/endpoints';
+import { useSession } from '@/auth/session';
+import { Button } from '@/components/ui/button';
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  ErrorNote,
+  Facts,
+  PageHeader,
+} from '@/components/ui/display';
+import { Field, Input } from '@/components/ui/form';
+import { cn } from '@/lib/cn';
+import { humanize } from '@/lib/format';
+import { type ThemeChoice, useTheme } from '@/theme/theme';
+
+const THEMES: [ThemeChoice, typeof Sun, string][] = [
+  ['light', Sun, 'Light'],
+  ['dark', Moon, 'Dark'],
+  ['system', Monitor, 'System'],
+];
 
 /** The signed-in admin's own account. */
 export function AccountPage() {
   const { state } = useSession();
+  const { choice, setChoice } = useTheme();
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [repeat, setRepeat] = useState('');
@@ -17,6 +37,7 @@ export function AccountPage() {
   const change = useMutation({
     mutationFn: () => authApi.changePassword({ currentPassword, newPassword }),
     onSuccess: () => {
+      toast.success('Your password is changed', { description: 'Other devices were signed out.' });
       setCurrentPassword('');
       setNewPassword('');
       setRepeat('');
@@ -41,68 +62,101 @@ export function AccountPage() {
   return (
     <>
       <PageHeader title="My account" />
-      <section className="card">
-        <dl className="facts">
-          <dt>Name</dt>
-          <dd>{state.me.displayName}</dd>
-          <dt>Email</dt>
-          <dd>{state.me.email}</dd>
-          <dt>Role</dt>
-          <dd>{humanize(state.me.role)}</dd>
-        </dl>
-      </section>
+      <div className="grid max-w-3xl gap-4">
+        <Card>
+          <CardHeader title="Profile" />
+          <CardContent>
+            <Facts
+              items={[
+                ['Name', state.me.displayName],
+                ['Email', state.me.email],
+                ['Role', humanize(state.me.role)],
+              ]}
+            />
+          </CardContent>
+        </Card>
 
-      <form className="card narrow-card" onSubmit={submit}>
-        <h2>Change password</h2>
-        <label className="field">
-          Current password
-          <input
-            type="password"
-            required
-            autoComplete="current-password"
-            value={currentPassword}
-            onChange={(event) => setCurrentPassword(event.target.value)}
+        <Card>
+          <CardHeader title="Appearance" description="Kept in this browser." />
+          <CardContent>
+            <div className="grid grid-cols-3 gap-3" role="radiogroup" aria-label="Theme">
+              {THEMES.map(([value, Icon, label]) => (
+                <button
+                  key={value}
+                  type="button"
+                  role="radio"
+                  aria-checked={choice === value}
+                  onClick={() => setChoice(value)}
+                  className={cn(
+                    'flex flex-col items-center gap-2 rounded-lg border p-4 text-sm font-medium text-muted-foreground transition-colors hover:bg-accent',
+                    choice === value && 'border-primary bg-primary/5 text-foreground',
+                  )}
+                >
+                  <Icon className="size-5" aria-hidden="true" />
+                  {label}
+                </button>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader
+            title="Change password"
+            description="Changing it signs you out on your other devices."
           />
-        </label>
-        <label className="field">
-          New password
-          <input
-            type="password"
-            required
-            minLength={12}
-            autoComplete="new-password"
-            value={newPassword}
-            onChange={(event) => setNewPassword(event.target.value)}
-          />
-          <span className="hint">At least 12 characters.</span>
-        </label>
-        <label className="field">
-          New password again
-          <input
-            type="password"
-            required
-            autoComplete="new-password"
-            value={repeat}
-            onChange={(event) => setRepeat(event.target.value)}
-          />
-        </label>
-        {mismatch ? (
-          <p className="note note-error" role="alert">
-            The two new passwords are not the same.
-          </p>
-        ) : null}
-        <ErrorNote error={change.error} />
-        {change.isSuccess ? (
-          <p className="note note-ok" role="status">
-            Your password is changed. Other devices were signed out.
-          </p>
-        ) : null}
-        <div>
-          <button type="submit" className="button button-primary" disabled={change.isPending}>
-            Change password
-          </button>
-        </div>
-      </form>
+          <CardContent>
+            <form className="grid max-w-sm gap-4" onSubmit={submit}>
+              <Field label="Current password">
+                {(id) => (
+                  <Input
+                    id={id}
+                    type="password"
+                    required
+                    autoComplete="current-password"
+                    value={currentPassword}
+                    onChange={(event) => setCurrentPassword(event.target.value)}
+                  />
+                )}
+              </Field>
+              <Field label="New password" hint="At least 12 characters.">
+                {(id) => (
+                  <Input
+                    id={id}
+                    type="password"
+                    required
+                    minLength={12}
+                    autoComplete="new-password"
+                    value={newPassword}
+                    onChange={(event) => setNewPassword(event.target.value)}
+                  />
+                )}
+              </Field>
+              <Field label="New password again">
+                {(id) => (
+                  <Input
+                    id={id}
+                    type="password"
+                    required
+                    autoComplete="new-password"
+                    aria-invalid={mismatch}
+                    value={repeat}
+                    onChange={(event) => setRepeat(event.target.value)}
+                  />
+                )}
+              </Field>
+              <ErrorNote
+                error={mismatch ? 'The two new passwords are not the same.' : change.error}
+              />
+              <div>
+                <Button type="submit" variant="primary" loading={change.isPending}>
+                  Change password
+                </Button>
+              </div>
+            </form>
+          </CardContent>
+        </Card>
+      </div>
     </>
   );
 }
