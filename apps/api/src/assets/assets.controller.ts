@@ -20,20 +20,26 @@ import type { Principal } from '../auth/principal.js';
 import { requestInfo } from '../auth/request-info.js';
 import type { Page } from '../common/pagination.js';
 import { ZodValidationPipe } from '../common/zod-validation.pipe.js';
-import type { AssetView } from './asset.view.js';
 import {
   type CreateAssetInput,
   createAssetSchema,
   type ListAssetsInput,
   listAssetsSchema,
+  type ReprocessAssetInput,
+  reprocessAssetSchema,
   type UpdateAssetInput,
   updateAssetSchema,
 } from './assets.schemas.js';
+import { PipelineService } from '../processing/pipeline.service.js';
+import { type AssetView, toAssetView } from './asset.view.js';
 import { AssetsService, type CreatedAsset } from './assets.service.js';
 
 @Controller('assets')
 export class AssetsController {
-  constructor(@Inject(AssetsService) private readonly assets: AssetsService) {}
+  constructor(
+    @Inject(AssetsService) private readonly assets: AssetsService,
+    @Inject(PipelineService) private readonly pipeline: PipelineService,
+  ) {}
 
   @Get()
   @RequirePermissions('assets:read')
@@ -69,6 +75,20 @@ export class AssetsController {
     @Req() request: Request,
   ): Promise<AssetView> {
     return this.assets.update(principal, id, body, requestInfo(request).ipAddress);
+  }
+
+  /**
+   * Processes the asset again from its source file and replaces earlier outputs.
+   * Leave the body empty to let the mode be chosen again.
+   */
+  @Post(':id/reprocess')
+  @RequirePermissions('assets:write')
+  @HttpCode(HttpStatus.ACCEPTED)
+  async reprocess(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body(new ZodValidationPipe(reprocessAssetSchema)) body: ReprocessAssetInput,
+  ): Promise<AssetView> {
+    return toAssetView(await this.pipeline.reprocess(id, body));
   }
 
   @Delete(':id')

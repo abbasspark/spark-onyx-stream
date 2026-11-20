@@ -1,16 +1,17 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 import { Logger, Module, type OnModuleInit } from '@nestjs/common';
+import { ProcessingWorkerModule } from '../processing/processing.module.js';
 
 /**
  * Role modules are loaded only when the process runs the matching role.
- * They are placeholders for now and are filled in as each area is built:
+ * The live and scheduler modules are placeholders and are filled in as those areas are built:
  *
- * - WorkerRoleModule:    processing job consumers (phase 1)
+ * - WorkerRoleModule:    runs processing jobs with FFmpeg
  * - LiveRoleModule:      live channel supervision (phase 4)
  * - SchedulerRoleModule: periodic tasks (phase 1)
  */
 
-@Module({})
+@Module({ imports: [ProcessingWorkerModule] })
 export class WorkerRoleModule implements OnModuleInit {
   private readonly logger = new Logger(WorkerRoleModule.name);
 

@@ -133,3 +133,18 @@ Assets are packaged as HLS with fragmented MP4 (CMAF) segments.
 **Why:** source files are often many gigabytes and connections drop. tus is an open protocol with client libraries for browsers and mobile platforms, so no custom client code is needed.
 
 **Consequence:** uploads have to reach the same API server until they finish, because the collected bytes are on its disk. An installation with several API servers needs sticky routing for `/v1/uploads` or a shared temporary directory. A large file is written twice, once to the temporary directory and once to the pool.
+
+## D-014 Processing: one FFmpeg run per asset, jobs recorded in the database
+
+**Date:** 2026-11-20
+
+- **Encoding and packaging happen in one FFmpeg process.** Its HLS muxer writes the playlists and fMP4 segments of all qualities directly, so there is no separate packaging job and no dedicated packager.
+- **Jobs run through BullMQ and are mirrored in the `jobs` table**, which keeps status, progress, attempts, error and output for the panel.
+- **A job only carries ids.** Everything else is read from the database when it runs.
+- **Workers read and write through the storage driver.** A pool on local disk is read in place. From other pools the source is downloaded into a working directory first. Outputs are always written to the working directory and uploaded afterwards.
+- **A running job is cancelled through a Redis channel** that every worker listens on. The worker ends the FFmpeg process.
+- **Errors that a retry cannot fix fail at once**, for example a file without video. Other errors are retried up to three times.
+
+**Why:** one FFmpeg run decodes the source once for all qualities and guarantees aligned segments. Keeping job history in PostgreSQL means it survives a Redis restart.
+
+**Consequence:** the `PACKAGE` job type is unused for now. Processing on a local pool writes outputs twice, to the working directory and then to the pool. The working directory needs free space for the outputs, and for the source too when the pool is not on local disk.

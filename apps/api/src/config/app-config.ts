@@ -24,6 +24,11 @@ export class AppConfig {
   readonly uploadTempPath: string;
   readonly uploadMaxBytes: number;
   readonly corsOrigins: readonly string[];
+  readonly ffmpegPath: string;
+  readonly ffprobePath: string;
+  /** Absolute path of the directory for working files of processing jobs. */
+  readonly processingTempPath: string;
+  readonly workerConcurrency: number;
 
   /**
    * @param env Validated environment variables.
@@ -44,6 +49,10 @@ export class AppConfig {
     this.uploadTempPath = path.resolve(baseDirectory, env.UPLOAD_TEMP_PATH);
     this.uploadMaxBytes = env.UPLOAD_MAX_BYTES;
     this.corsOrigins = env.CORS_ORIGINS;
+    this.ffmpegPath = env.FFMPEG_PATH;
+    this.ffprobePath = env.FFPROBE_PATH;
+    this.processingTempPath = path.resolve(baseDirectory, env.PROCESSING_TEMP_PATH);
+    this.workerConcurrency = env.WORKER_CONCURRENCY;
   }
 
   get isProduction(): boolean {

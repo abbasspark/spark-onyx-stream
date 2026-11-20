@@ -33,6 +33,15 @@ export const updateAssetSchema = z
   });
 export type UpdateAssetInput = z.infer<typeof updateAssetSchema>;
 
+export const reprocessAssetSchema = z
+  .object({
+    processingMode: z.enum(['COPY', 'TRANSCODE', 'PASSTHROUGH']).optional(),
+    encodingProfileId: z.uuid().optional(),
+  })
+  // A request without a body means "choose again".
+  .default({});
+export type ReprocessAssetInput = z.infer<typeof reprocessAssetSchema>;
+
 export const listAssetsSchema = paginationSchema.extend({
   /** Left out, deleted assets are hidden. */
   status: z.enum(ASSET_STATUSES).optional(),
