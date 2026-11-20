@@ -83,6 +83,33 @@ Copy mode produces a single rendition, so there is no adaptive bitrate. The pane
 - A job can be cancelled. The worker stops the FFmpeg process and removes partial output.
 - When a worker dies, BullMQ marks its job as stalled and another worker picks it up.
 
+## Storage
+
+### Pools and drivers
+
+A storage pool is one place files are kept. Each asset belongs to one pool, and the database stores file paths relative to the pool.
+
+| Driver  | Stores files in                       | Settings                                                                                        |
+| ------- | ------------------------------------- | ----------------------------------------------------------------------------------------------- |
+| `LOCAL` | A directory on the server             | `basePath` (absolute)                                                                           |
+| `S3`    | An S3 bucket or S3-compatible service | `bucket`, `region`, `endpoint`, `forcePathStyle`, `keyPrefix`, `accessKeyId`, `secretAccessKey` |
+
+All code reads and writes files through the `StorageDriver` interface and never through the file system or an S3 client directly. Both drivers pass the same contract tests.
+
+### Rules
+
+- A fresh installation gets a default local pool at `STORAGE_LOCAL_PATH`.
+- Exactly one pool is the default, and new assets go there. The default pool cannot be deactivated.
+- The location of a pool (base path, bucket or key prefix) cannot change once the pool holds assets. Credentials and endpoint can.
+- Storage keys are validated centrally. A key with `..`, an absolute path or a backslash is rejected before any driver sees it.
+- The S3 secret key is encrypted with the master key and is never returned by the API or written to the audit log.
+- Byte counts (`quotaBytes`, `usedBytes`) are returned as strings, because they can exceed the exact range of a JSON number.
+
+### Not built yet
+
+- Quota enforcement and `usedBytes` accounting. They arrive with uploads.
+- Moving assets between pools.
+
 ## Storage layout
 
 All paths are relative to the storage pool root.
@@ -111,46 +138,96 @@ The signature covers the asset directory and not a single file, so one signature
 
 ## API endpoints
 
-All endpoints are under `/v1` and need an admin session or an API key, except where noted.
+All endpoints are under `/v1`. Every endpoint needs credentials unless marked public. Credentials are sent as `Authorization: Bearer <token>`, where the token is a session token or an API key.
 
-| Method                 | Path                      | Purpose                                                |
-| ---------------------- | ------------------------- | ------------------------------------------------------ |
-| `POST`                 | `/auth/login`             | Start an admin session (public)                        |
-| `POST`                 | `/auth/logout`            | End the session                                        |
-| `GET`                  | `/auth/me`                | Current admin                                          |
-| `GET` `POST`           | `/admins`                 | List and create admins                                 |
-| `PATCH` `DELETE`       | `/admins/{id}`            | Update and deactivate an admin                         |
-| `GET` `POST`           | `/api-keys`               | List and create API keys                               |
-| `DELETE`               | `/api-keys/{id}`          | Revoke an API key                                      |
-| `GET` `POST`           | `/storage-pools`          | List and create storage pools                          |
-| `PATCH`                | `/storage-pools/{id}`     | Update a storage pool                                  |
-| `GET` `POST`           | `/encoding-profiles`      | List and create encoding profiles                      |
-| `PATCH` `DELETE`       | `/encoding-profiles/{id}` | Update and delete a profile                            |
-| `POST`                 | `/assets`                 | Create an asset and get an upload URL                  |
-| `GET`                  | `/assets`                 | List assets with filters and pagination                |
-| `GET` `PATCH` `DELETE` | `/assets/{id}`            | Read, update and soft-delete an asset                  |
-| `POST`                 | `/assets/{id}/reprocess`  | Process again, optionally with another mode or profile |
-| `POST`                 | `/assets/{id}/playback`   | Get a signed manifest URL                              |
-| `GET`                  | `/jobs`                   | List jobs with filters                                 |
-| `GET`                  | `/jobs/{id}`              | Read a job                                             |
-| `POST`                 | `/jobs/{id}/cancel`       | Cancel a job                                           |
-| `POST`                 | `/jobs/{id}/retry`        | Retry a failed job                                     |
-| `GET`                  | `/keys/{assetId}`         | AES-128 content key (signature required)               |
-| `GET`                  | `/health`                 | Liveness and dependency status (public)                |
+Status shows what exists today.
 
-Uploads use the tus resumable upload protocol on `/v1/uploads`.
+| Method                 | Path                       | Purpose                                                           | Status  |
+| ---------------------- | -------------------------- | ----------------------------------------------------------------- | ------- |
+| `GET`                  | `/health`                  | Readiness with dependency status (public)                         | Built   |
+| `GET`                  | `/health/live`             | Liveness (public)                                                 | Built   |
+| `GET`                  | `/auth/setup`              | Whether first-run setup is still required (public)                | Built   |
+| `POST`                 | `/auth/setup`              | Create the first owner. Works only while no admin exists (public) | Built   |
+| `POST`                 | `/auth/login`              | Start an admin session (public)                                   | Built   |
+| `POST`                 | `/auth/logout`             | End the session                                                   | Built   |
+| `GET`                  | `/auth/me`                 | The authenticated caller and its permissions                      | Built   |
+| `POST`                 | `/auth/password`           | Change your own password                                          | Built   |
+| `GET` `POST`           | `/admins`                  | List and create admins                                            | Built   |
+| `GET` `PATCH` `DELETE` | `/admins/{id}`             | Read, update and deactivate an admin                              | Built   |
+| `GET` `POST`           | `/api-keys`                | List and create API keys                                          | Built   |
+| `DELETE`               | `/api-keys/{id}`           | Revoke an API key                                                 | Built   |
+| `GET`                  | `/audit-logs`              | List audit entries with filters                                   | Built   |
+| `GET` `POST`           | `/storage-pools`           | List and create storage pools                                     | Built   |
+| `GET` `PATCH`          | `/storage-pools/{id}`      | Read and update a storage pool                                    | Built   |
+| `POST`                 | `/storage-pools/{id}/test` | Write, read and delete a test file to confirm the pool works      | Built   |
+| `GET` `POST`           | `/encoding-profiles`       | List and create encoding profiles                                 | Planned |
+| `PATCH` `DELETE`       | `/encoding-profiles/{id}`  | Update and delete a profile                                       | Planned |
+| `POST`                 | `/assets`                  | Create an asset and get an upload URL                             | Planned |
+| `GET`                  | `/assets`                  | List assets with filters and pagination                           | Planned |
+| `GET` `PATCH` `DELETE` | `/assets/{id}`             | Read, update and soft-delete an asset                             | Planned |
+| `POST`                 | `/assets/{id}/reprocess`   | Process again, optionally with another mode or profile            | Planned |
+| `POST`                 | `/assets/{id}/playback`    | Get a signed manifest URL                                         | Planned |
+| `GET`                  | `/jobs`                    | List jobs with filters                                            | Planned |
+| `GET`                  | `/jobs/{id}`               | Read a job                                                        | Planned |
+| `POST`                 | `/jobs/{id}/cancel`        | Cancel a job                                                      | Planned |
+| `POST`                 | `/jobs/{id}/retry`         | Retry a failed job                                                | Planned |
+| `GET`                  | `/keys/{assetId}`          | AES-128 content key (signature required)                          | Planned |
 
-## Roles
+Uploads will use the tus resumable upload protocol on `/v1/uploads`.
 
-| Role     | Can do                                             |
-| -------- | -------------------------------------------------- |
-| `OWNER`  | Everything, including managing admins and settings |
-| `ADMIN`  | Everything except managing owners                  |
-| `EDITOR` | Manage assets, profiles and jobs                   |
-| `VIEWER` | Read only                                          |
+## Authentication and access control
+
+### Credentials
+
+| Credential    | Format                                      | Lifetime                             | Stored as    |
+| ------------- | ------------------------------------------- | ------------------------------------ | ------------ |
+| Session token | `onyx_sess_` + random value                 | 7 days, or until logout              | SHA-256 hash |
+| API key       | `onyx_key_` + 8-character id + random value | Until revoked or its optional expiry | SHA-256 hash |
+
+A token or key is shown once, when it is created. It cannot be read back later.
+
+### Protection against guessing
+
+- Passwords need at least 12 characters and are hashed with scrypt.
+- After 5 failed sign-ins for the same email and IP address within 15 minutes, further attempts get a 429 response until the window ends. The counters live in Redis.
+- A wrong password and an unknown email get the same response and take the same time.
+
+### Permissions
+
+Endpoints declare the permissions they need. A role grants a fixed set:
+
+| Permission area                       | OWNER          | ADMIN          | EDITOR         | VIEWER |
+| ------------------------------------- | -------------- | -------------- | -------------- | ------ |
+| Admins, API keys, audit log, settings | Read and write | Read and write | None           | None   |
+| Storage pools                         | Read and write | Read and write | Read           | Read   |
+| Assets, jobs, encoding profiles       | Read and write | Read and write | Read and write | Read   |
+
+Further rules:
+
+- Only an owner can create, change or deactivate an owner.
+- Nobody can change their own role or deactivate themselves.
+- The last active owner cannot be demoted or deactivated.
+- Admins are deactivated, never deleted, so the audit log keeps its references.
+- Deactivation, a role change and a password reset sign the admin out everywhere.
+
+### API keys
+
+- A key carries scopes, which are permissions chosen when it is created.
+- A key can only hold permissions its creator holds. If the creator is moved to a lower role or deactivated, the key loses access accordingly.
+- Managing admins and managing API keys always needs a signed-in admin. Those two permissions cannot be given to a key.
+
+### Audit log
+
+These events are recorded with actor, target, time and IP address: setup, sign-in, failed sign-in, sign-out, password change, admin created, updated or deactivated, API key created or revoked. Passwords, tokens and keys are never written to the log.
+
+### Not built yet
+
+- Two-factor authentication. The schema has the field for it.
+- Cookie-based sessions for the admin panel. Bearer tokens are used for now.
+- A setting for trusted proxies. Until it exists, the recorded IP address is that of the nearest proxy when the API runs behind one.
 
 ## Open questions
 
-- Which S3 client library to use, and whether multipart upload goes directly from the browser to S3.
+- Whether large uploads go directly from the browser to S3 with multipart upload, or always through the API.
 - Whether packaging is done by FFmpeg alone or by a dedicated packager. FFmpeg alone is the starting point.
 - The exact Nginx mechanism for signature checks: the built-in secure link module or a small script module.

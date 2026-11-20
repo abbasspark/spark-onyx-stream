@@ -14,13 +14,18 @@
     "node": ">=22.18.0"
   },
   "scripts": {
+    "dev": "pnpm --filter @onyx/api start:dev",
     "dev:infra": "docker compose -f deploy/dev/docker-compose.yml up -d",
     "dev:infra:stop": "docker compose -f deploy/dev/docker-compose.yml down",
-    "db:generate": "pnpm --filter @onyx/database generate",
+    "build": "pnpm -r build",
+    "db:generate": "pnpm --filter @onyx/database generate && pnpm --filter @onyx/database build",
     "db:validate": "pnpm --filter @onyx/database validate",
     "db:migrate": "pnpm --filter @onyx/database migrate:dev",
     "db:studio": "pnpm --filter @onyx/database studio",
     "typecheck": "pnpm -r typecheck",
+    "lint": "pnpm -r lint",
+    "test": "pnpm -r test",
+    "test:e2e": "pnpm --filter @onyx/api test:e2e",
     "format": "prettier --write .",
     "format:check": "prettier --check ."
   },
