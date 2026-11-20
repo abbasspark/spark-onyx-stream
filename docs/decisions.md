@@ -87,3 +87,22 @@ PostgreSQL holds all durable state and is accessed through Prisma. Redis runs th
 Assets are packaged as HLS with fragmented MP4 (CMAF) segments.
 
 **Why:** one set of segment files can later serve both HLS and DASH, and it is the format the planned P2P layer and DRM both work with.
+
+## D-011 Admin authentication: opaque tokens, scrypt, permissions
+
+**Date:** 2026-11-20
+
+- **Sessions are opaque random tokens**, sent as `Authorization: Bearer`. The database stores only a SHA-256 hash of each token. Sessions last seven days.
+- **API keys work the same way** and carry a list of scopes.
+- **Passwords are hashed with scrypt** from Node's standard library.
+- **Endpoints declare permissions.** Roles map to permission sets, and an API key holds a subset of its creator's permissions.
+- **The first owner is created through a setup endpoint** that works only while no admin exists.
+
+**Why:**
+
+- Opaque tokens can be revoked at once on logout, password change and deactivation. Signed tokens such as JWT stay valid until they expire.
+- Storing hashes means a database leak exposes no usable credential.
+- scrypt needs no native module, so nothing has to be compiled on the servers the product is installed on.
+- Permissions keep endpoint rules independent of role names, so roles can change without touching controllers.
+
+**Consequence:** `JWT_SECRET` is not used by admin authentication. It is reserved for viewer tokens in phase 2.

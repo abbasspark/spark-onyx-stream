@@ -25,6 +25,7 @@
     "typecheck": "pnpm -r typecheck",
     "lint": "pnpm -r lint",
     "test": "pnpm -r test",
+    "test:e2e": "pnpm --filter @onyx/api test:e2e",
     "format": "prettier --write .",
     "format:check": "prettier --check ."
   },

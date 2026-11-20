@@ -1,5 +1,9 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 import { type DynamicModule, Module, type Type } from '@nestjs/common';
+import { AdminsModule } from './admins/admins.module.js';
+import { ApiKeysModule } from './api-keys/api-keys.module.js';
+import { AuditModule } from './audit/audit.module.js';
+import { AuthModule } from './auth/auth.module.js';
 import type { AppConfig } from './config/app-config.js';
 import { ConfigModule } from './config/config.module.js';
 import { DatabaseModule } from './database/database.module.js';
@@ -11,7 +15,7 @@ import { LiveRoleModule, SchedulerRoleModule, WorkerRoleModule } from './roles/r
 
 /** Modules that are loaded only when the process runs the given role. */
 const ROLE_MODULES: Record<AppRole, Type[]> = {
-  api: [HealthModule],
+  api: [AuthModule, AuditModule, AdminsModule, ApiKeysModule, HealthModule],
   worker: [WorkerRoleModule],
   live: [LiveRoleModule],
   scheduler: [SchedulerRoleModule],

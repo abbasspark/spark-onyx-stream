@@ -38,11 +38,32 @@ model AdminUser {
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
 
+  sessions  AdminSession[]
   apiKeys   ApiKey[]
   auditLogs AuditLog[]
   assets    Asset[]
 
   @@map("admin_users")
+}
+
+/// A signed-in admin session. The token is shown to the client once at login;
+/// only its hash is stored, so a database leak does not expose usable tokens.
+model AdminSession {
+  id         String    @id @default(uuid(7)) @db.Uuid
+  adminId    String    @db.Uuid
+  admin      AdminUser @relation(fields: [adminId], references: [id], onDelete: Cascade)
+  /// SHA-256 hash of the session token.
+  tokenHash  String    @unique
+  userAgent  String?
+  ipAddress  String?
+  expiresAt  DateTime
+  lastUsedAt DateTime  @default(now())
+  revokedAt  DateTime?
+  createdAt  DateTime  @default(now())
+
+  @@index([adminId])
+  @@index([expiresAt])
+  @@map("admin_sessions")
 }
 
 model ApiKey {
