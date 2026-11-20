@@ -6,11 +6,12 @@ import { Public } from '../auth/auth.decorators.js';
 import { StorageObjectNotFoundError } from '../storage/storage-driver.js';
 import { StorageService } from '../storage/storage.service.js';
 import { parseRange } from './byte-range.js';
-import { MEDIA_ROUTE, PlaybackService } from './playback.service.js';
+import { CONTENT_KEY_PATH, MEDIA_ROUTE, PlaybackService } from './playback.service.js';
 
 const CONTENT_TYPES: Record<string, string> = {
   '.m3u8': 'application/vnd.apple.mpegurl',
   '.m4s': 'video/iso.segment',
+  '.ts': 'video/mp2t',
   '.mp4': 'video/mp4',
   '.jpg': 'image/jpeg',
   '.vtt': 'text/vtt',
@@ -72,6 +73,11 @@ export class MediaController {
   ): Promise<void> {
     // The router gives a wildcard as a list of path segments.
     const relativePath = Array.isArray(filePath) ? filePath.join('/') : filePath;
+    if (relativePath === CONTENT_KEY_PATH) {
+      await this.serveKey(assetId, token, request, response);
+      return;
+    }
+
     const location = await this.playback.locate(assetId, token, relativePath);
     const driver = location ? await this.storage.getDriver(location.storagePoolId) : null;
     const info = location && driver ? await driver.stat(location.key) : null;
@@ -131,5 +137,30 @@ export class MediaController {
       }
       throw error;
     }
+  }
+
+  /**
+   * Sends the 16-byte content key of an encrypted asset. The playlists point
+   * here with a relative address, so the request carries the same signed token
+   * as every other file of the session.
+   */
+  private async serveKey(
+    assetId: string,
+    token: string,
+    request: Request,
+    response: Response,
+  ): Promise<void> {
+    const key = await this.playback.contentKey(assetId, token);
+    if (!key) {
+      response.status(HttpStatus.NOT_FOUND).json({ statusCode: 404, message: 'Not found' });
+      return;
+    }
+
+    response.setHeader('Content-Type', 'application/octet-stream');
+    response.setHeader('Content-Length', String(key.length));
+    // A key must not be kept by caches or proxies between the player and the server.
+    response.setHeader('Cache-Control', 'no-store');
+    response.setHeader('X-Content-Type-Options', 'nosniff');
+    response.end(request.method === 'HEAD' ? undefined : key);
   }
 }
