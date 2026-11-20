@@ -187,3 +187,17 @@ Assets are packaged as HLS with fragmented MP4 (CMAF) segments.
 **Why:** FFmpeg's HLS muxer cannot encrypt fragmented MP4 with AES-128. MPEG-TS with AES-128 needs no second tool and plays in every HLS player. A relative key address keeps stored playlists identical for every viewer and puts the key behind the same token as the segments.
 
 **Consequence:** there are two segment formats to support, and encrypted assets are slightly larger. This is protection against copying files, not DRM. Real DRM (Widevine, FairPlay, PlayReady) needs CMAF with common encryption and a packager such as Shaka Packager, which is planned as a commercial add-on behind the `EncryptionProvider` extension point. A proxy or edge in front of the API must not cache the key address.
+
+## D-018 Admin panel: a single-page app on the API's origin
+
+**Date:** 2026-11-20
+
+- **The panel is a Vite and React single-page app** with React Router and TanStack Query, and plain CSS without a component library.
+- **It talks to the API on its own origin.** In development Vite passes `/v1` on to the API. In production the web server in front of both does the same.
+- **The session token is kept in the browser's local storage** and sent as a bearer token.
+- **Lists refresh by asking again every two seconds** while something on them is changing.
+- **Uploads belong to the whole panel, not to one page**, so they continue while the admin moves around.
+
+**Why:** one origin needs no cross-origin setup and lets relative playback URLs work as they are. Bearer tokens are what API keys use too, so the API has one way to authenticate and no cross-site request forgery to defend against. Asking again is simple and good enough for one admin team. Plain CSS keeps the bundle small and avoids tying an open-source project to one design library.
+
+**Consequence:** a script injected into the panel could read the token, so the panel must never render untrusted HTML, and the production setup should send a strict content security policy. Signing out revokes the token on the server. Live updates over a push channel can replace the repeated asking later without changing the pages.
