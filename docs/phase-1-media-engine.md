@@ -287,6 +287,8 @@ Status shows what exists today.
 | `POST`                  | `/jobs/{id}/retry`                 | Retry a failed job                                                                                           | Built  |
 | `GET`                   | `/media/{assetId}/{token}/hls/key` | AES-128 content key of an encrypted asset (signed token in the path)                                         | Built  |
 | `GET`                   | `/stats/overview`                  | Figures for the dashboard: assets, jobs, storage, uploads per day, recent failures                           | Built  |
+| `GET`                   | `/assets/{id}/media`               | Qualities, subtitle tracks and pictures of an asset, with signed addresses                                   | Built  |
+| `GET`                   | `/events`                          | Stream of live events for the admin panel (server-sent events)                                               | Built  |
 
 ## Authentication and access control
 

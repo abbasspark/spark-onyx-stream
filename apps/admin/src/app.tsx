@@ -11,6 +11,7 @@ import { ConfirmProvider } from './components/confirm';
 import { Button } from './components/ui/button';
 import { EmptyState, Spinner } from './components/ui/display';
 import { TooltipProvider } from './components/ui/overlay';
+import { LiveProvider } from './live/live';
 import { AccountPage } from './pages/account-page';
 import { AdminsPage } from './pages/admins-page';
 import { ApiKeysPage } from './pages/api-keys-page';
@@ -55,45 +56,47 @@ function Pages() {
   }
 
   return (
-    <UploadsProvider>
-      <Routes>
-        <Route element={<AppShell />}>
-          <Route index element={<DashboardPage />} />
-          <Route path="assets" element={<AssetsPage />} />
-          <Route
-            path="assets/:id"
-            element={
-              <Suspense fallback={<Spinner label="Loading" />}>
-                <AssetDetailPage />
-              </Suspense>
-            }
-          />
-          <Route path="jobs" element={<JobsPage />} />
-          <Route path="encoding-profiles" element={<EncodingProfilesPage />} />
-          <Route path="storage" element={<StoragePage />} />
-          <Route path="admins" element={<AdminsPage />} />
-          <Route path="api-keys" element={<ApiKeysPage />} />
-          <Route path="audit" element={<AuditPage />} />
-          <Route path="account" element={<AccountPage />} />
-          <Route
-            path="*"
-            element={
-              <EmptyState
-                icon={Compass}
-                title="Page not found"
-                action={
-                  <Button asChild>
-                    <Link to="/">Go to the dashboard</Link>
-                  </Button>
-                }
-              >
-                This address does not exist.
-              </EmptyState>
-            }
-          />
-        </Route>
-      </Routes>
-    </UploadsProvider>
+    <LiveProvider>
+      <UploadsProvider>
+        <Routes>
+          <Route element={<AppShell />}>
+            <Route index element={<DashboardPage />} />
+            <Route path="assets" element={<AssetsPage />} />
+            <Route
+              path="assets/:id"
+              element={
+                <Suspense fallback={<Spinner label="Loading" />}>
+                  <AssetDetailPage />
+                </Suspense>
+              }
+            />
+            <Route path="jobs" element={<JobsPage />} />
+            <Route path="encoding-profiles" element={<EncodingProfilesPage />} />
+            <Route path="storage" element={<StoragePage />} />
+            <Route path="admins" element={<AdminsPage />} />
+            <Route path="api-keys" element={<ApiKeysPage />} />
+            <Route path="audit" element={<AuditPage />} />
+            <Route path="account" element={<AccountPage />} />
+            <Route
+              path="*"
+              element={
+                <EmptyState
+                  icon={Compass}
+                  title="Page not found"
+                  action={
+                    <Button asChild>
+                      <Link to="/">Go to the dashboard</Link>
+                    </Button>
+                  }
+                >
+                  This address does not exist.
+                </EmptyState>
+              }
+            />
+          </Route>
+        </Routes>
+      </UploadsProvider>
+    </LiveProvider>
   );
 }
 

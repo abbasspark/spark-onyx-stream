@@ -234,4 +234,55 @@ describe.skipIf(!TEST_DATABASE_URL || !hasFfmpeg)('Playback (e2e, real FFmpeg)',
 
     await http().get('/v1/assets?sort=password').set(auth()).expect(400);
   });
+
+  it('lists the qualities, subtitles and pictures of an asset', async () => {
+    const media = await http().get(`/v1/assets/${assetId}/media`).set(auth()).expect(200);
+
+    expect(media.body.renditions).toEqual([
+      expect.objectContaining({
+        name: expect.stringMatching(/^\d+p$/),
+        width: expect.any(Number),
+        height: expect.any(Number),
+        bitrate: expect.any(Number),
+        codec: expect.stringMatching(/^avc1\./),
+        sizeBytes: expect.stringMatching(/^[1-9]\d*$/),
+      }),
+    ]);
+    expect(media.body.outputBytes).toBe(media.body.renditions[0].sizeBytes);
+    expect(media.body.subtitles).toEqual([]);
+
+    // Each address is signed and can be fetched as it is.
+    const { posterUrl, spriteUrl, spriteTrackUrl } = media.body.thumbnails;
+    expect((await http().get(posterUrl).expect(200)).headers['content-type']).toBe('image/jpeg');
+    expect((await http().get(spriteUrl).expect(200)).headers['content-type']).toBe('image/jpeg');
+    expect((await http().get(spriteTrackUrl).expect(200)).text).toContain('WEBVTT');
+
+    await http().get(`/v1/assets/${assetId}/media`).expect(401);
+    await http()
+      .get('/v1/assets/00000000-0000-7000-8000-000000000000/media')
+      .set(auth())
+      .expect(404);
+  });
+
+  it('announces changes to open admin panels', async () => {
+    const events = testApp.redis.published
+      .filter((entry) => entry.channel === 'onyx:events')
+      .map((entry) => JSON.parse(entry.message) as { type: string; [key: string]: unknown });
+
+    expect(events).toContainEqual({ type: 'asset', assetId, change: 'created' });
+    expect(events).toContainEqual({ type: 'asset', assetId, change: 'uploaded' });
+    expect(events).toContainEqual(
+      expect.objectContaining({ type: 'job', assetId, jobType: 'PROBE', status: 'QUEUED' }),
+    );
+    expect(events).toContainEqual(
+      expect.objectContaining({ type: 'job', assetId, jobType: 'PROBE', status: 'COMPLETED' }),
+    );
+    expect(events).toContainEqual(
+      expect.objectContaining({ type: 'job', assetId, status: 'RUNNING' }),
+    );
+    // Events are hints. They never carry titles, paths or other content.
+    for (const event of events) {
+      expect(Object.keys(event).every((key) => !/title|path|error|url/i.test(key))).toBe(true);
+    }
+  });
 });

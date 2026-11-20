@@ -83,6 +83,21 @@ export class PlaybackService {
     return `${this.config.mediaBaseUrl}/v1/${MEDIA_ROUTE}/${asset.id}/${token}/${poster.path.slice(prefix.length)}`;
   }
 
+  /**
+   * Signs the address of one generated file of an asset.
+   *
+   * @param storagePath Path of the file in storage, such as "assets/{id}/thumbs/sprite.jpg".
+   */
+  signedUrl(assetId: string, storagePath: string): string {
+    const expiresAtSeconds = Math.floor(Date.now() / 1000) + this.config.playbackUrlTtlSeconds;
+    const token = createPlaybackToken(assetId, expiresAtSeconds, this.config.playbackSigningSecret);
+    const prefix = `${outputPrefix(assetId)}/`;
+    const relative = storagePath.startsWith(prefix)
+      ? storagePath.slice(prefix.length)
+      : storagePath;
+    return `${this.config.mediaBaseUrl}/v1/${MEDIA_ROUTE}/${assetId}/${token}/${relative}`;
+  }
+
   /** Issues signed URLs for playing an asset. */
   async createPlayback(assetId: string): Promise<PlaybackInfo> {
     const asset = await this.prisma.asset.findUnique({

@@ -30,6 +30,7 @@ import {
 import { Tooltip } from '@/components/ui/overlay';
 import { describeAction, subjectOf } from '@/lib/audit';
 import { cn } from '@/lib/cn';
+import { usePollInterval } from '@/live/live';
 import {
   formatBytes,
   formatDateTime,
@@ -38,8 +39,6 @@ import {
   humanize,
   usagePercent,
 } from '@/lib/format';
-
-const REFRESH_MS = 5000;
 
 const STATUS_COLORS: Record<Exclude<AssetStatus, 'DELETED'>, string> = {
   READY: 'bg-success',
@@ -178,18 +177,19 @@ function StatusBreakdown({ stats }: { stats: OverviewStats['assets'] }) {
 export function DashboardPage() {
   const { state, can } = useSession();
   const mayRead = can('assets:read') && can('jobs:read');
+  const pollInterval = usePollInterval();
 
   const stats = useQuery({
     queryKey: ['stats', 'overview'],
     queryFn: ({ signal }) => statsApi.overview(signal),
     enabled: mayRead,
-    refetchInterval: REFRESH_MS,
+    refetchInterval: pollInterval(true),
   });
   const activity = useQuery({
     queryKey: ['audit', 'recent'],
     queryFn: ({ signal }) => auditApi.list({ page: 1, pageSize: 6 }, signal),
     enabled: can('audit:read'),
-    refetchInterval: REFRESH_MS * 3,
+    refetchInterval: pollInterval(true),
   });
 
   const name = state.status === 'signedIn' ? state.me.displayName.split(' ')[0] : '';
