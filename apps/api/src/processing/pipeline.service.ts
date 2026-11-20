@@ -13,6 +13,11 @@ import { StorageService } from '../storage/storage.service.js';
 /** Job types whose failure makes the asset unusable. Thumbnails, for example, are not among them. */
 export const ESSENTIAL_JOB_TYPES: readonly JobType[] = ['PROBE', 'REMUX', 'TRANSCODE', 'PACKAGE'];
 
+/** Folder of an asset's uploaded source file inside its storage pool. */
+export function sourcePrefix(assetId: string): string {
+  return `sources/${assetId}`;
+}
+
 /** Folder of an asset's generated files inside its storage pool. */
 export function outputPrefix(assetId: string): string {
   return `assets/${assetId}`;
@@ -142,6 +147,82 @@ export class PipelineService {
       where: { id: assetId, status: 'PROCESSING' },
       data: { status: 'FAILED' },
     });
+  }
+
+  /**
+   * Arranges for the files of a deleted asset to be removed: stops its jobs
+   * and queues a cleanup job, unless one is already waiting.
+   */
+  async scheduleCleanup(assetId: string): Promise<void> {
+    const active = await this.prisma.job.findMany({
+      where: { assetId, status: { in: ['QUEUED', 'RUNNING'] } },
+      select: { id: true, type: true },
+    });
+
+    for (const job of active) {
+      if (job.type === 'CLEANUP') {
+        continue;
+      }
+      // A job that ends in this instant can no longer be cancelled, which is fine.
+      await this.jobs.cancel(job.id).catch(() => undefined);
+    }
+
+    if (!active.some((job) => job.type === 'CLEANUP')) {
+      await this.jobs.enqueue({ type: 'CLEANUP', assetId });
+    }
+  }
+
+  /**
+   * Removes every file of a deleted asset, source and outputs, with their
+   * records, and gives the space back to the pool. Safe to run more than once.
+   *
+   * @returns The number of bytes that were freed.
+   * @throws Error while another job of the asset is still running, so the caller tries again later.
+   */
+  async purge(assetId: string): Promise<bigint> {
+    const asset = await this.prisma.asset.findUnique({ where: { id: assetId } });
+    if (!asset) {
+      return 0n;
+    }
+    if (asset.status !== 'DELETED') {
+      throw new ConflictException('Only a deleted asset can be cleaned up');
+    }
+
+    // A job that still writes would leave files behind after the cleanup.
+    const busy = await this.prisma.job.count({
+      where: { assetId, status: 'RUNNING', type: { not: 'CLEANUP' } },
+    });
+    if (busy > 0) {
+      throw new Error('Another job of this asset is still stopping');
+    }
+
+    const driver = await this.storage.getDriver(asset.storagePoolId);
+    let bytes = 0n;
+    for (const prefix of [outputPrefix(assetId), sourcePrefix(assetId)]) {
+      for await (const entry of driver.list(prefix)) {
+        bytes += BigInt(entry.size);
+      }
+      await driver.deletePrefix(prefix);
+    }
+
+    await this.prisma.$transaction([
+      this.prisma.rendition.deleteMany({ where: { assetId } }),
+      this.prisma.thumbnail.deleteMany({ where: { assetId } }),
+      this.prisma.subtitleTrack.deleteMany({ where: { assetId } }),
+      this.prisma.encryptionKey.deleteMany({ where: { assetId } }),
+      // An empty source path marks the asset as cleaned up.
+      this.prisma.asset.update({
+        where: { id: assetId },
+        data: { sourcePath: null, manifestPath: null },
+      }),
+      this.prisma.$executeRaw`
+        UPDATE storage_pools
+        SET "usedBytes" = GREATEST("usedBytes" - ${bytes}, 0)
+        WHERE id = ${asset.storagePoolId}::uuid`,
+    ]);
+
+    this.logger.log(`Asset ${assetId}: removed all files after deletion (${bytes} bytes)`);
+    return bytes;
   }
 
   /** Deletes the generated files and their records, and gives the space back to the pool. */

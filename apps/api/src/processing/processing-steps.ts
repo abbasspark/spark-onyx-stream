@@ -3,7 +3,7 @@ import { createReadStream, createWriteStream } from 'node:fs';
 import { mkdir, readdir, readFile, rm, stat, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { pipeline } from 'node:stream/promises';
-import { Inject, Injectable, Logger } from '@nestjs/common';
+import { ConflictException, Inject, Injectable, Logger } from '@nestjs/common';
 import { type Asset, type JobType, Prisma, PrismaClient } from '@onyx/database';
 import { AppConfig } from '../config/app-config.js';
 import { type ContentKey, ContentKeysService } from '../crypto/content-keys.service.js';
@@ -130,8 +130,25 @@ export class ProcessingSteps {
         );
       case 'THUMBNAILS':
         return this.withWorkDirectory(context, (directory) => this.thumbnails(context, directory));
+      case 'CLEANUP':
+        return this.cleanup(context);
       default:
         throw new NonRetryableProcessingError(`Job type ${type} is not implemented yet`);
+    }
+  }
+
+  // --- Cleanup -------------------------------------------------------------
+
+  /** Removes the files of a deleted asset. */
+  private async cleanup(context: StepContext): Promise<Record<string, unknown>> {
+    try {
+      return { freedBytes: Number(await this.pipelineService.purge(context.assetId)) };
+    } catch (error) {
+      if (error instanceof ConflictException) {
+        // The asset is not deleted. Trying again would not change that.
+        throw new NonRetryableProcessingError(error.message);
+      }
+      throw error;
     }
   }
 
@@ -373,8 +390,9 @@ export class ProcessingSteps {
         })),
       }),
       ...this.contentKeys.replaceOperations(asset.id, contentKey),
-      this.prisma.asset.update({
-        where: { id: asset.id },
+      // Only an asset still in processing becomes ready. One deleted in the meantime stays deleted.
+      this.prisma.asset.updateMany({
+        where: { id: asset.id, status: 'PROCESSING' },
         data: {
           status: 'READY',
           manifestPath: `${hlsPrefix}/${MASTER_PLAYLIST_NAME}`,

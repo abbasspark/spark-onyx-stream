@@ -120,6 +120,12 @@ An asset created with `"encryption": "AES_128"` gets encrypted segments. Reproce
 
 AES-128 stops people from using downloaded segments or files copied from storage. It is not DRM: a viewer who is allowed to play can also get the key. Losing or changing `MASTER_KEY` makes encrypted assets unplayable until they are reprocessed.
 
+### Deleting and repairs
+
+Deleting an asset marks it deleted at once, cancels its jobs and queues a `CLEANUP` job that removes its source file, streams and content key and frees the space in the pool. Deleting cannot be undone.
+
+The scheduler role repairs what a request could not finish, once a minute: uploads that were stored but never queued for processing, and deleted assets whose files are still in storage.
+
 ### Not built yet
 
 - Several audio languages as separate HLS audio tracks.
