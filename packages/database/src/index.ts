@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 import { PrismaPg } from '@prisma/adapter-pg';
-import { PrismaClient } from './generated/client';
+import { PrismaClient } from './generated/client.js';
 
-export * from './generated/client';
+export * from './generated/client.js';
 
 /**
  * Creates a Prisma client connected through the node-postgres driver adapter.

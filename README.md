@@ -56,11 +56,14 @@ Requirements: Node.js 22.18 or newer (24 recommended), pnpm 12, Docker.
 cp .env.example .env        # then fill in the secrets
 pnpm install
 pnpm dev:infra              # starts PostgreSQL and Redis
-pnpm db:generate            # generates the database client
+pnpm db:generate            # generates and builds the database client
 pnpm db:migrate             # creates the tables
+pnpm dev                    # starts the API on http://localhost:3000/v1
 ```
 
-The applications themselves are not scaffolded yet. See the [roadmap](docs/roadmap.md).
+Check that it runs: `curl http://localhost:3000/v1/health`
+
+The API skeleton is in place. The admin panel and viewer website are not scaffolded yet. See the [roadmap](docs/roadmap.md).
 
 ## Documentation
 
