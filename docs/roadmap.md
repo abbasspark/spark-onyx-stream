@@ -21,8 +21,8 @@ The project is built in phases. Each phase ends with something that works end to
 4. Storage: local and S3-compatible drivers behind one interface. **Done.**
 5. Upload: resumable upload, source file registration. **Done.**
 6. Processing pipeline: probe, decision engine, remux, transcode, package, poster. **Done.** Step 6b added seek-bar previews, embedded subtitles as WebVTT tracks and management of encoding profiles. **Done.** AES-128 encryption with key delivery over the signed playback path is built as well. **Done.**
-7. Playback: signed URLs and delivery of the generated files by the API. **Done.** Verification of the same tokens by Nginx moves to step 9, where it can be tested with the Docker setup.
+7. Playback: signed URLs and delivery of the generated files by the API. **Done.** Step 9 added verification of the same tokens by Nginx.
 8. Admin panel: login, asset library, upload, job monitor, player preview. **Done.** Step 8b added pages for encoding profiles, storage pools, admins, API keys, the audit log and the admin's own account. **Done.**
-9. Development Docker image and a first single-server Compose file.
+9. Docker images and a single-server Compose file, with an Nginx gateway that serves the admin panel and checks playback tokens itself. **Done.**
 
 See [phase-1-media-engine.md](phase-1-media-engine.md) for the design.

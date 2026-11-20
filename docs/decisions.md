@@ -201,3 +201,18 @@ Assets are packaged as HLS with fragmented MP4 (CMAF) segments.
 **Why:** one origin needs no cross-origin setup and lets relative playback URLs work as they are. Bearer tokens are what API keys use too, so the API has one way to authenticate and no cross-site request forgery to defend against. Asking again is simple and good enough for one admin team. Plain CSS keeps the bundle small and avoids tying an open-source project to one design library.
 
 **Consequence:** a script injected into the panel could read the token, so the panel must never render untrusted HTML, and the production setup should send a strict content security policy. Signing out revokes the token on the server. Live updates over a push channel can replace the repeated asking later without changing the pages.
+
+## D-019 Two images and an Nginx gateway that checks tokens itself
+
+**Date:** 2026-11-20
+
+- **Two images:** `api` (the NestJS application with FFmpeg, one image for every role) and `gateway` (Nginx with the built admin panel).
+- **The gateway is the only published service.** It serves the panel, passes `/v1` on to the API and serves media files from the storage volume, which it mounts read-only.
+- **Playback tokens are checked in Nginx with njs**, using the same secret as the API. A unit test loads the script and compares it with the API on valid and invalid tokens.
+- **What the gateway cannot serve goes to the API:** content keys of encrypted assets, and files it does not find on disk, such as assets in an S3 pool.
+- **Migrations run as a one-time service** before the API starts.
+- **Both containers run without root.** The panel is sent with a content security policy that allows only its own files.
+
+**Why:** serving segments is the most frequent request by far, and Nginx sends files from disk with far less work than Node. Checking the token there keeps playback alive when the API is busy or restarting. Nginx's built-in signed-link module only supports MD5, so njs is used to keep HMAC-SHA256.
+
+**Consequence:** the gateway does not ask the database, so a playback URL stays usable until it expires even after its asset is deleted. Removing the files on deletion is the planned fix. The token format now exists in two places, which the test guards. The application image is large (about 390 MB compressed) because of FFmpeg's libraries.

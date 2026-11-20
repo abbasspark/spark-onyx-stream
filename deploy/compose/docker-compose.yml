@@ -1,0 +1,136 @@
+# SPDX-License-Identifier: AGPL-3.0-only
+#
+# Spark Onyx Stream on a single server.
+#
+#   ./init-env.sh                 # once: writes .env with fresh secrets
+#   docker compose up -d --build  # builds the images and starts everything
+#
+# Then open http://<server>:8080 and create the first admin.
+# See README.md in this folder for updates, backups and TLS.
+
+name: onyx
+
+x-app: &app
+  image: onyx-stream/api:local
+  build:
+    context: ../..
+    target: api
+  restart: unless-stopped
+  environment: &app-environment
+    NODE_ENV: production
+    DATABASE_URL: postgresql://${POSTGRES_USER:-onyx}:${POSTGRES_PASSWORD:?Run ./init-env.sh first}@postgres:5432/${POSTGRES_DB:-onyx}
+    REDIS_URL: redis://redis:6379
+    JWT_SECRET: ${JWT_SECRET:?Run ./init-env.sh first}
+    PLAYBACK_SIGNING_SECRET: ${PLAYBACK_SIGNING_SECRET:?Run ./init-env.sh first}
+    MASTER_KEY: ${MASTER_KEY:?Run ./init-env.sh first}
+    PLAYBACK_URL_TTL_SECONDS: ${PLAYBACK_URL_TTL_SECONDS:-21600}
+    UPLOAD_MAX_BYTES: ${UPLOAD_MAX_BYTES:-53687091200}
+    MEDIA_BASE_URL: ${MEDIA_BASE_URL:-}
+    CORS_ORIGINS: ${CORS_ORIGINS:-}
+    # The gateway is the one proxy in front of the API.
+    TRUST_PROXY_HOPS: ${TRUST_PROXY_HOPS:-1}
+
+services:
+  postgres:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-onyx}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Run ./init-env.sh first}
+      POSTGRES_DB: ${POSTGRES_DB:-onyx}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U ${POSTGRES_USER:-onyx} -d ${POSTGRES_DB:-onyx}']
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    # The queue must survive a restart, so every write is kept on disk.
+    command: ['redis-server', '--appendonly', 'yes', '--maxmemory-policy', 'noeviction']
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  # Brings the database to the version of the images, then ends.
+  migrate:
+    <<: *app
+    restart: 'no'
+    working_dir: /app/packages/database
+    command: ['pnpm', 'exec', 'prisma', 'migrate', 'deploy']
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  api:
+    <<: *app
+    environment:
+      <<: *app-environment
+      APP_ROLE: api,scheduler
+    volumes:
+      - storage:/var/lib/onyx/storage
+      - uploads:/var/lib/onyx/uploads
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - "fetch('http://127.0.0.1:3000/v1/health/live').then((r) => process.exit(r.ok ? 0 : 1), () => process.exit(1))"
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 20s
+
+  # Runs FFmpeg. Start more of them with: docker compose up -d --scale worker=2
+  worker:
+    <<: *app
+    environment:
+      <<: *app-environment
+      APP_ROLE: worker
+      WORKER_CONCURRENCY: ${WORKER_CONCURRENCY:-1}
+    volumes:
+      - storage:/var/lib/onyx/storage
+      - processing:/var/lib/onyx/processing
+    # Gives a running job time to stop cleanly.
+    stop_grace_period: 60s
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+
+  gateway:
+    image: onyx-stream/gateway:local
+    build:
+      context: ../..
+      target: gateway
+    restart: unless-stopped
+    environment:
+      PLAYBACK_SIGNING_SECRET: ${PLAYBACK_SIGNING_SECRET:?Run ./init-env.sh first}
+    ports:
+      - '${HTTP_PORT:-8080}:8080'
+    volumes:
+      # Read-only: the gateway sends media files and never changes them.
+      - storage:/var/lib/onyx/storage:ro
+    depends_on:
+      api:
+        condition: service_healthy
+
+volumes:
+  postgres-data:
+  redis-data:
+  storage:
+  uploads:
+  processing:
