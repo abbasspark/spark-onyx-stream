@@ -34,6 +34,7 @@ const PROBE = JSON.stringify({
     {
       codec_type: 'audio',
       codec_name: 'aac',
+      profile: 'LC',
       channels: 2,
       tags: { language: 'eng' },
       disposition: { default: 1 },
@@ -70,10 +71,19 @@ describe('parseProbe', () => {
     const info = parseProbe(PROBE);
 
     expect(info.audio).toEqual([
-      { index: 0, codec: 'aac', channels: 2, language: 'eng', isDefault: true },
-      { index: 1, codec: 'ac3', channels: 6, language: null, isDefault: false },
+      { index: 0, codec: 'aac', profile: 'LC', channels: 2, language: 'eng', isDefault: true },
+      { index: 1, codec: 'ac3', profile: null, channels: 6, language: null, isDefault: false },
     ]);
-    expect(info.subtitles).toEqual([{ index: 0, codec: 'subrip', language: 'deu' }]);
+    expect(info.subtitles).toEqual([
+      {
+        index: 0,
+        codec: 'subrip',
+        language: 'deu',
+        title: null,
+        isDefault: false,
+        isForced: false,
+      },
+    ]);
   });
 
   it('handles a file without video or duration', () => {

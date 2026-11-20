@@ -20,6 +20,11 @@ export interface PlaybackInfo {
   manifestUrl: string;
   /** URL of the poster picture, or null when there is none. */
   posterUrl: string | null;
+  /**
+   * URL of the WebVTT file for seek-bar previews, or null when there is none.
+   * Its cues point into a sprite sheet next to it.
+   */
+  thumbnailTrackUrl: string | null;
   /** When the URLs stop working. */
   expiresAt: Date;
 }
@@ -47,7 +52,7 @@ export class PlaybackService {
   async createPlayback(assetId: string): Promise<PlaybackInfo> {
     const asset = await this.prisma.asset.findUnique({
       where: { id: assetId },
-      include: { thumbnails: { where: { type: 'POSTER' }, take: 1 } },
+      include: { thumbnails: true },
     });
 
     if (!asset || asset.status === 'DELETED') {
@@ -80,11 +85,13 @@ export class PlaybackService {
     const urlFor = (storageKey: string): string =>
       `${this.config.mediaBaseUrl}/v1/${MEDIA_ROUTE}/${asset.id}/${token}/${storageKey.slice(prefix.length)}`;
 
-    const poster = asset.thumbnails[0];
+    const poster = asset.thumbnails.find((thumbnail) => thumbnail.type === 'POSTER');
+    const spriteVtt = asset.thumbnails.find((thumbnail) => thumbnail.type === 'SPRITE_VTT');
     return {
       protocol: 'hls',
       manifestUrl: urlFor(asset.manifestPath),
       posterUrl: poster ? urlFor(poster.path) : null,
+      thumbnailTrackUrl: spriteVtt ? urlFor(spriteVtt.path) : null,
       expiresAt: new Date(expiresAtSeconds * 1000),
     };
   }

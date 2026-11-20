@@ -92,12 +92,27 @@ The probe step fails the asset at once, without retries, when the file has no vi
 
 A process with the `worker` role runs the jobs. It needs FFmpeg and ffprobe, and a working directory (`PROCESSING_TEMP_PATH`) with room for the outputs. `WORKER_CONCURRENCY` sets how many jobs it runs at once.
 
+### Multivariant playlist
+
+The API writes `master.m3u8` itself after FFmpeg has finished. It measures the segments of each quality and lists the peak and average bitrate, the real picture size and the codec strings. FFmpeg's own playlist is not used, because FFmpeg leaves a quality out when it does not know the stream's bitrate, which is normal when a Matroska file is copied.
+
+### Subtitles
+
+Text subtitles inside the source (SubRip, ASS, WebVTT, MOV text) are converted to WebVTT and listed in the multivariant playlist, so every HLS player offers them. Each track gets a language, a label and a row in `subtitle_tracks`. Picture-based subtitles (DVD, Blu-ray) cannot be converted to text and are skipped, which the job output reports. A forced track is on by default, other tracks are off until the viewer turns them on.
+
+### Seek-bar previews
+
+The thumbnail job writes a poster and one sprite sheet: up to 100 small pictures in a single JPEG, at least two seconds apart, with a WebVTT file that tells the player which part of the sheet belongs to which time span. The playback response gives its address as `thumbnailTrackUrl`.
+
+### Encoding profiles
+
+A profile holds the qualities, the segment length and the keyframe interval. Profiles are created, changed and deleted through the API. The keyframe interval must divide the segment length, quality names must be unique, and widths and heights must be even. The default profile and a profile that assets use cannot be deleted. Changing a profile affects only later processing runs.
+
 ### Not built yet
 
-- Seek-bar sprite sheets and extraction of embedded subtitles.
-- AES-128 encryption of segments.
+- AES-128 encryption of segments (see the note in the roadmap).
 - Several audio languages as separate HLS audio tracks.
-- Creating and editing encoding profiles through the API. The default profile can be read.
+- Uploading subtitle files for an existing asset.
 - Hardware encoding.
 
 ## Storage
@@ -168,10 +183,14 @@ assets/{assetId}/hls/master.m3u8
 assets/{assetId}/hls/{quality}/playlist.m3u8
 assets/{assetId}/hls/{quality}/init.mp4          (init_0.mp4, init_1.mp4 ... with several qualities)
 assets/{assetId}/hls/{quality}/seg-00000.m4s
+assets/{assetId}/hls/subs/{number}-{language}/playlist.m3u8
+assets/{assetId}/hls/subs/{number}-{language}/subtitles.vtt
 assets/{assetId}/thumbs/poster.jpg
+assets/{assetId}/thumbs/sprite.jpg
+assets/{assetId}/thumbs/sprite.vtt
 ```
 
-Audio is stored inside each quality's segments. Separate audio tracks and subtitle files get their own folders when they are built.
+Audio is stored inside each quality's segments. Separate audio tracks get their own folders when they are built.
 
 ## Playback and URL signing
 
@@ -235,8 +254,8 @@ Status shows what exists today.
 | `POST`                  | `/storage-pools/{id}/test`        | Write, read and delete a test file to confirm the pool works                | Built   |
 | `GET`                   | `/encoding-profiles`              | List encoding profiles                                                      | Built   |
 | `GET`                   | `/encoding-profiles/{id}`         | Read an encoding profile                                                    | Built   |
-| `POST`                  | `/encoding-profiles`              | Create an encoding profile                                                  | Planned |
-| `PATCH` `DELETE`        | `/encoding-profiles/{id}`         | Update and delete a profile                                                 | Planned |
+| `POST`                  | `/encoding-profiles`              | Create an encoding profile                                                  | Built   |
+| `PATCH` `DELETE`        | `/encoding-profiles/{id}`         | Update and delete a profile                                                 | Built   |
 | `POST`                  | `/assets`                         | Create an asset and get an upload URL                                       | Built   |
 | `GET`                   | `/assets`                         | List assets with filters and pagination                                     | Built   |
 | `GET` `PATCH` `DELETE`  | `/assets/{id}`                    | Read, update and soft-delete an asset                                       | Built   |

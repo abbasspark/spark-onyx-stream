@@ -155,6 +155,7 @@ export class PipelineService {
     await this.prisma.$transaction([
       this.prisma.rendition.deleteMany({ where: { assetId: asset.id } }),
       this.prisma.thumbnail.deleteMany({ where: { assetId: asset.id } }),
+      this.prisma.subtitleTrack.deleteMany({ where: { assetId: asset.id, source: 'EMBEDDED' } }),
       this.prisma.$executeRaw`
         UPDATE storage_pools
         SET "usedBytes" = GREATEST("usedBytes" - ${bytes}, 0)
