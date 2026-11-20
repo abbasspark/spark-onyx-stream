@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-only
+import { getQueueToken } from '@nestjs/bullmq';
 import { Global, type INestApplication, Module, type Type } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import { PrismaClient } from '@onyx/database';
@@ -11,7 +12,11 @@ import { ConfigModule } from '../../src/config/config.module.js';
 import { validateEnv } from '../../src/config/env.schema.js';
 import { CryptoModule } from '../../src/crypto/crypto.module.js';
 import { DatabaseModule } from '../../src/database/database.module.js';
+import type { QueuedJobData } from '../../src/jobs/jobs.service.js';
+import { ProcessingCoreModule } from '../../src/processing/processing.module.js';
+import { PROCESSING_QUEUE } from '../../src/queue/queue.constants.js';
 import { REDIS_CLIENT } from '../../src/redis/redis.module.js';
+import { StorageModule } from '../../src/storage/storage.module.js';
 
 /**
  * Database used by end-to-end tests. The suites delete data in it, so it has
@@ -51,8 +56,52 @@ export class FakeRedis {
     return this.counters.delete(key) ? 1 : 0;
   }
 
+  async publish(channel: string, message: string): Promise<number> {
+    this.published.push({ channel, message });
+    return 0;
+  }
+
+  /** Messages sent with publish, for tests to inspect. */
+  readonly published: { channel: string; message: string }[] = [];
+
   clear(): void {
     this.counters.clear();
+    this.published.length = 0;
+  }
+}
+
+export interface FakeQueuedJob {
+  name: string;
+  data: QueuedJobData;
+  attempts: number;
+}
+
+/**
+ * Stand-in for the BullMQ queue. It records the jobs that were added, so a
+ * test can run them one by one at the moment it chooses.
+ */
+export class FakeQueue {
+  readonly waiting: FakeQueuedJob[] = [];
+
+  async add(name: string, data: QueuedJobData, options: { attempts?: number } = {}) {
+    this.waiting.push({ name, data, attempts: options.attempts ?? 1 });
+    return { id: data.jobId };
+  }
+
+  async getJob(id: string) {
+    const index = this.waiting.findIndex((job) => job.data.jobId === id);
+    if (index === -1) {
+      return undefined;
+    }
+    return {
+      remove: async () => {
+        this.waiting.splice(index, 1);
+      },
+    };
+  }
+
+  clear(): void {
+    this.waiting.length = 0;
   }
 }
 
@@ -66,6 +115,7 @@ export interface TestApp {
   app: INestApplication<App>;
   prisma: PrismaClient;
   redis: FakeRedis;
+  queue: FakeQueue;
   /** Starts a request against the running application. */
   http: () => ReturnType<typeof request>;
   /** Header for an authenticated request. */
@@ -81,7 +131,7 @@ export interface TestApp {
 
 /**
  * Starts the application for end-to-end tests with the real database, a fake
- * Redis, and authentication and audit always loaded.
+ * Redis and queue, and authentication and audit always loaded.
  *
  * @param featureModules The modules under test.
  * @param overrides Extra environment values, for example STORAGE_LOCAL_PATH.
@@ -91,6 +141,7 @@ export async function createTestApp(
   overrides: Record<string, string> = {},
 ): Promise<TestApp> {
   const redis = new FakeRedis();
+  const queue = new FakeQueue();
   const config = new AppConfig(
     validateEnv({
       NODE_ENV: 'test',
@@ -106,19 +157,24 @@ export async function createTestApp(
 
   @Global()
   @Module({
-    providers: [{ provide: REDIS_CLIENT, useValue: redis }],
-    exports: [REDIS_CLIENT],
+    providers: [
+      { provide: REDIS_CLIENT, useValue: redis },
+      { provide: getQueueToken(PROCESSING_QUEUE), useValue: queue },
+    ],
+    exports: [REDIS_CLIENT, getQueueToken(PROCESSING_QUEUE)],
   })
-  class FakeRedisModule {}
+  class FakeInfrastructureModule {}
 
   const moduleRef = await Test.createTestingModule({
     imports: [
       ConfigModule.forRoot(config),
       DatabaseModule,
-      FakeRedisModule,
+      FakeInfrastructureModule,
       CryptoModule,
       AuthModule,
       AuditModule,
+      StorageModule,
+      ProcessingCoreModule,
       ...featureModules,
     ],
   }).compile();
@@ -140,6 +196,7 @@ export async function createTestApp(
     app,
     prisma,
     redis,
+    queue,
     http,
     bearer,
     login,
@@ -149,7 +206,9 @@ export async function createTestApp(
     },
     resetDatabase: async () => {
       redis.clear();
+      queue.clear();
       await prisma.auditLog.deleteMany();
+      await prisma.job.deleteMany();
       await prisma.asset.deleteMany();
       await prisma.storagePool.deleteMany();
       await prisma.adminUser.deleteMany();

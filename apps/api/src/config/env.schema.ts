@@ -57,6 +57,14 @@ export const envSchema = z.object({
     .min(1)
     .default(50 * 1024 ** 3),
 
+  /** Programs used for media processing. A name is looked up on the PATH. */
+  FFMPEG_PATH: z.string().min(1).default('ffmpeg'),
+  FFPROBE_PATH: z.string().min(1).default('ffprobe'),
+  /** Directory for the working files of processing jobs. Needs room for a source file and its outputs. */
+  PROCESSING_TEMP_PATH: z.string().min(1).default('./tmp/processing'),
+  /** Processing jobs one worker process runs at the same time. Transcoding uses all CPU cores already. */
+  WORKER_CONCURRENCY: z.coerce.number().int().min(1).max(64).default(1),
+
   /**
    * Web origins allowed to call the API from a browser, separated by commas,
    * for example "https://admin.example.com". Empty allows same-origin requests only.

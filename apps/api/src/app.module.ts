@@ -10,6 +10,7 @@ import { ConfigModule } from './config/config.module.js';
 import { CryptoModule } from './crypto/crypto.module.js';
 import { DatabaseModule } from './database/database.module.js';
 import { HealthModule } from './health/health.module.js';
+import { ProcessingApiModule, ProcessingCoreModule } from './processing/processing.module.js';
 import { QueueModule } from './queue/queue.module.js';
 import { RedisModule } from './redis/redis.module.js';
 import { StorageModule, StoragePoolsModule } from './storage/storage.module.js';
@@ -25,6 +26,7 @@ const ROLE_MODULES: Record<AppRole, Type[]> = {
     ApiKeysModule,
     StoragePoolsModule,
     AssetsModule,
+    ProcessingApiModule,
     HealthModule,
   ],
   worker: [WorkerRoleModule],
@@ -50,6 +52,7 @@ export class AppModule {
         QueueModule,
         CryptoModule,
         StorageModule,
+        ProcessingCoreModule,
         ...roleModules,
       ],
     };

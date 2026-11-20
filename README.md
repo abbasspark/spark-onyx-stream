@@ -50,7 +50,7 @@ docs/
 
 ## Development setup
 
-Requirements: Node.js 22.18 or newer (24 recommended), pnpm 12, Docker.
+Requirements: Node.js 22.18 or newer (24 recommended), pnpm 12, Docker, FFmpeg.
 
 ```bash
 cp .env.example .env        # then fill in the secrets

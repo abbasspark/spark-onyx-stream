@@ -19,6 +19,7 @@ import { Server as TusServer } from '@tus/server';
 import { safeSourceFilename } from '../assets/source-filename.js';
 import { AuditService } from '../audit/audit.service.js';
 import { AppConfig } from '../config/app-config.js';
+import { PipelineService } from '../processing/pipeline.service.js';
 import { StorageService } from '../storage/storage.service.js';
 import { parseUploadMetadata } from './upload-metadata.js';
 import { UPLOAD_ENDPOINT } from './uploads.constants.js';
@@ -42,8 +43,8 @@ function uploadError(status: HttpStatus, message: string): HttpException {
  * An upload belongs to one asset and uses the asset id as its upload id, so a
  * client can resume with nothing but the asset id. Bytes are collected in a
  * temporary directory on this server. When the last byte has arrived, the file
- * is moved into the asset's storage pool, its checksum is recorded and the
- * asset becomes UPLOADED.
+ * is moved into the asset's storage pool, its checksum is recorded, the asset
+ * becomes UPLOADED and processing starts.
  *
  * The move runs after the client has its answer, because copying a large file
  * to remote storage can take minutes. If the process stops in between, the
@@ -62,6 +63,7 @@ export class UploadsService implements OnApplicationBootstrap {
     @Inject(StorageService) private readonly storage: StorageService,
     @Inject(AuditService) private readonly audit: AuditService,
     @Inject(AppConfig) private readonly config: AppConfig,
+    @Inject(PipelineService) private readonly pipeline: PipelineService,
   ) {
     this.store = new FileStore({
       directory: config.uploadTempPath,
@@ -267,6 +269,15 @@ export class UploadsService implements OnApplicationBootstrap {
       entityId: asset.id,
       metadata: { bytes: size, checksum },
     });
+
+    try {
+      await this.pipeline.start(asset.id);
+    } catch (error) {
+      // The file is safely stored. Processing can be started again from the panel.
+      this.logger.error(
+        `Asset ${asset.id}: could not start processing: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
   }
 
   private async finalizeWithRetry(assetId: string): Promise<void> {
