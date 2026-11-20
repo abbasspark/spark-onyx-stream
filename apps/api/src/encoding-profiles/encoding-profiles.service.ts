@@ -1,5 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 import {
+  BadRequestException,
+  ConflictException,
   Inject,
   Injectable,
   Logger,
@@ -8,6 +10,11 @@ import {
 } from '@nestjs/common';
 import { type EncodingProfile, type EncodingProfileRendition, PrismaClient } from '@onyx/database';
 import { isUniqueViolation } from '../common/prisma-errors.js';
+import {
+  type CreateEncodingProfileInput,
+  KEYFRAME_MESSAGE,
+  type UpdateEncodingProfileInput,
+} from './encoding-profiles.schemas.js';
 
 export type EncodingProfileWithRenditions = EncodingProfile & {
   renditions: EncodingProfileRendition[];
@@ -67,6 +74,8 @@ export class EncodingProfilesService implements OnApplicationBootstrap {
   }
 
   async list(): Promise<EncodingProfileWithRenditions[]> {
+    // A fresh installation shows its default profile right away.
+    await this.ensureDefault();
     return this.prisma.encodingProfile.findMany({
       orderBy: { createdAt: 'asc' },
       include: withRenditions,
@@ -81,6 +90,117 @@ export class EncodingProfilesService implements OnApplicationBootstrap {
     if (!profile) {
       throw new NotFoundException('Encoding profile not found');
     }
+    return profile;
+  }
+
+  async create(input: CreateEncodingProfileInput): Promise<EncodingProfileWithRenditions> {
+    try {
+      return await this.prisma.$transaction(async (tx) => {
+        if (input.isDefault) {
+          await tx.encodingProfile.updateMany({
+            where: { isDefault: true },
+            data: { isDefault: false },
+          });
+        }
+        return tx.encodingProfile.create({
+          data: {
+            name: input.name,
+            description: input.description,
+            isDefault: input.isDefault,
+            segmentSeconds: input.segmentSeconds,
+            keyframeSeconds: input.keyframeSeconds,
+            renditions: {
+              create: input.renditions.map((rendition, index) => ({
+                ...rendition,
+                sortOrder: index,
+              })),
+            },
+          },
+          include: withRenditions,
+        });
+      });
+    } catch (error) {
+      if (isUniqueViolation(error)) {
+        throw new ConflictException('An encoding profile with this name already exists');
+      }
+      throw error;
+    }
+  }
+
+  /**
+   * Changes a profile. Assets that are already processed keep their files.
+   * The change applies to assets processed or reprocessed afterwards.
+   */
+  async update(
+    id: string,
+    input: UpdateEncodingProfileInput,
+  ): Promise<EncodingProfileWithRenditions> {
+    const profile = await this.get(id);
+
+    const segmentSeconds = input.segmentSeconds ?? profile.segmentSeconds;
+    const keyframeSeconds = input.keyframeSeconds ?? profile.keyframeSeconds;
+    if (segmentSeconds % keyframeSeconds !== 0) {
+      throw new BadRequestException(KEYFRAME_MESSAGE);
+    }
+
+    try {
+      return await this.prisma.$transaction(async (tx) => {
+        if (input.isDefault && !profile.isDefault) {
+          await tx.encodingProfile.updateMany({
+            where: { isDefault: true },
+            data: { isDefault: false },
+          });
+        }
+        if (input.renditions) {
+          await tx.encodingProfileRendition.deleteMany({ where: { profileId: id } });
+        }
+        return tx.encodingProfile.update({
+          where: { id },
+          data: {
+            name: input.name,
+            description: input.description,
+            isDefault: input.isDefault,
+            segmentSeconds: input.segmentSeconds,
+            keyframeSeconds: input.keyframeSeconds,
+            renditions: input.renditions
+              ? {
+                  create: input.renditions.map((rendition, index) => ({
+                    ...rendition,
+                    sortOrder: index,
+                  })),
+                }
+              : undefined,
+          },
+          include: withRenditions,
+        });
+      });
+    } catch (error) {
+      if (isUniqueViolation(error)) {
+        throw new ConflictException('An encoding profile with this name already exists');
+      }
+      throw error;
+    }
+  }
+
+  /** Deletes a profile that is neither the default nor used by an asset that could be reprocessed. */
+  async delete(id: string): Promise<EncodingProfileWithRenditions> {
+    const profile = await this.get(id);
+    if (profile.isDefault) {
+      throw new ConflictException(
+        'The default encoding profile cannot be deleted. Make another profile the default first',
+      );
+    }
+
+    const inUse = await this.prisma.asset.count({
+      where: { encodingProfileId: id, status: { not: 'DELETED' } },
+    });
+    if (inUse > 0) {
+      throw new ConflictException(
+        `This profile is used by ${inUse} asset(s) and cannot be deleted`,
+      );
+    }
+
+    await this.prisma.encodingProfile.delete({ where: { id } });
     return profile;
   }
 

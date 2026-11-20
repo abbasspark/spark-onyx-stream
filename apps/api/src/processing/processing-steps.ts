@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 import { createReadStream, createWriteStream } from 'node:fs';
-import { mkdir, readdir, readFile, rm, stat } from 'node:fs/promises';
+import { mkdir, readdir, readFile, rm, stat, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { pipeline } from 'node:stream/promises';
 import { Inject, Injectable, Logger } from '@nestjs/common';
@@ -17,15 +17,32 @@ import {
   buildPosterArgs,
   buildTranscodeArgs,
   MASTER_PLAYLIST_NAME,
+  MEDIA_PLAYLIST_NAME,
 } from './media/hls-command.js';
 import { planRenditions } from './media/ladder.js';
-import { parseMasterPlaylist } from './media/master-playlist.js';
+import {
+  aacCodecString,
+  avcCodecString,
+  buildMasterPlaylist,
+  type MasterVariant,
+  measureBitrates,
+  parseMediaPlaylist,
+} from './media/master-builder.js';
 import {
   maxKeyframeGap,
   type MediaInfo,
   parseProbe,
   unsupportedSourceReason,
 } from './media/media-info.js';
+import { buildSpriteArgs, buildSpriteVtt, planSprite } from './media/sprite.js';
+import {
+  buildSubtitleArgs,
+  buildSubtitlePlaylist,
+  planSubtitles,
+  SUBTITLE_FILE_NAME,
+  SUBTITLE_PLAYLIST_NAME,
+  type SubtitleTrackPlan,
+} from './media/subtitles.js';
 import { outputPrefix, PipelineService } from './pipeline.service.js';
 
 /**
@@ -235,12 +252,16 @@ export class ProcessingSteps {
     const audioStream = info.audio.find((stream) => stream.isDefault) ?? info.audio[0] ?? null;
     const sourceHeight = info.video.rotation % 180 === 0 ? info.video.height : info.video.width;
 
+    const planned = type === 'TRANSCODE' ? planRenditions(profile.renditions, sourceHeight) : [];
+    const renditionNames =
+      type === 'TRANSCODE' ? planned.map((rendition) => rendition.name) : [`${info.video.height}p`];
+
     const args =
       type === 'TRANSCODE'
         ? buildTranscodeArgs({
             sourcePath,
             outputDirectory,
-            renditions: planRenditions(profile.renditions, sourceHeight),
+            renditions: planned,
             videoStreamIndex: info.video.index,
             audioStreamIndex: audioStream?.index ?? null,
             timing: {
@@ -251,7 +272,7 @@ export class ProcessingSteps {
         : buildCopyArgs({
             sourcePath,
             outputDirectory,
-            renditionName: `${info.video.height}p`,
+            renditionName: renditionNames[0] as string,
             videoStreamIndex: info.video.index,
             audioStreamIndex: audioStream?.index ?? null,
             segmentSeconds: profile.segmentSeconds,
@@ -264,30 +285,41 @@ export class ProcessingSteps {
         context.onProgress(Math.round(toPercent(positionMs, info.durationMs) * 0.9)),
     });
 
-    const master = await readFile(path.join(outputDirectory, MASTER_PLAYLIST_NAME), 'utf8');
-    const variants = parseMasterPlaylist(master);
-    if (variants.length === 0) {
-      throw new Error('FFmpeg produced no playable output');
+    // Subtitles are written into the same output and listed in the multivariant
+    // playlist before anything is uploaded, so players never see a half-finished asset.
+    const subtitles = await this.extractSubtitles(sourcePath, info, outputDirectory, context);
+
+    const audioCodec = audioStream
+      ? aacCodecString(type === 'TRANSCODE' ? 'LC' : audioStream.profile)
+      : null;
+    const variants: MasterVariant[] = [];
+    for (const name of renditionNames) {
+      variants.push(
+        await this.measureVariant(outputDirectory, name, info, audioCodec, context.signal),
+      );
     }
+    await writeFile(
+      path.join(outputDirectory, MASTER_PLAYLIST_NAME),
+      buildMasterPlaylist(variants, subtitles.tracks),
+    );
 
     const hlsPrefix = `${outputPrefix(asset.id)}/hls`;
     const files = await listFiles(outputDirectory);
     const sizes = await this.uploadFiles(driver, outputDirectory, hlsPrefix, files, context);
 
     const renditions = variants.map((variant) => {
-      const name = variant.uri.split('/')[0] as string;
       const size = files
-        .filter((file) => file.startsWith(`${name}/`))
+        .filter((file) => file.startsWith(`${variant.name}/`))
         .reduce((sum, file) => sum + (sizes.get(file) ?? 0), 0);
       return {
         assetId: asset.id,
-        name,
-        width: variant.width ?? info.video?.width ?? 0,
-        height: variant.height ?? info.video?.height ?? 0,
-        bitrate: variant.bandwidth,
-        frameRate: info.video?.frameRate ?? null,
-        codec: variant.codecs ?? 'unknown',
-        playlistPath: `${hlsPrefix}/${variant.uri}`,
+        name: variant.name,
+        width: variant.width,
+        height: variant.height,
+        bitrate: variant.bitrates.average,
+        frameRate: variant.frameRate,
+        codec: variant.codecs.join(','),
+        playlistPath: `${hlsPrefix}/${variant.name}/${MEDIA_PLAYLIST_NAME}`,
         sizeBytes: BigInt(size),
       };
     });
@@ -296,6 +328,18 @@ export class ProcessingSteps {
     await this.prisma.$transaction([
       this.prisma.rendition.deleteMany({ where: { assetId: asset.id } }),
       this.prisma.rendition.createMany({ data: renditions }),
+      this.prisma.subtitleTrack.deleteMany({ where: { assetId: asset.id, source: 'EMBEDDED' } }),
+      this.prisma.subtitleTrack.createMany({
+        data: subtitles.tracks.map((track) => ({
+          assetId: asset.id,
+          language: track.language,
+          label: track.label,
+          source: 'EMBEDDED' as const,
+          isDefault: track.isDefault,
+          isForced: track.isForced,
+          path: `${hlsPrefix}/subs/${track.slug}/${SUBTITLE_FILE_NAME}`,
+        })),
+      }),
       this.prisma.asset.update({
         where: { id: asset.id },
         data: {
@@ -316,9 +360,101 @@ export class ProcessingSteps {
 
     return {
       renditions: renditions.map((rendition) => rendition.name),
+      subtitles: subtitles.tracks.map((track) => track.label),
+      ...(subtitles.skipped.length > 0 ? { subtitlesSkipped: subtitles.skipped } : {}),
       files: files.length,
       bytes: totalBytes,
     };
+  }
+
+  /**
+   * Describes one finished quality for the multivariant playlist: its real
+   * picture size, its codec strings and the bitrates of its segments.
+   */
+  private async measureVariant(
+    outputDirectory: string,
+    name: string,
+    info: MediaInfo,
+    audioCodec: string | null,
+    signal: AbortSignal,
+  ): Promise<MasterVariant> {
+    const directory = path.join(outputDirectory, name);
+    const playlistPath = path.join(directory, MEDIA_PLAYLIST_NAME);
+    const playlist = parseMediaPlaylist(await readFile(playlistPath, 'utf8'));
+    if (playlist.segments.length === 0 || !playlist.initUri) {
+      throw new Error(`FFmpeg produced no playable output for ${name}`);
+    }
+
+    const segments = await Promise.all(
+      playlist.segments.map(async (segment) => ({
+        bytes: (await stat(path.join(directory, segment.uri))).size,
+        duration: segment.duration,
+      })),
+    );
+
+    // The encoder decides the exact width, so it is read back from the output.
+    const probed = parseProbe(
+      await this.ffmpeg.ffprobe(
+        ['-print_format', 'json', '-show_format', '-show_streams', playlistPath],
+        signal,
+      ),
+    );
+    const videoCodec =
+      avcCodecString(await readFile(path.join(directory, playlist.initUri))) ?? 'avc1.640028';
+
+    return {
+      name,
+      width: probed.video?.width ?? info.video?.width ?? 0,
+      height: probed.video?.height ?? info.video?.height ?? 0,
+      bitrates: measureBitrates(segments),
+      codecs: audioCodec ? [videoCodec, audioCodec] : [videoCodec],
+      frameRate: info.video?.frameRate ?? null,
+    };
+  }
+
+  /**
+   * Converts the text subtitle streams of the source to WebVTT, each in its
+   * own folder with an HLS playlist. A stream that cannot be converted is
+   * reported and left out. It never fails the asset.
+   */
+  private async extractSubtitles(
+    sourcePath: string,
+    info: MediaInfo,
+    outputDirectory: string,
+    context: StepContext,
+  ): Promise<{ tracks: SubtitleTrackPlan[]; skipped: string[] }> {
+    const plan = planSubtitles(info);
+    const tracks: SubtitleTrackPlan[] = [];
+    const skipped = [...plan.skipped];
+
+    for (const track of plan.tracks) {
+      const directory = path.join(outputDirectory, 'subs', track.slug);
+      await mkdir(directory, { recursive: true });
+
+      try {
+        await this.ffmpeg.ffmpeg(
+          buildSubtitleArgs(
+            sourcePath,
+            track.streamIndex,
+            path.join(directory, SUBTITLE_FILE_NAME),
+          ),
+          { signal: context.signal },
+        );
+        await writeFile(
+          path.join(directory, SUBTITLE_PLAYLIST_NAME),
+          buildSubtitlePlaylist(info.durationMs ?? 0),
+        );
+        tracks.push(track);
+      } catch (error) {
+        context.signal.throwIfAborted();
+        await rm(directory, { recursive: true, force: true });
+        skipped.push(
+          `Subtitle track "${track.label}" could not be converted: ${error instanceof Error ? error.message : String(error)}`,
+        );
+      }
+    }
+
+    return { tracks, skipped };
   }
 
   // --- Thumbnails ----------------------------------------------------------
@@ -359,16 +495,64 @@ export class ProcessingSteps {
     const size = (await stat(posterPath)).size;
     await driver.write(key, createReadStream(posterPath), { contentType: CONTENT_TYPES['.jpg'] });
 
+    const thumbnails: {
+      type: 'POSTER' | 'SPRITE' | 'SPRITE_VTT';
+      path: string;
+      width?: number;
+      height?: number;
+    }[] = [{ type: 'POSTER', path: key }];
+    let totalBytes = size;
+
+    // The sprite sheet for seek-bar previews, with the WebVTT file that indexes it.
+    const rotated = info.video.rotation % 180 !== 0;
+    const plan = planSprite(
+      info.durationMs ?? 0,
+      rotated ? info.video.height : info.video.width,
+      rotated ? info.video.width : info.video.height,
+    );
+    if (plan) {
+      const spritePath = path.join(workDirectory, 'sprite.jpg');
+      await this.ffmpeg.ffmpeg(
+        buildSpriteArgs({
+          sourcePath,
+          outputPath: spritePath,
+          videoStreamIndex: info.video.index,
+          plan,
+        }),
+        { signal: context.signal },
+      );
+
+      const spriteKey = `${outputPrefix(asset.id)}/thumbs/sprite.jpg`;
+      const vttKey = `${outputPrefix(asset.id)}/thumbs/sprite.vtt`;
+      const vtt = Buffer.from(buildSpriteVtt(plan, info.durationMs ?? 0, 'sprite.jpg'));
+      await driver.write(spriteKey, createReadStream(spritePath), {
+        contentType: CONTENT_TYPES['.jpg'],
+      });
+      await driver.write(vttKey, vtt, { contentType: CONTENT_TYPES['.vtt'] });
+
+      totalBytes += (await stat(spritePath)).size + vtt.length;
+      thumbnails.push(
+        { type: 'SPRITE', path: spriteKey, width: plan.tileWidth, height: plan.tileHeight },
+        { type: 'SPRITE_VTT', path: vttKey },
+      );
+    }
+
     await this.prisma.$transaction([
-      this.prisma.thumbnail.deleteMany({ where: { assetId: asset.id, type: 'POSTER' } }),
-      this.prisma.thumbnail.create({ data: { assetId: asset.id, type: 'POSTER', path: key } }),
+      this.prisma.thumbnail.deleteMany({ where: { assetId: asset.id } }),
+      this.prisma.thumbnail.createMany({
+        data: thumbnails.map((thumbnail) => ({ assetId: asset.id, ...thumbnail })),
+      }),
       this.prisma.storagePool.update({
         where: { id: asset.storagePoolId },
-        data: { usedBytes: { increment: BigInt(size) } },
+        data: { usedBytes: { increment: BigInt(totalBytes) } },
       }),
     ]);
 
-    return { poster: key, bytes: size };
+    return {
+      poster: key,
+      sprite: plan ? { pictures: plan.count, everySeconds: plan.intervalSeconds } : null,
+      bytes: totalBytes,
+    };
   }
 
   // --- Shared helpers ------------------------------------------------------

@@ -246,11 +246,93 @@ describe.skipIf(!TEST_DATABASE_URL || !hasFfmpeg)('Processing pipeline (e2e, rea
     expect(asset.status).toBe('READY');
     expect(asset.processingMode).toBe('TRANSCODE');
     expect(await testApp.prisma.rendition.count({ where: { assetId } })).toBe(1);
-    expect(await testApp.prisma.thumbnail.count({ where: { assetId } })).toBe(1);
+    expect(await testApp.prisma.thumbnail.count({ where: { assetId } })).toBe(3);
 
     await http().post(`/v1/assets/${assetId}/reprocess`).set(auth()).expect(202);
     await http().post(`/v1/assets/${assetId}/reprocess`).set(auth()).expect(409);
   }, 180_000);
+
+  it('converts embedded subtitles to WebVTT tracks and builds seek-bar previews', async () => {
+    const english = path.join(workDirectory, 'en.srt');
+    const german = path.join(workDirectory, 'de.srt');
+    await writeFile(english, '1\n00:00:01,000 --> 00:00:03,000\nHello from the first cue\n\n');
+    await writeFile(
+      german,
+      '1\n00:00:01,000 --> 00:00:03,000\nHallo aus dem ersten Untertitel\n\n',
+    );
+    const withSubtitles = path.join(workDirectory, 'with-subtitles.mkv');
+    generateVideo(withSubtitles, [
+      '-i',
+      copyable,
+      '-i',
+      english,
+      '-i',
+      german,
+      '-map',
+      '0:v',
+      '-map',
+      '0:a',
+      '-map',
+      '1',
+      '-map',
+      '2',
+      '-c',
+      'copy',
+      '-c:s',
+      'srt',
+      '-metadata:s:s:0',
+      'language=eng',
+      '-metadata:s:s:1',
+      'language=ger',
+      '-metadata:s:s:1',
+      'title=Deutsch (SDH)',
+    ]);
+
+    const assetId = await uploadSource(withSubtitles);
+    await drainQueue();
+    expect((await getAsset(assetId)).status).toBe('READY');
+
+    // Subtitles: one WebVTT file and one playlist per track, listed in the multivariant playlist.
+    const hls = path.join(storageDirectory, 'assets', assetId, 'hls');
+    const master = await readFile(path.join(hls, 'master.m3u8'), 'utf8');
+    expect(master).toContain('TYPE=SUBTITLES,GROUP-ID="subs",NAME="English",LANGUAGE="en"');
+    expect(master).toContain('NAME="Deutsch (SDH)",LANGUAGE="de"');
+    expect(master).toContain('URI="subs/0-en/playlist.m3u8"');
+    expect(master).toMatch(/#EXT-X-STREAM-INF:.*SUBTITLES="subs"/);
+
+    const vtt = await readFile(path.join(hls, 'subs', '0-en', 'subtitles.vtt'), 'utf8');
+    expect(vtt.startsWith('WEBVTT')).toBe(true);
+    expect(vtt).toContain('Hello from the first cue');
+    expect(await readFile(path.join(hls, 'subs', '1-de', 'playlist.m3u8'), 'utf8')).toContain(
+      'subtitles.vtt',
+    );
+
+    const tracks = await testApp.prisma.subtitleTrack.findMany({
+      where: { assetId },
+      orderBy: { language: 'asc' },
+    });
+    expect(tracks.map((track) => `${track.language}:${track.label}:${track.source}`)).toEqual([
+      'de:Deutsch (SDH):EMBEDDED',
+      'en:English:EMBEDDED',
+    ]);
+
+    const encode = (await jobsOf(assetId)).find((job) => job.type === 'REMUX');
+    expect(encode?.output?.subtitles).toEqual(['English', 'Deutsch (SDH)']);
+
+    // Previews: a sprite sheet and the WebVTT file that indexes it.
+    const thumbs = path.join(storageDirectory, 'assets', assetId, 'thumbs');
+    expect((await readdir(thumbs)).sort()).toEqual(['poster.jpg', 'sprite.jpg', 'sprite.vtt']);
+    const spriteVtt = await readFile(path.join(thumbs, 'sprite.vtt'), 'utf8');
+    expect(spriteVtt).toContain('00:00:00.000 --> 00:00:02.000\nsprite.jpg#xywh=0,0,160,90');
+    expect(spriteVtt).toContain('sprite.jpg#xywh=480,0,160,90');
+
+    const kinds = await testApp.prisma.thumbnail.findMany({ where: { assetId } });
+    expect(kinds.map((thumbnail) => thumbnail.type).sort()).toEqual([
+      'POSTER',
+      'SPRITE',
+      'SPRITE_VTT',
+    ]);
+  }, 120_000);
 
   it('fails an asset whose file is not a video, without retrying', async () => {
     const notVideo = path.join(workDirectory, 'notes.txt');
