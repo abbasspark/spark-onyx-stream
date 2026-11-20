@@ -16,7 +16,7 @@ import {
   X,
 } from 'lucide-react';
 import { type ReactNode, useEffect, useRef, useState } from 'react';
-import { Link, useNavigate, useSearchParams } from 'react-router';
+import { Link, useNavigate } from 'react-router';
 import { toast } from 'sonner';
 import { apiUrl } from '@/api/client';
 import { assetsApi } from '@/api/endpoints';
@@ -55,6 +55,7 @@ import {
   Tooltip,
 } from '@/components/ui/overlay';
 import { UploadDialog, videoFilesOf } from '@/components/upload-dialog';
+import { useAddressParams } from '@/lib/address-params';
 import { cn } from '@/lib/cn';
 import { usePollInterval } from '@/live/live';
 import {
@@ -116,7 +117,7 @@ export function AssetsPage() {
   const confirm = useConfirm();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const [params, setParams] = useSearchParams();
+  const [params, change] = useAddressParams();
   const pollInterval = usePollInterval();
 
   const page = Math.max(1, Number(params.get('page')) || 1);
@@ -133,23 +134,6 @@ export function AssetsPage() {
   const [droppedFiles, setDroppedFiles] = useState<File[]>([]);
   const [draggingOver, setDraggingOver] = useState(false);
   const dragDepth = useRef(0);
-
-  function change(values: Record<string, string | null>) {
-    setParams(
-      (current) => {
-        const next = new URLSearchParams(current);
-        for (const [key, value] of Object.entries(values)) {
-          if (value) {
-            next.set(key, value);
-          } else {
-            next.delete(key);
-          }
-        }
-        return next;
-      },
-      { replace: true },
-    );
-  }
 
   // A link such as /assets?upload=1 opens the upload dialog.
   useEffect(() => {

@@ -17,11 +17,14 @@ import { AdminsPage } from './pages/admins-page';
 import { ApiKeysPage } from './pages/api-keys-page';
 import { AssetsPage } from './pages/assets-page';
 import { AuditPage } from './pages/audit-page';
+import { CategoriesPage } from './pages/categories-page';
 import { DashboardPage } from './pages/dashboard-page';
 import { EncodingProfilesPage } from './pages/encoding-profiles-page';
 import { JobsPage } from './pages/jobs-page';
 import { LoginPage } from './pages/login-page';
 import { StoragePage } from './pages/storage-page';
+import { TitleEditorPage } from './pages/title-editor-page';
+import { TitlesPage } from './pages/titles-page';
 import { ThemeProvider, useTheme } from './theme/theme';
 import { UploadsProvider } from './uploads/uploads';
 
@@ -70,6 +73,9 @@ function Pages() {
                 </Suspense>
               }
             />
+            <Route path="titles" element={<TitlesPage />} />
+            <Route path="titles/:id" element={<TitleEditorPage />} />
+            <Route path="categories" element={<CategoriesPage />} />
             <Route path="jobs" element={<JobsPage />} />
             <Route path="encoding-profiles" element={<EncodingProfilesPage />} />
             <Route path="storage" element={<StoragePage />} />

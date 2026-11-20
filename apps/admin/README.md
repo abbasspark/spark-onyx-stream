@@ -4,7 +4,10 @@ The admin panel: a single-page app built with Vite and React.
 
 ## What it does today
 
-- **Dashboard:** videos, processing, storage, uploads per day, recent failures and activity
+- **Dashboard:** titles, videos, processing, storage, uploads per day, recent failures and activity
+- **Titles:** movies and series as a wall of posters or a table, with search, filters and sorting
+- **Title editor:** texts, categories, videos, artwork, seasons and episodes, and a checklist that says what is missing before publishing
+- **Categories:** create, edit, delete and reorder
 - **Library:** posters in a grid or a table, search, status filter, sorting, bulk actions, drag-and-drop upload
 - **Uploads:** several files at once, resumable, shown in a tray on every page
 - **Video page:** preview player, details, and tabs for qualities, subtitles, pictures, jobs, activity and source
@@ -47,7 +50,7 @@ The result in `dist/` is static files. Serve them with any web server that answe
 src/
   api/             API client, endpoint functions and response types
   auth/            Session state and token storage
-  components/      App shell, command palette, player, upload tray, job table
+  components/      App shell, command palette, player, upload tray, job table, title editor parts
   components/ui/   The component library: buttons, forms, dialogs, tables, badges
   lib/             Formatting, navigation and other helpers
   live/            Connection to the server's event stream

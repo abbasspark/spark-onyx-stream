@@ -260,3 +260,18 @@ This replaces the "plain CSS without a component library" part of D-018.
 **Why:** asking every two seconds from every open page costs requests whether or not anything changed and still feels late. Server-sent events are plain HTTP, pass through Nginx without extra setup and reconnect simply. WebSockets would add a second protocol for something that only flows one way.
 
 **Consequence:** one open connection per browser tab on the API. A lost event only delays what the panel shows, so publishing never fails the work that caused it. Events are not stored: a panel that was disconnected reads everything again when it reconnects.
+
+## D-023 The catalog is separate from the media library
+
+**Date:** 2026-11-21
+
+- **A title points at a video, it does not own one.** Movies, trailers and episodes link to assets in the library. Deleting a title leaves the videos alone, and one video can be used by more than one title.
+- **Publishing rules live in the API**, which returns a checklist with every title. The panel shows that list and never decides on its own what is missing.
+- **Nothing published can be made unplayable through the catalog:** publishing needs a ready video, a published title's video can only be replaced by a ready one, and a published title cannot be deleted before it is unpublished.
+- **Artwork is public and never changes under its address.** Each upload gets a new id, so pictures can be cached for a long time by browsers and, later, by edges.
+- **The kind of an uploaded picture is read from its bytes.** The file name and the type sent by the browser are not trusted.
+- **Categories are one flat, ordered list.** A title can be in several.
+
+**Why:** the library is about files and processing, the catalog is about what viewers see. Keeping them apart lets a video be re-encoded, replaced or reused without touching what is published, and lets the catalog grow (people, collections, imported metadata) without changing the media engine.
+
+**Consequence:** a video can still be deleted in the library while a published title uses it. The title then shows as incomplete in the panel, and the public catalog API must leave such titles out. Artwork is stored only as uploaded. Resized variants are a later addition.

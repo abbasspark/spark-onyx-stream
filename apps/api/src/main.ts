@@ -9,6 +9,7 @@ import { AppModule } from './app.module.js';
 import { AppConfig } from './config/app-config.js';
 import { validateEnv } from './config/env.schema.js';
 import { loadEnvFile } from './config/load-env-file.js';
+import { ARTWORK_ROUTE } from './catalog/catalog.views.js';
 import { MEDIA_ROUTE } from './playback/playback.service.js';
 
 /** Version prefix of every HTTP route. */
@@ -60,7 +61,11 @@ async function bootstrap(): Promise<void> {
 
     app.enableCors((request: { url?: string }, callback: CorsCallback) => {
       // Media files are opened by players on any site. Their signed URL is the authorization.
-      if (request.url?.startsWith(`/${API_PREFIX}/${MEDIA_ROUTE}/`)) {
+      const path = request.url ?? '';
+      if (
+        path.startsWith(`/${API_PREFIX}/${MEDIA_ROUTE}/`) ||
+        path.startsWith(`/${API_PREFIX}/${ARTWORK_ROUTE}/`)
+      ) {
         callback(null, {
           origin: '*',
           methods: ['GET', 'HEAD', 'OPTIONS'],

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-only
-import { request } from './client';
+import { request, uploadFile } from './client';
 import type {
   Admin,
   ApiKey,
@@ -8,6 +8,8 @@ import type {
   AssetSortField,
   AssetStatus,
   AuditEntry,
+  CatalogImage,
+  Category,
   CreateAdminInput,
   CreateApiKeyInput,
   CreateAssetInput,
@@ -16,6 +18,9 @@ import type {
   CreateStoragePoolInput,
   EncodingProfile,
   EncodingProfileInput,
+  Episode,
+  EpisodeInput,
+  ImageKind,
   Job,
   JobStatus,
   LoginResult,
@@ -23,12 +28,18 @@ import type {
   OverviewStats,
   Page,
   Playback,
+  PublishStatus,
   ReprocessInput,
   SortOrder,
   StoragePool,
   StoragePoolTestResult,
+  TitleDetail,
+  TitleSortField,
+  TitleSummary,
+  TitleType,
   UpdateAdminInput,
   UpdateStoragePoolInput,
+  UpdateTitleInput,
 } from './types';
 
 export const authApi = {
@@ -133,4 +144,61 @@ export const auditApi = {
 
 export const statsApi = {
   overview: (signal?: AbortSignal) => request<OverviewStats>('/v1/stats/overview', { signal }),
+};
+
+export interface TitleListQuery {
+  page: number;
+  pageSize: number;
+  type?: TitleType;
+  status?: PublishStatus;
+  categoryId?: string;
+  q?: string;
+  sort?: TitleSortField;
+  order?: SortOrder;
+}
+
+export const titlesApi = {
+  list: (query: TitleListQuery, signal?: AbortSignal) =>
+    request<Page<TitleSummary>>('/v1/titles', { query: { ...query }, signal }),
+  get: (id: string, signal?: AbortSignal) => request<TitleDetail>(`/v1/titles/${id}`, { signal }),
+  create: (body: { type: TitleType; name: string }) =>
+    request<TitleDetail>('/v1/titles', { method: 'POST', body }),
+  update: (id: string, body: UpdateTitleInput) =>
+    request<TitleDetail>(`/v1/titles/${id}`, { method: 'PATCH', body }),
+  setStatus: (id: string, status: PublishStatus) =>
+    request<TitleDetail>(`/v1/titles/${id}/status`, { method: 'PUT', body: { status } }),
+  remove: (id: string) => request<void>(`/v1/titles/${id}`, { method: 'DELETE' }),
+
+  createSeason: (titleId: string, body: { name?: string | null }) =>
+    request<TitleDetail>(`/v1/titles/${titleId}/seasons`, { method: 'POST', body }),
+  updateSeason: (
+    seasonId: string,
+    body: { number?: number; name?: string | null; synopsis?: string | null },
+  ) => request<TitleDetail>(`/v1/seasons/${seasonId}`, { method: 'PATCH', body }),
+  removeSeason: (seasonId: string) =>
+    request<TitleDetail>(`/v1/seasons/${seasonId}`, { method: 'DELETE' }),
+
+  createEpisode: (seasonId: string, body: EpisodeInput & { name: string }) =>
+    request<Episode>(`/v1/seasons/${seasonId}/episodes`, { method: 'POST', body }),
+  updateEpisode: (episodeId: string, body: EpisodeInput) =>
+    request<Episode>(`/v1/episodes/${episodeId}`, { method: 'PATCH', body }),
+  removeEpisode: (episodeId: string) =>
+    request<TitleDetail>(`/v1/episodes/${episodeId}`, { method: 'DELETE' }),
+};
+
+export const categoriesApi = {
+  list: (signal?: AbortSignal) => request<Category[]>('/v1/categories', { signal }),
+  create: (body: { name: string; description?: string | null }) =>
+    request<Category>('/v1/categories', { method: 'POST', body }),
+  update: (id: string, body: { name?: string; slug?: string; description?: string | null }) =>
+    request<Category>(`/v1/categories/${id}`, { method: 'PATCH', body }),
+  reorder: (ids: string[]) =>
+    request<Category[]>('/v1/categories/order', { method: 'PUT', body: { ids } }),
+  remove: (id: string) => request<void>(`/v1/categories/${id}`, { method: 'DELETE' }),
+};
+
+export const imagesApi = {
+  upload: (kind: ImageKind, file: Blob) =>
+    uploadFile<CatalogImage>(`/v1/images?kind=${kind}`, file),
+  remove: (id: string) => request<void>(`/v1/images/${id}`, { method: 'DELETE' }),
 };

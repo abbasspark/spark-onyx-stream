@@ -19,6 +19,8 @@ export const PERMISSIONS = [
   'encoding-profiles:write',
   'storage:read',
   'storage:write',
+  'catalog:read',
+  'catalog:write',
   'settings:read',
   'settings:write',
 ] as const;
@@ -32,6 +34,7 @@ export type Permission = (typeof PERMISSIONS)[number];
 export const NON_DELEGABLE_PERMISSIONS: readonly Permission[] = ['admins:write', 'api-keys:write'];
 
 const CONTENT_READ: readonly Permission[] = [
+  'catalog:read',
   'assets:read',
   'jobs:read',
   'encoding-profiles:read',
@@ -39,6 +42,7 @@ const CONTENT_READ: readonly Permission[] = [
 ];
 
 const CONTENT_WRITE: readonly Permission[] = [
+  'catalog:write',
   'assets:write',
   'jobs:write',
   'encoding-profiles:write',

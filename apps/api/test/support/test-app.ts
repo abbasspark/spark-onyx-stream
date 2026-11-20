@@ -210,6 +210,10 @@ export async function createTestApp(
       redis.clear();
       queue.clear();
       await prisma.auditLog.deleteMany();
+      // Catalog rows point to assets, pictures and pools, so they go first.
+      await prisma.title.deleteMany();
+      await prisma.category.deleteMany();
+      await prisma.image.deleteMany();
       await prisma.job.deleteMany();
       await prisma.asset.deleteMany();
       await prisma.encodingProfile.deleteMany();

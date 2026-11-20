@@ -1,0 +1,303 @@
+// SPDX-License-Identifier: AGPL-3.0-only
+import type {
+  Asset,
+  AssetStatus,
+  Category,
+  Episode,
+  Image,
+  ImageKind,
+  PublishStatus,
+  Season,
+  Title,
+  TitleType,
+} from '@onyx/database';
+
+/** Route under which artwork is served, relative to the API prefix. */
+export const ARTWORK_ROUTE = 'artwork';
+
+export interface ImageView {
+  id: string;
+  kind: ImageKind;
+  /** Public address of the picture. It never changes, so it can be cached for good. */
+  url: string;
+  width: number;
+  height: number;
+  bytes: number;
+}
+
+const EXTENSIONS: Record<string, string> = {
+  'image/jpeg': 'jpg',
+  'image/png': 'png',
+  'image/webp': 'webp',
+};
+
+export function toImageView(image: Image, mediaBaseUrl: string): ImageView {
+  return {
+    id: image.id,
+    kind: image.kind,
+    url: `${mediaBaseUrl}/v1/${ARTWORK_ROUTE}/${image.id}.${EXTENSIONS[image.mimeType] ?? 'jpg'}`,
+    width: image.width,
+    height: image.height,
+    bytes: image.bytes,
+  };
+}
+
+/** The part of an asset the catalog shows next to a title or an episode. */
+export interface AssetRef {
+  id: string;
+  title: string;
+  status: AssetStatus;
+  durationMs: number | null;
+  height: number | null;
+}
+
+export function toAssetRef(asset: Asset | null): AssetRef | null {
+  // A deleted asset counts as no asset: it cannot be played.
+  if (!asset || asset.status === 'DELETED') {
+    return null;
+  }
+  return {
+    id: asset.id,
+    title: asset.title,
+    status: asset.status,
+    durationMs: asset.durationMs,
+    height: asset.height,
+  };
+}
+
+export interface CategoryView {
+  id: string;
+  slug: string;
+  name: string;
+  description: string | null;
+  sortOrder: number;
+  /** How many titles carry this category. */
+  titleCount: number;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export function toCategoryView(category: Category & { _count: { titles: number } }): CategoryView {
+  return {
+    id: category.id,
+    slug: category.slug,
+    name: category.name,
+    description: category.description,
+    sortOrder: category.sortOrder,
+    titleCount: category._count.titles,
+    createdAt: category.createdAt,
+    updatedAt: category.updatedAt,
+  };
+}
+
+/** One point of the list that says whether a title is ready to be published. */
+export interface ChecklistItem {
+  key: string;
+  label: string;
+  done: boolean;
+  /** A required point blocks publishing while it is not done. */
+  required: boolean;
+}
+
+export interface TitleSummary {
+  id: string;
+  type: TitleType;
+  slug: string;
+  name: string;
+  releaseYear: number | null;
+  status: PublishStatus;
+  publishedAt: Date | null;
+  isFeatured: boolean;
+  poster: ImageView | null;
+  categories: { id: string; name: string }[];
+  /** Movies: the film's asset. Series: null. */
+  asset: AssetRef | null;
+  seasonCount: number;
+  episodeCount: number;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface EpisodeView {
+  id: string;
+  seasonId: string;
+  number: number;
+  name: string;
+  synopsis: string | null;
+  status: PublishStatus;
+  publishedAt: Date | null;
+  asset: AssetRef | null;
+  still: ImageView | null;
+}
+
+export interface SeasonView {
+  id: string;
+  number: number;
+  name: string | null;
+  synopsis: string | null;
+  episodes: EpisodeView[];
+}
+
+export interface TitleDetail extends TitleSummary {
+  originalName: string | null;
+  tagline: string | null;
+  synopsis: string | null;
+  ageRating: string | null;
+  originalLanguage: string | null;
+  backdrop: ImageView | null;
+  logo: ImageView | null;
+  trailerAsset: AssetRef | null;
+  seasons: SeasonView[];
+  /** What is done and what is missing before the title can be published. */
+  checklist: ChecklistItem[];
+}
+
+export type EpisodeRecord = Episode & { asset: Asset | null; still: Image | null };
+export type SeasonRecord = Season & { episodes: EpisodeRecord[] };
+
+export type TitleSummaryRecord = Title & {
+  poster: Image | null;
+  asset: Asset | null;
+  categories: { category: Category }[];
+  seasons: { _count: { episodes: number } }[];
+};
+
+export type TitleDetailRecord = Title & {
+  poster: Image | null;
+  backdrop: Image | null;
+  logo: Image | null;
+  asset: Asset | null;
+  trailerAsset: Asset | null;
+  categories: { category: Category }[];
+  seasons: SeasonRecord[];
+};
+
+export function toEpisodeView(episode: EpisodeRecord, mediaBaseUrl: string): EpisodeView {
+  return {
+    id: episode.id,
+    seasonId: episode.seasonId,
+    number: episode.number,
+    name: episode.name,
+    synopsis: episode.synopsis,
+    status: episode.status,
+    publishedAt: episode.publishedAt,
+    asset: toAssetRef(episode.asset),
+    still: episode.still ? toImageView(episode.still, mediaBaseUrl) : null,
+  };
+}
+
+function sortedCategories(links: { category: Category }[]): { id: string; name: string }[] {
+  return links
+    .map((link) => link.category)
+    .sort((a, b) => a.sortOrder - b.sortOrder || a.name.localeCompare(b.name))
+    .map((category) => ({ id: category.id, name: category.name }));
+}
+
+export function toTitleSummary(title: TitleSummaryRecord, mediaBaseUrl: string): TitleSummary {
+  return {
+    id: title.id,
+    type: title.type,
+    slug: title.slug,
+    name: title.name,
+    releaseYear: title.releaseYear,
+    status: title.status,
+    publishedAt: title.publishedAt,
+    isFeatured: title.isFeatured,
+    poster: title.poster ? toImageView(title.poster, mediaBaseUrl) : null,
+    categories: sortedCategories(title.categories),
+    asset: title.type === 'MOVIE' ? toAssetRef(title.asset) : null,
+    seasonCount: title.seasons.length,
+    episodeCount: title.seasons.reduce((total, season) => total + season._count.episodes, 0),
+    createdAt: title.createdAt,
+    updatedAt: title.updatedAt,
+  };
+}
+
+/**
+ * Lists what a title needs before it can be published, and what would make it
+ * better. Required points block publishing.
+ */
+export function buildChecklist(title: TitleDetailRecord): ChecklistItem[] {
+  const asset = toAssetRef(title.asset);
+  const episodes = title.seasons.flatMap((season) => season.episodes);
+
+  const playable: ChecklistItem[] =
+    title.type === 'MOVIE'
+      ? [
+          { key: 'video', label: 'A video is attached', done: asset !== null, required: true },
+          {
+            key: 'video-ready',
+            label: 'The video is processed and ready to play',
+            done: asset?.status === 'READY',
+            required: true,
+          },
+        ]
+      : [
+          {
+            key: 'episode',
+            label: 'At least one episode is published',
+            done: episodes.some((episode) => episode.status === 'PUBLISHED'),
+            required: true,
+          },
+        ];
+
+  return [
+    ...playable,
+    { key: 'poster', label: 'A poster is set', done: title.posterId !== null, required: false },
+    {
+      key: 'synopsis',
+      label: 'A synopsis is written',
+      done: Boolean(title.synopsis?.trim()),
+      required: false,
+    },
+    {
+      key: 'category',
+      label: 'At least one category is chosen',
+      done: title.categories.length > 0,
+      required: false,
+    },
+  ];
+}
+
+export function toTitleDetail(title: TitleDetailRecord, mediaBaseUrl: string): TitleDetail {
+  const image = (value: Image | null) => (value ? toImageView(value, mediaBaseUrl) : null);
+  const seasons = [...title.seasons]
+    .sort((a, b) => a.number - b.number)
+    .map((season) => ({
+      id: season.id,
+      number: season.number,
+      name: season.name,
+      synopsis: season.synopsis,
+      episodes: [...season.episodes]
+        .sort((a, b) => a.number - b.number)
+        .map((episode) => toEpisodeView(episode, mediaBaseUrl)),
+    }));
+
+  return {
+    id: title.id,
+    type: title.type,
+    slug: title.slug,
+    name: title.name,
+    originalName: title.originalName,
+    tagline: title.tagline,
+    synopsis: title.synopsis,
+    releaseYear: title.releaseYear,
+    ageRating: title.ageRating,
+    originalLanguage: title.originalLanguage,
+    status: title.status,
+    publishedAt: title.publishedAt,
+    isFeatured: title.isFeatured,
+    poster: image(title.poster),
+    backdrop: image(title.backdrop),
+    logo: image(title.logo),
+    categories: sortedCategories(title.categories),
+    asset: title.type === 'MOVIE' ? toAssetRef(title.asset) : null,
+    trailerAsset: toAssetRef(title.trailerAsset),
+    seasonCount: seasons.length,
+    episodeCount: seasons.reduce((total, season) => total + season.episodes.length, 0),
+    seasons,
+    checklist: buildChecklist(title),
+    createdAt: title.createdAt,
+    updatedAt: title.updatedAt,
+  };
+}

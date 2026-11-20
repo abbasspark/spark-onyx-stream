@@ -27,6 +27,9 @@ const PAGE_SIZE = 50;
 
 /** The kinds of things the API writes entries about, with a readable name. */
 const ENTITY_TYPES: Record<string, string> = {
+  Title: 'Titles',
+  Episode: 'Episodes',
+  Category: 'Categories',
   Asset: 'Videos',
   Job: 'Jobs',
   EncodingProfile: 'Encoding profiles',

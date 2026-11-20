@@ -6,6 +6,7 @@ import { AssetsModule } from './assets/assets.module.js';
 import { AuditModule } from './audit/audit.module.js';
 import { AuthModule } from './auth/auth.module.js';
 import type { AppConfig } from './config/app-config.js';
+import { CatalogModule } from './catalog/catalog.module.js';
 import { ConfigModule } from './config/config.module.js';
 import { CryptoModule } from './crypto/crypto.module.js';
 import { DatabaseModule } from './database/database.module.js';
@@ -31,6 +32,7 @@ const ROLE_MODULES: Record<AppRole, Type[]> = {
     AssetsModule,
     ProcessingApiModule,
     StatsModule,
+    CatalogModule,
     EventStreamModule,
     HealthModule,
   ],
