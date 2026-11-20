@@ -2,7 +2,8 @@
 //
 // Spark Onyx Stream - database schema
 // Phase 1: media engine core and admin access.
-// Catalog, viewer and billing models are added in later phases.
+// Phase 2: catalog (titles, seasons, episodes, categories, artwork).
+// Viewer and billing models are added in later phases.
 
 generator client {
   provider            = "prisma-client"
@@ -135,6 +136,7 @@ model StoragePool {
   updatedAt  DateTime      @updatedAt
 
   assets Asset[]
+  images Image[]
 
   @@map("storage_pools")
 }
@@ -223,6 +225,11 @@ model Asset {
   thumbnails     Thumbnail[]
   encryptionKeys EncryptionKey[]
   jobs           Job[]
+
+  // Catalog entries that play this asset. The asset itself does not depend on them.
+  titles        Title[]   @relation("TitleMainAsset")
+  trailerTitles Title[]   @relation("TitleTrailerAsset")
+  episodes      Episode[]
 
   @@index([status])
   @@index([storagePoolId])
@@ -424,4 +431,178 @@ model Job {
   @@index([status, type])
   @@index([queuedAt])
   @@map("jobs")
+}
+
+// ---------------------------------------------------------------------------
+// Catalog (OTT layer)
+//
+// What viewers browse. A title or an episode points to an asset of the media
+// engine. Assets know nothing about the catalog.
+// ---------------------------------------------------------------------------
+
+enum TitleType {
+  MOVIE
+  SERIES
+}
+
+enum PublishStatus {
+  /// Being prepared. Only admins see it.
+  DRAFT
+  /// Visible to viewers.
+  PUBLISHED
+  /// Taken out of the catalog but kept.
+  ARCHIVED
+}
+
+enum ImageKind {
+  /// Upright picture for lists and cards, usually 2:3.
+  POSTER
+  /// Wide picture behind the title page, usually 16:9.
+  BACKDROP
+  /// Wide picture of one episode.
+  STILL
+  /// The title as a transparent logo.
+  LOGO
+}
+
+/// A picture uploaded for the catalog. Served without a token, because
+/// artwork of published titles is public by nature.
+model Image {
+  id            String      @id @default(uuid(7)) @db.Uuid
+  kind          ImageKind
+  storagePoolId String      @db.Uuid
+  storagePool   StoragePool @relation(fields: [storagePoolId], references: [id])
+  /// Path of the file, relative to the storage pool root.
+  path          String
+  /// "image/jpeg", "image/png" or "image/webp".
+  mimeType      String
+  width         Int
+  height        Int
+  bytes         Int
+  createdById   String?     @db.Uuid
+  createdAt     DateTime    @default(now())
+
+  posterOf   Title[]   @relation("TitlePoster")
+  backdropOf Title[]   @relation("TitleBackdrop")
+  logoOf     Title[]   @relation("TitleLogo")
+  stillOf    Episode[]
+
+  @@map("images")
+}
+
+/// A movie or a series as viewers see it.
+model Title {
+  id               String    @id @default(uuid(7)) @db.Uuid
+  type             TitleType
+  /// Part of the web address, for example "the-long-road". Unique.
+  slug             String    @unique
+  name             String
+  originalName     String?
+  tagline          String?
+  synopsis         String?
+  releaseYear      Int?
+  /// Age rating as shown to viewers, for example "12" or "PG-13".
+  ageRating        String?
+  /// Language code of the original audio, for example "en".
+  originalLanguage String?
+  /// Shown in prominent places of the viewer site.
+  isFeatured       Boolean   @default(false)
+
+  status      PublishStatus @default(DRAFT)
+  publishedAt DateTime?
+
+  /// The film itself. Only used for movies.
+  assetId        String? @db.Uuid
+  asset          Asset?  @relation("TitleMainAsset", fields: [assetId], references: [id], onDelete: SetNull)
+  trailerAssetId String? @db.Uuid
+  trailerAsset   Asset?  @relation("TitleTrailerAsset", fields: [trailerAssetId], references: [id], onDelete: SetNull)
+
+  posterId   String? @db.Uuid
+  poster     Image?  @relation("TitlePoster", fields: [posterId], references: [id], onDelete: SetNull)
+  backdropId String? @db.Uuid
+  backdrop   Image?  @relation("TitleBackdrop", fields: [backdropId], references: [id], onDelete: SetNull)
+  logoId     String? @db.Uuid
+  logo       Image?  @relation("TitleLogo", fields: [logoId], references: [id], onDelete: SetNull)
+
+  createdById String?  @db.Uuid
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  categories TitleCategory[]
+  seasons    Season[]
+
+  @@index([type, status])
+  @@index([status, publishedAt])
+  @@index([createdAt])
+  @@map("titles")
+}
+
+/// A genre or another grouping that viewers browse by.
+model Category {
+  id          String   @id @default(uuid(7)) @db.Uuid
+  slug        String   @unique
+  name        String   @unique
+  description String?
+  /// Position in lists. Lower comes first.
+  sortOrder   Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  titles TitleCategory[]
+
+  @@index([sortOrder])
+  @@map("categories")
+}
+
+model TitleCategory {
+  titleId    String   @db.Uuid
+  title      Title    @relation(fields: [titleId], references: [id], onDelete: Cascade)
+  categoryId String   @db.Uuid
+  category   Category @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+
+  @@id([titleId, categoryId])
+  @@index([categoryId])
+  @@map("title_categories")
+}
+
+model Season {
+  id       String  @id @default(uuid(7)) @db.Uuid
+  titleId  String  @db.Uuid
+  title    Title   @relation(fields: [titleId], references: [id], onDelete: Cascade)
+  /// Season number as shown to viewers. 0 is used for specials.
+  number   Int
+  name     String?
+  synopsis String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  episodes Episode[]
+
+  @@unique([titleId, number])
+  @@map("seasons")
+}
+
+model Episode {
+  id       String  @id @default(uuid(7)) @db.Uuid
+  seasonId String  @db.Uuid
+  season   Season  @relation(fields: [seasonId], references: [id], onDelete: Cascade)
+  number   Int
+  name     String
+  synopsis String?
+
+  assetId String? @db.Uuid
+  asset   Asset?  @relation(fields: [assetId], references: [id], onDelete: SetNull)
+  stillId String? @db.Uuid
+  still   Image?  @relation(fields: [stillId], references: [id], onDelete: SetNull)
+
+  status      PublishStatus @default(DRAFT)
+  publishedAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([seasonId, number])
+  @@index([assetId])
+  @@map("episodes")
 }

@@ -2,6 +2,7 @@
 import { useQuery } from '@tanstack/react-query';
 import {
   Activity,
+  Clapperboard,
   AlertTriangle,
   ArrowRight,
   CheckCircle2,
@@ -223,8 +224,8 @@ export function DashboardPage() {
       <ErrorNote error={stats.error} className="mb-4" />
 
       {mayRead && stats.isPending ? (
-        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-          {Array.from({ length: 4 }, (_, index) => (
+        <div className="flex flex-wrap gap-4 *:min-w-[12.5rem] *:flex-1">
+          {Array.from({ length: 5 }, (_, index) => (
             <Skeleton key={index} className="h-[104px] rounded-xl" />
           ))}
         </div>
@@ -232,7 +233,14 @@ export function DashboardPage() {
 
       {data ? (
         <div className="grid gap-4">
-          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          <div className="flex flex-wrap gap-4 *:min-w-[12.5rem] *:flex-1">
+            <StatTile
+              icon={Clapperboard}
+              label="Titles in the catalog"
+              value={data.catalog.titles}
+              detail={`${data.catalog.published} published · ${data.catalog.drafts} ${data.catalog.drafts === 1 ? 'draft' : 'drafts'}`}
+              to={can('catalog:read') ? '/titles' : undefined}
+            />
             <StatTile
               icon={Film}
               label="Videos"

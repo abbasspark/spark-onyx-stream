@@ -2,7 +2,17 @@
 import * as DialogPrimitive from '@radix-ui/react-dialog';
 import { useQuery } from '@tanstack/react-query';
 import { Command } from 'cmdk';
-import { Film, LogOut, Monitor, Moon, Search, Sun, Upload, UserRound } from 'lucide-react';
+import {
+  Clapperboard,
+  Film,
+  LogOut,
+  Monitor,
+  Moon,
+  Search,
+  Sun,
+  Upload,
+  UserRound,
+} from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router';
 import { assetsApi } from '@/api/endpoints';
@@ -141,6 +151,17 @@ export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
                   >
                     <Upload />
                     Upload videos
+                  </Command.Item>
+                ) : null}
+                {can('catalog:write') ? (
+                  <Command.Item
+                    value="New title"
+                    keywords={['add', 'create', 'movie', 'series', 'catalog']}
+                    className={itemClasses}
+                    onSelect={() => run(() => void navigate('/titles?new=1'))}
+                  >
+                    <Clapperboard />
+                    New title
                   </Command.Item>
                 ) : null}
                 <Command.Item

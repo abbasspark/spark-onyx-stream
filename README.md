@@ -92,7 +92,7 @@ The viewer website is not scaffolded yet. See the [roadmap](docs/roadmap.md).
 
 ## Documentation
 
-Design documents are in [docs/](docs/README.md): architecture, decision log, roadmap and the phase 1 design.
+Design documents are in [docs/](docs/README.md): architecture, decision log, roadmap and the designs of phase 1 and of the catalog.
 
 ## License
 
