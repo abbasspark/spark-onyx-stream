@@ -1,6 +1,12 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 import { Inject, Injectable } from '@nestjs/common';
-import { type AssetStatus, type JobStatus, type JobType, PrismaClient } from '@onyx/database';
+import {
+  type AssetStatus,
+  type JobStatus,
+  type JobType,
+  PrismaClient,
+  type PublishStatus,
+} from '@onyx/database';
 
 /** Days covered by the uploads chart, today included. */
 const UPLOAD_HISTORY_DAYS = 14;
@@ -14,6 +20,12 @@ export interface OverviewStats {
     byStatus: Partial<Record<AssetStatus, number>>;
     /** Playing time of all ready assets in milliseconds. */
     readyDurationMs: number;
+  };
+  catalog: {
+    /** Movies and series, whatever their state. */
+    titles: number;
+    published: number;
+    drafts: number;
   };
   jobs: {
     queued: number;
@@ -50,36 +62,40 @@ export class StatsService {
     const today = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
     const historyStart = new Date(today - (UPLOAD_HISTORY_DAYS - 1) * DAY_MS);
 
-    const [assetGroups, duration, jobGroups, pools, uploads, failures] = await Promise.all([
-      this.prisma.asset.groupBy({
-        by: ['status'],
-        where: { status: { not: 'DELETED' } },
-        _count: { _all: true },
-      }),
-      this.prisma.asset.aggregate({ where: { status: 'READY' }, _sum: { durationMs: true } }),
-      this.prisma.job.groupBy({
-        by: ['status'],
-        where: {
-          OR: [{ status: { in: ['QUEUED', 'RUNNING'] } }, { finishedAt: { gte: dayAgo } }],
-        },
-        _count: { _all: true },
-      }),
-      this.prisma.storagePool.findMany({
-        where: { isActive: true },
-        select: { usedBytes: true, quotaBytes: true },
-      }),
-      this.prisma.$queryRaw<{ day: Date; count: bigint }[]>`
+    const [assetGroups, duration, jobGroups, pools, uploads, failures, titleGroups] =
+      await Promise.all([
+        this.prisma.asset.groupBy({
+          by: ['status'],
+          where: { status: { not: 'DELETED' } },
+          _count: { _all: true },
+        }),
+        this.prisma.asset.aggregate({ where: { status: 'READY' }, _sum: { durationMs: true } }),
+        this.prisma.job.groupBy({
+          by: ['status'],
+          where: {
+            OR: [{ status: { in: ['QUEUED', 'RUNNING'] } }, { finishedAt: { gte: dayAgo } }],
+          },
+          _count: { _all: true },
+        }),
+        this.prisma.storagePool.findMany({
+          where: { isActive: true },
+          select: { usedBytes: true, quotaBytes: true },
+        }),
+        this.prisma.$queryRaw<{ day: Date; count: bigint }[]>`
         SELECT date_trunc('day', "createdAt" AT TIME ZONE 'UTC') AS day, count(*) AS count
         FROM assets
         WHERE "createdAt" >= ${historyStart} AND status <> 'DELETED'
         GROUP BY 1`,
-      this.prisma.job.findMany({
-        where: { status: 'FAILED' },
-        orderBy: { finishedAt: 'desc' },
-        take: RECENT_FAILURES,
-        include: { asset: { select: { title: true, status: true } } },
-      }),
-    ]);
+        this.prisma.job.findMany({
+          where: { status: 'FAILED' },
+          orderBy: { finishedAt: 'desc' },
+          take: RECENT_FAILURES,
+          include: { asset: { select: { title: true, status: true } } },
+        }),
+        this.prisma.title.groupBy({ by: ['status'], _count: { _all: true } }),
+      ]);
+    const titleCount = (status: PublishStatus): number =>
+      titleGroups.find((group) => group.status === status)?._count._all ?? 0;
 
     const byStatus = Object.fromEntries(
       assetGroups.map((group) => [group.status, group._count._all]),
@@ -104,6 +120,11 @@ export class StatsService {
         total: assetGroups.reduce((total, group) => total + group._count._all, 0),
         byStatus,
         readyDurationMs: duration._sum.durationMs ?? 0,
+      },
+      catalog: {
+        titles: titleGroups.reduce((total, group) => total + group._count._all, 0),
+        published: titleCount('PUBLISHED'),
+        drafts: titleCount('DRAFT'),
       },
       jobs: {
         queued: jobCount('QUEUED'),

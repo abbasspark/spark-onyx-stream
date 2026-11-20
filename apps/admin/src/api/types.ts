@@ -18,6 +18,8 @@ export type Permission =
   | 'encoding-profiles:write'
   | 'storage:read'
   | 'storage:write'
+  | 'catalog:read'
+  | 'catalog:write'
   | 'settings:read'
   | 'settings:write';
 
@@ -299,6 +301,11 @@ export interface OverviewStats {
     byStatus: Partial<Record<AssetStatus, number>>;
     readyDurationMs: number;
   };
+  catalog: {
+    titles: number;
+    published: number;
+    drafts: number;
+  };
   jobs: {
     queued: number;
     running: number;
@@ -351,4 +358,136 @@ export interface AssetMedia {
     spriteTrackUrl: string | null;
   };
   outputBytes: string;
+}
+
+// --- Catalog -----------------------------------------------------------------
+
+export type TitleType = 'MOVIE' | 'SERIES';
+export const PUBLISH_STATUSES = ['DRAFT', 'PUBLISHED', 'ARCHIVED'] as const;
+export type PublishStatus = (typeof PUBLISH_STATUSES)[number];
+export type ImageKind = 'POSTER' | 'BACKDROP' | 'STILL' | 'LOGO';
+
+export interface CatalogImage {
+  id: string;
+  kind: ImageKind;
+  /** Public address of the picture. */
+  url: string;
+  width: number;
+  height: number;
+  bytes: number;
+}
+
+/** The part of a video the catalog shows next to a title or an episode. */
+export interface AssetRef {
+  id: string;
+  title: string;
+  status: AssetStatus;
+  durationMs: number | null;
+  height: number | null;
+}
+
+export interface Category {
+  id: string;
+  slug: string;
+  name: string;
+  description: string | null;
+  sortOrder: number;
+  titleCount: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ChecklistItem {
+  key: string;
+  label: string;
+  done: boolean;
+  /** A required point blocks publishing while it is not done. */
+  required: boolean;
+}
+
+export interface TitleSummary {
+  id: string;
+  type: TitleType;
+  slug: string;
+  name: string;
+  releaseYear: number | null;
+  status: PublishStatus;
+  publishedAt: string | null;
+  isFeatured: boolean;
+  poster: CatalogImage | null;
+  categories: { id: string; name: string }[];
+  asset: AssetRef | null;
+  seasonCount: number;
+  episodeCount: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface Episode {
+  id: string;
+  seasonId: string;
+  number: number;
+  name: string;
+  synopsis: string | null;
+  status: PublishStatus;
+  publishedAt: string | null;
+  asset: AssetRef | null;
+  still: CatalogImage | null;
+}
+
+export interface Season {
+  id: string;
+  number: number;
+  name: string | null;
+  synopsis: string | null;
+  episodes: Episode[];
+}
+
+export interface TitleDetail extends TitleSummary {
+  originalName: string | null;
+  tagline: string | null;
+  synopsis: string | null;
+  ageRating: string | null;
+  originalLanguage: string | null;
+  backdrop: CatalogImage | null;
+  logo: CatalogImage | null;
+  trailerAsset: AssetRef | null;
+  seasons: Season[];
+  checklist: ChecklistItem[];
+}
+
+export interface UpdateTitleInput {
+  name?: string;
+  slug?: string;
+  originalName?: string | null;
+  tagline?: string | null;
+  synopsis?: string | null;
+  releaseYear?: number | null;
+  ageRating?: string | null;
+  originalLanguage?: string | null;
+  isFeatured?: boolean;
+  categoryIds?: string[];
+  assetId?: string | null;
+  trailerAssetId?: string | null;
+  posterId?: string | null;
+  backdropId?: string | null;
+  logoId?: string | null;
+}
+
+export const TITLE_SORT_FIELDS = [
+  'createdAt',
+  'updatedAt',
+  'name',
+  'releaseYear',
+  'publishedAt',
+] as const;
+export type TitleSortField = (typeof TITLE_SORT_FIELDS)[number];
+
+export interface EpisodeInput {
+  number?: number;
+  name?: string;
+  synopsis?: string | null;
+  assetId?: string | null;
+  stillId?: string | null;
+  status?: 'DRAFT' | 'PUBLISHED';
 }

@@ -96,6 +96,9 @@ const STATUS_TONES: Record<string, { tone: BadgeTone; live?: boolean }> = {
   CANCELLED: { tone: 'neutral' },
   DELETED: { tone: 'neutral' },
   FAILED: { tone: 'danger' },
+  PUBLISHED: { tone: 'success' },
+  DRAFT: { tone: 'neutral' },
+  ARCHIVED: { tone: 'warning' },
 };
 
 /** A colored label for an asset or job status. */

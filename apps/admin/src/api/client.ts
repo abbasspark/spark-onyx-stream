@@ -131,3 +131,38 @@ export async function request<Result>(path: string, options: RequestOptions = {}
   }
   return (await response.json()) as Result;
 }
+
+/**
+ * Sends a file as the body of a request and returns the parsed answer.
+ * Used for pictures, which the API takes as the raw file and not as a form.
+ *
+ * @throws ApiError when the server refuses the upload.
+ */
+export async function uploadFile<Result>(path: string, file: Blob): Promise<Result> {
+  const token = readToken();
+  let response: Response;
+  try {
+    response = await fetch(`${API_ORIGIN}${path}`, {
+      method: 'POST',
+      headers: {
+        Accept: 'application/json',
+        // The server recognizes the format from the content, so one fixed type is enough.
+        'Content-Type': 'application/octet-stream',
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+      body: file,
+    });
+  } catch (error) {
+    throw new Error('The server cannot be reached. Check that the API is running', {
+      cause: error,
+    });
+  }
+
+  if (!response.ok) {
+    if (response.status === 401 && token) {
+      onUnauthorized();
+    }
+    throw await toApiError(response);
+  }
+  return (await response.json()) as Result;
+}

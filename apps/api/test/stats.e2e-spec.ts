@@ -31,6 +31,7 @@ describe.skipIf(!TEST_DATABASE_URL)('Stats (e2e)', () => {
     const stats = await http().get('/v1/stats/overview').set(auth()).expect(200);
 
     expect(stats.body.assets).toEqual({ total: 0, byStatus: {}, readyDurationMs: 0 });
+    expect(stats.body.catalog).toEqual({ titles: 0, published: 0, drafts: 0 });
     expect(stats.body.jobs).toEqual({
       queued: 0,
       running: 0,

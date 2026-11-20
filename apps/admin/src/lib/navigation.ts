@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 import {
   Activity,
+  Clapperboard,
   Database,
   Film,
   KeyRound,
@@ -8,6 +9,7 @@ import {
   type LucideIcon,
   ScrollText,
   SlidersHorizontal,
+  Tags,
   Users,
 } from 'lucide-react';
 import type { Permission } from '@/api/types';
@@ -30,9 +32,31 @@ export interface NavGroup {
 /** The pages of the panel, used by the sidebar, the command palette and the breadcrumbs. */
 export const NAVIGATION: NavGroup[] = [
   {
-    label: 'Content',
+    label: 'Overview',
+    items: [{ to: '/', label: 'Dashboard', icon: LayoutDashboard, keywords: 'home overview' }],
+  },
+  {
+    label: 'Catalog',
     items: [
-      { to: '/', label: 'Dashboard', icon: LayoutDashboard, keywords: 'home overview' },
+      {
+        to: '/titles',
+        label: 'Titles',
+        icon: Clapperboard,
+        permission: 'catalog:read',
+        keywords: 'movies series films shows episodes catalog',
+      },
+      {
+        to: '/categories',
+        label: 'Categories',
+        icon: Tags,
+        permission: 'catalog:read',
+        keywords: 'genres groups tags',
+      },
+    ],
+  },
+  {
+    label: 'Media',
+    items: [
       {
         to: '/assets',
         label: 'Library',
