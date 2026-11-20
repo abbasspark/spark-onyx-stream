@@ -4,6 +4,7 @@ import type { Server } from 'node:http';
 import path from 'node:path';
 import { Logger } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
+import type { NestExpressApplication } from '@nestjs/platform-express';
 import { AppModule } from './app.module.js';
 import { AppConfig } from './config/app-config.js';
 import { validateEnv } from './config/env.schema.js';
@@ -51,8 +52,10 @@ async function bootstrap(): Promise<void> {
   logger.log(`Roles: ${config.roles.join(', ')}`);
 
   if (config.hasRole('api')) {
-    const app = await NestFactory.create(rootModule);
+    const app = await NestFactory.create<NestExpressApplication>(rootModule);
     app.setGlobalPrefix(API_PREFIX);
+    // Behind a proxy, the audit log and the sign-in limit need the real client address.
+    app.set('trust proxy', config.trustProxyHops);
     app.enableShutdownHooks();
 
     app.enableCors((request: { url?: string }, callback: CorsCallback) => {

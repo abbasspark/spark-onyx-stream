@@ -44,7 +44,9 @@ packages/
   shared/       Types, DTOs, API client
   player/       Web player with P2P integration
 deploy/
-  installer/    Docker Compose, install and update scripts
+  compose/      Single-server installation with Docker Compose
+  nginx/        Gateway configuration and the playback token check
+  installer/    Install and update scripts (planned)
 docs/
 ```
 
@@ -73,6 +75,18 @@ pnpm dev:admin              # the admin panel on http://localhost:5174
 Open http://localhost:5174. On a fresh installation the panel asks you to create the first admin. After that you can upload videos, watch them being processed, preview them and manage their jobs. See the [admin README](apps/admin/README.md).
 
 There is also a single-page development player (`pnpm dev:player`, http://localhost:5173) for testing the API without the panel. It needs `http://localhost:5173` in `CORS_ORIGINS`.
+
+### Run everything with Docker
+
+To try the whole platform without installing Node.js or FFmpeg:
+
+```bash
+cd deploy/compose
+./init-env.sh
+docker compose up -d --build
+```
+
+Then open http://localhost:8080. See the [Compose README](deploy/compose/README.md) for updates, backups and TLS.
 
 The viewer website is not scaffolded yet. See the [roadmap](docs/roadmap.md).
 

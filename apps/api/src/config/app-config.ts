@@ -24,6 +24,8 @@ export class AppConfig {
   readonly uploadTempPath: string;
   readonly uploadMaxBytes: number;
   readonly corsOrigins: readonly string[];
+  /** Reverse proxies in front of the API whose X-Forwarded-For entry is trusted. */
+  readonly trustProxyHops: number;
   readonly ffmpegPath: string;
   readonly ffprobePath: string;
   /** Absolute path of the directory for working files of processing jobs. */
@@ -52,6 +54,7 @@ export class AppConfig {
     this.uploadTempPath = path.resolve(baseDirectory, env.UPLOAD_TEMP_PATH);
     this.uploadMaxBytes = env.UPLOAD_MAX_BYTES;
     this.corsOrigins = env.CORS_ORIGINS;
+    this.trustProxyHops = env.TRUST_PROXY_HOPS;
     this.ffmpegPath = env.FFMPEG_PATH;
     this.ffprobePath = env.FFPROBE_PATH;
     this.processingTempPath = path.resolve(baseDirectory, env.PROCESSING_TEMP_PATH);
