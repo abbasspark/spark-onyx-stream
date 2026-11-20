@@ -33,12 +33,38 @@ export function Layout() {
               Jobs
             </NavLink>
           ) : null}
+          <span className="nav-heading">Settings</span>
+          {can('encoding-profiles:read') ? (
+            <NavLink to="/encoding-profiles" className="nav-link">
+              Encoding profiles
+            </NavLink>
+          ) : null}
+          {can('storage:read') ? (
+            <NavLink to="/storage" className="nav-link">
+              Storage
+            </NavLink>
+          ) : null}
+          {can('admins:read') ? (
+            <NavLink to="/admins" className="nav-link">
+              Admins
+            </NavLink>
+          ) : null}
+          {can('api-keys:read') ? (
+            <NavLink to="/api-keys" className="nav-link">
+              API keys
+            </NavLink>
+          ) : null}
+          {can('audit:read') ? (
+            <NavLink to="/audit" className="nav-link">
+              Audit log
+            </NavLink>
+          ) : null}
         </nav>
         <div className="sidebar-foot">
-          <div className="who">
+          <NavLink to="/account" className="who nav-link">
             <strong>{state.me.displayName}</strong>
             <span className="muted">{humanize(state.me.role)}</span>
-          </div>
+          </NavLink>
           <button type="button" className="button button-quiet" onClick={() => void signOut()}>
             Sign out
           </button>

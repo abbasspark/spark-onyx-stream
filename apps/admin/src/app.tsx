@@ -6,9 +6,15 @@ import { ApiError } from './api/client';
 import { SessionProvider, useSession } from './auth/session';
 import { Layout } from './components/layout';
 import { EmptyState, Spinner } from './components/ui';
+import { AccountPage } from './pages/account-page';
+import { AdminsPage } from './pages/admins-page';
+import { ApiKeysPage } from './pages/api-keys-page';
 import { AssetsPage } from './pages/assets-page';
+import { AuditPage } from './pages/audit-page';
+import { EncodingProfilesPage } from './pages/encoding-profiles-page';
 import { JobsPage } from './pages/jobs-page';
 import { LoginPage } from './pages/login-page';
+import { StoragePage } from './pages/storage-page';
 import { UploadsProvider } from './uploads/uploads';
 
 // The asset page brings the video player with it, so it is loaded only when opened.
@@ -56,6 +62,12 @@ function Pages() {
             }
           />
           <Route path="jobs" element={<JobsPage />} />
+          <Route path="encoding-profiles" element={<EncodingProfilesPage />} />
+          <Route path="storage" element={<StoragePage />} />
+          <Route path="admins" element={<AdminsPage />} />
+          <Route path="api-keys" element={<ApiKeysPage />} />
+          <Route path="audit" element={<AuditPage />} />
+          <Route path="account" element={<AccountPage />} />
           <Route
             path="*"
             element={<EmptyState title="Page not found">This address does not exist.</EmptyState>}
