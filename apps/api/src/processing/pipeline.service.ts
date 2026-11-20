@@ -22,6 +22,8 @@ export interface ReprocessOptions {
   /** Forces a mode. Left out, the mode is chosen again from the probe result. */
   processingMode?: ProcessingMode;
   encodingProfileId?: string;
+  /** Left out, the asset keeps its setting. */
+  encryption?: 'NONE' | 'AES_128';
 }
 
 /**
@@ -86,6 +88,7 @@ export class PipelineService {
         // Null lets the probe step choose again.
         processingMode: options.processingMode ?? null,
         encodingProfileId: options.encodingProfileId ?? asset.encodingProfileId,
+        encryption: options.encryption ?? asset.encryption,
         manifestPath: null,
         readyAt: null,
       },
@@ -156,6 +159,7 @@ export class PipelineService {
       this.prisma.rendition.deleteMany({ where: { assetId: asset.id } }),
       this.prisma.thumbnail.deleteMany({ where: { assetId: asset.id } }),
       this.prisma.subtitleTrack.deleteMany({ where: { assetId: asset.id, source: 'EMBEDDED' } }),
+      this.prisma.encryptionKey.deleteMany({ where: { assetId: asset.id } }),
       this.prisma.$executeRaw`
         UPDATE storage_pools
         SET "usedBytes" = GREATEST("usedBytes" - ${bytes}, 0)

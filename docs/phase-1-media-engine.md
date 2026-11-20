@@ -108,9 +108,20 @@ The thumbnail job writes a poster and one sprite sheet: up to 100 small pictures
 
 A profile holds the qualities, the segment length and the keyframe interval. Profiles are created, changed and deleted through the API. The keyframe interval must divide the segment length, quality names must be unique, and widths and heights must be even. The default profile and a profile that assets use cannot be deleted. Changing a profile affects only later processing runs.
 
+### Encryption (AES-128)
+
+An asset created with `"encryption": "AES_128"` gets encrypted segments. Reprocessing can switch it on or off.
+
+- Each processing run makes a new random 16-byte key and initialization vector. One key covers all qualities of the asset.
+- Encrypted assets use MPEG-TS segments (`.ts`), because FFmpeg cannot encrypt fragmented MP4 with AES-128. Other assets keep fragmented MP4.
+- The key is stored in `encryption_keys`, encrypted with `MASTER_KEY`. It is never written to storage. During a job it exists as a file in the working directory, outside the output folder, and is removed before the upload.
+- Playlists point to the key with the relative address `../key`, so the player asks for `/v1/media/{assetId}/{token}/hls/key` with the same signed token as the segments. The answer is the 16 key bytes with `Cache-Control: no-store`.
+- Subtitles, the poster and the seek-bar previews are not encrypted.
+
+AES-128 stops people from using downloaded segments or files copied from storage. It is not DRM: a viewer who is allowed to play can also get the key. Losing or changing `MASTER_KEY` makes encrypted assets unplayable until they are reprocessed.
+
 ### Not built yet
 
-- AES-128 encryption of segments (see the note in the roadmap).
 - Several audio languages as separate HLS audio tracks.
 - Uploading subtitle files for an existing asset.
 - Hardware encoding.
@@ -183,6 +194,7 @@ assets/{assetId}/hls/master.m3u8
 assets/{assetId}/hls/{quality}/playlist.m3u8
 assets/{assetId}/hls/{quality}/init.mp4          (init_0.mp4, init_1.mp4 ... with several qualities)
 assets/{assetId}/hls/{quality}/seg-00000.m4s
+assets/{assetId}/hls/{quality}/seg-00000.ts           (encrypted assets, which have no init file)
 assets/{assetId}/hls/subs/{number}-{language}/playlist.m3u8
 assets/{assetId}/hls/subs/{number}-{language}/subtitles.vtt
 assets/{assetId}/thumbs/poster.jpg
@@ -225,7 +237,6 @@ Playback URLs are relative paths while the API serves the files. When `MEDIA_BAS
 
 - Verification of the token by Nginx or an edge server, so files are served without passing through the API.
 - Redirecting to pre-signed URLs for pools in S3.
-- Delivery of AES-128 keys.
 - Limits per viewer, such as concurrent streams. They belong to the viewer accounts of phase 2.
 
 ## API endpoints
@@ -234,41 +245,41 @@ All endpoints are under `/v1`. Every endpoint needs credentials unless marked pu
 
 Status shows what exists today.
 
-| Method                  | Path                              | Purpose                                                                     | Status  |
-| ----------------------- | --------------------------------- | --------------------------------------------------------------------------- | ------- |
-| `GET`                   | `/health`                         | Readiness with dependency status (public)                                   | Built   |
-| `GET`                   | `/health/live`                    | Liveness (public)                                                           | Built   |
-| `GET`                   | `/auth/setup`                     | Whether first-run setup is still required (public)                          | Built   |
-| `POST`                  | `/auth/setup`                     | Create the first owner. Works only while no admin exists (public)           | Built   |
-| `POST`                  | `/auth/login`                     | Start an admin session (public)                                             | Built   |
-| `POST`                  | `/auth/logout`                    | End the session                                                             | Built   |
-| `GET`                   | `/auth/me`                        | The authenticated caller and its permissions                                | Built   |
-| `POST`                  | `/auth/password`                  | Change your own password                                                    | Built   |
-| `GET` `POST`            | `/admins`                         | List and create admins                                                      | Built   |
-| `GET` `PATCH` `DELETE`  | `/admins/{id}`                    | Read, update and deactivate an admin                                        | Built   |
-| `GET` `POST`            | `/api-keys`                       | List and create API keys                                                    | Built   |
-| `DELETE`                | `/api-keys/{id}`                  | Revoke an API key                                                           | Built   |
-| `GET`                   | `/audit-logs`                     | List audit entries with filters                                             | Built   |
-| `GET` `POST`            | `/storage-pools`                  | List and create storage pools                                               | Built   |
-| `GET` `PATCH`           | `/storage-pools/{id}`             | Read and update a storage pool                                              | Built   |
-| `POST`                  | `/storage-pools/{id}/test`        | Write, read and delete a test file to confirm the pool works                | Built   |
-| `GET`                   | `/encoding-profiles`              | List encoding profiles                                                      | Built   |
-| `GET`                   | `/encoding-profiles/{id}`         | Read an encoding profile                                                    | Built   |
-| `POST`                  | `/encoding-profiles`              | Create an encoding profile                                                  | Built   |
-| `PATCH` `DELETE`        | `/encoding-profiles/{id}`         | Update and delete a profile                                                 | Built   |
-| `POST`                  | `/assets`                         | Create an asset and get an upload URL                                       | Built   |
-| `GET`                   | `/assets`                         | List assets with filters and pagination                                     | Built   |
-| `GET` `PATCH` `DELETE`  | `/assets/{id}`                    | Read, update and soft-delete an asset                                       | Built   |
-| `POST`                  | `/uploads`                        | Start a resumable upload for an asset (tus)                                 | Built   |
-| `HEAD` `PATCH` `DELETE` | `/uploads/{assetId}`              | Check progress, send bytes, cancel (tus)                                    | Built   |
-| `POST`                  | `/assets/{id}/reprocess`          | Process again, optionally with another mode or profile                      | Built   |
-| `POST`                  | `/assets/{id}/playback`           | Get a signed manifest URL                                                   | Built   |
-| `GET` `HEAD`            | `/media/{assetId}/{token}/{file}` | Generated files of an asset. The signed token is the authorization (public) | Built   |
-| `GET`                   | `/jobs`                           | List jobs with filters                                                      | Built   |
-| `GET`                   | `/jobs/{id}`                      | Read a job                                                                  | Built   |
-| `POST`                  | `/jobs/{id}/cancel`               | Cancel a job                                                                | Built   |
-| `POST`                  | `/jobs/{id}/retry`                | Retry a failed job                                                          | Built   |
-| `GET`                   | `/keys/{assetId}`                 | AES-128 content key (signature required)                                    | Planned |
+| Method                  | Path                               | Purpose                                                                     | Status |
+| ----------------------- | ---------------------------------- | --------------------------------------------------------------------------- | ------ |
+| `GET`                   | `/health`                          | Readiness with dependency status (public)                                   | Built  |
+| `GET`                   | `/health/live`                     | Liveness (public)                                                           | Built  |
+| `GET`                   | `/auth/setup`                      | Whether first-run setup is still required (public)                          | Built  |
+| `POST`                  | `/auth/setup`                      | Create the first owner. Works only while no admin exists (public)           | Built  |
+| `POST`                  | `/auth/login`                      | Start an admin session (public)                                             | Built  |
+| `POST`                  | `/auth/logout`                     | End the session                                                             | Built  |
+| `GET`                   | `/auth/me`                         | The authenticated caller and its permissions                                | Built  |
+| `POST`                  | `/auth/password`                   | Change your own password                                                    | Built  |
+| `GET` `POST`            | `/admins`                          | List and create admins                                                      | Built  |
+| `GET` `PATCH` `DELETE`  | `/admins/{id}`                     | Read, update and deactivate an admin                                        | Built  |
+| `GET` `POST`            | `/api-keys`                        | List and create API keys                                                    | Built  |
+| `DELETE`                | `/api-keys/{id}`                   | Revoke an API key                                                           | Built  |
+| `GET`                   | `/audit-logs`                      | List audit entries with filters                                             | Built  |
+| `GET` `POST`            | `/storage-pools`                   | List and create storage pools                                               | Built  |
+| `GET` `PATCH`           | `/storage-pools/{id}`              | Read and update a storage pool                                              | Built  |
+| `POST`                  | `/storage-pools/{id}/test`         | Write, read and delete a test file to confirm the pool works                | Built  |
+| `GET`                   | `/encoding-profiles`               | List encoding profiles                                                      | Built  |
+| `GET`                   | `/encoding-profiles/{id}`          | Read an encoding profile                                                    | Built  |
+| `POST`                  | `/encoding-profiles`               | Create an encoding profile                                                  | Built  |
+| `PATCH` `DELETE`        | `/encoding-profiles/{id}`          | Update and delete a profile                                                 | Built  |
+| `POST`                  | `/assets`                          | Create an asset and get an upload URL                                       | Built  |
+| `GET`                   | `/assets`                          | List assets with filters and pagination                                     | Built  |
+| `GET` `PATCH` `DELETE`  | `/assets/{id}`                     | Read, update and soft-delete an asset                                       | Built  |
+| `POST`                  | `/uploads`                         | Start a resumable upload for an asset (tus)                                 | Built  |
+| `HEAD` `PATCH` `DELETE` | `/uploads/{assetId}`               | Check progress, send bytes, cancel (tus)                                    | Built  |
+| `POST`                  | `/assets/{id}/reprocess`           | Process again, optionally with another mode or profile                      | Built  |
+| `POST`                  | `/assets/{id}/playback`            | Get a signed manifest URL                                                   | Built  |
+| `GET` `HEAD`            | `/media/{assetId}/{token}/{file}`  | Generated files of an asset. The signed token is the authorization (public) | Built  |
+| `GET`                   | `/jobs`                            | List jobs with filters                                                      | Built  |
+| `GET`                   | `/jobs/{id}`                       | Read a job                                                                  | Built  |
+| `POST`                  | `/jobs/{id}/cancel`                | Cancel a job                                                                | Built  |
+| `POST`                  | `/jobs/{id}/retry`                 | Retry a failed job                                                          | Built  |
+| `GET`                   | `/media/{assetId}/{token}/hls/key` | AES-128 content key of an encrypted asset (signed token in the path)        | Built  |
 
 ## Authentication and access control
 

@@ -80,6 +80,7 @@ export class AssetsService {
         createdById: actor.adminId,
         processingMode: input.processingMode,
         p2pEnabled: input.p2pEnabled,
+        encryption: input.encryption,
       },
     });
 

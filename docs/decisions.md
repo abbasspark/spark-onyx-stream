@@ -174,3 +174,16 @@ Assets are packaged as HLS with fragmented MP4 (CMAF) segments.
 **Why:** FFmpeg drops a quality from its playlist when the stream has no known bitrate, which made copied Matroska files unplayable. Measured values are also what players need to switch quality without stalling, and target bitrates are often far from the real ones.
 
 **Consequence:** the playlist format is our responsibility, including future additions such as separate audio tracks. Each quality is probed once more after encoding, which costs a fraction of a second.
+
+## D-017 AES-128 encryption with MPEG-TS segments
+
+**Date:** 2026-11-20
+
+- **Encryption is chosen per asset** (`NONE` or `AES_128`) and applied by FFmpeg while it writes the segments.
+- **Encrypted assets use MPEG-TS segments**, all others fragmented MP4.
+- **One random key per asset and processing run**, stored encrypted with `MASTER_KEY` and never written to storage.
+- **The key is delivered under the signed playback path** (`…/hls/key`), referenced from the playlists with a relative address.
+
+**Why:** FFmpeg's HLS muxer cannot encrypt fragmented MP4 with AES-128. MPEG-TS with AES-128 needs no second tool and plays in every HLS player. A relative key address keeps stored playlists identical for every viewer and puts the key behind the same token as the segments.
+
+**Consequence:** there are two segment formats to support, and encrypted assets are slightly larger. This is protection against copying files, not DRM. Real DRM (Widevine, FairPlay, PlayReady) needs CMAF with common encryption and a packager such as Shaka Packager, which is planned as a commercial add-on behind the `EncryptionProvider` extension point. A proxy or edge in front of the API must not cache the key address.

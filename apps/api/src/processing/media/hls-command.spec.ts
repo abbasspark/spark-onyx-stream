@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-only
-import { buildCopyArgs, buildPosterArgs, buildTranscodeArgs } from './hls-command.js';
+import { buildCopyArgs, buildKeyInfo, buildPosterArgs, buildTranscodeArgs } from './hls-command.js';
 import type { PlannedRendition } from './ladder.js';
 
 function rendition(name: string, height: number, videoBitrate: number): PlannedRendition {
@@ -125,5 +125,65 @@ describe('buildPosterArgs', () => {
     expect(valueOf(args, '-ss')).toBe('12.500');
     expect(valueOf(args, '-frames:v')).toBe('1');
     expect(valueOf(args, '-vf')).toBe("scale=-2:'min(720,ih)'");
+  });
+});
+
+describe('encryption', () => {
+  const encryption = { keyInfoPath: '/work/keys/key.info' };
+
+  it('writes encrypted MPEG-TS segments when transcoding', () => {
+    const args = buildTranscodeArgs({
+      sourcePath: '/work/in.mp4',
+      outputDirectory: '/work/out',
+      renditions: RENDITIONS,
+      videoStreamIndex: 0,
+      audioStreamIndex: 0,
+      timing: TIMING,
+      encryption,
+    });
+
+    expect(valueOf(args, '-hls_segment_type')).toBe('mpegts');
+    expect(valueOf(args, '-hls_key_info_file')).toBe('/work/keys/key.info');
+    expect(valueOf(args, '-hls_segment_filename')).toBe('/work/out/%v/seg-%05d.ts');
+    expect(args).not.toContain('-hls_fmp4_init_filename');
+  });
+
+  it('writes encrypted MPEG-TS segments when copying', () => {
+    const args = buildCopyArgs({
+      sourcePath: '/work/in.mp4',
+      outputDirectory: '/work/out',
+      renditionName: '720p',
+      videoStreamIndex: 0,
+      audioStreamIndex: null,
+      segmentSeconds: 4,
+      encryption,
+    });
+
+    expect(valueOf(args, '-hls_segment_type')).toBe('mpegts');
+    expect(valueOf(args, '-hls_key_info_file')).toBe('/work/keys/key.info');
+  });
+
+  it('keeps fragmented MP4 without encryption', () => {
+    const args = buildCopyArgs({
+      sourcePath: '/work/in.mp4',
+      outputDirectory: '/work/out',
+      renditionName: '720p',
+      videoStreamIndex: 0,
+      audioStreamIndex: null,
+      segmentSeconds: 4,
+    });
+
+    expect(valueOf(args, '-hls_segment_type')).toBe('fmp4');
+    expect(args).not.toContain('-hls_key_info_file');
+  });
+
+  it('builds the key info file', () => {
+    const iv = Buffer.from('000102030405060708090a0b0c0d0e0f', 'hex');
+
+    expect(buildKeyInfo('../key', '/work/keys/content.key', iv)).toBe(
+      '../key\n/work/keys/content.key\n000102030405060708090a0b0c0d0e0f\n',
+    );
+    expect(() => buildKeyInfo('../key', '/work/k', Buffer.alloc(8))).toThrow(/16 bytes/);
+    expect(() => buildKeyInfo('../key\nx', '/work/k', iv)).toThrow(/line breaks/);
   });
 });

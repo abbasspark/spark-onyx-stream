@@ -13,6 +13,8 @@ export const ASSET_STATUSES = [
   'DELETED',
 ] as const;
 
+export const ENCRYPTION_MODES = ['NONE', 'AES_128'] as const;
+
 export const createAssetSchema = z.object({
   title: titleSchema,
   /** Pool to store the asset in. Defaults to the default pool. */
@@ -20,6 +22,8 @@ export const createAssetSchema = z.object({
   /** Forces a processing mode. Left out, the mode is chosen after probing. */
   processingMode: z.enum(['COPY', 'TRANSCODE', 'PASSTHROUGH']).optional(),
   p2pEnabled: z.boolean().optional(),
+  /** AES_128 encrypts the segments. Left out, they are not encrypted. */
+  encryption: z.enum(ENCRYPTION_MODES).optional(),
 });
 export type CreateAssetInput = z.infer<typeof createAssetSchema>;
 
@@ -37,6 +41,8 @@ export const reprocessAssetSchema = z
   .object({
     processingMode: z.enum(['COPY', 'TRANSCODE', 'PASSTHROUGH']).optional(),
     encodingProfileId: z.uuid().optional(),
+    /** Changes whether the segments are encrypted. Left out, the setting stays. */
+    encryption: z.enum(ENCRYPTION_MODES).optional(),
   })
   // A request without a body means "choose again".
   .default({});

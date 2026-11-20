@@ -23,6 +23,8 @@ function media(
             height: 1080,
             frameRate: 25,
             pixelFormat: 'yuv420p',
+            profile: 'High',
+            level: 40,
             rotation: 0,
             ...overrides.video,
           },
