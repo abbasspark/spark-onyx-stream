@@ -1,0 +1,30 @@
+{
+  "name": "spark-onyx-stream",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Open-source, self-hosted OTT platform for VOD and live streaming with hybrid P2P delivery.",
+  "license": "AGPL-3.0-only",
+  "author": "Abbas Bandar",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/abbasspark/spark-onyx-stream.git"
+  },
+  "packageManager": "pnpm@12.21.0",
+  "engines": {
+    "node": ">=22.18.0"
+  },
+  "scripts": {
+    "dev:infra": "docker compose -f deploy/dev/docker-compose.yml up -d",
+    "dev:infra:stop": "docker compose -f deploy/dev/docker-compose.yml down",
+    "db:generate": "pnpm --filter @onyx/database generate",
+    "db:validate": "pnpm --filter @onyx/database validate",
+    "db:migrate": "pnpm --filter @onyx/database migrate:dev",
+    "db:studio": "pnpm --filter @onyx/database studio",
+    "typecheck": "pnpm -r typecheck",
+    "format": "prettier --write .",
+    "format:check": "prettier --check ."
+  },
+  "devDependencies": {
+    "prettier": "^3.6.0"
+  }
+}

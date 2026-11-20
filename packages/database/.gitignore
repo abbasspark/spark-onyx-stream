@@ -1,0 +1,2 @@
+# Generated Prisma client. Recreate with: pnpm --filter @onyx/database generate
+src/generated
