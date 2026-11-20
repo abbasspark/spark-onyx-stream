@@ -161,3 +161,16 @@ Assets are packaged as HLS with fragmented MP4 (CMAF) segments.
 **Why:** HLS playlists point to their segments with relative paths. With the token in the path, every request of a session carries it, and the playlists stored on disk never have to be rewritten per viewer. A signature can be verified without a database or a call to the API, which is what a web server or edge in front of the API needs.
 
 **Consequence:** anyone who has a playback URL can watch until it expires, so the URLs are issued per request and are short-lived. Because the token is part of the path, a cache in front of the API must leave it out of its cache key. Serving through the API costs a database lookup per asset every 30 seconds and passes all bytes through Node, which is fine for development and small installations and is replaced by direct delivery for larger ones.
+
+## D-016 The API writes the multivariant playlist
+
+**Date:** 2026-11-20
+
+- **`master.m3u8` is built by the API**, not taken from FFmpeg. FFmpeg still writes the media playlists and segments.
+- **Bitrates are measured from the finished segments.** `BANDWIDTH` is the highest segment bitrate and `AVERAGE-BANDWIDTH` the overall one.
+- **The H.264 codec string is read from the initialization segment**, and the picture size from the output itself.
+- **Subtitle tracks are listed in the same playlist** before anything is uploaded.
+
+**Why:** FFmpeg drops a quality from its playlist when the stream has no known bitrate, which made copied Matroska files unplayable. Measured values are also what players need to switch quality without stalling, and target bitrates are often far from the real ones.
+
+**Consequence:** the playlist format is our responsibility, including future additions such as separate audio tracks. Each quality is probed once more after encoding, which costs a fraction of a second.

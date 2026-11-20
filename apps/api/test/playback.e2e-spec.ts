@@ -75,6 +75,7 @@ describe.skipIf(!TEST_DATABASE_URL || !hasFfmpeg)('Playback (e2e, real FFmpeg)',
       new RegExp(`^/v1/media/${assetId}/\\d+\\.[A-Za-z0-9_-]{43}/hls/master\\.m3u8$`),
     );
     expect(playback.body.posterUrl).toMatch(/\/thumbs\/poster\.jpg$/);
+    expect(playback.body.thumbnailTrackUrl).toMatch(/\/thumbs\/sprite\.vtt$/);
     // The default lifetime is six hours.
     const lifetimeMs = new Date(playback.body.expiresAt).getTime() - before;
     expect(lifetimeMs).toBeGreaterThan(5.9 * 60 * 60 * 1000);
@@ -111,6 +112,19 @@ describe.skipIf(!TEST_DATABASE_URL || !hasFfmpeg)('Playback (e2e, real FFmpeg)',
     expect(Number(segment.headers['content-length'])).toBeGreaterThan(1_000);
     expect(segment.headers['accept-ranges']).toBe('bytes');
     expect(segment.headers['cache-control']).toBe('private, max-age=3600');
+  });
+
+  it('serves the seek-bar preview track and its picture', async () => {
+    const playback = await http().post(`/v1/assets/${assetId}/playback`).set(auth()).expect(200);
+
+    const track = await http().get(playback.body.thumbnailTrackUrl).expect(200);
+    expect(track.headers['content-type']).toContain('text/vtt');
+    expect(track.text).toContain('sprite.jpg#xywh=0,0,160,90');
+
+    // The cues name the picture relative to the track, so it is found beside it.
+    const base = playback.body.thumbnailTrackUrl.replace(/sprite\.vtt$/, '');
+    const sprite = await http().get(`${base}sprite.jpg`).buffer(true).expect(200);
+    expect(sprite.headers['content-type']).toBe('image/jpeg');
   });
 
   it('serves byte ranges', async () => {

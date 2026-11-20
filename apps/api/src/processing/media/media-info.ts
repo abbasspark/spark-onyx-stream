@@ -17,6 +17,8 @@ export interface AudioStreamInfo {
   /** Position among the audio streams of the file, for "-map 0:a:N". */
   index: number;
   codec: string;
+  /** Codec profile as ffprobe names it, for example "LC" or "HE-AAC". */
+  profile: string | null;
   channels: number;
   /** Language tag from the file, for example "eng". Null when missing. */
   language: string | null;
@@ -24,9 +26,15 @@ export interface AudioStreamInfo {
 }
 
 export interface SubtitleStreamInfo {
+  /** Position among the subtitle streams of the file, for "-map 0:s:N". */
   index: number;
   codec: string;
   language: string | null;
+  /** Name given to the track in the file, for example "English (SDH)". */
+  title: string | null;
+  isDefault: boolean;
+  /** Forced tracks carry only translations of foreign-language parts and are shown automatically. */
+  isForced: boolean;
 }
 
 /** What the platform needs to know about a source file. */
@@ -44,6 +52,7 @@ export interface MediaInfo {
 interface RawStream {
   codec_type?: string;
   codec_name?: string;
+  profile?: string;
   width?: number;
   height?: number;
   pix_fmt?: string;
@@ -133,6 +142,7 @@ export function parseProbe(json: string): MediaInfo {
       audio.push({
         index: audio.length,
         codec: stream.codec_name ?? 'unknown',
+        profile: stream.profile ?? null,
         channels: stream.channels ?? 0,
         language: languageOf(stream),
         isDefault: stream.disposition?.default === 1,
@@ -142,6 +152,9 @@ export function parseProbe(json: string): MediaInfo {
         index: subtitles.length,
         codec: stream.codec_name ?? 'unknown',
         language: languageOf(stream),
+        title: stream.tags?.title ?? stream.tags?.TITLE ?? null,
+        isDefault: stream.disposition?.default === 1,
+        isForced: stream.disposition?.forced === 1,
       });
     }
   }

@@ -29,6 +29,7 @@ function media(
     audio: (overrides.audioCodecs ?? ['aac']).map((codec, index) => ({
       index,
       codec,
+      profile: null,
       channels: 2,
       language: null,
       isDefault: index === 0,
