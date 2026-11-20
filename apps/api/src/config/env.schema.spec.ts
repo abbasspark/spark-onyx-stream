@@ -40,6 +40,22 @@ describe('validateEnv', () => {
     expect(run).toThrow(/Unknown APP_ROLE value: nope/);
   });
 
+  it('parses the list of allowed origins', () => {
+    const env = validateEnv({
+      ...validEnv,
+      CORS_ORIGINS: 'http://localhost:5173, https://admin.example.com/',
+    });
+
+    expect(env.CORS_ORIGINS).toEqual(['http://localhost:5173', 'https://admin.example.com']);
+    expect(validateEnv(validEnv).CORS_ORIGINS).toEqual([]);
+  });
+
+  it('rejects an origin with a path', () => {
+    expect(() => validateEnv({ ...validEnv, CORS_ORIGINS: 'https://example.com/admin' })).toThrow(
+      /is not an origin/,
+    );
+  });
+
   it('requires the secrets', () => {
     const { MASTER_KEY: _omitted, ...withoutMasterKey } = validEnv;
 

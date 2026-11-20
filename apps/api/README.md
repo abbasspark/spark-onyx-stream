@@ -25,7 +25,7 @@ The database client has to be generated and built first: `pnpm db:generate`.
 
 ## Endpoints
 
-The full list with status is in [docs/phase-1-media-engine.md](../../docs/phase-1-media-engine.md#api-endpoints). Built so far: health, first-run setup, sign-in and sign-out, password change, admin management, API keys, the audit log and storage pools.
+The full list with status is in [docs/phase-1-media-engine.md](../../docs/phase-1-media-engine.md#api-endpoints). Built so far: health, first-run setup, sign-in and sign-out, password change, admin management, API keys, the audit log, storage pools, assets and resumable uploads.
 
 Every endpoint needs credentials unless its controller or handler is marked `@Public()`.
 
@@ -56,7 +56,7 @@ Send the token on later requests as `Authorization: Bearer <token>`.
 | Unit       | `pnpm --filter @onyx/api test` | Nothing                                      |
 | End-to-end | `pnpm test:e2e`                | A test database for the authentication suite |
 
-The authentication and storage pool suites run against a real PostgreSQL database and are skipped when `TEST_DATABASE_URL` is not set. They delete data in that database, so it must be a separate database. Prepare it once, and again after every new migration:
+The authentication, storage pool and upload suites run against a real PostgreSQL database and are skipped when `TEST_DATABASE_URL` is not set. They delete data in that database, so it must be a separate database. Prepare it once, and again after every new migration:
 
 ```bash
 docker compose -f deploy/dev/docker-compose.yml exec postgres createdb -U onyx onyx_test
@@ -85,6 +85,8 @@ src/
   api-keys/          API key management and authentication
   audit/             Audit log
   storage/           Storage driver interface, local and S3 drivers, storage pools
+  assets/            Asset records and their API
+  uploads/           Resumable uploads with the tus protocol
   health/            Health endpoints
 test/                End-to-end tests
 ```

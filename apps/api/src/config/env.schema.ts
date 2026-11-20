@@ -47,6 +47,40 @@ export const envSchema = z.object({
     ),
 
   STORAGE_LOCAL_PATH: z.string().min(1).default('./storage'),
+
+  /** Directory where uploads are collected before they move into a storage pool. */
+  UPLOAD_TEMP_PATH: z.string().min(1).default('./uploads'),
+  /** Largest accepted source file, in bytes. The default is 50 GiB. */
+  UPLOAD_MAX_BYTES: z.coerce
+    .number()
+    .int()
+    .min(1)
+    .default(50 * 1024 ** 3),
+
+  /**
+   * Web origins allowed to call the API from a browser, separated by commas,
+   * for example "https://admin.example.com". Empty allows same-origin requests only.
+   */
+  CORS_ORIGINS: z
+    .string()
+    .default('')
+    .transform((value, ctx) => {
+      const origins = value
+        .split(',')
+        .map((origin) => origin.trim().replace(/\/$/, ''))
+        .filter((origin) => origin.length > 0);
+
+      for (const origin of origins) {
+        if (!/^https?:\/\/[^/]+$/.test(origin)) {
+          ctx.addIssue({
+            code: 'custom',
+            message: `"${origin}" is not an origin. Use the form https://host or http://host:port`,
+          });
+          return z.NEVER;
+        }
+      }
+      return origins;
+    }),
 });
 
 export type Env = z.infer<typeof envSchema>;

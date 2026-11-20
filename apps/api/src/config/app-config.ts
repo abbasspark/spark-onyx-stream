@@ -20,6 +20,11 @@ export class AppConfig {
   /** Absolute path of the default local storage pool. */
   readonly storageLocalPath: string;
 
+  /** Absolute path of the directory where uploads are collected. */
+  readonly uploadTempPath: string;
+  readonly uploadMaxBytes: number;
+  readonly corsOrigins: readonly string[];
+
   /**
    * @param env Validated environment variables.
    * @param baseDirectory Directory that relative paths in the configuration are
@@ -36,6 +41,9 @@ export class AppConfig {
     this.playbackSigningSecret = env.PLAYBACK_SIGNING_SECRET;
     this.masterKey = env.MASTER_KEY;
     this.storageLocalPath = path.resolve(baseDirectory, env.STORAGE_LOCAL_PATH);
+    this.uploadTempPath = path.resolve(baseDirectory, env.UPLOAD_TEMP_PATH);
+    this.uploadMaxBytes = env.UPLOAD_MAX_BYTES;
+    this.corsOrigins = env.CORS_ORIGINS;
   }
 
   get isProduction(): boolean {
