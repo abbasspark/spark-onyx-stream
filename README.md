@@ -18,16 +18,16 @@ A complete OTT platform that you install on your own servers:
 
 A modular monolith in NestJS, plus small Go services where a single static binary matters.
 
-| Part | Technology |
-|---|---|
+| Part                                     | Technology                                        |
+| ---------------------------------------- | ------------------------------------------------- |
 | API, workers, live supervisor, scheduler | NestJS (one codebase, started in different roles) |
-| Database | PostgreSQL with Prisma |
-| Queue and cache | Redis with BullMQ |
-| Media processing | FFmpeg |
-| Delivery | Nginx |
-| Edge agent, tracker | Go |
-| Admin panel | Vite + React |
-| Viewer website | Next.js |
+| Database                                 | PostgreSQL with Prisma                            |
+| Queue and cache                          | Redis with BullMQ                                 |
+| Media processing                         | FFmpeg                                            |
+| Delivery                                 | Nginx                                             |
+| Edge agent, tracker                      | Go                                                |
+| Admin panel                              | Vite + React                                      |
+| Viewer website                           | Next.js                                           |
 
 Planned repository layout:
 
@@ -47,6 +47,24 @@ deploy/
   installer/    Docker Compose, install and update scripts
 docs/
 ```
+
+## Development setup
+
+Requirements: Node.js 22.18 or newer (24 recommended), pnpm 12, Docker.
+
+```bash
+cp .env.example .env        # then fill in the secrets
+pnpm install
+pnpm dev:infra              # starts PostgreSQL and Redis
+pnpm db:generate            # generates the database client
+pnpm db:migrate             # creates the tables
+```
+
+The applications themselves are not scaffolded yet. See the [roadmap](docs/roadmap.md).
+
+## Documentation
+
+Design documents are in [docs/](docs/README.md): architecture, decision log, roadmap and the phase 1 design.
 
 ## License
 

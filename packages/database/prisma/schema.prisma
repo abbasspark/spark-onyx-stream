@@ -1,0 +1,404 @@
+// SPDX-License-Identifier: AGPL-3.0-only
+//
+// Spark Onyx Stream - database schema
+// Phase 1: media engine core and admin access.
+// Catalog, viewer and billing models are added in later phases.
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ---------------------------------------------------------------------------
+// Admin access
+// ---------------------------------------------------------------------------
+
+enum AdminRole {
+  OWNER
+  ADMIN
+  EDITOR
+  VIEWER
+}
+
+model AdminUser {
+  id           String    @id @default(uuid(7)) @db.Uuid
+  email        String    @unique
+  passwordHash String
+  displayName  String
+  role         AdminRole @default(EDITOR)
+  totpSecret   String?
+  isActive     Boolean   @default(true)
+  lastLoginAt  DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  apiKeys   ApiKey[]
+  auditLogs AuditLog[]
+  assets    Asset[]
+
+  @@map("admin_users")
+}
+
+model ApiKey {
+  id          String    @id @default(uuid(7)) @db.Uuid
+  name        String
+  /// First characters of the key, shown in the panel so a key can be recognized.
+  prefix      String    @unique
+  /// SHA-256 hash of the full key. The key itself is shown once and never stored.
+  keyHash     String    @unique
+  scopes      String[]
+  createdById String    @db.Uuid
+  createdBy   AdminUser @relation(fields: [createdById], references: [id], onDelete: Cascade)
+  lastUsedAt  DateTime?
+  expiresAt   DateTime?
+  revokedAt   DateTime?
+  createdAt   DateTime  @default(now())
+
+  @@index([createdById])
+  @@map("api_keys")
+}
+
+model AuditLog {
+  id         String     @id @default(uuid(7)) @db.Uuid
+  adminId    String?    @db.Uuid
+  admin      AdminUser? @relation(fields: [adminId], references: [id], onDelete: SetNull)
+  action     String
+  entityType String?
+  entityId   String?
+  metadata   Json?
+  ipAddress  String?
+  createdAt  DateTime   @default(now())
+
+  @@index([adminId])
+  @@index([entityType, entityId])
+  @@index([createdAt])
+  @@map("audit_logs")
+}
+
+model Setting {
+  key       String   @id
+  value     Json
+  updatedAt DateTime @updatedAt
+
+  @@map("settings")
+}
+
+// ---------------------------------------------------------------------------
+// Storage
+// ---------------------------------------------------------------------------
+
+enum StorageDriver {
+  LOCAL
+  S3
+}
+
+model StoragePool {
+  id         String        @id @default(uuid(7)) @db.Uuid
+  name       String        @unique
+  driver     StorageDriver
+  /// Driver settings: base path for LOCAL; endpoint, bucket and region for S3.
+  /// Credentials are stored encrypted.
+  config     Json
+  isDefault  Boolean       @default(false)
+  isActive   Boolean       @default(true)
+  /// Optional limit in bytes. Null means unlimited.
+  quotaBytes BigInt?
+  usedBytes  BigInt        @default(0)
+  createdAt  DateTime      @default(now())
+  updatedAt  DateTime      @updatedAt
+
+  assets Asset[]
+
+  @@map("storage_pools")
+}
+
+// ---------------------------------------------------------------------------
+// Assets (VOD)
+// ---------------------------------------------------------------------------
+
+enum AssetStatus {
+  /// Record created, upload not finished.
+  UPLOADING
+  /// Source file complete, waiting for probe.
+  UPLOADED
+  /// Being probed, transcoded or packaged.
+  PROCESSING
+  /// Playable.
+  READY
+  /// Processing failed. See the failed job for the reason.
+  FAILED
+  /// Soft-deleted. Files are removed by a cleanup job.
+  DELETED
+}
+
+enum ProcessingMode {
+  /// Remux only: the source codecs are kept and only the container changes.
+  COPY
+  /// Re-encode into the renditions of an encoding profile.
+  TRANSCODE
+  /// Serve the original file unchanged.
+  PASSTHROUGH
+}
+
+enum EncryptionMode {
+  NONE
+  AES_128
+}
+
+model Asset {
+  id     String      @id @default(uuid(7)) @db.Uuid
+  title  String
+  status AssetStatus @default(UPLOADING)
+
+  storagePoolId String      @db.Uuid
+  storagePool   StoragePool @relation(fields: [storagePoolId], references: [id])
+
+  createdById String?    @db.Uuid
+  createdBy   AdminUser? @relation(fields: [createdById], references: [id], onDelete: SetNull)
+
+  // Source file
+  sourceFilename String?
+  /// Path of the source file, relative to the storage pool root.
+  sourcePath     String?
+  sourceBytes    BigInt?
+  sourceChecksum String?
+  /// Raw ffprobe output of the source file.
+  probe          Json?
+
+  // Summary of the source, filled in after probing
+  durationMs Int?
+  width      Int?
+  height     Int?
+  frameRate  Float?
+  videoCodec String?
+  audioCodec String?
+
+  // Processing
+  /// Chosen by the decision engine after probing. May be forced at upload time.
+  processingMode    ProcessingMode?
+  encodingProfileId String?          @db.Uuid
+  encodingProfile   EncodingProfile? @relation(fields: [encodingProfileId], references: [id], onDelete: SetNull)
+
+  // Output
+  /// Path of the HLS multivariant playlist, relative to the storage pool root.
+  manifestPath String?
+  encryption   EncryptionMode @default(NONE)
+  p2pEnabled   Boolean        @default(true)
+
+  readyAt   DateTime?
+  deletedAt DateTime?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  renditions     Rendition[]
+  audioTracks    AudioTrack[]
+  subtitleTracks SubtitleTrack[]
+  thumbnails     Thumbnail[]
+  encryptionKeys EncryptionKey[]
+  jobs           Job[]
+
+  @@index([status])
+  @@index([storagePoolId])
+  @@index([createdAt])
+  @@map("assets")
+}
+
+model Rendition {
+  id           String   @id @default(uuid(7)) @db.Uuid
+  assetId      String   @db.Uuid
+  asset        Asset    @relation(fields: [assetId], references: [id], onDelete: Cascade)
+  /// Label shown in the player, for example "1080p".
+  name         String
+  width        Int
+  height       Int
+  /// Average video bitrate in bits per second.
+  bitrate      Int
+  frameRate    Float?
+  codec        String
+  /// Path of the media playlist, relative to the storage pool root.
+  playlistPath String
+  sizeBytes    BigInt   @default(0)
+  createdAt    DateTime @default(now())
+
+  @@unique([assetId, name])
+  @@map("renditions")
+}
+
+model AudioTrack {
+  id           String   @id @default(uuid(7)) @db.Uuid
+  assetId      String   @db.Uuid
+  asset        Asset    @relation(fields: [assetId], references: [id], onDelete: Cascade)
+  /// BCP 47 language tag, for example "en" or "de".
+  language     String
+  label        String?
+  codec        String
+  channels     Int
+  bitrate      Int
+  isDefault    Boolean  @default(false)
+  playlistPath String
+  createdAt    DateTime @default(now())
+
+  @@index([assetId])
+  @@map("audio_tracks")
+}
+
+enum SubtitleSource {
+  /// Extracted from the source file.
+  EMBEDDED
+  /// Uploaded separately.
+  UPLOADED
+}
+
+model SubtitleTrack {
+  id        String         @id @default(uuid(7)) @db.Uuid
+  assetId   String         @db.Uuid
+  asset     Asset          @relation(fields: [assetId], references: [id], onDelete: Cascade)
+  language  String
+  label     String?
+  source    SubtitleSource
+  isDefault Boolean        @default(false)
+  isForced  Boolean        @default(false)
+  /// Path of the WebVTT file, relative to the storage pool root.
+  path      String
+  createdAt DateTime       @default(now())
+
+  @@index([assetId])
+  @@map("subtitle_tracks")
+}
+
+enum ThumbnailType {
+  /// Single poster image.
+  POSTER
+  /// Sprite sheet for seek-bar previews.
+  SPRITE
+  /// WebVTT file that maps time ranges to sprite positions.
+  SPRITE_VTT
+}
+
+model Thumbnail {
+  id        String        @id @default(uuid(7)) @db.Uuid
+  assetId   String        @db.Uuid
+  asset     Asset         @relation(fields: [assetId], references: [id], onDelete: Cascade)
+  type      ThumbnailType
+  path      String
+  width     Int?
+  height    Int?
+  createdAt DateTime      @default(now())
+
+  @@index([assetId])
+  @@map("thumbnails")
+}
+
+model EncryptionKey {
+  id           String    @id @default(uuid(7)) @db.Uuid
+  assetId      String    @db.Uuid
+  asset        Asset     @relation(fields: [assetId], references: [id], onDelete: Cascade)
+  /// Content key, encrypted with the platform master key. Never stored in plain form.
+  encryptedKey Bytes
+  iv           Bytes
+  /// Rotation counter. The highest active version is used for new packaging.
+  version      Int       @default(1)
+  createdAt    DateTime  @default(now())
+  retiredAt    DateTime?
+
+  @@unique([assetId, version])
+  @@map("encryption_keys")
+}
+
+// ---------------------------------------------------------------------------
+// Encoding profiles
+// ---------------------------------------------------------------------------
+
+model EncodingProfile {
+  id              String   @id @default(uuid(7)) @db.Uuid
+  name            String   @unique
+  description     String?
+  isDefault       Boolean  @default(false)
+  /// Segment length in seconds. All renditions share it so they stay aligned.
+  segmentSeconds  Int      @default(4)
+  /// Keyframe interval in seconds. Must divide segmentSeconds evenly.
+  keyframeSeconds Int      @default(2)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  renditions EncodingProfileRendition[]
+  assets     Asset[]
+
+  @@map("encoding_profiles")
+}
+
+model EncodingProfileRendition {
+  id           String          @id @default(uuid(7)) @db.Uuid
+  profileId    String          @db.Uuid
+  profile      EncodingProfile @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  name         String
+  /// Target height in pixels. Width follows the source aspect ratio.
+  /// Renditions taller than the source are skipped, so nothing is upscaled.
+  height       Int
+  videoBitrate Int
+  audioBitrate Int
+  videoCodec   String          @default("h264")
+  audioCodec   String          @default("aac")
+  /// Encoder preset, for example "medium" or "slow".
+  preset       String          @default("medium")
+  sortOrder    Int             @default(0)
+
+  @@unique([profileId, name])
+  @@map("encoding_profile_renditions")
+}
+
+// ---------------------------------------------------------------------------
+// Jobs
+// ---------------------------------------------------------------------------
+
+enum JobType {
+  PROBE
+  REMUX
+  TRANSCODE
+  PACKAGE
+  THUMBNAILS
+  SUBTITLES
+  CLEANUP
+}
+
+enum JobStatus {
+  QUEUED
+  RUNNING
+  COMPLETED
+  FAILED
+  CANCELLED
+}
+
+/// Durable record of processing work. BullMQ in Redis drives execution;
+/// this table keeps the history, so job state survives a Redis restart
+/// and can be shown in the panel.
+model Job {
+  id          String    @id @default(uuid(7)) @db.Uuid
+  type        JobType
+  status      JobStatus @default(QUEUED)
+  assetId     String?   @db.Uuid
+  asset       Asset?    @relation(fields: [assetId], references: [id], onDelete: Cascade)
+  /// Higher numbers run first.
+  priority    Int       @default(0)
+  /// Progress from 0 to 100.
+  progress    Int       @default(0)
+  attempts    Int       @default(0)
+  maxAttempts Int       @default(3)
+  input       Json?
+  output      Json?
+  error       String?
+  /// Identifier of the worker process that ran the job.
+  workerId    String?
+  queuedAt    DateTime  @default(now())
+  startedAt   DateTime?
+  finishedAt  DateTime?
+
+  @@index([assetId])
+  @@index([status, type])
+  @@index([queuedAt])
+  @@map("jobs")
+}
