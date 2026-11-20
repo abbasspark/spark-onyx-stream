@@ -1,0 +1,533 @@
+<!doctype html>
+<!-- SPDX-License-Identifier: AGPL-3.0-only -->
+<!--
+  Development player for Spark Onyx Stream.
+
+  A single page for trying the API by hand: sign in, upload a video, watch
+  it being processed and play the result. It is a development tool and not
+  part of the product. The admin panel replaces it.
+
+  It loads hls.js and tus-js-client from the jsDelivr CDN.
+-->
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Onyx Stream development player</title>
+    <style>
+      :root {
+        color-scheme: light dark;
+        --border: #8884;
+        --muted: #888;
+        --accent: #4f6df5;
+        --danger: #d64545;
+        --ok: #2e9d5b;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0 auto;
+        max-width: 960px;
+        padding: 24px 16px 64px;
+        font:
+          15px/1.5 system-ui,
+          sans-serif;
+      }
+      h1 {
+        font-size: 20px;
+        margin: 0 0 4px;
+      }
+      h2 {
+        font-size: 16px;
+        margin: 0 0 12px;
+      }
+      p.note {
+        color: var(--muted);
+        margin: 0 0 20px;
+      }
+      section {
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        padding: 16px;
+        margin-bottom: 16px;
+      }
+      label {
+        display: block;
+        font-size: 13px;
+        color: var(--muted);
+        margin-bottom: 4px;
+      }
+      input[type='text'],
+      input[type='email'],
+      input[type='password'],
+      input[type='url'] {
+        width: 100%;
+        padding: 8px 10px;
+        border: 1px solid var(--border);
+        border-radius: 6px;
+        font: inherit;
+        background: transparent;
+        color: inherit;
+      }
+      .row {
+        display: flex;
+        gap: 12px;
+        flex-wrap: wrap;
+        align-items: flex-end;
+      }
+      .row > div {
+        flex: 1 1 200px;
+      }
+      button {
+        padding: 8px 14px;
+        border: 1px solid var(--accent);
+        border-radius: 6px;
+        background: var(--accent);
+        color: #fff;
+        font: inherit;
+        cursor: pointer;
+      }
+      button.secondary {
+        background: transparent;
+        color: var(--accent);
+      }
+      button:disabled {
+        opacity: 0.5;
+        cursor: default;
+      }
+      video {
+        width: 100%;
+        background: #000;
+        border-radius: 8px;
+        aspect-ratio: 16 / 9;
+      }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+      }
+      th,
+      td {
+        text-align: left;
+        padding: 8px 6px;
+        border-bottom: 1px solid var(--border);
+        vertical-align: middle;
+      }
+      th {
+        font-size: 13px;
+        color: var(--muted);
+        font-weight: 500;
+      }
+      .status {
+        font-size: 12px;
+        padding: 2px 8px;
+        border-radius: 99px;
+        border: 1px solid var(--border);
+        white-space: nowrap;
+      }
+      .status.READY {
+        color: var(--ok);
+        border-color: var(--ok);
+      }
+      .status.FAILED {
+        color: var(--danger);
+        border-color: var(--danger);
+      }
+      progress {
+        width: 100%;
+        height: 8px;
+      }
+      #message {
+        min-height: 22px;
+        margin: 8px 0 0;
+      }
+      #message.error {
+        color: var(--danger);
+      }
+      .muted {
+        color: var(--muted);
+        font-size: 13px;
+      }
+      [hidden] {
+        display: none !important;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Onyx Stream development player</h1>
+    <p class="note">Sign in, upload a video, watch it being processed and play the result.</p>
+
+    <section id="sign-in-section">
+      <h2>Sign in</h2>
+      <form id="sign-in-form" class="row">
+        <div>
+          <label for="api-base">API address</label>
+          <input id="api-base" type="url" value="http://localhost:3000" required />
+        </div>
+        <div>
+          <label for="email">Email</label>
+          <input id="email" type="email" autocomplete="username" required />
+        </div>
+        <div>
+          <label for="password">Password</label>
+          <input id="password" type="password" autocomplete="current-password" required />
+        </div>
+        <button type="submit">Sign in</button>
+      </form>
+    </section>
+
+    <div id="app" hidden>
+      <section>
+        <div class="row" style="justify-content: space-between; align-items: center">
+          <h2 id="signed-in-as" style="margin: 0"></h2>
+          <button id="sign-out" class="secondary" type="button">Sign out</button>
+        </div>
+      </section>
+
+      <section>
+        <h2>Upload</h2>
+        <form id="upload-form" class="row">
+          <div>
+            <label for="title">Title</label>
+            <input
+              id="title"
+              type="text"
+              maxlength="200"
+              placeholder="Taken from the file name when empty"
+            />
+          </div>
+          <div>
+            <label for="file">Video file</label>
+            <input id="file" type="file" accept="video/*,.mkv,.mov,.ts" required />
+          </div>
+          <button id="upload-button" type="submit">Upload</button>
+        </form>
+        <div id="upload-progress" hidden>
+          <progress id="upload-bar" max="100" value="0"></progress>
+          <div id="upload-text" class="muted"></div>
+        </div>
+      </section>
+
+      <section>
+        <h2>Player</h2>
+        <video id="video" controls playsinline></video>
+        <div id="now-playing" class="muted">Choose a ready asset below.</div>
+      </section>
+
+      <section>
+        <h2>Assets</h2>
+        <table>
+          <thead>
+            <tr>
+              <th>Title</th>
+              <th>Status</th>
+              <th>Details</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody id="assets"></tbody>
+        </table>
+        <div id="no-assets" class="muted" hidden>No assets yet. Upload a video above.</div>
+      </section>
+    </div>
+
+    <div id="message" role="status" aria-live="polite"></div>
+
+    <script src="https://cdn.jsdelivr.net/npm/hls.js@1"></script>
+    <script src="https://cdn.jsdelivr.net/npm/tus-js-client@4/dist/tus.min.js"></script>
+    <script>
+      'use strict';
+
+      const REFRESH_MS = 2000;
+      const UPLOAD_CHUNK_BYTES = 16 * 1024 * 1024;
+      const element = (id) => document.getElementById(id);
+
+      /** Signed-in state. Kept in memory and, for convenience across reloads, in session storage. */
+      const state = { apiBase: '', token: '', hls: null, refreshTimer: null };
+
+      function remember() {
+        try {
+          sessionStorage.setItem(
+            'onyx-dev-player',
+            JSON.stringify({ apiBase: state.apiBase, token: state.token }),
+          );
+        } catch {
+          // Storage can be unavailable. Signing in again after a reload is fine.
+        }
+      }
+
+      function recall() {
+        try {
+          return JSON.parse(sessionStorage.getItem('onyx-dev-player') ?? 'null');
+        } catch {
+          return null;
+        }
+      }
+
+      function forget() {
+        try {
+          sessionStorage.removeItem('onyx-dev-player');
+        } catch {
+          // Nothing to remove.
+        }
+      }
+
+      function showMessage(text, isError = false) {
+        const box = element('message');
+        box.textContent = text;
+        box.className = isError ? 'error' : '';
+      }
+
+      /** Calls the API and returns the parsed answer. Throws an Error with the API's message. */
+      async function api(path, options = {}) {
+        let response;
+        try {
+          response = await fetch(state.apiBase + path, {
+            ...options,
+            headers: {
+              ...(options.body ? { 'Content-Type': 'application/json' } : {}),
+              ...(state.token ? { Authorization: `Bearer ${state.token}` } : {}),
+            },
+          });
+        } catch {
+          throw new Error(
+            `Could not reach ${state.apiBase}. Check that the API is running and that CORS_ORIGINS in .env contains ${location.origin}`,
+          );
+        }
+
+        if (response.status === 204) {
+          return null;
+        }
+        const body = await response.json().catch(() => null);
+        if (!response.ok) {
+          if (response.status === 401 && state.token) {
+            signOut();
+          }
+          throw new Error(body?.message ?? `The API answered with status ${response.status}`);
+        }
+        return body;
+      }
+
+      // --- Sign in and out ---------------------------------------------------
+
+      async function showApp() {
+        const me = await api('/v1/auth/me');
+        element('signed-in-as').textContent =
+          `Signed in as ${me.displayName ?? me.name} (${me.role ?? 'API key'})`;
+        element('sign-in-section').hidden = true;
+        element('app').hidden = false;
+        await refreshAssets();
+        state.refreshTimer = setInterval(() => refreshAssets().catch(() => {}), REFRESH_MS);
+      }
+
+      function signOut() {
+        clearInterval(state.refreshTimer);
+        stopPlayback();
+        state.token = '';
+        forget();
+        element('app').hidden = true;
+        element('sign-in-section').hidden = false;
+      }
+
+      element('sign-in-form').addEventListener('submit', async (event) => {
+        event.preventDefault();
+        showMessage('');
+        state.apiBase = element('api-base').value.trim().replace(/\/$/, '');
+        state.token = '';
+        try {
+          const result = await api('/v1/auth/login', {
+            method: 'POST',
+            body: JSON.stringify({
+              email: element('email').value,
+              password: element('password').value,
+            }),
+          });
+          state.token = result.token;
+          element('password').value = '';
+          remember();
+          await showApp();
+        } catch (error) {
+          showMessage(error.message, true);
+        }
+      });
+
+      element('sign-out').addEventListener('click', async () => {
+        await api('/v1/auth/logout', { method: 'POST' }).catch(() => {});
+        signOut();
+      });
+
+      // --- Upload ------------------------------------------------------------
+
+      element('upload-form').addEventListener('submit', async (event) => {
+        event.preventDefault();
+        const file = element('file').files[0];
+        if (!file) {
+          return;
+        }
+        showMessage('');
+        element('upload-button').disabled = true;
+
+        try {
+          const title = element('title').value.trim() || file.name.replace(/\.[^.]+$/, '');
+          const created = await api('/v1/assets', {
+            method: 'POST',
+            body: JSON.stringify({ title }),
+          });
+          if (file.size > created.upload.maxBytes) {
+            throw new Error('The file is larger than the upload limit of this server');
+          }
+
+          element('upload-progress').hidden = false;
+          await new Promise((resolve, reject) => {
+            const upload = new tus.Upload(file, {
+              endpoint: state.apiBase + created.upload.endpoint,
+              chunkSize: UPLOAD_CHUNK_BYTES,
+              retryDelays: [0, 1000, 3000, 5000],
+              headers: { Authorization: `Bearer ${state.token}` },
+              metadata: { ...created.upload.metadata, filename: file.name },
+              // Each upload belongs to a new asset, so an earlier upload is never continued.
+              storeFingerprintForResuming: false,
+              onProgress(sent, total) {
+                const percent = Math.floor((sent / total) * 100);
+                element('upload-bar').value = percent;
+                element('upload-text').textContent =
+                  `${percent}% of ${(total / 1048576).toFixed(1)} MB`;
+              },
+              onSuccess: resolve,
+              onError: reject,
+            });
+            upload.start();
+          });
+
+          showMessage(`"${title}" is uploaded and is being processed.`);
+          element('upload-form').reset();
+          await refreshAssets();
+        } catch (error) {
+          showMessage(`Upload failed: ${error.message}`, true);
+        } finally {
+          element('upload-button').disabled = false;
+          element('upload-progress').hidden = true;
+          element('upload-bar').value = 0;
+        }
+      });
+
+      // --- Assets ------------------------------------------------------------
+
+      function describe(asset, jobs) {
+        if (asset.status === 'PROCESSING') {
+          const running =
+            jobs.find((job) => job.status === 'RUNNING') ??
+            jobs.find((job) => job.status === 'QUEUED');
+          return running
+            ? `${running.type.toLowerCase()} ${running.status === 'RUNNING' ? `${running.progress}%` : 'waiting'}`
+            : 'starting';
+        }
+        if (asset.status === 'FAILED') {
+          return jobs.find((job) => job.status === 'FAILED')?.error ?? 'Processing was cancelled';
+        }
+        if (asset.status === 'READY') {
+          const seconds = Math.round((asset.media.durationMs ?? 0) / 1000);
+          return `${asset.media.width}x${asset.media.height}, ${seconds} s, ${String(asset.processingMode).toLowerCase()}`;
+        }
+        return '';
+      }
+
+      async function refreshAssets() {
+        const [assets, jobs] = await Promise.all([
+          api('/v1/assets?pageSize=50'),
+          api('/v1/jobs?pageSize=100'),
+        ]);
+
+        const body = element('assets');
+        body.replaceChildren();
+        element('no-assets').hidden = assets.items.length > 0;
+
+        for (const asset of assets.items) {
+          const row = body.insertRow();
+          // textContent everywhere: titles and error texts are data, never markup.
+          row.insertCell().textContent = asset.title;
+
+          const status = document.createElement('span');
+          status.className = `status ${asset.status}`;
+          status.textContent = asset.status.toLowerCase();
+          row.insertCell().append(status);
+
+          const details = row.insertCell();
+          details.className = 'muted';
+          details.textContent = describe(
+            asset,
+            jobs.items.filter((job) => job.assetId === asset.id),
+          );
+
+          const actions = row.insertCell();
+          if (asset.status === 'READY') {
+            const play = document.createElement('button');
+            play.type = 'button';
+            play.textContent = 'Play';
+            play.addEventListener('click', () => playAsset(asset));
+            actions.append(play);
+          }
+        }
+      }
+
+      // --- Playback ----------------------------------------------------------
+
+      function stopPlayback() {
+        state.hls?.destroy();
+        state.hls = null;
+        const video = element('video');
+        video.removeAttribute('src');
+        video.load();
+      }
+
+      async function playAsset(asset) {
+        showMessage('');
+        try {
+          const playback = await api(`/v1/assets/${asset.id}/playback`, { method: 'POST' });
+          // URLs are relative unless the server has a separate media origin.
+          const absolute = (url) => (url.startsWith('http') ? url : state.apiBase + url);
+          const manifestUrl = absolute(playback.manifestUrl);
+
+          stopPlayback();
+          const video = element('video');
+          video.poster = playback.posterUrl ? absolute(playback.posterUrl) : '';
+
+          if (window.Hls?.isSupported()) {
+            state.hls = new Hls();
+            state.hls.on(Hls.Events.ERROR, (_event, data) => {
+              if (data.fatal) {
+                showMessage(`Playback failed: ${data.details}`, true);
+              }
+            });
+            state.hls.on(Hls.Events.MANIFEST_PARSED, (_event, data) => {
+              const qualities = data.levels.map((level) => `${level.height}p`).join(', ');
+              element('now-playing').textContent =
+                `Playing "${asset.title}". Qualities: ${qualities}`;
+            });
+            state.hls.loadSource(manifestUrl);
+            state.hls.attachMedia(video);
+          } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
+            // Safari plays HLS without a library.
+            video.src = manifestUrl;
+            element('now-playing').textContent = `Playing "${asset.title}"`;
+          } else {
+            throw new Error('This browser cannot play HLS');
+          }
+          await video.play().catch(() => {});
+        } catch (error) {
+          showMessage(error.message, true);
+        }
+      }
+
+      // --- Start -------------------------------------------------------------
+
+      const remembered = recall();
+      if (remembered?.token) {
+        state.apiBase = remembered.apiBase;
+        state.token = remembered.token;
+        element('api-base').value = remembered.apiBase;
+        showApp().catch(() => signOut());
+      }
+    </script>
+  </body>
+</html>

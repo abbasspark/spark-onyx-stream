@@ -30,6 +30,7 @@ import {
   type UpdateAssetInput,
   updateAssetSchema,
 } from './assets.schemas.js';
+import { type PlaybackInfo, PlaybackService } from '../playback/playback.service.js';
 import { PipelineService } from '../processing/pipeline.service.js';
 import { type AssetView, toAssetView } from './asset.view.js';
 import { AssetsService, type CreatedAsset } from './assets.service.js';
@@ -39,6 +40,7 @@ export class AssetsController {
   constructor(
     @Inject(AssetsService) private readonly assets: AssetsService,
     @Inject(PipelineService) private readonly pipeline: PipelineService,
+    @Inject(PlaybackService) private readonly playback: PlaybackService,
   ) {}
 
   @Get()
@@ -89,6 +91,14 @@ export class AssetsController {
     @Body(new ZodValidationPipe(reprocessAssetSchema)) body: ReprocessAssetInput,
   ): Promise<AssetView> {
     return toAssetView(await this.pipeline.reprocess(id, body));
+  }
+
+  /** Returns signed, short-lived URLs for playing the asset. */
+  @Post(':id/playback')
+  @RequirePermissions('assets:read')
+  @HttpCode(HttpStatus.OK)
+  createPlayback(@Param('id', ParseUUIDPipe) id: string): Promise<PlaybackInfo> {
+    return this.playback.createPlayback(id);
   }
 
   @Delete(':id')

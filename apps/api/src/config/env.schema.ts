@@ -57,6 +57,25 @@ export const envSchema = z.object({
     .min(1)
     .default(50 * 1024 ** 3),
 
+  /** How long a playback URL stays valid, in seconds. Long videos get more time automatically. */
+  PLAYBACK_URL_TTL_SECONDS: z.coerce
+    .number()
+    .int()
+    .min(60)
+    .max(7 * 24 * 60 * 60)
+    .default(6 * 60 * 60),
+  /**
+   * Origin that serves media files, for example "https://media.example.com".
+   * Empty means the API itself, and playback URLs are then relative paths.
+   */
+  MEDIA_BASE_URL: z
+    .string()
+    .default('')
+    .transform((value) => value.trim().replace(/\/$/, ''))
+    .refine((value) => value === '' || /^https?:\/\/[^/]+$/.test(value), {
+      message: 'MEDIA_BASE_URL must be an origin of the form https://host or http://host:port',
+    }),
+
   /** Programs used for media processing. A name is looked up on the PATH. */
   FFMPEG_PATH: z.string().min(1).default('ffmpeg'),
   FFPROBE_PATH: z.string().min(1).default('ffprobe'),

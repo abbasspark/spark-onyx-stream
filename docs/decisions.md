@@ -148,3 +148,16 @@ Assets are packaged as HLS with fragmented MP4 (CMAF) segments.
 **Why:** one FFmpeg run decodes the source once for all qualities and guarantees aligned segments. Keeping job history in PostgreSQL means it survives a Redis restart.
 
 **Consequence:** the `PACKAGE` job type is unused for now. Processing on a local pool writes outputs twice, to the working directory and then to the pool. The working directory needs free space for the outputs, and for the source too when the pool is not on local disk.
+
+## D-015 Playback: a signed token in the URL path
+
+**Date:** 2026-11-20
+
+- **A playback URL carries a token in its path**, in front of the file path: `/v1/media/{assetId}/{token}/hls/master.m3u8`.
+- **The token is an expiry time and an HMAC-SHA256 signature** over the asset id and that time, made with `PLAYBACK_SIGNING_SECRET`.
+- **One token opens every generated file of one asset** until it expires. It never opens the source file or another asset.
+- **The API serves the files itself for now**, with byte ranges, through the storage driver.
+
+**Why:** HLS playlists point to their segments with relative paths. With the token in the path, every request of a session carries it, and the playlists stored on disk never have to be rewritten per viewer. A signature can be verified without a database or a call to the API, which is what a web server or edge in front of the API needs.
+
+**Consequence:** anyone who has a playback URL can watch until it expires, so the URLs are issued per request and are short-lived. Because the token is part of the path, a cache in front of the API must leave it out of its cache key. Serving through the API costs a database lookup per asset every 30 seconds and passes all bytes through Node, which is fine for development and small installations and is replaced by direct delivery for larger ones.
