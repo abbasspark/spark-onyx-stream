@@ -27,6 +27,9 @@ import { UPLOAD_ENDPOINT } from './uploads.constants.js';
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 /** Attempts to move a finished upload into its storage pool before giving up until the next start. */
+/** How often starting the processing is tried right after an upload. */
+const START_ATTEMPTS = 3;
+const START_RETRY_DELAY_MS = 500;
 const FINALIZE_ATTEMPTS = 3;
 const FINALIZE_RETRY_DELAY_MS = 5_000;
 
@@ -270,13 +273,26 @@ export class UploadsService implements OnApplicationBootstrap {
       metadata: { bytes: size, checksum },
     });
 
-    try {
-      await this.pipeline.start(asset.id);
-    } catch (error) {
-      // The file is safely stored. Processing can be started again from the panel.
-      this.logger.error(
-        `Asset ${asset.id}: could not start processing: ${error instanceof Error ? error.message : String(error)}`,
-      );
+    await this.startProcessing(asset.id);
+  }
+
+  /**
+   * Starts processing, trying a few times. If it still fails, the file is
+   * safely stored and the scheduler starts processing later.
+   */
+  private async startProcessing(assetId: string): Promise<void> {
+    for (let attempt = 1; attempt <= START_ATTEMPTS; attempt += 1) {
+      try {
+        await this.pipeline.start(assetId);
+        return;
+      } catch (error) {
+        this.logger.error(
+          `Asset ${assetId}: could not start processing (attempt ${attempt} of ${START_ATTEMPTS}): ${error instanceof Error ? error.message : String(error)}`,
+        );
+        if (attempt < START_ATTEMPTS) {
+          await new Promise((resolve) => setTimeout(resolve, START_RETRY_DELAY_MS * attempt));
+        }
+      }
     }
   }
 

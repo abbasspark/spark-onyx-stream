@@ -165,7 +165,7 @@ export function AssetDetailPage() {
             <div>
               <strong>Delete</strong>
               <p className="muted">
-                Removes the asset from the library. Viewers can no longer play it.
+                Deletes the asset with its source file and streams. Viewers can no longer play it.
               </p>
             </div>
             <button
@@ -173,7 +173,7 @@ export function AssetDetailPage() {
               className="button button-danger"
               disabled={remove.isPending}
               onClick={() => {
-                if (window.confirm(`Delete "${data.title}"? This cannot be undone here.`)) {
+                if (window.confirm(`Delete "${data.title}"? This cannot be undone.`)) {
                   remove.mutate();
                 }
               }}

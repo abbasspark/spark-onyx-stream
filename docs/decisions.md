@@ -215,4 +215,17 @@ Assets are packaged as HLS with fragmented MP4 (CMAF) segments.
 
 **Why:** serving segments is the most frequent request by far, and Nginx sends files from disk with far less work than Node. Checking the token there keeps playback alive when the API is busy or restarting. Nginx's built-in signed-link module only supports MD5, so njs is used to keep HMAC-SHA256.
 
-**Consequence:** the gateway does not ask the database, so a playback URL stays usable until it expires even after its asset is deleted. Removing the files on deletion is the planned fix. The token format now exists in two places, which the test guards. The application image is large (about 390 MB compressed) because of FFmpeg's libraries.
+**Consequence:** the gateway does not ask the database, so playback of a deleted asset ends when its files are gone, not at the moment of deletion (see D-020). The token format now exists in two places, which the test guards. The application image is large (about 390 MB compressed) because of FFmpeg's libraries.
+
+## D-020 Deleting an asset removes its files, and the scheduler repairs what requests left unfinished
+
+**Date:** 2026-11-20
+
+- **Deleting is final.** The asset is marked deleted at once, its jobs are cancelled, and a `CLEANUP` job removes the source file, the streams, the content key and their records, and gives the space back to the pool.
+- **The scheduler role runs repairs every minute:** it starts the processing of uploads that were stored but never queued, and queues the cleanup of deleted assets whose files are still there. A Redis lock lets one scheduler work at a time.
+- **Repairs only touch what has waited two minutes**, so they never race with a request doing the same work.
+- **A finished encode no longer makes a deleted asset ready again.**
+
+**Why:** the gateway serves files without asking the database, so removing the files is what actually ends playback. A request can fail halfway when the database or Redis is unreachable for a moment, and a system that only works when every step succeeds the first time needs manual repair.
+
+**Consequence:** there is no restore for deleted assets. A trash with a waiting period can be added later by delaying the cleanup job. Between deletion and cleanup, usually seconds, files of the default local pool can still be fetched through the gateway with a valid playback URL.

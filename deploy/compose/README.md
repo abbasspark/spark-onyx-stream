@@ -46,7 +46,7 @@ Only the gateway is reachable from outside. The API, the database and Redis have
 
 The gateway checks the playback token of every media request itself, with a small script (`deploy/nginx/njs/media.js`) that uses the same secret as the API. Files of the local storage pool are then sent straight from disk. Anything it does not find there, such as an asset in an S3 pool, and the content keys of encrypted assets are passed on to the API.
 
-A playback URL the gateway serves stays usable until it expires (six hours by default), even if the asset is deleted in the meantime. Choose a shorter `PLAYBACK_URL_TTL_SECONDS` if that matters to you.
+The gateway does not ask the database. When an asset is deleted, a cleanup job removes its files, usually within seconds, and from then on the gateway answers its playback URLs with 404.
 
 ## TLS
 

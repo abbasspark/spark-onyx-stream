@@ -1,10 +1,11 @@
 // SPDX-License-Identifier: AGPL-3.0-only
-import { BadRequestException, Inject, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Inject, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { type Asset, type Prisma, PrismaClient } from '@onyx/database';
 import { AuditService } from '../audit/audit.service.js';
 import type { Principal } from '../auth/principal.js';
 import { type Page, toPage, toSkipTake } from '../common/pagination.js';
 import { AppConfig } from '../config/app-config.js';
+import { PipelineService } from '../processing/pipeline.service.js';
 import { StorageService } from '../storage/storage.service.js';
 import { UPLOAD_ENDPOINT } from '../uploads/uploads.constants.js';
 import { UploadsService } from '../uploads/uploads.service.js';
@@ -30,12 +31,15 @@ export interface CreatedAsset {
 
 @Injectable()
 export class AssetsService {
+  private readonly logger = new Logger(AssetsService.name);
+
   constructor(
     @Inject(PrismaClient) private readonly prisma: PrismaClient,
     @Inject(StorageService) private readonly storage: StorageService,
     @Inject(AuditService) private readonly audit: AuditService,
     @Inject(AppConfig) private readonly config: AppConfig,
     @Inject(UploadsService) private readonly uploads: UploadsService,
+    @Inject(PipelineService) private readonly pipeline: PipelineService,
   ) {}
 
   async list(input: ListAssetsInput): Promise<Page<AssetView>> {
@@ -135,7 +139,8 @@ export class AssetsService {
 
   /**
    * Marks the asset as deleted. It disappears from lists and can no longer be
-   * played or uploaded to. Its files are removed later by a cleanup job.
+   * played or uploaded to. Its jobs are stopped and a cleanup job removes its
+   * files, source included, so deleting cannot be undone.
    */
   async softDelete(actor: Principal, id: string, ipAddress: string | null): Promise<void> {
     const asset = await this.findOrThrow(id);
@@ -148,6 +153,15 @@ export class AssetsService {
     if (asset.status === 'UPLOADING') {
       // Bytes of an unfinished upload are of no use to anyone and are removed at once.
       await this.uploads.discard(id);
+    }
+
+    try {
+      await this.pipeline.scheduleCleanup(id);
+    } catch (error) {
+      // The asset is deleted either way. The scheduler queues the cleanup again later.
+      this.logger.error(
+        `Asset ${id}: could not queue the cleanup: ${error instanceof Error ? error.message : String(error)}`,
+      );
     }
 
     await this.audit.record({
