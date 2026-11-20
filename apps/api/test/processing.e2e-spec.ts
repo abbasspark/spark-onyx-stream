@@ -5,28 +5,22 @@
 // each job runs at a known moment.
 //
 // Skipped unless TEST_DATABASE_URL is set and FFmpeg is installed.
-import { spawnSync } from 'node:child_process';
 import { mkdir, mkdtemp, readdir, readFile, rm, stat, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { AssetsModule } from '../src/assets/assets.module.js';
-import { JobEndedError, JobExecutor } from '../src/processing/job-executor.js';
 import { ProcessingApiModule, ProcessingStepsModule } from '../src/processing/processing.module.js';
 import { StoragePoolsModule } from '../src/storage/storage.module.js';
-import { encodeUploadMetadata } from '../src/uploads/upload-metadata.js';
+import {
+  copyableVideoOptions,
+  drainQueue as drainQueueOf,
+  FFMPEG,
+  FFPROBE,
+  generateVideo,
+  hasFfmpeg,
+  uploadSource as uploadSourceTo,
+} from './support/processing-helpers.js';
 import { createTestApp, TEST_DATABASE_URL, type TestApp } from './support/test-app.js';
-
-const FFMPEG = process.env.FFMPEG_PATH ?? 'ffmpeg';
-const hasFfmpeg = spawnSync(FFMPEG, ['-version']).status === 0;
-const TUS = { 'Tus-Resumable': '1.0.0' };
-
-/** Creates a short test video with FFmpeg's built-in test pattern and tone. */
-function generateVideo(target: string, options: string[]): void {
-  const result = spawnSync(FFMPEG, ['-v', 'error', '-y', ...options, target]);
-  if (result.status !== 0) {
-    throw new Error(`Could not generate ${target}: ${result.stderr.toString()}`);
-  }
-}
 
 describe.skipIf(!TEST_DATABASE_URL || !hasFfmpeg)('Processing pipeline (e2e, real FFmpeg)', () => {
   let testApp: TestApp;
@@ -69,32 +63,7 @@ describe.skipIf(!TEST_DATABASE_URL || !hasFfmpeg)('Processing pipeline (e2e, rea
       'libmp3lame',
     ]);
     copyable = path.join(workDirectory, 'copyable.mp4');
-    generateVideo(copyable, [
-      '-f',
-      'lavfi',
-      '-i',
-      'testsrc2=size=640x360:rate=30:duration=9',
-      '-f',
-      'lavfi',
-      '-i',
-      'sine=frequency=880:duration=9',
-      '-c:v',
-      'libx264',
-      '-preset',
-      'ultrafast',
-      '-pix_fmt',
-      'yuv420p',
-      '-g',
-      '60',
-      '-keyint_min',
-      '60',
-      '-sc_threshold',
-      '0',
-      '-b:v',
-      '300k',
-      '-c:a',
-      'aac',
-    ]);
+    generateVideo(copyable, copyableVideoOptions());
 
     testApp = await createTestApp(
       [StoragePoolsModule, AssetsModule, ProcessingApiModule, ProcessingStepsModule],
@@ -103,7 +72,7 @@ describe.skipIf(!TEST_DATABASE_URL || !hasFfmpeg)('Processing pipeline (e2e, rea
         UPLOAD_TEMP_PATH: path.join(workDirectory, 'uploads'),
         PROCESSING_TEMP_PATH: path.join(workDirectory, 'processing'),
         FFMPEG_PATH: FFMPEG,
-        FFPROBE_PATH: process.env.FFPROBE_PATH ?? 'ffprobe',
+        FFPROBE_PATH: FFPROBE,
       },
     );
   }, 120_000);
@@ -120,67 +89,9 @@ describe.skipIf(!TEST_DATABASE_URL || !hasFfmpeg)('Processing pipeline (e2e, rea
     await rm(workDirectory, { recursive: true, force: true });
   });
 
-  /** Creates an asset, uploads a file to it and waits until processing is queued. */
-  async function uploadSource(file: string, body: Record<string, unknown> = {}): Promise<string> {
-    const content = await readFile(file);
-    const created = await http()
-      .post('/v1/assets')
-      .set(auth())
-      .send({ title: path.basename(file), ...body })
-      .expect(201);
-    const assetId = created.body.asset.id as string;
-
-    await http()
-      .post('/v1/uploads')
-      .set(auth())
-      .set(TUS)
-      .set('Upload-Length', String(content.length))
-      .set('Upload-Metadata', encodeUploadMetadata({ assetId, filename: path.basename(file) }))
-      .expect(201);
-    await http()
-      .patch(`/v1/uploads/${assetId}`)
-      .set(auth())
-      .set(TUS)
-      .set('Upload-Offset', '0')
-      .set('Content-Type', 'application/offset+octet-stream')
-      .send(content)
-      .expect(204);
-
-    for (let attempt = 0; attempt < 100; attempt += 1) {
-      if (testApp.queue.waiting.some((job) => job.data.assetId === assetId)) {
-        return assetId;
-      }
-      await new Promise((resolve) => setTimeout(resolve, 50));
-    }
-    throw new Error('Processing was not queued after the upload');
-  }
-
-  /** Runs queued jobs, including the ones they queue in turn, until none is left. */
-  async function drainQueue(): Promise<void> {
-    const executor = testApp.app.get(JobExecutor);
-
-    while (testApp.queue.waiting.length > 0) {
-      const next = testApp.queue.waiting.shift();
-      if (!next) {
-        break;
-      }
-      try {
-        await executor.execute({
-          jobId: next.data.jobId,
-          assetId: next.data.assetId,
-          type: next.name as never,
-          attempt: 1,
-          // One attempt, so a failing job ends at once instead of waiting for a retry.
-          maxAttempts: 1,
-          workerId: 'test-worker',
-        });
-      } catch (error) {
-        if (!(error instanceof JobEndedError)) {
-          throw error;
-        }
-      }
-    }
-  }
+  const uploadSource = (file: string, body: Record<string, unknown> = {}) =>
+    uploadSourceTo(testApp, ownerToken, file, body);
+  const drainQueue = () => drainQueueOf(testApp);
 
   async function getAsset(assetId: string) {
     return (await http().get(`/v1/assets/${assetId}`).set(auth()).expect(200)).body;

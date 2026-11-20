@@ -63,7 +63,17 @@ pnpm dev                    # starts the API on http://localhost:3000/v1
 
 Check that it runs: `curl http://localhost:3000/v1/health`
 
-The API skeleton is in place. The admin panel and viewer website are not scaffolded yet. See the [roadmap](docs/roadmap.md).
+### Trying it in a browser
+
+A small development page lets you sign in, upload a video, watch it being processed and play the result:
+
+```bash
+pnpm dev:player             # serves the page on http://localhost:5173
+```
+
+Create the first admin once, as described in the [API README](apps/api/README.md#first-run), then open the page and sign in. The page is a development tool and is replaced by the admin panel.
+
+The API covers uploads, processing and playback. The admin panel and viewer website are not scaffolded yet. See the [roadmap](docs/roadmap.md).
 
 ## Documentation
 

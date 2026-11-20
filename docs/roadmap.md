@@ -21,7 +21,7 @@ The project is built in phases. Each phase ends with something that works end to
 4. Storage: local and S3-compatible drivers behind one interface. **Done.**
 5. Upload: resumable upload, source file registration. **Done.**
 6. Processing pipeline: probe, decision engine, remux, transcode, package, poster. **Done.** Seek-bar sprites, subtitles and AES-128 encryption follow as step 6b.
-7. Playback: signed URLs, Nginx verification, key delivery for AES-128.
+7. Playback: signed URLs and delivery of the generated files by the API. **Done.** Verification of the same tokens by Nginx moves to step 9, where it can be tested with the Docker setup. Key delivery for AES-128 follows with step 6b.
 8. Admin panel: login, asset library, upload, job monitor, player preview.
 9. Development Docker image and a first single-server Compose file.
 

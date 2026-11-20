@@ -8,6 +8,7 @@ import { AppModule } from './app.module.js';
 import { AppConfig } from './config/app-config.js';
 import { validateEnv } from './config/env.schema.js';
 import { loadEnvFile } from './config/load-env-file.js';
+import { MEDIA_ROUTE } from './playback/playback.service.js';
 
 /** Version prefix of every HTTP route. */
 const API_PREFIX = 'v1';
@@ -34,6 +35,8 @@ const TUS_RESPONSE_HEADERS = [
 
 const UPLOAD_REQUEST_TIMEOUT_MS = 60 * 60 * 1000;
 
+type CorsCallback = (error: Error | null, options: Record<string, unknown>) => void;
+
 async function bootstrap(): Promise<void> {
   const logger = new Logger('Bootstrap');
 
@@ -52,15 +55,28 @@ async function bootstrap(): Promise<void> {
     app.setGlobalPrefix(API_PREFIX);
     app.enableShutdownHooks();
 
-    if (config.corsOrigins.length > 0) {
-      app.enableCors({
-        origin: [...config.corsOrigins],
+    app.enableCors((request: { url?: string }, callback: CorsCallback) => {
+      // Media files are opened by players on any site. Their signed URL is the authorization.
+      if (request.url?.startsWith(`/${API_PREFIX}/${MEDIA_ROUTE}/`)) {
+        callback(null, {
+          origin: '*',
+          methods: ['GET', 'HEAD', 'OPTIONS'],
+          allowedHeaders: ['Range'],
+          exposedHeaders: ['Content-Length', 'Content-Range', 'Accept-Ranges'],
+          maxAge: 600,
+        });
+        return;
+      }
+
+      // Everything else is limited to the configured origins. An empty list allows none.
+      callback(null, {
+        origin: config.corsOrigins.length > 0 ? [...config.corsOrigins] : false,
         methods: ['GET', 'HEAD', 'POST', 'PATCH', 'DELETE', 'OPTIONS'],
         allowedHeaders: ['Authorization', 'Content-Type', ...TUS_REQUEST_HEADERS],
         exposedHeaders: TUS_RESPONSE_HEADERS,
         maxAge: 600,
       });
-    }
+    });
 
     // Node ends a request that takes longer than five minutes by default.
     // One chunk of a large upload over a slow connection can take longer.

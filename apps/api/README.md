@@ -27,7 +27,7 @@ Processing needs FFmpeg and ffprobe on the machine that runs the `worker` role, 
 
 ## Endpoints
 
-The full list with status is in [docs/phase-1-media-engine.md](../../docs/phase-1-media-engine.md#api-endpoints). Built so far: health, first-run setup, sign-in and sign-out, password change, admin management, API keys, the audit log, storage pools, assets, resumable uploads, the processing pipeline, jobs and encoding profiles.
+The full list with status is in [docs/phase-1-media-engine.md](../../docs/phase-1-media-engine.md#api-endpoints). Built so far: health, first-run setup, sign-in and sign-out, password change, admin management, API keys, the audit log, storage pools, assets, resumable uploads, the processing pipeline, jobs, encoding profiles and playback.
 
 Every endpoint needs credentials unless its controller or handler is marked `@Public()`.
 
@@ -58,7 +58,7 @@ Send the token on later requests as `Authorization: Bearer <token>`.
 | Unit       | `pnpm --filter @onyx/api test` | Nothing                                      |
 | End-to-end | `pnpm test:e2e`                | A test database for the authentication suite |
 
-The authentication, storage pool, upload and processing suites run against a real PostgreSQL database and are skipped when `TEST_DATABASE_URL` is not set. They delete data in that database, so it must be a separate database. Prepare it once, and again after every new migration:
+The authentication, storage pool, upload, processing and playback suites run against a real PostgreSQL database and are skipped when `TEST_DATABASE_URL` is not set. They delete data in that database, so it must be a separate database. Prepare it once, and again after every new migration:
 
 ```bash
 docker compose -f deploy/dev/docker-compose.yml exec postgres createdb -U onyx onyx_test
@@ -67,7 +67,7 @@ DATABASE_URL="postgresql://onyx:<your password>@localhost:5432/onyx_test" pnpm -
 
 The first command fails harmlessly if the database already exists.
 
-The processing suite also needs FFmpeg and is skipped without it. It generates its own test videos.
+The processing and playback suites also need FFmpeg and are skipped without it. They generate their own test videos.
 
 The S3 driver tests are part of the unit test command and are skipped unless `TEST_S3_ENDPOINT` and the other `TEST_S3_*` values are set in `.env`. They need an existing bucket on any S3-compatible service.
 
@@ -94,6 +94,7 @@ src/
   encoding-profiles/ Encoding profiles and the default ladder
   jobs/              Job records, queueing and the jobs API
   processing/        Pipeline orchestration, FFmpeg runner, media steps, queue worker
+  playback/          Signed playback URLs and delivery of generated files
   health/            Health endpoints
 test/                End-to-end tests
 ```

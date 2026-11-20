@@ -29,6 +29,9 @@ export class AppConfig {
   /** Absolute path of the directory for working files of processing jobs. */
   readonly processingTempPath: string;
   readonly workerConcurrency: number;
+  readonly playbackUrlTtlSeconds: number;
+  /** Origin that serves media files. Empty when the API serves them itself. */
+  readonly mediaBaseUrl: string;
 
   /**
    * @param env Validated environment variables.
@@ -53,6 +56,8 @@ export class AppConfig {
     this.ffprobePath = env.FFPROBE_PATH;
     this.processingTempPath = path.resolve(baseDirectory, env.PROCESSING_TEMP_PATH);
     this.workerConcurrency = env.WORKER_CONCURRENCY;
+    this.playbackUrlTtlSeconds = env.PLAYBACK_URL_TTL_SECONDS;
+    this.mediaBaseUrl = env.MEDIA_BASE_URL;
   }
 
   get isProduction(): boolean {
