@@ -244,3 +244,19 @@ This replaces the "plain CSS without a component library" part of D-018.
 **Why:** the panel is the product's face for the people who run it, and it has to feel like a finished content management system. Radix gives correct keyboard and screen reader behavior for the hard components. Keeping the component code in the repository avoids a dependency on one design library's releases and lets the look be changed freely.
 
 **Consequence:** the panel has more dependencies and a larger first download (about 205 kB compressed, plus the player on the asset page). The content security policy still needs `'unsafe-inline'` for styles, because Radix positions popups with inline styles. Fonts are served from the panel's own origin.
+
+## D-022 Live updates over server-sent events
+
+**Date:** 2026-11-20
+
+- **The panel keeps one stream open** to `GET /v1/events` (server-sent events) while an admin is signed in.
+- **Any process publishes events to a Redis channel**, and every API process passes them on to its connected panels. That is how a worker's progress reaches a browser.
+- **Events are hints, not data.** They carry ids, a status and a progress number, never titles, paths or errors. The panel reads the details through the normal API, where permissions are checked as usual. Job progress is the one value shown straight from an event.
+- **Each stream gets only the kinds of events its permissions allow**, is ended after 15 minutes so the session is checked again, and gets a keep-alive line every 20 seconds.
+- **The panel reads the stream with `fetch`**, because the browser's `EventSource` cannot send the session token in a header.
+- **When the stream is down, pages ask the server every few seconds** as before, and a badge in the top bar says so.
+- **Streams are ended before the HTTP server closes**, so an open panel cannot keep the API from stopping.
+
+**Why:** asking every two seconds from every open page costs requests whether or not anything changed and still feels late. Server-sent events are plain HTTP, pass through Nginx without extra setup and reconnect simply. WebSockets would add a second protocol for something that only flows one way.
+
+**Consequence:** one open connection per browser tab on the API. A lost event only delays what the panel shows, so publishing never fails the work that caused it. Events are not stored: a panel that was disconnected reads everything again when it reconnects.

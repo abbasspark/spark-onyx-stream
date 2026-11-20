@@ -7,7 +7,8 @@ The admin panel: a single-page app built with Vite and React.
 - **Dashboard:** videos, processing, storage, uploads per day, recent failures and activity
 - **Library:** posters in a grid or a table, search, status filter, sorting, bulk actions, drag-and-drop upload
 - **Uploads:** several files at once, resumable, shown in a tray on every page
-- **Video page:** preview player with quality choice, details, jobs, rename, process again, delete
+- **Video page:** preview player, details, and tabs for qualities, subtitles, pictures, jobs, activity and source
+- **Live updates:** progress and changes appear as they happen, also from other admins and tabs
 - **Jobs:** progress of every processing step, cancel and retry
 - **Settings:** encoding profiles, storage pools, admins, API keys, audit log
 - **Everywhere:** light and dark theme, command palette (`Ctrl K` or `Cmd K`), keyboard navigation
@@ -49,6 +50,7 @@ src/
   components/      App shell, command palette, player, upload tray, job table
   components/ui/   The component library: buttons, forms, dialogs, tables, badges
   lib/             Formatting, navigation and other helpers
+  live/            Connection to the server's event stream
   pages/           One file per page
   theme/           Light, dark and system theme
   uploads/         Upload manager shared by all pages

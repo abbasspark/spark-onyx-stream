@@ -56,6 +56,7 @@ import {
 } from '@/components/ui/overlay';
 import { UploadDialog, videoFilesOf } from '@/components/upload-dialog';
 import { cn } from '@/lib/cn';
+import { usePollInterval } from '@/live/live';
 import {
   formatBytes,
   formatDateTime,
@@ -66,8 +67,6 @@ import {
 } from '@/lib/format';
 
 const PAGE_SIZE = 24;
-/** How often the list is read again while something on it is still changing. */
-const REFRESH_MS = 2500;
 const SEARCH_DELAY_MS = 300;
 const VIEW_KEY = 'onyx.admin.library-view';
 
@@ -118,6 +117,7 @@ export function AssetsPage() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [params, setParams] = useSearchParams();
+  const pollInterval = usePollInterval();
 
   const page = Math.max(1, Number(params.get('page')) || 1);
   const status = (params.get('status') ?? '') as AssetStatus | '';
@@ -180,7 +180,7 @@ export function AssetsPage() {
         signal,
       ),
     placeholderData: keepPreviousData,
-    refetchInterval: (query) => (query.state.data?.items.some(isBusy) ? REFRESH_MS : false),
+    refetchInterval: (query) => pollInterval(query.state.data?.items.some(isBusy) ?? false),
   });
   const items = assets.data?.items ?? [];
 

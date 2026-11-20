@@ -6,6 +6,7 @@ import type { Queue } from 'bullmq';
 import type { Redis } from 'ioredis';
 import { type Page, type PaginationInput, toPage, toSkipTake } from '../common/pagination.js';
 import { PROCESSING_QUEUE } from '../queue/queue.constants.js';
+import { EventPublisher } from '../events/event-publisher.js';
 import { REDIS_CLIENT } from '../redis/redis.module.js';
 
 /** Redis channel on which the API tells workers to stop a running job. */
@@ -81,6 +82,7 @@ export class JobsService {
     @Inject(PrismaClient) private readonly prisma: PrismaClient,
     @InjectQueue(PROCESSING_QUEUE) private readonly queue: Queue<QueuedJobData>,
     @Inject(REDIS_CLIENT) private readonly redis: Redis,
+    @Inject(EventPublisher) private readonly events: EventPublisher,
   ) {}
 
   async enqueue(input: EnqueueInput): Promise<Job> {
@@ -105,7 +107,7 @@ export class JobsService {
       },
     );
 
-    return job;
+    return this.announce(job);
   }
 
   async list(filter: JobFilter, pagination: PaginationInput): Promise<Page<JobView>> {
@@ -158,22 +160,25 @@ export class JobsService {
 
   // --- State changes reported by the worker --------------------------------
 
-  markRunning(id: string, workerId: string, attempt: number): Promise<Job> {
-    return this.prisma.job.update({
+  async markRunning(id: string, workerId: string, attempt: number): Promise<Job> {
+    const job = await this.prisma.job.update({
       where: { id },
       data: { status: 'RUNNING', workerId, attempts: attempt, startedAt: new Date(), error: null },
     });
+    return this.announce(job);
   }
 
   async setProgress(id: string, progress: number): Promise<void> {
+    const value = Math.max(0, Math.min(100, Math.round(progress)));
     await this.prisma.job.updateMany({
       where: { id, status: 'RUNNING' },
-      data: { progress: Math.max(0, Math.min(100, Math.round(progress))) },
+      data: { progress: value },
     });
+    this.events.publish({ type: 'job-progress', jobId: id, progress: value });
   }
 
-  markCompleted(id: string, output?: Record<string, unknown>): Promise<Job> {
-    return this.prisma.job.update({
+  async markCompleted(id: string, output?: Record<string, unknown>): Promise<Job> {
+    const job = await this.prisma.job.update({
       where: { id },
       data: {
         status: 'COMPLETED',
@@ -182,27 +187,44 @@ export class JobsService {
         finishedAt: new Date(),
       },
     });
+    return this.announce(job);
   }
 
   /** The attempt failed and the queue will run the job again. */
-  markRetrying(id: string, error: string): Promise<Job> {
-    return this.prisma.job.update({
+  async markRetrying(id: string, error: string): Promise<Job> {
+    const job = await this.prisma.job.update({
       where: { id },
       data: { status: 'QUEUED', progress: 0, error: error.slice(0, MAX_ERROR_LENGTH) },
     });
+    return this.announce(job);
   }
 
-  markFailed(id: string, error: string): Promise<Job> {
-    return this.prisma.job.update({
+  async markFailed(id: string, error: string): Promise<Job> {
+    const job = await this.prisma.job.update({
       where: { id },
       data: { status: 'FAILED', error: error.slice(0, MAX_ERROR_LENGTH), finishedAt: new Date() },
     });
+    return this.announce(job);
   }
 
-  markCancelled(id: string): Promise<Job> {
-    return this.prisma.job.update({
+  async markCancelled(id: string): Promise<Job> {
+    const job = await this.prisma.job.update({
       where: { id },
       data: { status: 'CANCELLED', finishedAt: new Date() },
     });
+    return this.announce(job);
+  }
+
+  /** Tells open admin panels that a job changed, and returns the job for chaining. */
+  private announce(job: Job): Job {
+    this.events.publish({
+      type: 'job',
+      jobId: job.id,
+      assetId: job.assetId,
+      jobType: job.type,
+      status: job.status,
+      progress: job.progress,
+    });
+    return job;
   }
 }

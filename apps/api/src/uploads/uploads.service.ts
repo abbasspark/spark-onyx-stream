@@ -19,6 +19,7 @@ import { Server as TusServer } from '@tus/server';
 import { safeSourceFilename } from '../assets/source-filename.js';
 import { AuditService } from '../audit/audit.service.js';
 import { AppConfig } from '../config/app-config.js';
+import { EventPublisher } from '../events/event-publisher.js';
 import { PipelineService } from '../processing/pipeline.service.js';
 import { StorageService } from '../storage/storage.service.js';
 import { parseUploadMetadata } from './upload-metadata.js';
@@ -67,6 +68,7 @@ export class UploadsService implements OnApplicationBootstrap {
     @Inject(AuditService) private readonly audit: AuditService,
     @Inject(AppConfig) private readonly config: AppConfig,
     @Inject(PipelineService) private readonly pipeline: PipelineService,
+    @Inject(EventPublisher) private readonly events: EventPublisher,
   ) {
     this.store = new FileStore({
       directory: config.uploadTempPath,
@@ -272,6 +274,7 @@ export class UploadsService implements OnApplicationBootstrap {
       entityId: asset.id,
       metadata: { bytes: size, checksum },
     });
+    this.events.publish({ type: 'asset', assetId: asset.id, change: 'uploaded' });
 
     await this.startProcessing(asset.id);
   }

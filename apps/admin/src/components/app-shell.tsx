@@ -16,6 +16,7 @@ import { useSession } from '@/auth/session';
 import { cn } from '@/lib/cn';
 import { humanize } from '@/lib/format';
 import { findNavItem, NAVIGATION } from '@/lib/navigation';
+import { useLiveState } from '@/live/live';
 import { type ThemeChoice, useTheme } from '@/theme/theme';
 import { useUploads } from '@/uploads/uploads';
 import { CommandPalette } from './command-palette';
@@ -53,6 +54,7 @@ export function AppShell() {
   const { state, signOut, can } = useSession();
   const { choice, setChoice } = useTheme();
   const { uploads } = useUploads();
+  const live = useLiveState();
   const location = useLocation();
   const navigate = useNavigate();
   const [paletteOpen, setPaletteOpen] = useState(false);
@@ -252,6 +254,34 @@ export function AppShell() {
           </nav>
 
           <div className="ml-auto flex items-center gap-2">
+            <Tooltip
+              content={
+                live === 'live'
+                  ? 'Changes appear as they happen'
+                  : live === 'connecting'
+                    ? 'Connecting to live updates'
+                    : 'Live updates are interrupted. The panel asks the server every few seconds instead.'
+              }
+            >
+              <span
+                className={cn(
+                  'hidden items-center gap-1.5 rounded-full border px-2 py-0.5 text-xs font-medium sm:inline-flex',
+                  live === 'live'
+                    ? 'border-success/25 bg-success/10 text-success'
+                    : 'border-warning/30 bg-warning/10 text-warning',
+                )}
+                role="status"
+              >
+                <span
+                  className={cn(
+                    'size-1.5 rounded-full bg-current',
+                    live !== 'live' && 'animate-pulse',
+                  )}
+                  aria-hidden="true"
+                />
+                {live === 'live' ? 'Live' : live === 'connecting' ? 'Connecting' : 'Reconnecting'}
+              </span>
+            </Tooltip>
             <button
               type="button"
               onClick={() => setPaletteOpen(true)}

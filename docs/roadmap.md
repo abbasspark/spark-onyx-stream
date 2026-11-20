@@ -24,6 +24,6 @@ The project is built in phases. Each phase ends with something that works end to
 7. Playback: signed URLs and delivery of the generated files by the API. **Done.** Step 9 added verification of the same tokens by Nginx.
 8. Admin panel: login, asset library, upload, job monitor, player preview. **Done.** Step 8b added pages for encoding profiles, storage pools, admins, API keys, the audit log and the admin's own account. **Done.**
 9. Docker images and a single-server Compose file, with an Nginx gateway that serves the admin panel and checks playback tokens itself. **Done.**
-10. Admin panel design system: Tailwind and Radix components, light and dark themes, command palette, dashboard, library with posters, sorting, bulk actions and drag-and-drop upload. **Done.** Live updates pushed from the server and a fuller asset workspace follow as step 10b.
+10. Admin panel design system: Tailwind and Radix components, light and dark themes, command palette, dashboard, library with posters, sorting, bulk actions and drag-and-drop upload. **Done.** Step 10b added live updates pushed from the server and the video workspace with qualities, subtitles, pictures and activity. **Done.**
 
 See [phase-1-media-engine.md](phase-1-media-engine.md) for the design.
