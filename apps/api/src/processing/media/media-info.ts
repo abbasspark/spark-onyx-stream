@@ -9,6 +9,10 @@ export interface VideoStreamInfo {
   /** Frames per second. Null when the file does not say. */
   frameRate: number | null;
   pixelFormat: string | null;
+  /** Codec profile as ffprobe names it, for example "High". */
+  profile: string | null;
+  /** Codec level as ffprobe reports it, for example 40 for H.264 level 4.0. */
+  level: number | null;
   /** Clockwise rotation the player is asked to apply, in degrees. */
   rotation: number;
 }
@@ -53,6 +57,7 @@ interface RawStream {
   codec_type?: string;
   codec_name?: string;
   profile?: string;
+  level?: number;
   width?: number;
   height?: number;
   pix_fmt?: string;
@@ -134,6 +139,8 @@ export function parseProbe(json: string): MediaInfo {
           height: stream.height,
           frameRate: parseFrameRate(stream.avg_frame_rate) ?? parseFrameRate(stream.r_frame_rate),
           pixelFormat: stream.pix_fmt ?? null,
+          profile: stream.profile ?? null,
+          level: typeof stream.level === 'number' && stream.level > 0 ? stream.level : null,
           rotation: rotationOf(stream),
         };
       }

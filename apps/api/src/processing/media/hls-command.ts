@@ -5,6 +5,13 @@ import type { PlannedRendition } from './ladder.js';
 export const MASTER_PLAYLIST_NAME = 'master.m3u8';
 export const MEDIA_PLAYLIST_NAME = 'playlist.m3u8';
 
+/**
+ * Address of the content key as written into the media playlists. It is
+ * relative, so it resolves to "hls/key" under the same signed playback path
+ * as the playlist itself.
+ */
+export const CONTENT_KEY_URI = '../key';
+
 export interface HlsTiming {
   /** Segment length in seconds. */
   segmentSeconds: number;
@@ -12,12 +19,60 @@ export interface HlsTiming {
   keyframeSeconds: number;
 }
 
-/** Arguments shared by every HLS output: fragmented MP4 segments in an on-demand playlist. */
+/**
+ * AES-128 encryption of the segments.
+ *
+ * FFmpeg can only encrypt MPEG-TS segments this way, not fragmented MP4, so an
+ * encrypted asset is written with MPEG-TS segments.
+ */
+export interface HlsEncryption {
+  /** Path of the key info file. See {@link buildKeyInfo}. */
+  keyInfoPath: string;
+}
+
+/**
+ * Builds the key info file FFmpeg reads: the key address to write into the
+ * playlists, the local file holding the 16 key bytes, and the initialization
+ * vector in hexadecimal.
+ */
+export function buildKeyInfo(keyUri: string, keyPath: string, iv: Buffer): string {
+  if (iv.length !== 16) {
+    throw new Error('The initialization vector must be 16 bytes');
+  }
+  if (/[\r\n]/.test(keyUri) || /[\r\n]/.test(keyPath)) {
+    throw new Error('The key address and path must not contain line breaks');
+  }
+  return `${keyUri}\n${keyPath}\n${iv.toString('hex')}\n`;
+}
+
+/**
+ * Arguments shared by every HLS output: an on-demand playlist with fragmented
+ * MP4 segments, or encrypted MPEG-TS segments when encryption is requested.
+ */
 function hlsOutputArgs(
   outputDirectory: string,
   segmentSeconds: number,
   streamMap: string,
+  encryption: HlsEncryption | undefined,
 ): string[] {
+  const segments = encryption
+    ? [
+        '-hls_segment_type',
+        'mpegts',
+        '-hls_key_info_file',
+        encryption.keyInfoPath,
+        '-hls_segment_filename',
+        path.join(outputDirectory, '%v', 'seg-%05d.ts'),
+      ]
+    : [
+        '-hls_segment_type',
+        'fmp4',
+        '-hls_fmp4_init_filename',
+        'init.mp4',
+        '-hls_segment_filename',
+        path.join(outputDirectory, '%v', 'seg-%05d.m4s'),
+      ];
+
   return [
     '-f',
     'hls',
@@ -25,14 +80,9 @@ function hlsOutputArgs(
     String(segmentSeconds),
     '-hls_playlist_type',
     'vod',
-    '-hls_segment_type',
-    'fmp4',
     '-hls_flags',
     'independent_segments',
-    '-hls_fmp4_init_filename',
-    'init.mp4',
-    '-hls_segment_filename',
-    path.join(outputDirectory, '%v', 'seg-%05d.m4s'),
+    ...segments,
     '-master_pl_name',
     MASTER_PLAYLIST_NAME,
     '-var_stream_map',
@@ -51,6 +101,8 @@ export interface TranscodeCommandInput {
   /** Position of the audio stream to use among the source's audio streams. Null for no audio. */
   audioStreamIndex: number | null;
   timing: HlsTiming;
+  /** Left out, the segments are not encrypted. */
+  encryption?: HlsEncryption;
 }
 
 /**
@@ -127,7 +179,7 @@ export function buildTranscodeArgs(input: TranscodeCommandInput): string[] {
     // Subtitles and data streams are handled separately.
     '-sn',
     '-dn',
-    ...hlsOutputArgs(input.outputDirectory, timing.segmentSeconds, streamMap),
+    ...hlsOutputArgs(input.outputDirectory, timing.segmentSeconds, streamMap, input.encryption),
   ];
 }
 
@@ -139,6 +191,8 @@ export interface CopyCommandInput {
   videoStreamIndex: number;
   audioStreamIndex: number | null;
   segmentSeconds: number;
+  /** Left out, the segments are not encrypted. */
+  encryption?: HlsEncryption;
 }
 
 /**
@@ -162,6 +216,7 @@ export function buildCopyArgs(input: CopyCommandInput): string[] {
       input.outputDirectory,
       input.segmentSeconds,
       `v:0${hasAudio ? ',a:0' : ''},name:${input.renditionName}`,
+      input.encryption,
     ),
   ];
 }

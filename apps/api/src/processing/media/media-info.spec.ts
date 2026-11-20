@@ -24,6 +24,8 @@ const PROBE = JSON.stringify({
     {
       codec_type: 'video',
       codec_name: 'h264',
+      profile: 'High',
+      level: 40,
       width: 1920,
       height: 1080,
       pix_fmt: 'yuv420p',
@@ -63,6 +65,8 @@ describe('parseProbe', () => {
       height: 1080,
       frameRate: 29.97,
       pixelFormat: 'yuv420p',
+      profile: 'High',
+      level: 40,
       rotation: 270,
     });
   });

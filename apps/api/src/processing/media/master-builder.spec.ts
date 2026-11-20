@@ -2,6 +2,7 @@
 import {
   aacCodecString,
   avcCodecString,
+  avcCodecStringFromProfile,
   buildMasterPlaylist,
   type MasterVariant,
   measureBitrates,
@@ -37,6 +38,7 @@ describe('parseMediaPlaylist', () => {
   it('reads the initialization segment and the segments with their durations', () => {
     expect(parseMediaPlaylist(PLAYLIST)).toEqual({
       initUri: 'init_0.mp4',
+      encrypted: false,
       segments: [
         { uri: 'seg-00000.m4s', duration: 4 },
         { uri: 'seg-00001.m4s', duration: 4 },
@@ -48,8 +50,27 @@ describe('parseMediaPlaylist', () => {
   it('handles a playlist without segments', () => {
     expect(parseMediaPlaylist('#EXTM3U\n#EXT-X-ENDLIST\n')).toEqual({
       initUri: null,
+      encrypted: false,
       segments: [],
     });
+  });
+});
+
+describe('parseMediaPlaylist with encryption', () => {
+  it('recognizes encrypted MPEG-TS playlists', () => {
+    const playlist = parseMediaPlaylist(
+      [
+        '#EXTM3U',
+        '#EXT-X-KEY:METHOD=AES-128,URI="../key",IV=0x000102030405060708090a0b0c0d0e0f',
+        '#EXTINF:4.000000,',
+        'seg-00000.ts',
+        '#EXT-X-ENDLIST',
+      ].join('\n'),
+    );
+
+    expect(playlist.encrypted).toBe(true);
+    expect(playlist.initUri).toBeNull();
+    expect(playlist.segments).toEqual([{ uri: 'seg-00000.ts', duration: 4 }]);
   });
 });
 
@@ -102,6 +123,14 @@ describe('codec strings', () => {
   it('returns null when there is no H.264 configuration', () => {
     expect(avcCodecString(Buffer.from('no such box here'))).toBeNull();
     expect(avcCodecString(Buffer.from('avcC'))).toBeNull();
+  });
+
+  it('builds the H.264 codec string from profile and level', () => {
+    expect(avcCodecStringFromProfile('High', 31)).toBe('avc1.64001f');
+    expect(avcCodecStringFromProfile('Main', 30)).toBe('avc1.4d401e');
+    expect(avcCodecStringFromProfile('Constrained Baseline', 30)).toBe('avc1.42e01e');
+    expect(avcCodecStringFromProfile('Unknown', 30)).toBeNull();
+    expect(avcCodecStringFromProfile('High', null)).toBeNull();
   });
 
   it('maps AAC profiles', () => {

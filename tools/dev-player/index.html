@@ -200,6 +200,12 @@
             <label for="file">Video file</label>
             <input id="file" type="file" accept="video/*,.mkv,.mov,.ts" required />
           </div>
+          <div>
+            <label for="encrypt">
+              <input id="encrypt" type="checkbox" />
+              Encrypt (AES-128)
+            </label>
+          </div>
           <button id="upload-button" type="submit">Upload</button>
         </form>
         <div id="upload-progress" hidden>
@@ -371,7 +377,10 @@
           const title = element('title').value.trim() || file.name.replace(/\.[^.]+$/, '');
           const created = await api('/v1/assets', {
             method: 'POST',
-            body: JSON.stringify({ title }),
+            body: JSON.stringify({
+              title,
+              encryption: element('encrypt').checked ? 'AES_128' : 'NONE',
+            }),
           });
           if (file.size > created.upload.maxBytes) {
             throw new Error('The file is larger than the upload limit of this server');
@@ -427,7 +436,7 @@
         }
         if (asset.status === 'READY') {
           const seconds = Math.round((asset.media.durationMs ?? 0) / 1000);
-          return `${asset.media.width}x${asset.media.height}, ${seconds} s, ${String(asset.processingMode).toLowerCase()}`;
+          return `${asset.media.width}x${asset.media.height}, ${seconds} s, ${String(asset.processingMode).toLowerCase()}${asset.encryption === 'AES_128' ? ', encrypted' : ''}`;
         }
         return '';
       }

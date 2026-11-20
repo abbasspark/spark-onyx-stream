@@ -17,6 +17,8 @@ export interface MediaSegment {
 export interface MediaPlaylistInfo {
   /** File name of the initialization segment, from EXT-X-MAP. Null when there is none. */
   initUri: string | null;
+  /** True when the segments are encrypted (EXT-X-KEY with a method other than NONE). */
+  encrypted: boolean;
   segments: MediaSegment[];
 }
 
@@ -25,11 +27,14 @@ export function parseMediaPlaylist(content: string): MediaPlaylistInfo {
   const lines = content.split(/\r?\n/).map((line) => line.trim());
   const segments: MediaSegment[] = [];
   let initUri: string | null = null;
+  let encrypted = false;
   let pendingDuration: number | null = null;
 
   for (const line of lines) {
     if (line.startsWith('#EXT-X-MAP:')) {
       initUri = /URI="([^"]+)"/.exec(line)?.[1] ?? null;
+    } else if (line.startsWith('#EXT-X-KEY:')) {
+      encrypted = !/METHOD=NONE\b/.test(line);
     } else if (line.startsWith('#EXTINF:')) {
       const duration = Number(line.slice('#EXTINF:'.length).split(',')[0]);
       pendingDuration = Number.isFinite(duration) ? duration : null;
@@ -39,7 +44,7 @@ export function parseMediaPlaylist(content: string): MediaPlaylistInfo {
     }
   }
 
-  return { initUri, segments };
+  return { initUri, encrypted, segments };
 }
 
 export interface Bitrates {
@@ -90,6 +95,36 @@ export function avcCodecString(initSegment: Buffer): string | null {
   const constraints = initSegment[position + 6] as number;
   const level = initSegment[position + 7] as number;
   return `avc1.${hex(profile)}${hex(constraints)}${hex(level)}`;
+}
+
+/** Profile number and constraint flags of the H.264 profiles, as two hexadecimal bytes. */
+const AVC_PROFILES: Record<string, string> = {
+  'Constrained Baseline': '42e0',
+  Baseline: '4200',
+  Main: '4d40',
+  Extended: '5800',
+  High: '6400',
+  'High 10': '6e00',
+  'High 4:2:2': '7a00',
+  'High 4:4:4 Predictive': 'f400',
+};
+
+/**
+ * Builds the H.264 codec string from the profile name and level ffprobe
+ * reports. Used for MPEG-TS output, which has no initialization segment to
+ * read the exact bytes from.
+ *
+ * @returns Null when the profile is unknown or the level is missing.
+ */
+export function avcCodecStringFromProfile(
+  profile: string | null | undefined,
+  level: number | null | undefined,
+): string | null {
+  const prefix = profile ? AVC_PROFILES[profile] : undefined;
+  if (!prefix || !level || level < 1 || level > 255) {
+    return null;
+  }
+  return `avc1.${prefix}${hex(level)}`;
 }
 
 /** Maps an AAC profile name from ffprobe to its codec string. Unknown profiles count as AAC-LC. */

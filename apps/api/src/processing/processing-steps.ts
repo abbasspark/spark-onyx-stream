@@ -6,6 +6,7 @@ import { pipeline } from 'node:stream/promises';
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { type Asset, type JobType, Prisma, PrismaClient } from '@onyx/database';
 import { AppConfig } from '../config/app-config.js';
+import { type ContentKey, ContentKeysService } from '../crypto/content-keys.service.js';
 import { EncodingProfilesService } from '../encoding-profiles/encoding-profiles.service.js';
 import type { StorageDriver } from '../storage/storage-driver.js';
 import { StorageService } from '../storage/storage.service.js';
@@ -14,7 +15,9 @@ import { toPercent } from './ffmpeg/progress.js';
 import { decideProcessingMode } from './media/decision.js';
 import {
   buildCopyArgs,
+  buildKeyInfo,
   buildPosterArgs,
+  CONTENT_KEY_URI,
   buildTranscodeArgs,
   MASTER_PLAYLIST_NAME,
   MEDIA_PLAYLIST_NAME,
@@ -23,6 +26,7 @@ import { planRenditions } from './media/ladder.js';
 import {
   aacCodecString,
   avcCodecString,
+  avcCodecStringFromProfile,
   buildMasterPlaylist,
   type MasterVariant,
   measureBitrates,
@@ -111,6 +115,7 @@ export class ProcessingSteps {
     @Inject(PipelineService) private readonly pipelineService: PipelineService,
     @Inject(FfmpegRunner) private readonly ffmpeg: FfmpegRunner,
     @Inject(AppConfig) private readonly config: AppConfig,
+    @Inject(ContentKeysService) private readonly contentKeys: ContentKeysService,
   ) {}
 
   /** Runs the step for a job type and returns what is stored as the job's output. */
@@ -256,6 +261,20 @@ export class ProcessingSteps {
     const renditionNames =
       type === 'TRANSCODE' ? planned.map((rendition) => rendition.name) : [`${info.video.height}p`];
 
+    // The key lives outside the output folder, so it can never be uploaded with the segments.
+    const contentKey = asset.encryption === 'AES_128' ? this.contentKeys.generate() : null;
+    const keyPath = path.join(workDirectory, 'keys', 'content.key');
+    let encryption: { keyInfoPath: string } | undefined;
+    if (contentKey) {
+      const keyInfoPath = path.join(workDirectory, 'keys', 'key.info');
+      await mkdir(path.dirname(keyPath), { recursive: true, mode: 0o700 });
+      await writeFile(keyPath, contentKey.key, { mode: 0o600 });
+      await writeFile(keyInfoPath, buildKeyInfo(CONTENT_KEY_URI, keyPath, contentKey.iv), {
+        mode: 0o600,
+      });
+      encryption = { keyInfoPath };
+    }
+
     const args =
       type === 'TRANSCODE'
         ? buildTranscodeArgs({
@@ -268,6 +287,7 @@ export class ProcessingSteps {
               segmentSeconds: profile.segmentSeconds,
               keyframeSeconds: profile.keyframeSeconds,
             },
+            encryption,
           })
         : buildCopyArgs({
             sourcePath,
@@ -276,6 +296,7 @@ export class ProcessingSteps {
             videoStreamIndex: info.video.index,
             audioStreamIndex: audioStream?.index ?? null,
             segmentSeconds: profile.segmentSeconds,
+            encryption,
           });
 
     // Encoding is 0 to 90 percent of the job, uploading the results the rest.
@@ -295,13 +316,24 @@ export class ProcessingSteps {
     const variants: MasterVariant[] = [];
     for (const name of renditionNames) {
       variants.push(
-        await this.measureVariant(outputDirectory, name, info, audioCodec, context.signal),
+        await this.measureVariant(
+          outputDirectory,
+          name,
+          info,
+          audioCodec,
+          contentKey,
+          context.signal,
+        ),
       );
     }
     await writeFile(
       path.join(outputDirectory, MASTER_PLAYLIST_NAME),
       buildMasterPlaylist(variants, subtitles.tracks),
     );
+
+    if (contentKey) {
+      await rm(path.dirname(keyPath), { recursive: true, force: true });
+    }
 
     const hlsPrefix = `${outputPrefix(asset.id)}/hls`;
     const files = await listFiles(outputDirectory);
@@ -340,6 +372,7 @@ export class ProcessingSteps {
           path: `${hlsPrefix}/subs/${track.slug}/${SUBTITLE_FILE_NAME}`,
         })),
       }),
+      ...this.contentKeys.replaceOperations(asset.id, contentKey),
       this.prisma.asset.update({
         where: { id: asset.id },
         data: {
@@ -362,6 +395,7 @@ export class ProcessingSteps {
       renditions: renditions.map((rendition) => rendition.name),
       subtitles: subtitles.tracks.map((track) => track.label),
       ...(subtitles.skipped.length > 0 ? { subtitlesSkipped: subtitles.skipped } : {}),
+      encrypted: contentKey !== null,
       files: files.length,
       bytes: totalBytes,
     };
@@ -376,13 +410,18 @@ export class ProcessingSteps {
     name: string,
     info: MediaInfo,
     audioCodec: string | null,
+    contentKey: ContentKey | null,
     signal: AbortSignal,
   ): Promise<MasterVariant> {
     const directory = path.join(outputDirectory, name);
     const playlistPath = path.join(directory, MEDIA_PLAYLIST_NAME);
     const playlist = parseMediaPlaylist(await readFile(playlistPath, 'utf8'));
-    if (playlist.segments.length === 0 || !playlist.initUri) {
+    if (playlist.segments.length === 0) {
       throw new Error(`FFmpeg produced no playable output for ${name}`);
+    }
+    if (contentKey && !playlist.encrypted) {
+      // Never publish plain segments for an asset that was asked to be encrypted.
+      throw new Error(`FFmpeg did not encrypt the output for ${name}`);
     }
 
     const segments = await Promise.all(
@@ -393,14 +432,14 @@ export class ProcessingSteps {
     );
 
     // The encoder decides the exact width, so it is read back from the output.
-    const probed = parseProbe(
-      await this.ffmpeg.ffprobe(
-        ['-print_format', 'json', '-show_format', '-show_streams', playlistPath],
-        signal,
-      ),
-    );
+    const probed = parseProbe(await this.probeOutput(directory, playlist, contentKey, signal));
+    const fromInit = playlist.initUri
+      ? avcCodecString(await readFile(path.join(directory, playlist.initUri)))
+      : null;
     const videoCodec =
-      avcCodecString(await readFile(path.join(directory, playlist.initUri))) ?? 'avc1.640028';
+      fromInit ??
+      avcCodecStringFromProfile(probed.video?.profile, probed.video?.level) ??
+      'avc1.640028';
 
     return {
       name,
@@ -410,6 +449,36 @@ export class ProcessingSteps {
       codecs: audioCodec ? [videoCodec, audioCodec] : [videoCodec],
       frameRate: info.video?.frameRate ?? null,
     };
+  }
+
+  /**
+   * Runs ffprobe on one finished quality. An encrypted quality is probed
+   * through its first segment, decrypted on the fly, because the playlist
+   * points to a key address that only exists on the server.
+   */
+  private probeOutput(
+    directory: string,
+    playlist: { segments: { uri: string }[] },
+    contentKey: ContentKey | null,
+    signal: AbortSignal,
+  ): Promise<string> {
+    const show = ['-print_format', 'json', '-show_format', '-show_streams'];
+    if (!contentKey) {
+      return this.ffmpeg.ffprobe([...show, path.join(directory, MEDIA_PLAYLIST_NAME)], signal);
+    }
+
+    const firstSegment = path.join(directory, (playlist.segments[0] as { uri: string }).uri);
+    return this.ffmpeg.ffprobe(
+      [
+        '-key',
+        contentKey.key.toString('hex'),
+        '-iv',
+        contentKey.iv.toString('hex'),
+        ...show,
+        `crypto:${firstSegment}`,
+      ],
+      signal,
+    );
   }
 
   /**

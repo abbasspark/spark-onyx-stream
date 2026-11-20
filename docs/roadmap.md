@@ -20,8 +20,8 @@ The project is built in phases. Each phase ends with something that works end to
 3. Admin authentication: login, sessions, roles, API keys, audit log. **Done.**
 4. Storage: local and S3-compatible drivers behind one interface. **Done.**
 5. Upload: resumable upload, source file registration. **Done.**
-6. Processing pipeline: probe, decision engine, remux, transcode, package, poster. **Done.** Step 6b added seek-bar previews, embedded subtitles as WebVTT tracks and management of encoding profiles. **Done.** AES-128 encryption is a separate step: FFmpeg cannot encrypt fMP4 segments with AES-128, so encrypted assets need MPEG-TS segments or another packager, and that choice is still open.
-7. Playback: signed URLs and delivery of the generated files by the API. **Done.** Verification of the same tokens by Nginx moves to step 9, where it can be tested with the Docker setup. Key delivery follows with AES-128 encryption.
+6. Processing pipeline: probe, decision engine, remux, transcode, package, poster. **Done.** Step 6b added seek-bar previews, embedded subtitles as WebVTT tracks and management of encoding profiles. **Done.** AES-128 encryption with key delivery over the signed playback path is built as well. **Done.**
+7. Playback: signed URLs and delivery of the generated files by the API. **Done.** Verification of the same tokens by Nginx moves to step 9, where it can be tested with the Docker setup.
 8. Admin panel: login, asset library, upload, job monitor, player preview.
 9. Development Docker image and a first single-server Compose file.
 
