@@ -23,6 +23,8 @@
     "@nestjs/core": "^12.0.1",
     "@nestjs/platform-express": "^12.0.1",
     "@onyx/database": "workspace:*",
+    "@tus/file-store": "^2.1.2",
+    "@tus/server": "^2.4.7",
     "bullmq": "^6.7.8",
     "ioredis": "^5.8.0",
     "reflect-metadata": "^0.2.2",

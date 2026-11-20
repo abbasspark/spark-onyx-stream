@@ -120,3 +120,16 @@ Assets are packaged as HLS with fragmented MP4 (CMAF) segments.
 **Why:** processing and delivery code must not care where files are, and credentials in a database dump should be useless without the master key.
 
 **Consequence:** losing or changing `MASTER_KEY` makes stored S3 credentials unreadable. They have to be entered again. The master key belongs in every backup plan, stored apart from the database backup.
+
+## D-013 Uploads: tus protocol, one upload per asset
+
+**Date:** 2026-11-20
+
+- **Source files are uploaded with the tus resumable upload protocol**, implemented with the `@tus/server` library.
+- **The upload id is the asset id.** A client that lost its connection can resume knowing only the asset.
+- **Bytes are collected in a temporary directory on the API server.** When the upload is complete, the file is moved into the asset's storage pool, its SHA-256 checksum is recorded and the asset becomes `UPLOADED`.
+- **The move runs after the client has its answer** and is resumed at the next start if the process stops in between.
+
+**Why:** source files are often many gigabytes and connections drop. tus is an open protocol with client libraries for browsers and mobile platforms, so no custom client code is needed.
+
+**Consequence:** uploads have to reach the same API server until they finish, because the collected bytes are on its disk. An installation with several API servers needs sticky routing for `/v1/uploads` or a shared temporary directory. A large file is written twice, once to the temporary directory and once to the pool.
