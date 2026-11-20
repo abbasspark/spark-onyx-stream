@@ -85,6 +85,13 @@ export const envSchema = z.object({
   WORKER_CONCURRENCY: z.coerce.number().int().min(1).max(64).default(1),
 
   /**
+   * Number of reverse proxies in front of the API, such as the Nginx gateway.
+   * The client address is then taken from the X-Forwarded-For header. Zero
+   * means the API is reached directly and the header is ignored.
+   */
+  TRUST_PROXY_HOPS: z.coerce.number().int().min(0).max(10).default(0),
+
+  /**
    * Web origins allowed to call the API from a browser, separated by commas,
    * for example "https://admin.example.com". Empty allows same-origin requests only.
    */

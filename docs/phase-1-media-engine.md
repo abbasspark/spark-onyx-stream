@@ -235,7 +235,7 @@ Playback URLs are relative paths while the API serves the files. When `MEDIA_BAS
 
 ### Not built yet
 
-- Verification of the token by Nginx or an edge server, so files are served without passing through the API.
+- Verification of the token by an edge server. The Nginx gateway of the Compose setup already does it, see [the Compose README](../deploy/compose/README.md).
 - Redirecting to pre-signed URLs for pools in S3.
 - Limits per viewer, such as concurrent streams. They belong to the viewer accounts of phase 2.
 
@@ -335,4 +335,3 @@ These events are recorded with actor, target, time and IP address: setup, sign-i
 ## Open questions
 
 - Whether large uploads go directly from the browser to S3 with multipart upload, or always through the API.
-- The Nginx mechanism for checking playback tokens. The built-in secure link module only supports MD5, so a small script module (njs) is the likely choice.
