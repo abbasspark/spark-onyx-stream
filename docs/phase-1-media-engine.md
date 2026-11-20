@@ -181,6 +181,7 @@ Any tus client library works, for example `tus-js-client` or Uppy in the browser
 - Unfinished uploads are removed after 48 hours, at the next start of the API.
 
 ### Browser access
+
 A browser on another origin than the API needs that origin listed in `CORS_ORIGINS`. The API then answers preflight requests and exposes the tus headers.
 
 ### Not built yet
