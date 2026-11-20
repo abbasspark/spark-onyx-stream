@@ -85,3 +85,37 @@ export function formatElapsed(
   const seconds = Math.max(0, Math.round((end - new Date(startedAt).getTime()) / 1000));
   return seconds < 60 ? `${seconds} s` : `${Math.floor(seconds / 60)} min ${seconds % 60} s`;
 }
+
+const GIGABYTE = 1024 ** 3;
+
+/** Converts gigabytes typed into a form to the byte text the API expects. Null when the text is not a positive number. */
+export function gigabytesToBytes(text: string): string | null {
+  const value = Number(text.replace(',', '.'));
+  if (!text.trim() || !Number.isFinite(value) || value <= 0) {
+    return null;
+  }
+  return String(Math.round(value * GIGABYTE));
+}
+
+/** Converts a byte text from the API to gigabytes for a form field. */
+export function bytesToGigabytes(bytes: string | null): string {
+  if (!bytes) {
+    return '';
+  }
+  return String(Number((Number(bytes) / GIGABYTE).toFixed(2)));
+}
+
+/** Formats a bitrate, for example "2.8 Mbit/s" or "128 kbit/s". */
+export function formatBitrate(bitsPerSecond: number): string {
+  return bitsPerSecond >= 1_000_000
+    ? `${Number((bitsPerSecond / 1_000_000).toFixed(2))} Mbit/s`
+    : `${Math.round(bitsPerSecond / 1000)} kbit/s`;
+}
+
+/** Share of a quota that is used, 0 to 100. Null without a quota. */
+export function usagePercent(usedBytes: string, quotaBytes: string | null): number | null {
+  if (!quotaBytes || Number(quotaBytes) <= 0) {
+    return null;
+  }
+  return Math.min(100, (Number(usedBytes) / Number(quotaBytes)) * 100);
+}

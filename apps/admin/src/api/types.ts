@@ -142,3 +142,146 @@ export interface Job {
   startedAt: string | null;
   finishedAt: string | null;
 }
+
+export const ADMIN_ROLES = ['OWNER', 'ADMIN', 'EDITOR', 'VIEWER'] as const;
+
+export const ENCODER_PRESETS = [
+  'ultrafast',
+  'superfast',
+  'veryfast',
+  'faster',
+  'fast',
+  'medium',
+  'slow',
+  'slower',
+  'veryslow',
+] as const;
+export type EncoderPreset = (typeof ENCODER_PRESETS)[number];
+
+/** One quality of an encoding profile. Bitrates are in bits per second. */
+export interface ProfileRendition {
+  name: string;
+  height: number;
+  videoBitrate: number;
+  audioBitrate: number;
+  preset: EncoderPreset;
+}
+
+export interface EncodingProfile {
+  id: string;
+  name: string;
+  description: string | null;
+  isDefault: boolean;
+  segmentSeconds: number;
+  keyframeSeconds: number;
+  renditions: (ProfileRendition & { id: string })[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface EncodingProfileInput {
+  name: string;
+  description?: string;
+  isDefault?: boolean;
+  segmentSeconds: number;
+  keyframeSeconds: number;
+  renditions: ProfileRendition[];
+}
+
+export interface LocalPoolConfig {
+  basePath: string;
+}
+
+/** S3 settings as the API returns them. The secret key is never returned. */
+export interface S3PoolConfig {
+  bucket: string;
+  region: string;
+  endpoint?: string;
+  forcePathStyle: boolean;
+  keyPrefix?: string;
+  accessKeyId: string;
+}
+
+export type StoragePool = {
+  id: string;
+  name: string;
+  isDefault: boolean;
+  isActive: boolean;
+  /** Bytes as text. Null means no limit. */
+  quotaBytes: string | null;
+  /** Bytes as text. */
+  usedBytes: string;
+  createdAt: string;
+  updatedAt: string;
+} & ({ driver: 'LOCAL'; config: LocalPoolConfig } | { driver: 'S3'; config: S3PoolConfig });
+
+export type CreateStoragePoolInput = {
+  name: string;
+  isDefault?: boolean;
+  quotaBytes?: string;
+} & (
+  | { driver: 'LOCAL'; config: LocalPoolConfig }
+  | { driver: 'S3'; config: S3PoolConfig & { secretAccessKey: string } }
+);
+
+export interface UpdateStoragePoolInput {
+  name?: string;
+  isActive?: boolean;
+  isDefault?: true;
+  quotaBytes?: string | null;
+}
+
+export interface StoragePoolTestResult {
+  ok: boolean;
+  latencyMs: number;
+  error?: string;
+}
+
+export interface CreateAdminInput {
+  email: string;
+  displayName: string;
+  password: string;
+  role: AdminRole;
+}
+
+export interface UpdateAdminInput {
+  displayName?: string;
+  role?: AdminRole;
+  isActive?: boolean;
+  password?: string;
+}
+
+export interface ApiKey {
+  id: string;
+  name: string;
+  /** Public start of the key, for recognizing it. */
+  prefix: string;
+  scopes: Permission[];
+  createdBy: { id: string; displayName: string };
+  lastUsedAt: string | null;
+  expiresAt: string | null;
+  revokedAt: string | null;
+  createdAt: string;
+}
+
+/** The answer to creating a key. The full key is in it this once only. */
+export interface CreatedApiKey extends ApiKey {
+  key: string;
+}
+
+export interface CreateApiKeyInput {
+  name: string;
+  scopes: Permission[];
+  expiresAt?: string;
+}
+
+export interface AuditEntry {
+  id: string;
+  adminId: string | null;
+  action: string;
+  entityType: string | null;
+  entityId: string | null;
+  metadata: unknown;
+  ipAddress: string | null;
+  createdAt: string;
+}
