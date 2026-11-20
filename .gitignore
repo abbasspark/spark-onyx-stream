@@ -22,3 +22,45 @@ lerna-debug.log*
 # temp directory
 .temp
 .tmp
+
+# Monorepo
+node_modules
+dist
+build
+coverage
+.turbo
+*.tsbuildinfo
+
+# Next.js
+.next
+out
+
+# Vite
+*.local
+
+# Environment files (keep examples)
+.env.*
+!.env.example
+
+# Prisma
+*.db
+*.db-journal
+
+# Go
+bin/
+*.exe
+*.test
+*.out
+vendor/
+
+# Media and local storage used in development
+/storage
+/media
+/uploads
+
+# Editors and OS
+.idea
+.vscode/*
+!.vscode/extensions.json
+.DS_Store
+Thumbs.db
