@@ -6,6 +6,8 @@ import { BillingAdminController, PublicBillingController } from './billing.contr
 import { CheckoutService } from './checkout.service.js';
 import { StripeWebhookController } from './stripe-webhook.controller.js';
 import { StripeWebhookService } from './stripe-webhook.service.js';
+import { PaymentsAdminController, ViewerPaymentsController } from './payments.controller.js';
+import { PaymentsService } from './payments.service.js';
 import { PlansService } from './plans.service.js';
 import { SubscriptionsService } from './subscriptions.service.js';
 
@@ -16,8 +18,20 @@ import { SubscriptionsService } from './subscriptions.service.js';
  */
 @Module({
   imports: [ViewersModule, StripeModule],
-  controllers: [PublicBillingController, BillingAdminController, StripeWebhookController],
-  providers: [PlansService, SubscriptionsService, CheckoutService, StripeWebhookService],
+  controllers: [
+    PublicBillingController,
+    BillingAdminController,
+    StripeWebhookController,
+    ViewerPaymentsController,
+    PaymentsAdminController,
+  ],
+  providers: [
+    PlansService,
+    SubscriptionsService,
+    CheckoutService,
+    StripeWebhookService,
+    PaymentsService,
+  ],
   exports: [SubscriptionsService],
 })
 export class BillingModule {}

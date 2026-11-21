@@ -27,8 +27,29 @@ export interface FakeSubscription {
   ended_at: number | null;
   start_date: number;
   items: {
-    data: { current_period_end: number; price: { recurring: { interval: string } } }[];
+    data: {
+      current_period_end: number;
+      price: { unit_amount: number; recurring: { interval: string } };
+    }[];
   };
+}
+
+export interface FakeInvoice {
+  id: string;
+  object: 'invoice';
+  status: string;
+  currency: string;
+  amount_paid: number;
+  customer: string;
+  number: string;
+  hosted_invoice_url: string;
+  created: number;
+  status_transitions: { paid_at: number | null };
+  parent: { type: string; subscription_details: { subscription: string } };
+  total_taxes: { amount: number }[];
+  lines: { data: { period: { start: number; end: number } }[] };
+  /** Id of the payment. Handed out only when the request asks for the payments. */
+  paymentIntent: string;
 }
 
 interface FakeSession {
@@ -58,14 +79,27 @@ export interface FakeStripe {
   products: Map<string, { id: string; name: string }>;
   sessions: Map<string, FakeSession>;
   subscriptions: Map<string, FakeSubscription>;
+  invoices: Map<string, FakeInvoice>;
   /** Makes every request answer with this status. */
   failWith: number | null;
+  /** The most invoices one page of a list holds. Lowered by tests of paging. */
+  pageSize: number;
   /** The viewer pays: the session completes and its subscription starts. */
   pay: (sessionId: string) => FakeSubscription;
   /** Changes a subscription, as Stripe or its customer portal would. */
   change: (id: string, fields: Partial<FakeSubscription>) => FakeSubscription;
-  /** Moves a subscription into its next period, as a renewal does. */
+  /** Moves a subscription into its next period, as a renewal does, and bills it. */
   renew: (id: string) => FakeSubscription;
+  /** A paid invoice for a subscription, over its price unless told otherwise. */
+  bill: (
+    subscriptionId: string,
+    fields?: { amount?: number; tax?: number; paidAt?: number },
+  ) => FakeInvoice;
+  /** Returns money of an invoice. Answers with the charge, as the message about it carries it. */
+  refund: (
+    invoiceId: string,
+    amount: number,
+  ) => { id: string; amount: number; amount_refunded: number; payment_intent: string };
   /** A message as Stripe would send it: the body and the signature header. */
   event: (
     type: string,
@@ -91,6 +125,14 @@ export async function startFakeStripe(): Promise<FakeStripe> {
   let counter = 0;
   const next = (prefix: string) => `${prefix}_${String((counter += 1)).padStart(6, '0')}fake`;
   const idempotent = new Map<string, unknown>();
+  const refunded = new Map<string, number>();
+  /** An invoice as the API hands it out: the payments only when asked for. */
+  const shown = (invoice: FakeInvoice, withPayments: boolean) => {
+    const { paymentIntent, ...rest } = invoice;
+    return withPayments
+      ? { ...rest, payments: { data: [{ payment: { payment_intent: paymentIntent } }] } }
+      : rest;
+  };
 
   const fake: FakeStripe = {
     apiUrl: '',
@@ -101,7 +143,9 @@ export async function startFakeStripe(): Promise<FakeStripe> {
     products: new Map(),
     sessions: new Map(),
     subscriptions: new Map(),
+    invoices: new Map(),
     failWith: null,
+    pageSize: 100,
     pay(sessionId) {
       const session = fake.sessions.get(sessionId);
       if (!session) {
@@ -130,11 +174,23 @@ export async function startFakeStripe(): Promise<FakeStripe> {
         canceled_at: null,
         ended_at: null,
         start_date: start,
-        items: { data: [{ current_period_end: periodEnd, price: { recurring: { interval } } }] },
+        items: {
+          data: [
+            {
+              current_period_end: periodEnd,
+              price: {
+                unit_amount: Number(session.form['line_items[0][price_data][unit_amount]'] ?? 0),
+                recurring: { interval },
+              },
+            },
+          ],
+        },
       };
       fake.subscriptions.set(subscription.id, subscription);
       session.status = 'complete';
       session.subscription = subscription.id;
+      // A trial starts with an invoice over nothing, which is no payment.
+      fake.bill(subscription.id, trialDays > 0 ? { amount: 0 } : {});
       return subscription;
     },
     change(id, fields) {
@@ -152,7 +208,55 @@ export async function startFakeStripe(): Promise<FakeStripe> {
         const days = item.price.recurring.interval === 'year' ? 365 : 30;
         item.current_period_end = Math.max(item.current_period_end, nowSeconds()) + days * DAY;
       }
+      fake.bill(id);
       return subscription;
+    },
+    bill(subscriptionId, fields = {}) {
+      const subscription = fake.subscriptions.get(subscriptionId);
+      if (!subscription) {
+        throw new Error(`No such subscription: ${subscriptionId}`);
+      }
+      const item = subscription.items.data[0];
+      const paidAt = fields.paidAt ?? nowSeconds();
+      const end = item?.current_period_end ?? paidAt + 30 * DAY;
+      const days = item?.price.recurring.interval === 'year' ? 365 : 30;
+      const id = next('in');
+      refunded.set(id, 0);
+      const invoice: FakeInvoice = {
+        id,
+        object: 'invoice',
+        status: 'paid',
+        currency: 'eur',
+        amount_paid: fields.amount ?? item?.price.unit_amount ?? 0,
+        customer: subscription.customer,
+        number: `FAKE-${String(fake.invoices.size + 1).padStart(4, '0')}`,
+        hosted_invoice_url: `https://invoice.stripe.test/i/${id}`,
+        created: paidAt,
+        status_transitions: { paid_at: paidAt },
+        parent: {
+          type: 'subscription_details',
+          subscription_details: { subscription: subscriptionId },
+        },
+        total_taxes: fields.tax ? [{ amount: fields.tax }] : [],
+        lines: { data: [{ period: { start: end - days * DAY, end } }] },
+        paymentIntent: next('pi'),
+      };
+      fake.invoices.set(id, invoice);
+      return invoice;
+    },
+    refund(invoiceId, amount) {
+      const invoice = fake.invoices.get(invoiceId);
+      if (!invoice) {
+        throw new Error(`No such invoice: ${invoiceId}`);
+      }
+      const total = (refunded.get(invoiceId) ?? 0) + amount;
+      refunded.set(invoiceId, total);
+      return {
+        id: `ch_${invoiceId}`,
+        amount: invoice.amount_paid,
+        amount_refunded: total,
+        payment_intent: invoice.paymentIntent,
+      };
     },
     event(type, object, options = {}) {
       const id = options.id ?? next('evt');
@@ -182,8 +286,11 @@ export async function startFakeStripe(): Promise<FakeStripe> {
       fake.products.clear();
       fake.sessions.clear();
       fake.subscriptions.clear();
+      fake.invoices.clear();
+      refunded.clear();
       idempotent.clear();
       fake.failWith = null;
+      fake.pageSize = 100;
     },
     close: () => new Promise((resolve) => server.close(() => resolve())),
   };
@@ -283,6 +390,38 @@ export async function startFakeStripe(): Promise<FakeStripe> {
       return {
         status: 200,
         body: { id: next('bps'), url: `https://billing.stripe.test/p/session/${form.customer}` },
+      };
+    }
+    if (resource === 'invoices' && method === 'GET') {
+      if (id) {
+        const invoice = fake.invoices.get(id);
+        return invoice
+          ? { status: 200, body: shown(invoice, form['expand[0]'] === 'payments') }
+          : missing(`invoice: '${id}'`);
+      }
+      // Newest first, a page at a time, as Stripe lists.
+      const all = [...fake.invoices.values()]
+        .filter((invoice) => invoice.status === 'paid')
+        .reverse();
+      const start = form.starting_after
+        ? all.findIndex((invoice) => invoice.id === form.starting_after) + 1
+        : 0;
+      const size = Math.min(Number(form.limit ?? 10), fake.pageSize);
+      return {
+        status: 200,
+        body: {
+          object: 'list',
+          data: all.slice(start, start + size).map((invoice) => shown(invoice, false)),
+          has_more: start + size < all.length,
+        },
+      };
+    }
+    if (resource === 'invoice_payments' && method === 'GET') {
+      const wanted = form['payment[payment_intent]'];
+      const invoice = [...fake.invoices.values()].find((item) => item.paymentIntent === wanted);
+      return {
+        status: 200,
+        body: { object: 'list', data: invoice ? [{ invoice: invoice.id }] : [], has_more: false },
       };
     }
     if (resource === 'subscriptions' && id) {

@@ -1,15 +1,22 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 import { Inject, Injectable, Logger } from '@nestjs/common';
-import { PrismaClient, type Subscription } from '@onyx/database';
+import { type Payment, PrismaClient, type Subscription } from '@onyx/database';
 import { isUniqueViolation } from '../common/prisma-errors.js';
 import { StripeClient, StripeError } from './stripe.client.js';
-import { mapSubscription } from './stripe.mapper.js';
-import { idOf, type StripeSubscription } from './stripe.types.js';
+import { mapInvoice, mapSubscription, refundState } from './stripe.mapper.js';
+import {
+  idOf,
+  type StripeCharge,
+  type StripeInvoice,
+  type StripeSubscription,
+} from './stripe.types.js';
 
 /** A renewal Stripe has not reported this long after it was due is asked for. */
 const OVERDUE_MS = 60 * 60 * 1000;
 /** How many subscriptions one check asks Stripe about, so a run stays short. */
 const RECONCILE_BATCH = 25;
+/** How many pages of a hundred invoices one import reads. */
+const IMPORT_PAGES = 20;
 /** How long messages from Stripe are kept. Stripe repeats one for three days at most. */
 const KEEP_EVENTS_MS = 30 * 24 * 60 * 60 * 1000;
 
@@ -72,6 +79,7 @@ export class StripeSyncService {
       renewsAt: state.renewsAt,
       cancelAtPeriodEnd: state.cancelAtPeriodEnd,
       canceledAt: state.canceledAt,
+      amount: state.amount,
     };
     const write = () =>
       this.prisma.subscription.upsert({
@@ -100,6 +108,148 @@ export class StripeSyncService {
       });
     }
     return saved;
+  }
+
+  /**
+   * Reads an invoice from Stripe and writes its payment into the books.
+   *
+   * @returns The payment, or null when the invoice is not paid, is over
+   *   nothing, or belongs to nobody known here.
+   * @throws StripeError
+   */
+  async recordInvoiceById(invoiceId: string): Promise<Payment | null> {
+    return this.recordInvoice(await this.stripe.retrieveInvoice(invoiceId));
+  }
+
+  /** Writes the payment of an invoice into the books, once. */
+  async recordInvoice(invoice: StripeInvoice): Promise<Payment | null> {
+    const paid = mapInvoice(invoice);
+    if (!paid) {
+      return null;
+    }
+    let subscription = paid.subscriptionExternalId
+      ? await this.prisma.subscription.findUnique({
+          where: { externalId: paid.subscriptionExternalId },
+          include: { plan: { select: { id: true, name: true } } },
+        })
+      : null;
+    if (!subscription && paid.subscriptionExternalId) {
+      // The invoice can be heard of before its subscription.
+      await this.syncById(paid.subscriptionExternalId).catch(() => null);
+      subscription = await this.prisma.subscription.findUnique({
+        where: { externalId: paid.subscriptionExternalId },
+        include: { plan: { select: { id: true, name: true } } },
+      });
+    }
+    const viewer = subscription
+      ? await this.prisma.viewer.findUnique({ where: { id: subscription.viewerId } })
+      : paid.customerId
+        ? await this.prisma.viewer.findUnique({ where: { stripeCustomerId: paid.customerId } })
+        : null;
+    if (!viewer) {
+      this.logger.warn(`Stripe invoice ${paid.externalId} is from no viewer of this site`);
+      return null;
+    }
+
+    const facts = {
+      amount: paid.amount,
+      taxAmount: paid.taxAmount,
+      currency: paid.currency,
+      paidAt: paid.paidAt,
+      periodStart: paid.periodStart,
+      periodEnd: paid.periodEnd,
+      invoiceNumber: paid.invoiceNumber,
+      invoiceUrl: paid.invoiceUrl,
+      ...(paid.paymentId ? { externalPaymentId: paid.paymentId } : {}),
+    };
+    const write = () =>
+      this.prisma.payment.upsert({
+        where: { externalId: paid.externalId },
+        // What was returned is kept: a refund is not part of the invoice.
+        update: facts,
+        create: {
+          ...facts,
+          externalId: paid.externalId,
+          source: 'STRIPE',
+          viewerId: viewer.id,
+          viewerEmail: viewer.email,
+          subscriptionId: subscription?.id ?? null,
+          planId: subscription?.plan.id ?? null,
+          planName: subscription?.plan.name ?? null,
+        },
+      });
+    return write().catch((error: unknown) => {
+      if (isUniqueViolation(error)) {
+        return write();
+      }
+      throw error;
+    });
+  }
+
+  /**
+   * Notes money that was returned, from what Stripe says about the charge.
+   *
+   * @returns The payment, or null when the charge was for nothing in the books.
+   * @throws StripeError
+   */
+  async recordRefund(charge: StripeCharge): Promise<Payment | null> {
+    const paymentId = idOf(charge.payment_intent);
+    if (!paymentId) {
+      return null;
+    }
+    let payment = await this.prisma.payment.findFirst({
+      where: { externalPaymentId: paymentId, source: 'STRIPE' },
+    });
+    if (!payment) {
+      const invoiceId = await this.stripe.invoiceOfPayment(paymentId);
+      if (!invoiceId) {
+        return null;
+      }
+      payment =
+        (await this.prisma.payment.findUnique({ where: { externalId: invoiceId } })) ??
+        (await this.recordInvoiceById(invoiceId));
+      if (!payment) {
+        return null;
+      }
+    }
+    return this.prisma.payment.update({
+      where: { id: payment.id },
+      data: {
+        ...refundState(payment.amount, charge.amount_refunded),
+        externalPaymentId: paymentId,
+      },
+    });
+  }
+
+  /**
+   * Writes the paid invoices Stripe has into the books: for payments made
+   * before this version, or while messages did not arrive.
+   *
+   * @returns How many invoices were read, and how many payments are new.
+   * @throws StripeError
+   */
+  async importPayments(): Promise<{ checked: number; added: number; complete: boolean }> {
+    let checked = 0;
+    let added = 0;
+    let after: string | undefined;
+    for (let page = 0; page < IMPORT_PAGES; page += 1) {
+      const list = await this.stripe.listPaidInvoices(after);
+      for (const invoice of list.data) {
+        checked += 1;
+        const known = await this.prisma.payment.findUnique({
+          where: { externalId: invoice.id },
+          select: { id: true },
+        });
+        if (!known && (await this.recordInvoice(invoice))) {
+          added += 1;
+        }
+      }
+      after = list.data.at(-1)?.id;
+      if (!list.has_more || !after) {
+        return { checked, added, complete: true };
+      }
+    }
+    return { checked, added, complete: false };
   }
 
   /**

@@ -821,3 +821,83 @@ export interface StripeAccount {
   /** Set when the account's currency is not the one prices are in here. */
   currencyMismatch: boolean;
 }
+
+export type PaymentStatus = 'PAID' | 'PARTIALLY_REFUNDED' | 'REFUNDED';
+
+/** Money a viewer paid for a subscription. Amounts are in the smallest unit of the currency. */
+export interface Payment {
+  id: string;
+  /** Null once the account is deleted. The email address stays. */
+  viewer: { id: string; displayName: string } | null;
+  viewerEmail: string;
+  planId: string | null;
+  planName: string | null;
+  /** MANUAL: written down by an admin. STRIPE: collected online. */
+  source: 'MANUAL' | 'STRIPE';
+  status: PaymentStatus;
+  amount: number;
+  taxAmount: number;
+  refundedAmount: number;
+  /** What stays after refunds. */
+  netAmount: number;
+  currency: string;
+  paidAt: string;
+  periodStart: string | null;
+  periodEnd: string | null;
+  invoiceNumber: string | null;
+  invoiceUrl: string | null;
+  note: string | null;
+  recordedBy: { id: string; displayName: string } | null;
+  /** Where to open it at Stripe. */
+  externalUrl: string | null;
+  createdAt: string;
+}
+
+export interface PaymentListQuery {
+  page?: number;
+  pageSize?: number;
+  q?: string;
+  source?: 'MANUAL' | 'STRIPE';
+  status?: PaymentStatus;
+  planId?: string;
+  /** Paid at or after this moment, and before that one. */
+  from?: string;
+  to?: string;
+}
+
+export interface RecordPaymentInput {
+  amount: number;
+  paidAt?: string;
+  planId?: string;
+  note?: string | null;
+}
+
+export interface RevenueMonth {
+  /** "2026-11" */
+  month: string;
+  gross: number;
+  refunded: number;
+  net: number;
+  tax: number;
+  payments: number;
+  /** Of net: collected online, and written down by an admin. */
+  online: number;
+  byHand: number;
+  /** Subscriptions paid online that started, and that ended. */
+  started: number;
+  ended: number;
+}
+
+export interface RevenueReport {
+  currency: string;
+  timeZone: string;
+  months: RevenueMonth[];
+  totals: { gross: number; refunded: number; net: number; tax: number; payments: number };
+  byPlan: { planId: string | null; planName: string; net: number; payments: number }[];
+  /** What the subscriptions paid online bring in per month as they stand. */
+  monthlyRecurring: number;
+  payingSubscribers: number;
+  trialing: number;
+  /** Payments in other currencies, left out of every sum. */
+  otherCurrencies: { currency: string; payments: number }[];
+}

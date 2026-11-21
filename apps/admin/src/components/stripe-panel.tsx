@@ -172,6 +172,7 @@ function Connected({ status, currency }: { status: StripeStatus; currency: strin
   return (
     <Card>
       <CardHeader
+        className="flex-wrap"
         title={
           <>
             Online payment
@@ -218,13 +219,14 @@ function Connected({ status, currency }: { status: StripeStatus; currency: strin
           </p>
         ) : null}
 
-        <div className="grid gap-5 lg:grid-cols-2">
-          <div className="grid content-start gap-4">
+        <div className="grid grid-cols-[minmax(0,1fr)] gap-5 lg:grid-cols-2">
+          <div className="grid min-w-0 grid-cols-[minmax(0,1fr)] content-start gap-4">
             <CopyField label="Webhook endpoint, to enter at Stripe" value={endpoint} />
             {local ? (
               <p className="text-xs text-muted-foreground">
                 Stripe cannot reach this computer. While testing here, let the Stripe CLI pass the
-                messages on: <code>stripe listen --forward-to {endpoint}</code>
+                messages on:{' '}
+                <code className="break-all">stripe listen --forward-to {endpoint}</code>
               </p>
             ) : null}
             <div>

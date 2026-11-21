@@ -2,11 +2,15 @@
 import { describe, expect, it } from 'vitest';
 import {
   describeEventType,
+  describePayment,
   describePrices,
   describeSubscription,
   endOfDay,
   fractionDigits,
+  monthLabel,
   parsePrice,
+  percentChange,
+  periodRange,
   presetEnd,
   toPriceText,
   webhookUrl,
@@ -134,5 +138,44 @@ describe('paying online', () => {
     expect(describeSubscription({ status: 'ACTIVE', running: true, online: true }).label).toBe(
       'Running',
     );
+  });
+});
+
+describe('the books', () => {
+  it('names months', () => {
+    expect(monthLabel('2026-11')).toMatch(/Nov/);
+    expect(monthLabel('2026-01', true)).toMatch(/Jan.*2026/);
+  });
+
+  it('compares a figure with the one before', () => {
+    expect(percentChange(150, 100)).toBe(50);
+    expect(percentChange(50, 100)).toBe(-50);
+    expect(percentChange(100, 100)).toBe(0);
+    // Nothing before: no percentage that would mean anything.
+    expect(percentChange(100, 0)).toBeNull();
+  });
+
+  it('turns a named period into its moments', () => {
+    const now = new Date(2026, 10, 21, 15, 0, 0);
+    expect(periodRange('all', now)).toEqual({});
+    expect(periodRange('this-month', now)).toEqual({ from: new Date(2026, 10, 1).toISOString() });
+    expect(periodRange('last-month', now)).toEqual({
+      from: new Date(2026, 9, 1).toISOString(),
+      to: new Date(2026, 10, 1).toISOString(),
+    });
+    expect(periodRange('this-year', now)).toEqual({ from: new Date(2026, 0, 1).toISOString() });
+    // January looks back into the year before.
+    expect(periodRange('last-month', new Date(2026, 0, 5)).from).toBe(
+      new Date(2025, 11, 1).toISOString(),
+    );
+  });
+
+  it('describes a payment', () => {
+    expect(describePayment({ status: 'PAID' }).label).toBe('Paid');
+    expect(describePayment({ status: 'PARTIALLY_REFUNDED' })).toEqual({
+      label: 'Partly refunded',
+      tone: 'warning',
+    });
+    expect(describePayment({ status: 'REFUNDED' }).tone).toBe('neutral');
   });
 });

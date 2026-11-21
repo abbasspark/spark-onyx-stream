@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 import type { BillingInterval, SubscriptionStatus } from '@onyx/database';
-import type { StripeSubscription } from './stripe.types.js';
+import { idOf, type StripeInvoice, type StripeSubscription } from './stripe.types.js';
 
 /**
  * How long a renewing subscription lets its viewer watch past the day the
@@ -21,6 +21,8 @@ export interface SubscriptionState {
   renewsAt: Date | null;
   cancelAtPeriodEnd: boolean;
   canceledAt: Date | null;
+  /** What one interval costs, in the smallest unit of the currency. */
+  amount: number | null;
 }
 
 const STATUS: Record<string, SubscriptionStatus> = {
@@ -54,6 +56,78 @@ function intervalOf(subscription: StripeSubscription): BillingInterval | null {
   return interval === 'month' ? 'MONTH' : interval === 'year' ? 'YEAR' : null;
 }
 
+function amountOf(subscription: StripeSubscription): number | null {
+  const item = subscription.items?.data?.[0];
+  const unit = item?.price?.unit_amount;
+  return typeof unit === 'number' && unit >= 0 ? unit * (item?.quantity ?? 1) : null;
+}
+
+/** A paid invoice at Stripe, as the books here keep it. */
+export interface InvoicePayment {
+  externalId: string;
+  /** Id of the subscription at Stripe that the invoice is for. */
+  subscriptionExternalId: string | null;
+  customerId: string | null;
+  /** Id of the payment at Stripe, by which a refund finds the invoice. */
+  paymentId: string | null;
+  amount: number;
+  taxAmount: number;
+  currency: string;
+  paidAt: Date;
+  periodStart: Date | null;
+  periodEnd: Date | null;
+  invoiceNumber: string | null;
+  invoiceUrl: string | null;
+}
+
+/**
+ * Translates an invoice at Stripe into a payment.
+ *
+ * @returns null for an invoice that is not paid, and for one over nothing,
+ *   as the first invoice of a free trial is.
+ */
+export function mapInvoice(invoice: StripeInvoice): InvoicePayment | null {
+  if (invoice.status !== 'paid' || !(invoice.amount_paid > 0)) {
+    return null;
+  }
+  const taxes = (invoice.total_taxes ?? []).reduce((sum, tax) => sum + (tax.amount ?? 0), 0);
+  const tax = taxes > 0 ? taxes : (invoice.tax ?? 0);
+  const period = invoice.lines?.data?.[0]?.period;
+  const subscription =
+    invoice.parent?.subscription_details?.subscription ?? invoice.subscription ?? null;
+  const payment =
+    (invoice.payments?.data ?? [])
+      .map((entry) => idOf(entry.payment?.payment_intent))
+      .find((id) => id !== null) ?? idOf(invoice.payment_intent);
+  return {
+    externalId: invoice.id,
+    subscriptionExternalId: idOf(subscription),
+    customerId: idOf(invoice.customer),
+    paymentId: payment ?? null,
+    amount: invoice.amount_paid,
+    taxAmount: Math.max(0, Math.min(tax, invoice.amount_paid)),
+    currency: invoice.currency.toUpperCase(),
+    paidAt: date(invoice.status_transitions?.paid_at) ?? date(invoice.created) ?? new Date(),
+    periodStart: date(period?.start),
+    periodEnd: date(period?.end),
+    invoiceNumber: invoice.number ?? null,
+    invoiceUrl: invoice.hosted_invoice_url ?? null,
+  };
+}
+
+/** What a payment is after money was returned. */
+export function refundState(
+  amount: number,
+  refunded: number,
+): { refundedAmount: number; status: 'PAID' | 'PARTIALLY_REFUNDED' | 'REFUNDED' } {
+  const refundedAmount = Math.max(0, Math.min(refunded, amount));
+  return {
+    refundedAmount,
+    status:
+      refundedAmount === 0 ? 'PAID' : refundedAmount >= amount ? 'REFUNDED' : 'PARTIALLY_REFUNDED',
+  };
+}
+
 /**
  * Translates a subscription at Stripe into the record kept here.
  *
@@ -70,6 +144,7 @@ export function mapSubscription(subscription: StripeSubscription): SubscriptionS
   const base = {
     status,
     interval: intervalOf(subscription),
+    amount: amountOf(subscription),
     startedAt: date(subscription.start_date) ?? date(subscription.created),
     canceledAt: date(subscription.canceled_at),
   };

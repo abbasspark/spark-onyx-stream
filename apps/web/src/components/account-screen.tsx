@@ -13,7 +13,15 @@ import {
   viewerApi,
   type ViewerDevice,
 } from '@/lib/viewer-api';
-import { describeEnd, formatDate, type OwnSubscription, type Plans } from '@/lib/plans';
+import {
+  describeEnd,
+  describeRefund,
+  formatDate,
+  formatMoney,
+  type OwnPayment,
+  type OwnSubscription,
+  type Plans,
+} from '@/lib/plans';
 import { type Profile, profilesApi } from '@/lib/profiles';
 import { clearHistory } from '@/lib/watch-sync';
 import { FormField } from './form-field';
@@ -106,6 +114,7 @@ export function AccountScreen() {
       <NameSection name={viewer.displayName} onSaved={setViewer} />
       <PasswordSection />
       <SubscriptionSection />
+      <PaymentsSection />
       <ProfilesSection />
       <DevicesSection />
       <HistorySection />
@@ -541,6 +550,81 @@ function SubscriptionSection() {
           </Link>
         </>
       )}
+    </Section>
+  );
+}
+
+/** What the viewer paid, with the way to each invoice. Not shown to someone who never paid. */
+function PaymentsSection() {
+  const [payments, setPayments] = useState<OwnPayment[]>([]);
+  const [all, setAll] = useState(false);
+
+  useEffect(() => {
+    let current = true;
+    viewerApi
+      .payments()
+      .then((result) => {
+        if (current) {
+          setPayments(result.items);
+        }
+      })
+      .catch(() => {
+        // A site whose API is older than payments has none to show.
+      });
+    return () => {
+      current = false;
+    };
+  }, []);
+
+  if (payments.length === 0) {
+    return null;
+  }
+  const shown = all ? payments : payments.slice(0, 4);
+
+  return (
+    <Section heading="Payments">
+      <ul className="divide-y divide-line border-y border-line">
+        {shown.map((payment) => {
+          const refund = describeRefund(payment);
+          return (
+            <li key={payment.id} className="flex items-baseline justify-between gap-4 py-3">
+              <div className="min-w-0">
+                <p>
+                  <span className={payment.status === 'REFUNDED' ? 'line-through opacity-60' : ''}>
+                    {formatMoney(payment.amount, payment.currency)}
+                  </span>
+                  {payment.planName ? (
+                    <span className="text-smoke"> for {payment.planName}</span>
+                  ) : null}
+                </p>
+                <p className="mt-0.5 text-sm text-dust">
+                  {formatDate(payment.paidAt)}
+                  {refund ? `, ${refund.charAt(0).toLowerCase()}${refund.slice(1)}` : ''}
+                </p>
+              </div>
+              {payment.invoiceUrl ? (
+                <a
+                  href={payment.invoiceUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="shrink-0 text-sm text-smoke underline underline-offset-4 hover:text-vein"
+                >
+                  Invoice<span className="sr-only"> {payment.invoiceNumber ?? ''}</span>
+                </a>
+              ) : null}
+            </li>
+          );
+        })}
+      </ul>
+      {payments.length > shown.length ? (
+        <button
+          type="button"
+          className="mt-4 text-sm text-smoke underline underline-offset-4 hover:text-vein"
+          onClick={() => setAll(true)}
+        >
+          Show all {payments.length}
+        </button>
+      ) : null}
     </Section>
   );
 }

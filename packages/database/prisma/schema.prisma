@@ -44,6 +44,7 @@ model AdminUser {
   auditLogs            AuditLog[]
   assets               Asset[]
   subscriptionsGranted Subscription[]
+  paymentsRecorded     Payment[]
 
   @@map("admin_users")
 }
@@ -94,6 +95,7 @@ model Viewer {
   sessions      ViewerSession[]
   profiles      ViewerProfile[]
   subscriptions Subscription[]
+  payments      Payment[]
   watching      WatchProgress[]
   tokens        ViewerToken[]
 
@@ -795,6 +797,7 @@ model Plan {
   updatedAt     DateTime @updatedAt
 
   subscriptions Subscription[]
+  payments      Payment[]
 
   @@index([position])
   @@map("plans")
@@ -839,6 +842,9 @@ model Subscription {
   endsAt            DateTime?
   /// When the next payment is due. Empty when it is not renewed.
   renewsAt          DateTime?
+  /// What one interval costs, in the smallest unit of the currency. Empty for
+  /// access an admin granted.
+  amount            Int?
   /// Set when it will not be renewed at endsAt.
   cancelAtPeriodEnd Boolean   @default(false)
   /// When it was ended before its time, by the viewer or an admin.
@@ -850,6 +856,7 @@ model Subscription {
   grantedBy   AdminUser? @relation(fields: [grantedById], references: [id], onDelete: SetNull)
   /// Id of the subscription at the payment provider.
   externalId  String?    @unique
+  payments    Payment[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -875,4 +882,61 @@ model StripeEvent {
 
   @@index([receivedAt])
   @@map("stripe_events")
+}
+
+enum PaymentStatus {
+  PAID
+  /// Part of the money was returned.
+  PARTIALLY_REFUNDED
+  /// All of the money was returned.
+  REFUNDED
+}
+
+/// Money a viewer paid for a subscription: collected by Stripe, or received
+/// by the operator and written down by an admin. The books of the site.
+model Payment {
+  id                String             @id @default(uuid(7)) @db.Uuid
+  /// Empty once the account is deleted. The payment stays in the books.
+  viewerId          String?            @db.Uuid
+  viewer            Viewer?            @relation(fields: [viewerId], references: [id], onDelete: SetNull)
+  /// The email address of the viewer when they paid, kept beyond the account.
+  viewerEmail       String
+  subscriptionId    String?            @db.Uuid
+  subscription      Subscription?      @relation(fields: [subscriptionId], references: [id], onDelete: SetNull)
+  planId            String?            @db.Uuid
+  plan              Plan?              @relation(fields: [planId], references: [id], onDelete: SetNull)
+  /// The name of the plan when it was paid for.
+  planName          String?
+  source            SubscriptionSource
+  status            PaymentStatus      @default(PAID)
+  /// What was paid, tax included, in the smallest unit of the currency.
+  amount            Int
+  /// How much of it is tax, when the provider worked it out.
+  taxAmount         Int                @default(0)
+  /// How much of it was returned.
+  refundedAmount    Int                @default(0)
+  /// Three capital letters, such as "EUR".
+  currency          String
+  paidAt            DateTime
+  /// The stretch of the subscription it paid for.
+  periodStart       DateTime?
+  periodEnd         DateTime?
+  /// Id of the invoice at the payment provider.
+  externalId        String?            @unique
+  /// Id of the payment itself at the provider, by which a refund finds it.
+  externalPaymentId String?
+  invoiceNumber     String?
+  /// Where the viewer reads and downloads the invoice.
+  invoiceUrl        String?
+  /// A remark of the admin who wrote it down, such as "cash, receipt 114".
+  note              String?
+  recordedById      String?            @db.Uuid
+  recordedBy        AdminUser?         @relation(fields: [recordedById], references: [id], onDelete: SetNull)
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+
+  @@index([paidAt])
+  @@index([viewerId, paidAt])
+  @@index([externalPaymentId])
+  @@map("payments")
 }
