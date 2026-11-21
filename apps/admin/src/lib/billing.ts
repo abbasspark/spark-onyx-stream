@@ -138,3 +138,75 @@ export function describeSubscription(
       return { label: 'Running', tone: 'success' };
   }
 }
+
+/** "Nov" for "2026-11", and "Nov 2026" when the year is wanted. */
+export function monthLabel(month: string, withYear = false): string {
+  const [year, index] = month.split('-').map(Number) as [number, number];
+  return new Intl.DateTimeFormat(undefined, {
+    month: 'short',
+    ...(withYear ? { year: 'numeric' } : {}),
+    timeZone: 'UTC',
+  }).format(new Date(Date.UTC(year, index - 1, 1)));
+}
+
+/**
+ * How a figure moved against the one before, in whole percent.
+ * Null when there is nothing to compare with.
+ */
+export function percentChange(now: number, before: number): number | null {
+  if (before <= 0) {
+    return null;
+  }
+  return Math.round(((now - before) / before) * 100);
+}
+
+/** The time zone of this browser, in which the months of a report are cut. */
+export function browserTimeZone(): string {
+  try {
+    return new Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
+  } catch {
+    return 'UTC';
+  }
+}
+
+export type PaymentPeriod = 'all' | 'this-month' | 'last-month' | 'this-year';
+
+/** The moments a named period starts and ends, in the admin's own time zone. */
+export function periodRange(
+  period: PaymentPeriod,
+  now: Date = new Date(),
+): { from?: string; to?: string } {
+  const start = (monthsBack: number) =>
+    new Date(now.getFullYear(), now.getMonth() - monthsBack, 1).toISOString();
+  switch (period) {
+    case 'this-month':
+      return { from: start(0) };
+    case 'last-month':
+      return { from: start(1), to: start(0) };
+    case 'this-year':
+      return { from: new Date(now.getFullYear(), 0, 1).toISOString() };
+    default:
+      return {};
+  }
+}
+
+/** How a payment stands, in words and a tone for its badge. */
+export function describePayment(payment: { status: 'PAID' | 'PARTIALLY_REFUNDED' | 'REFUNDED' }): {
+  label: string;
+  tone: 'success' | 'warning' | 'neutral';
+} {
+  switch (payment.status) {
+    case 'REFUNDED':
+      return { label: 'Refunded', tone: 'neutral' };
+    case 'PARTIALLY_REFUNDED':
+      return { label: 'Partly refunded', tone: 'warning' };
+    default:
+      return { label: 'Paid', tone: 'success' };
+  }
+}
+
+/** The start of a day chosen in a date field, in the admin's own time zone. */
+export function startOfDay(date: string): string | null {
+  const parsed = new Date(`${date}T12:00:00`);
+  return Number.isNaN(parsed.getTime()) ? null : parsed.toISOString();
+}

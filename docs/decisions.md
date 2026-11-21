@@ -423,3 +423,19 @@ This replaces the "plain CSS without a component library" part of D-018.
 **Why:** Stripe's pages carry the burden of card data, of strong customer authentication and of the many ways to pay, and they stay current without work here. Reading the state again on each message removes a whole class of faults: duplicates, messages out of order, and a webhook that was down for a day all end in the same correct record. Three ways to learn of a change (the return, the message, the hourly check) mean that none of them has to be reliable alone. The days of grace exist because locking out somebody who paid is worse than a few free days for somebody who did not. A derived product id and prices sent along need no bookkeeping that could drift from Stripe. The API version is fixed because Stripe moved the billing period of a subscription to its items in 2025, and an account upgraded later must not change what this code reads.
 
 **Consequence:** Stripe has to be reachable when a message arrives, or the message is refused and Stripe sends it again. A viewer cannot change plans while subscribed: they cancel and subscribe again. A change of price reaches new subscribers only. Each price a viewer pays is its own price object at Stripe, which Stripe's reports group by product. Changing from a test key to a live key ends the subscriptions made in test mode. Refunds, disputes, invoices and taxes are handled in Stripe. Another provider would be a second source beside `STRIPE`, with the same rule for who may watch.
+
+## D-034 Payments are kept here as the books, and Stripe stays the place for money
+
+**Date:** 2026-11-21
+
+- **Every payment is a row of its own:** a paid invoice from Stripe, or money an admin writes down. Revenue is always computed from these rows.
+- **A payment keeps the email address and the plan name of its day,** and outlives the account and the plan.
+- **Refunds are made in Stripe and only noted here.** A payment collected by Stripe cannot be changed or deleted here.
+- **A refund counts against the month of its payment.**
+- **Monthly recurring revenue is computed from the subscriptions as they stand,** from the price each one carries, not from past payments.
+- **Months are cut in a time zone the caller names.**
+- **Recording a payment by hand does not grant access, and granting access does not record a payment.**
+
+**Why:** an operator who also sells for cash or through resellers has no single place that knows the whole income, and Stripe's reports know only Stripe's half. Rows that are never recomputed stay true when a plan is renamed, a price changes or a viewer leaves. Moving money is where mistakes cost most, so it stays with the provider that is built for it, and this application cannot send money anywhere. Counting a refund in the month of its payment keeps each month equal to what its sales were worth in the end, which is what a small operator asks. Keeping access and money apart avoids a form that does two things and half-fails: a gift is access without money, and a late payment is money without a change of access.
+
+**Consequence:** the figures of a past month change when one of its payments is refunded later, so they are not a ledger for tax filing: for that, the export and Stripe's own reports are the source. Fees of Stripe are not known here, so revenue is before fees. Payments in a currency other than the configured one are listed and left out of sums. An endpoint at Stripe from before this decision needs two more events, and earlier invoices are brought in with the import.

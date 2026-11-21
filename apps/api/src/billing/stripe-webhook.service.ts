@@ -13,7 +13,7 @@ import { AppConfig } from '../config/app-config.js';
 import { StripeError } from '../stripe/stripe.client.js';
 import { verifySignature } from '../stripe/stripe.signature.js';
 import { StripeSyncService } from '../stripe/stripe-sync.service.js';
-import { idOf, type StripeEventPayload } from '../stripe/stripe.types.js';
+import { idOf, type StripeCharge, type StripeEventPayload } from '../stripe/stripe.types.js';
 import type { StripeEventView } from './billing.views.js';
 
 /** Where Stripe reports to, after the prefix of the API. */
@@ -27,6 +27,8 @@ export const STRIPE_WEBHOOK_EVENTS = [
   'customer.subscription.deleted',
   'customer.subscription.paused',
   'customer.subscription.resumed',
+  'invoice.paid',
+  'charge.refunded',
 ] as const;
 
 export type WebhookOutcome = 'handled' | 'duplicate' | 'ignored';
@@ -91,7 +93,15 @@ export class StripeWebhookService {
     }
 
     try {
-      const handled = await this.handle(event);
+      const handled = await this.handle(event).catch((error: unknown) => {
+        // Stripe does not know what its own message names: it is from another
+        // account or mode than the key. Asking again would not change that.
+        if (error instanceof StripeError && error.missing) {
+          this.logger.warn(`Ignored ${event.type} ${event.id}: ${error.message}`);
+          return false;
+        }
+        throw error;
+      });
       await this.prisma.stripeEvent.update({
         where: { id: event.id },
         data: { processedAt: new Date(), error: null },
@@ -182,6 +192,18 @@ export class StripeWebhookService {
       // The message describes the subscription as it was when sent. Stripe is asked
       // for it as it is now, so an old message cannot undo a newer one.
       await this.sync.syncById(object.id);
+      return true;
+    }
+    if (event.type === 'invoice.paid' && typeof object.id === 'string') {
+      await this.sync.recordInvoiceById(object.id);
+      return true;
+    }
+    if (event.type === 'charge.refunded' && typeof object.id === 'string') {
+      const charge = event.data.object as unknown as StripeCharge;
+      if (typeof charge.amount !== 'number' || typeof charge.amount_refunded !== 'number') {
+        return false;
+      }
+      await this.sync.recordRefund(charge);
       return true;
     }
     return false;

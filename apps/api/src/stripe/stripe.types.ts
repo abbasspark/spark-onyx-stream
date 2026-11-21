@@ -35,7 +35,11 @@ export interface StripePortalSession {
 export interface StripeSubscriptionItem {
   /** Where the billing period is from API version 2025-03-31 on. */
   current_period_end?: number | null;
-  price?: { recurring?: { interval?: string | null } | null } | null;
+  price?: {
+    unit_amount?: number | null;
+    recurring?: { interval?: string | null } | null;
+  } | null;
+  quantity?: number | null;
 }
 
 export interface StripeSubscription {
@@ -53,6 +57,51 @@ export interface StripeSubscription {
   /** Where the billing period was before API version 2025-03-31. */
   current_period_end?: number | null;
   items?: { data?: StripeSubscriptionItem[] | null } | null;
+}
+
+export interface StripeInvoice {
+  id: string;
+  /** "draft", "open", "paid", "uncollectible" or "void". */
+  status: string | null;
+  currency: string;
+  /** What was paid, tax included. */
+  amount_paid: number;
+  customer: string | { id: string } | null;
+  number?: string | null;
+  hosted_invoice_url?: string | null;
+  created?: number;
+  status_transitions?: { paid_at?: number | null } | null;
+  /** What made the invoice, from API version 2025-03-31 on. */
+  parent?: {
+    type?: string | null;
+    subscription_details?: { subscription?: string | { id: string } | null } | null;
+  } | null;
+  /** Where the subscription was named before API version 2025-03-31. */
+  subscription?: string | { id: string } | null;
+  total_taxes?: { amount?: number | null }[] | null;
+  /** Where the tax was before API version 2025-03-31. */
+  tax?: number | null;
+  /** The payments that settled it. Present when asked for. */
+  payments?: {
+    data?: { payment?: { payment_intent?: string | { id: string } | null } | null }[] | null;
+  } | null;
+  /** Where the payment was named before API version 2025-03-31. */
+  payment_intent?: string | { id: string } | null;
+  lines?: { data?: { period?: { start?: number; end?: number } | null }[] | null } | null;
+}
+
+export interface StripeList<Item> {
+  data: Item[];
+  has_more: boolean;
+}
+
+/** A charge as a message about a refund describes it. */
+export interface StripeCharge {
+  id: string;
+  amount: number;
+  amount_refunded: number;
+  refunded?: boolean;
+  payment_intent?: string | { id: string } | null;
 }
 
 export interface StripeEventPayload {

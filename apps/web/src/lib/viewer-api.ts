@@ -2,7 +2,7 @@
 //
 // Calls the browser makes about the viewer's own account. They go to the same
 // origin, so the session cookie travels with them by itself.
-import type { OwnSubscription } from './plans';
+import type { OwnPayment, OwnSubscription } from './plans';
 
 export interface Viewer {
   id: string;
@@ -130,6 +130,8 @@ export const viewerApi = {
       'GET',
       '/subscription',
     ),
+  /** The viewer's own payments, newest first. */
+  payments: () => call<{ items: OwnPayment[] }>('GET', '/payments'),
   /** Opens the payment page for a plan. Answers with the address to go to. */
   checkout: (planId: string, interval: 'MONTH' | 'YEAR') =>
     call<{ url: string }>('POST', '/checkout', { planId, interval }),

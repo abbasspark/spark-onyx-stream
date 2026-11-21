@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-only
-import { request, uploadFile } from './client';
+import { download, request, uploadFile } from './client';
 import type {
   Admin,
   ApiKey,
@@ -36,11 +36,15 @@ import type {
   MetadataStatus,
   OverviewStats,
   Page,
+  Payment,
+  PaymentListQuery,
   Plan,
   PlanInput,
   Playback,
   PublishStatus,
+  RecordPaymentInput,
   ReprocessInput,
+  RevenueReport,
   SortOrder,
   StoragePool,
   StoragePoolTestResult,
@@ -178,6 +182,27 @@ export const billingApi = {
   checkStripe: () => request<StripeAccount>('/v1/billing/stripe/check', { method: 'POST' }),
   stripeEvents: (signal?: AbortSignal) =>
     request<StripeEvent[]>('/v1/billing/stripe/events', { signal }),
+};
+
+export const paymentsApi = {
+  revenue: (query: { months: number; timeZone: string }, signal?: AbortSignal) =>
+    request<RevenueReport>('/v1/billing/revenue', { query, signal }),
+  list: (query: PaymentListQuery, signal?: AbortSignal) =>
+    request<Page<Payment>>('/v1/payments', { query: { ...query }, signal }),
+  /** The payments as a CSV file, with the same filters as the list. */
+  exportCsv: (query: Omit<PaymentListQuery, 'page' | 'pageSize'>) =>
+    download('/v1/payments/export', { ...query }),
+  ofViewer: (viewerId: string, signal?: AbortSignal) =>
+    request<{ items: Payment[] }>(`/v1/viewers/${viewerId}/payments`, { signal }),
+  record: (viewerId: string, body: RecordPaymentInput) =>
+    request<Payment>(`/v1/viewers/${viewerId}/payments`, { method: 'POST', body }),
+  remove: (id: string) => request<void>(`/v1/payments/${id}`, { method: 'DELETE' }),
+  /** Reads the paid invoices from Stripe into the books. */
+  importFromStripe: () =>
+    request<{ checked: number; added: number; complete: boolean }>(
+      '/v1/billing/stripe/import-payments',
+      { method: 'POST' },
+    ),
 };
 
 export const mailApi = {

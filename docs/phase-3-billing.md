@@ -2,13 +2,14 @@
 
 Billing lets an operator earn from a site: viewers subscribe to a plan, and a subscription opens the titles that need one.
 
-It is built in steps. This document describes what is built so far: plans, subscriptions, paid titles, access granted by an admin, and paying online with Stripe.
+It is built in steps. This document describes what is built so far: plans, subscriptions, paid titles, access granted by an admin, paying online with Stripe, and the books: every payment, and what the payments add up to.
 
 ## Model
 
 - **Plan**: what a viewer subscribes to. A name, a description, a list of what is included, a price per month, per year, or both, and a number of free trial days.
 - **Subscription**: a viewer's hold on a plan over a stretch of time. It has a state, a source (granted by an admin, or paid online), a start and an end. A viewer has at most one that is running. Ended ones stay as the history of the account.
 - **Access of a title**: `FREE` or `PAID`, set per title. An episode is as open as its series.
+- **Payment**: money a viewer paid for a subscription. Collected by Stripe, or received by the operator and written down by an admin. It stays in the books when the account is deleted, with the email address it was paid under.
 
 In this version every plan opens all paid titles. Plans differ in price and in how they are paid.
 
@@ -65,7 +66,7 @@ With a Stripe key set, the page of plans gets a button per plan. Without one, no
 2. Under Developers, "API keys", copy the **secret key**. It starts with `sk_test_`.
 3. Under Developers, "Webhooks", add an endpoint:
    - address: the address of your API followed by `/v1/billing/stripe/webhook`, such as `https://watch.example.com/v1/billing/stripe/webhook`
-   - events: `checkout.session.completed`, `customer.subscription.created`, `customer.subscription.updated`, `customer.subscription.deleted`, `customer.subscription.paused`, `customer.subscription.resumed`
+   - events: `checkout.session.completed`, `customer.subscription.created`, `customer.subscription.updated`, `customer.subscription.deleted`, `customer.subscription.paused`, `customer.subscription.resumed`, `invoice.paid`, `charge.refunded`
    - copy its **signing secret**. It starts with `whsec_`.
 4. Under Settings, "Billing", "Customer portal", activate the portal. Allow customers to update payment methods, see invoices and cancel subscriptions. Leave "switch plans" off: this version does not follow a change of plan made there.
 5. Set `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET` and `SITE_URL`, and restart.
@@ -86,9 +87,31 @@ stripe listen --forward-to localhost:3000/v1/billing/stripe/webhook
 
 It prints a signing secret (`whsec_...`). Use that one as `STRIPE_WEBHOOK_SECRET` while testing this way. Pay with the card number `4242 4242 4242 4242`, any date in the future and any three digits. `4000 0000 0000 0341` is a card that is accepted and then fails when charged, for trying a failed renewal.
 
+### Payments and refunds
+
+- **Each paid invoice becomes a payment in the books,** reported by Stripe with `invoice.paid`. The invoice over nothing that starts a free trial is no payment.
+- **A refund is made in Stripe,** in full or in part. Stripe reports it with `charge.refunded` and the payment here shows what was returned. A refund does not end the subscription: cancel it as well if the viewer should stop watching.
+- **"Import from Stripe"** on the Revenue page reads the paid invoices Stripe has into the books. Use it once after updating from a version without payments, or after the endpoint was unreachable for longer than Stripe retries. It reads up to 2,000 invoices per run and never counts one twice.
+- An endpoint set up before payments existed has to get the two events `invoice.paid` and `charge.refunded` added at Stripe.
+
 ### Taxes
 
 By default the price of a plan is charged as it is, and taxes are the operator's to handle. With `STRIPE_AUTOMATIC_TAX=true` Stripe Tax works out the tax of each payment from the customer's address. Prices then include the tax. Stripe Tax has to be set up in the Stripe account first and costs extra.
+
+## Revenue
+
+The Revenue page of the admin panel, and `GET /billing/revenue`, add the payments up.
+
+- **Per month:** what was paid, what was returned of it, and the rest, split into collected online and written down by hand. A refund counts against the month of its payment, so the figures of a past month can still change.
+- **Months are cut in a time zone.** The panel asks for the one of the browser.
+- **By plan,** with the name the plan had when it was paid for.
+- **Monthly recurring revenue:** what the subscriptions paid online bring in per month as they stand. A yearly price counts a twelfth. Trials and cancelled subscriptions are left out. Access granted by hand has no price and is not in it.
+- **Started and ended:** subscriptions paid online, by month.
+- **One currency.** Sums are in `BILLING_CURRENCY`. Payments in another currency, which exist after the setting was changed, are left out of the sums and named.
+- **Tax** is shown where Stripe Tax worked it out, and is part of every amount.
+- **Export:** the payments as a CSV file with the filters of the list, one line per payment, amounts with a decimal point, times in UTC. Who exported is written to the audit log, because the file holds email addresses.
+
+Money received by hand is written down in a viewer on the Viewers page: an amount, the day, the plan and a note. It can be deleted again when entered by mistake. Granting access and recording a payment are separate: one opens the titles, the other goes into the books.
 
 ## Settings
 
@@ -119,6 +142,7 @@ All under `/v1`.
 | `POST /viewer/checkout/confirm` | Called on return from the payment page. Records the subscription at once                  |
 | `POST /viewer/billing-portal`   | Opens Stripe's customer portal. Answers with the address to go to                         |
 | `POST /billing/stripe/webhook`  | Where Stripe reports to. Trusted by the signature of each message alone                   |
+| `GET /viewer/payments`          | The signed-in viewer's own payments, with the address of each invoice                     |
 
 `POST /viewer/checkout` answers `409` with the code `already_subscribed` to a viewer with a running subscription, `503` with `checkout_unavailable` when there is no online payment, and `502` with `payment_provider_error` when Stripe cannot be reached.
 
@@ -128,19 +152,26 @@ All under `/v1`.
 
 Permissions `billing:read` and `billing:write`. Owners and admins have them. Editors do not.
 
-| Method and path                           | Purpose                                            |
-| ----------------------------------------- | -------------------------------------------------- |
-| `GET /billing`                            | How billing is set up, and counts for the panel    |
-| `GET /plans`, `POST /plans`               | List plans with their subscribers, create one      |
-| `PATCH /plans/{id}`, `DELETE /plans/{id}` | Change a plan. Delete one that nobody ever had     |
-| `PUT /plans/order`                        | Set the order of the page of plans                 |
-| `GET /viewers/{id}/subscriptions`         | A viewer's running subscription and the history    |
-| `POST /viewers/{id}/subscriptions`        | Grant access                                       |
-| `PATCH /subscriptions/{id}`               | Change granted access                              |
-| `POST /subscriptions/{id}/end`            | End access now. Cancels at Stripe when paid online |
-| `POST /subscriptions/{id}/refresh`        | Read a subscription paid online from Stripe again  |
-| `POST /billing/stripe/check`              | Ask Stripe which account the key belongs to        |
-| `GET /billing/stripe/events`              | The last messages from Stripe                      |
+| Method and path                           | Purpose                                                                                      |
+| ----------------------------------------- | -------------------------------------------------------------------------------------------- |
+| `GET /billing`                            | How billing is set up, and counts for the panel                                              |
+| `GET /plans`, `POST /plans`               | List plans with their subscribers, create one                                                |
+| `PATCH /plans/{id}`, `DELETE /plans/{id}` | Change a plan. Delete one that nobody ever had                                               |
+| `PUT /plans/order`                        | Set the order of the page of plans                                                           |
+| `GET /viewers/{id}/subscriptions`         | A viewer's running subscription and the history                                              |
+| `POST /viewers/{id}/subscriptions`        | Grant access                                                                                 |
+| `PATCH /subscriptions/{id}`               | Change granted access                                                                        |
+| `POST /subscriptions/{id}/end`            | End access now. Cancels at Stripe when paid online                                           |
+| `POST /subscriptions/{id}/refresh`        | Read a subscription paid online from Stripe again                                            |
+| `POST /billing/stripe/check`              | Ask Stripe which account the key belongs to                                                  |
+| `GET /billing/stripe/events`              | The last messages from Stripe                                                                |
+| `GET /billing/revenue`                    | Revenue per month and by plan, and monthly recurring revenue. `months` (1 to 36), `timeZone` |
+| `GET /payments`                           | The payments, newest first. Filters `q`, `source`, `status`, `planId`, `from`, `to`          |
+| `GET /payments/export`                    | The same as a CSV file                                                                       |
+| `GET /viewers/{id}/payments`              | What one viewer paid                                                                         |
+| `POST /viewers/{id}/payments`             | Write down money received by hand                                                            |
+| `DELETE /payments/{id}`                   | Delete a payment that was written down by hand                                               |
+| `POST /billing/stripe/import-payments`    | Read the paid invoices from Stripe into the books                                            |
 
 A title's access is part of the title: `access` in `PATCH /titles/{id}`, and a filter of `GET /titles`. `GET /viewers` shows each viewer's plan and takes `subscribed=yes` or `no`.
 
@@ -153,7 +184,8 @@ A title's access is part of the title: `access` in `PATCH /titles/{id}`, and a f
 
 - **Plans** page: figures on subscribers, the plans as cards with prices and what a year saves, creating and editing, ordering, recommending, and taking a plan off the offer.
 - **Online payment** on the Plans page: test or live mode, a check of the connection, the webhook address and its events to copy, the last message from Stripe, and the list of recent messages with what went wrong, if anything.
-- **Viewers** page: the plan next to each viewer, a filter for subscribers, and in a viewer's sheet the subscription with granting, changing and ending, and the history. A subscription paid online shows its next payment, a link to Stripe, and can be refreshed and cancelled.
+- **Revenue** page: monthly recurring revenue, this month against the last, a chart of the months split into online and by hand, revenue by plan, who started and ended, and every payment with search, filters and export.
+- **Viewers** page: the plan next to each viewer, a filter for subscribers, and in a viewer's sheet the subscription with granting, changing and ending, and the history. A subscription paid online shows its next payment, a link to Stripe, and can be refreshed and cancelled. Below it are the viewer's payments, and recording one received by hand.
 - **Titles**: a switch "Needs a subscription" in each title, a mark in the list, and a filter.
 
 ## Viewer website
@@ -162,7 +194,7 @@ A title's access is part of the title: `access` in `PATCH /titles/{id}`, and a f
 - **After paying** the viewer lands on a page that confirms the subscription and leads back to what they wanted to watch.
 - **Paid titles carry a lock** on their poster. Their main button reads "Subscribe to watch" for a viewer without a subscription.
 - **The player explains itself:** it asks a visitor to sign in, and a viewer without a subscription to subscribe, each with the way there and back.
-- **Account** page: the plan, when it is paid next or until when it runs, a failed payment, and the way to Stripe's portal.
+- **Account** page: the plan, when it is paid next or until when it runs, a failed payment, the way to Stripe's portal, and the payments with a link to each invoice.
 
 ## Not built yet
 
@@ -172,5 +204,4 @@ A title's access is part of the title: `access` in `PATCH /titles/{id}`, and a f
 - Payment providers other than Stripe
 - Plans that open only part of the catalog
 - Renting or buying a single title
-- Reports on revenue
 - A limit on how many devices play at the same time

@@ -218,7 +218,7 @@ function Overview({ overview }: { overview: BillingOverview }) {
     },
   ];
   return (
-    <div className="mb-6 grid gap-4">
+    <div className="mb-6 grid grid-cols-[minmax(0,1fr)] gap-4">
       <Card>
         <CardContent className="grid gap-x-8 gap-y-5 p-5 sm:grid-cols-2 xl:grid-cols-4">
           {figures.map((figure) => (

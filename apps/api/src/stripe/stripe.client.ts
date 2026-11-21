@@ -6,6 +6,8 @@ import type {
   StripeAccount,
   StripeCheckoutSession,
   StripeCustomer,
+  StripeInvoice,
+  StripeList,
   StripePortalSession,
   StripeSubscription,
 } from './stripe.types.js';
@@ -175,6 +177,46 @@ export class StripeClient {
       'DELETE',
       `/v1/subscriptions/${encodeURIComponent(id)}`,
     );
+  }
+
+  /**
+   * An invoice with the payments that settled it. The payments are asked for
+   * as an extra; an account that does not hand them out still gets the invoice.
+   */
+  async retrieveInvoice(id: string): Promise<StripeInvoice> {
+    const path = `/v1/invoices/${encodeURIComponent(id)}`;
+    try {
+      return await this.request<StripeInvoice>('GET', path, { expand: ['payments'] });
+    } catch (error) {
+      if (error instanceof StripeError && error.status === 400) {
+        return this.request<StripeInvoice>('GET', path);
+      }
+      throw error;
+    }
+  }
+
+  /** Paid invoices, newest first, a hundred at a time. */
+  listPaidInvoices(startingAfter?: string): Promise<StripeList<StripeInvoice>> {
+    return this.request<StripeList<StripeInvoice>>('GET', '/v1/invoices', {
+      status: 'paid',
+      limit: 100,
+      starting_after: startingAfter,
+    });
+  }
+
+  /**
+   * The invoice a payment settled.
+   *
+   * @returns null when the payment was for no invoice.
+   */
+  async invoiceOfPayment(paymentIntentId: string): Promise<string | null> {
+    const list = await this.request<StripeList<{ invoice?: string | { id: string } | null }>>(
+      'GET',
+      '/v1/invoice_payments',
+      { payment: { type: 'payment_intent', payment_intent: paymentIntentId }, limit: 1 },
+    );
+    const invoice = list.data[0]?.invoice;
+    return typeof invoice === 'string' ? invoice : (invoice?.id ?? null);
   }
 
   private setup(): NonNullable<AppConfig['stripe']> {

@@ -42,6 +42,33 @@ export interface OwnSubscription {
   online?: boolean;
 }
 
+/** A payment of the viewer's own. Amounts are in the smallest unit of the currency. */
+export interface OwnPayment {
+  id: string;
+  planName: string | null;
+  status: 'PAID' | 'PARTIALLY_REFUNDED' | 'REFUNDED';
+  amount: number;
+  refundedAmount: number;
+  currency: string;
+  paidAt: string;
+  invoiceNumber: string | null;
+  /** Where the invoice can be read and downloaded. */
+  invoiceUrl: string | null;
+}
+
+/** What is said next to a payment that was returned, or null for one that was not. */
+export function describeRefund(
+  payment: Pick<OwnPayment, 'status' | 'refundedAmount' | 'currency'>,
+): string | null {
+  if (payment.status === 'REFUNDED') {
+    return 'Returned';
+  }
+  if (payment.status === 'PARTIALLY_REFUNDED') {
+    return `${formatMoney(payment.refundedAmount, payment.currency)} returned`;
+  }
+  return null;
+}
+
 export type Interval = 'month' | 'year';
 
 /** What a site without plans answers, also when its API is older than plans. */

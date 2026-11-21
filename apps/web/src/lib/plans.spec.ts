@@ -2,6 +2,7 @@
 import {
   bestYearlySaving,
   describeEnd,
+  describeRefund,
   subscribeLabel,
   formatMoney,
   intervalsOf,
@@ -82,6 +83,18 @@ describe('describeEnd', () => {
     expect(
       describeEnd({ endsAt: '2026-12-24T12:00:00.000Z', renewsAt: null, status: 'ACTIVE' }),
     ).toBe('until 24 December 2026');
+  });
+});
+
+describe('describeRefund', () => {
+  it('says what came back of a payment', () => {
+    expect(describeRefund({ status: 'PAID', refundedAmount: 0, currency: 'EUR' })).toBeNull();
+    expect(describeRefund({ status: 'REFUNDED', refundedAmount: 799, currency: 'EUR' })).toBe(
+      'Returned',
+    );
+    expect(
+      describeRefund({ status: 'PARTIALLY_REFUNDED', refundedAmount: 300, currency: 'EUR' }),
+    ).toBe('€3 returned');
   });
 });
 
