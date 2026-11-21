@@ -39,6 +39,29 @@ function webpExtended(width: number, height: number): Buffer {
   return data;
 }
 
+/** A lossy WebP: the frame tag, the start code, then both sizes. */
+function webpLossy(width: number, height: number): Buffer {
+  const data = Buffer.alloc(30);
+  data.write('RIFF', 0, 'latin1');
+  data.write('WEBP', 8, 'latin1');
+  data.write('VP8 ', 12, 'latin1');
+  Buffer.from([0x9d, 0x01, 0x2a]).copy(data, 23);
+  data.writeUInt16LE(width, 26);
+  data.writeUInt16LE(height, 28);
+  return data;
+}
+
+/** A lossless WebP: a signature byte, then both sizes minus one, 14 bits each. */
+function webpLossless(width: number, height: number): Buffer {
+  const data = Buffer.alloc(30);
+  data.write('RIFF', 0, 'latin1');
+  data.write('WEBP', 8, 'latin1');
+  data.write('VP8L', 12, 'latin1');
+  data[20] = 0x2f;
+  data.writeUInt32LE(((width - 1) | ((height - 1) << 14)) >>> 0, 21);
+  return data;
+}
+
 describe('readImageInfo', () => {
   it('reads PNG', () => {
     expect(readImageInfo(pngHeader(1000, 1500))).toEqual({
@@ -68,6 +91,22 @@ describe('readImageInfo', () => {
     });
   });
 
+  it('reads lossy and lossless WebP', () => {
+    expect(readImageInfo(webpLossy(500, 750))).toMatchObject({
+      mimeType: 'image/webp',
+      width: 500,
+      height: 750,
+    });
+    expect(readImageInfo(webpLossless(320, 180))).toMatchObject({
+      mimeType: 'image/webp',
+      width: 320,
+      height: 180,
+    });
+    // Without the start code or the signature it is not a picture.
+    expect(readImageInfo(webpLossy(500, 750).fill(0, 23, 26))).toBeNull();
+    expect(readImageInfo(webpLossless(320, 180).fill(0, 20, 21))).toBeNull();
+  });
+
   it('rejects everything that is not a picture', () => {
     expect(readImageInfo(Buffer.from('<svg xmlns="http://www.w3.org/2000/svg"></svg>'))).toBeNull();
     expect(readImageInfo(Buffer.from('GIF89a'.padEnd(40, '\0')))).toBeNull();
@@ -94,6 +133,19 @@ function hasFfmpeg(): boolean {
   try {
     execFileSync('ffmpeg', ['-version'], { stdio: 'ignore' });
     return true;
+  } catch {
+    return false;
+  }
+}
+
+/** Not every FFmpeg build can write WebP. The one from Homebrew often cannot. */
+function hasWebpEncoder(): boolean {
+  try {
+    return execFileSync('ffmpeg', ['-hide_banner', '-encoders'], {
+      stdio: ['ignore', 'pipe', 'ignore'],
+    })
+      .toString()
+      .includes('libwebp');
   } catch {
     return false;
   }
@@ -149,7 +201,7 @@ describe.skipIf(!hasFfmpeg())('readImageInfo with real files', () => {
     });
   });
 
-  it('reads real lossy and lossless WebP', () => {
+  it.skipIf(!hasWebpEncoder())('reads real lossy and lossless WebP', () => {
     expect(readImageInfo(generate('lossy.webp', '500x750'))).toMatchObject({
       mimeType: 'image/webp',
       width: 500,
