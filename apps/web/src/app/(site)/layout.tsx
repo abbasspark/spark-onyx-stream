@@ -2,7 +2,7 @@
 import { type ReactNode, Suspense } from 'react';
 import { SiteFooter } from '@/components/site-footer';
 import { SiteHeader } from '@/components/site-header';
-import { getCategories } from '@/lib/api';
+import { getCategories, getPlans } from '@/lib/api';
 import { siteConfig } from '@/lib/config';
 import type { Category } from '@/lib/types';
 
@@ -17,7 +17,13 @@ async function loadCategories(): Promise<Category[]> {
 
 /** The frame of every page except the player: header, content, footer. */
 export default async function SiteLayout({ children }: { children: ReactNode }) {
-  const categories = await loadCategories();
+  // Asked for together. A site without plans shows no link to them.
+  const [categories, hasPlans] = await Promise.all([
+    loadCategories(),
+    getPlans()
+      .then((offer) => offer.plans.length > 0)
+      .catch(() => false),
+  ]);
 
   return (
     <div className="flex min-h-dvh flex-col">
@@ -29,12 +35,12 @@ export default async function SiteLayout({ children }: { children: ReactNode }) 
       </a>
       {/* The header reads the address, which for some pages is only known in the browser. */}
       <Suspense fallback={<div className="h-16" />}>
-        <SiteHeader siteName={siteConfig.name} categories={categories} />
+        <SiteHeader siteName={siteConfig.name} categories={categories} hasPlans={hasPlans} />
       </Suspense>
       <main id="content" className="flex-1">
         {children}
       </main>
-      <SiteFooter siteName={siteConfig.name} categories={categories} />
+      <SiteFooter siteName={siteConfig.name} categories={categories} hasPlans={hasPlans} />
     </div>
   );
 }

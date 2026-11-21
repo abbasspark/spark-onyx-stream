@@ -1,30 +1,24 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 'use client';
 
-import { LogOut, UserRound } from 'lucide-react';
+import { LogOut, UserRound, UsersRound } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
+import { type Profile, profilesApi } from '@/lib/profiles';
 import { authHref } from '@/lib/viewer-api';
+import { ProfileAvatar } from './profile-avatar';
 import { useViewerSession } from './viewer-session';
 
-/** One or two letters for the round picture of a person. */
-function initialsOf(name: string): string {
-  const words = name.trim().split(/\s+/).filter(Boolean);
-  const picked = words.length > 1 ? [words[0], words.at(-1)] : [words[0]];
-  return picked
-    .map((word) => [...(word ?? '')][0] ?? '')
-    .join('')
-    .toUpperCase();
-}
-
-/** In the header: "Sign in" for a visitor, the account for a viewer. */
+/** In the header: "Sign in" for a visitor, who is watching for a viewer. */
 export function AccountMenu() {
-  const { state, viewer, signOut } = useViewerSession();
+  const { state, viewer, profile, setProfile, signOut } = useViewerSession();
   const router = useRouter();
   const pathname = usePathname();
   const params = useSearchParams();
   const [open, setOpen] = useState(false);
+  const [others, setOthers] = useState<Profile[]>([]);
+  const [switching, setSwitching] = useState<string | null>(null);
   const root = useRef<HTMLDivElement>(null);
 
   const here = params.size > 0 ? `${pathname}?${params}` : pathname;
@@ -52,12 +46,47 @@ export function AccountMenu() {
     };
   }, [open]);
 
+  // The other people of the account, asked for when the menu opens.
+  const profileId = profile?.id;
+  useEffect(() => {
+    if (!open || !profileId) {
+      return;
+    }
+    let current = true;
+    profilesApi
+      .list()
+      .then((result) => {
+        if (current) {
+          setOthers(result.profiles.filter((other) => other.id !== profileId));
+        }
+      })
+      .catch(() => {
+        // The menu works without the list.
+      });
+    return () => {
+      current = false;
+    };
+  }, [open, profileId]);
+
+  const switchTo = async (next: Profile) => {
+    setSwitching(next.id);
+    try {
+      setProfile(await profilesApi.select(next.id));
+      setOpen(false);
+    } catch {
+      // Deleted on another device in the meantime. The page to manage profiles shows what is there.
+      router.push('/profiles');
+    } finally {
+      setSwitching(null);
+    }
+  };
+
   // The space is kept while it is not known who is here, so the header does not jump.
   if (state === 'loading') {
     return <div className="size-10" aria-hidden="true" />;
   }
 
-  if (!viewer) {
+  if (!viewer || !profile) {
     return (
       <Link
         href={authHref('sign-in', here)}
@@ -68,37 +97,61 @@ export function AccountMenu() {
     );
   }
 
+  const item =
+    'flex h-11 w-full items-center gap-3 px-4 text-left text-smoke hover:bg-ash hover:text-vein';
+
   return (
     <div ref={root} className="relative">
       <button
         type="button"
-        aria-label={`Account of ${viewer.displayName}`}
+        aria-label={`${profile.name}, account of ${viewer.displayName}`}
         aria-expanded={open}
         aria-controls="account-menu"
-        className="flex size-10 items-center justify-center rounded-full bg-vein text-sm font-bold text-onyx hover:bg-sard"
+        className="block rounded-[3px] outline-offset-4 hover:brightness-110"
         onClick={() => setOpen((value) => !value)}
       >
-        {initialsOf(viewer.displayName) || <UserRound className="size-5" />}
+        <ProfileAvatar profile={profile} className="size-10" />
       </button>
       {open ? (
         <div
           id="account-menu"
-          className="absolute top-full right-0 mt-3 w-64 border border-line bg-coal py-2"
+          className="absolute top-full right-0 mt-3 w-72 border border-line bg-coal py-2"
         >
-          <div className="border-b border-line px-4 pt-1 pb-3">
-            <p className="truncate font-medium">{viewer.displayName}</p>
-            <p className="truncate text-sm text-smoke">{viewer.email}</p>
+          <div className="flex items-center gap-3 border-b border-line px-4 pt-1 pb-3">
+            <ProfileAvatar profile={profile} className="size-11" />
+            <div className="min-w-0">
+              <p className="truncate font-medium">{profile.name}</p>
+              <p className="truncate text-sm text-smoke">{viewer.email}</p>
+            </div>
           </div>
-          <Link
-            href="/account"
-            className="mt-2 flex h-11 items-center gap-3 px-4 text-smoke hover:bg-ash hover:text-vein"
-          >
+          {others.length > 0 ? (
+            <ul className="border-b border-line py-2" aria-label="Switch profile">
+              {others.map((other) => (
+                <li key={other.id}>
+                  <button
+                    type="button"
+                    className={item}
+                    disabled={switching !== null}
+                    onClick={() => void switchTo(other)}
+                  >
+                    <ProfileAvatar profile={other} className="size-7" />
+                    <span className="truncate">{other.name}</span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          ) : null}
+          <Link href="/profiles" className={`${item} mt-2`}>
+            <UsersRound className="size-4" aria-hidden="true" />
+            {others.length > 0 ? 'Manage profiles' : 'Add a profile'}
+          </Link>
+          <Link href="/account" className={item}>
             <UserRound className="size-4" aria-hidden="true" />
             Account
           </Link>
           <button
             type="button"
-            className="flex h-11 w-full items-center gap-3 px-4 text-left text-smoke hover:bg-ash hover:text-vein"
+            className={item}
             onClick={() => {
               setOpen(false);
               void signOut().then(() => router.refresh());

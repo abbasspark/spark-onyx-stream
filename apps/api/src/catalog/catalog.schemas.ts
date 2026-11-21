@@ -57,10 +57,13 @@ export type ReorderCategoriesInput = z.infer<typeof reorderCategoriesSchema>;
 
 // --- Titles ----------------------------------------------------------------------
 
+export const TITLE_ACCESS = ['FREE', 'PAID'] as const;
+
 export const listTitlesSchema = paginationSchema.extend({
   type: z.enum(TITLE_TYPES).optional(),
   status: z.enum(PUBLISH_STATUSES).optional(),
   categoryId: z.uuid().optional(),
+  access: z.enum(TITLE_ACCESS).optional(),
   /** Matches the name and the original name, ignoring case. */
   q: z.string().trim().min(1).max(200).optional(),
   sort: z.enum(TITLE_SORT_FIELDS).default('createdAt'),
@@ -94,6 +97,8 @@ export const updateTitleSchema = z
     ageRating: optionalText(16),
     originalLanguage: languageCode.nullable(),
     isFeatured: z.boolean(),
+    /** FREE: open to everyone the installation lets watch. PAID: needs a subscription. */
+    access: z.enum(TITLE_ACCESS),
     /** Replaces the title's categories. */
     categoryIds: z.array(z.uuid()).max(50),
     assetId: z.uuid().nullable(),

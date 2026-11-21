@@ -11,6 +11,7 @@ import {
   ExternalLink,
   EyeOff,
   Film,
+  Lock,
   MoreHorizontal,
   Rocket,
   Star,
@@ -254,6 +255,12 @@ export function TitleEditorPage() {
               <Badge tone="primary">
                 <Star className="size-3 fill-current" aria-hidden="true" />
                 Featured
+              </Badge>
+            ) : null}
+            {title.access === 'PAID' ? (
+              <Badge tone="info">
+                <Lock className="size-3" aria-hidden="true" />
+                Subscribers
               </Badge>
             ) : null}
           </p>
@@ -690,6 +697,13 @@ function DetailsTab({ title, disabled, save }: DetailsTabProps) {
             checked={form.isFeatured}
             disabled={disabled}
             onCheckedChange={(checked) => set('isFeatured', checked)}
+          />
+          <ToggleRow
+            label="Needs a subscription"
+            description="On, only viewers with a running subscription can watch. The trailer stays open to everyone. Off, the title is as open as the installation is."
+            checked={form.isPaid}
+            disabled={disabled}
+            onCheckedChange={(checked) => set('isPaid', checked)}
           />
           <Field
             label="Slug"

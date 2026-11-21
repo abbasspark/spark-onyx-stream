@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-only
+import { Lock } from 'lucide-react';
 import Link from 'next/link';
 import { describeLength } from '@/lib/format';
 import type { TitleCard } from '@/lib/types';
@@ -49,6 +50,13 @@ export function PosterCard({ title, eager, className }: PosterCardProps) {
         ) : (
           <PosterFallback name={title.name} />
         )}
+        {title.access === 'PAID' ? (
+          <span className="absolute top-2 left-2 flex h-6 items-center gap-1 rounded-[3px] bg-onyx/80 px-1.5 text-[0.6875rem] font-medium text-sard">
+            <Lock className="size-3" aria-hidden="true" />
+            <span className="sr-only">Needs a subscription. </span>
+            <span aria-hidden="true">Plan</span>
+          </span>
+        ) : null}
       </div>
       <p className="mt-2.5 truncate text-sm font-medium" title={title.name}>
         {title.name}

@@ -38,6 +38,10 @@ export class AppConfig {
   readonly viewerRegistrationOpen: boolean;
   /** Origin that serves media files. Empty when the API serves them itself. */
   readonly mediaBaseUrl: string;
+  /** Currency of all prices, such as "EUR". */
+  readonly billingCurrency: string;
+  /** Where viewers ask for a subscription. Empty when not set. */
+  readonly billingContactUrl: string;
   /** Access to TMDB for importing details of titles. Null when the import is off. */
   readonly tmdb: {
     readonly token: string;
@@ -83,6 +87,8 @@ export class AppConfig {
     this.catalogPlayback = env.CATALOG_PLAYBACK;
     this.viewerRegistrationOpen = env.VIEWER_REGISTRATION === 'open';
     this.mediaBaseUrl = env.MEDIA_BASE_URL;
+    this.billingCurrency = env.BILLING_CURRENCY;
+    this.billingContactUrl = env.BILLING_CONTACT_URL;
     this.tmdb = env.TMDB_API_TOKEN
       ? { token: env.TMDB_API_TOKEN, apiUrl: env.TMDB_API_URL, imageUrl: env.TMDB_IMAGE_URL }
       : null;

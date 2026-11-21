@@ -1,12 +1,13 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 'use client';
 
-import { Clapperboard, Play } from 'lucide-react';
+import { Clapperboard, Lock, Play } from 'lucide-react';
 import Link from 'next/link';
 import { formatClock } from '@/lib/format';
 import type { TitleDetail } from '@/lib/types';
 import { episodeCode, movieKey, nextUnwatched, watchHref } from '@/lib/watch';
 import { useWatching } from './continue-watching';
+import { useViewerSession } from './viewer-session';
 import { useWatchedVideos } from './watched-videos';
 
 /**
@@ -17,6 +18,9 @@ import { useWatchedVideos } from './watched-videos';
 export function TitleActions({ title }: { title: TitleDetail }) {
   const watching = useWatching();
   const watched = useWatchedVideos(title.slug);
+  const { state, entitled } = useViewerSession();
+  // Until it is known who is here the button says "Play": the player explains the rest.
+  const locked = title.access === 'PAID' && state === 'ready' && !entitled;
 
   let href: string;
   let label: string;
@@ -43,7 +47,19 @@ export function TitleActions({ title }: { title: TitleDetail }) {
 
   return (
     <div className="flex flex-wrap gap-3">
-      <Link href={href} className="button button-play relative overflow-hidden">
+      {locked ? (
+        <Link
+          href={`/plans?next=${encodeURIComponent(`/title/${title.slug}`)}`}
+          className="button button-play"
+        >
+          <Lock />
+          Subscribe to watch
+        </Link>
+      ) : null}
+      <Link
+        href={href}
+        className={`button relative overflow-hidden ${locked ? 'hidden' : 'button-play'}`}
+      >
         <Play className="fill-current" />
         {label}
         {progress !== null ? (

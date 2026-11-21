@@ -116,4 +116,24 @@ describe('validateEnv', () => {
       ).toBe('required');
     });
   });
+
+  describe('billing', () => {
+    it('prices are in euros unless told otherwise', () => {
+      expect(validateEnv(validEnv).BILLING_CURRENCY).toBe('EUR');
+      expect(validateEnv({ ...validEnv, BILLING_CURRENCY: 'USD' }).BILLING_CURRENCY).toBe('USD');
+    });
+
+    it('rejects a currency or a contact address of the wrong form', () => {
+      expect(() => validateEnv({ ...validEnv, BILLING_CURRENCY: 'euro' })).toThrow(
+        /BILLING_CURRENCY must be three capital letters/,
+      );
+      expect(() => validateEnv({ ...validEnv, BILLING_CONTACT_URL: 'call us' })).toThrow(
+        /BILLING_CONTACT_URL must start with/,
+      );
+      expect(
+        validateEnv({ ...validEnv, BILLING_CONTACT_URL: 'mailto:billing@example.com' })
+          .BILLING_CONTACT_URL,
+      ).toBe('mailto:billing@example.com');
+    });
+  });
 });

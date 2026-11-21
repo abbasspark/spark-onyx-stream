@@ -4,7 +4,14 @@ import { Prisma, PrismaClient, type Viewer } from '@onyx/database';
 import { hashPassword } from '../auth/password-hasher.js';
 import { type Page, toPage, toSkipTake } from '../common/pagination.js';
 import type { CreateViewerInput, ListViewersInput, UpdateViewerInput } from './viewer.schemas.js';
-import { toViewerAdminView, type ViewerAdminDetail, type ViewerAdminView } from './viewer.view.js';
+import { runningAt } from '../billing/entitlement.js';
+import {
+  toViewerAdminView,
+  type ViewerAdminDetail,
+  type ViewerAdminView,
+  type ViewerPlanRef,
+} from './viewer.view.js';
+import { toProfileView, ViewerProfilesService } from './viewer-profiles.service.js';
 import { ACTIVE_SESSION, ViewerSessionService } from './viewer-session.service.js';
 
 /** What changing a viewer did, for the audit log. */
@@ -22,16 +29,35 @@ function isUniqueViolation(error: unknown): boolean {
 }
 
 /** Management of viewers by admins. */
+/** The newest running subscription, with the name of its plan. */
+const RUNNING_PLAN = {
+  orderBy: { createdAt: 'desc' },
+  take: 1,
+  select: { endsAt: true, plan: { select: { id: true, name: true } } },
+} as const;
+
+function toPlanRef(
+  subscription: { endsAt: Date | null; plan: { id: string; name: string } } | undefined,
+): ViewerPlanRef | null {
+  return subscription
+    ? { id: subscription.plan.id, name: subscription.plan.name, endsAt: subscription.endsAt }
+    : null;
+}
+
 @Injectable()
 export class ViewersAdminService {
   constructor(
     @Inject(PrismaClient) private readonly prisma: PrismaClient,
     @Inject(ViewerSessionService) private readonly sessions: ViewerSessionService,
+    @Inject(ViewerProfilesService) private readonly profiles: ViewerProfilesService,
   ) {}
 
   async list(input: ListViewersInput): Promise<Page<ViewerAdminView>> {
+    const running = runningAt();
     const where: Prisma.ViewerWhereInput = {
       status: input.status,
+      ...(input.subscribed === 'yes' ? { subscriptions: { some: running } } : {}),
+      ...(input.subscribed === 'no' ? { subscriptions: { none: running } } : {}),
       ...(input.q
         ? {
             OR: [
@@ -51,13 +77,18 @@ export class ViewersAdminService {
       this.prisma.viewer.findMany({
         where,
         orderBy,
-        include: { _count: { select: { sessions: { where: ACTIVE_SESSION() } } } },
+        include: {
+          _count: { select: { sessions: { where: ACTIVE_SESSION() } } },
+          subscriptions: { where: running, ...RUNNING_PLAN },
+        },
         ...toSkipTake(input),
       }),
       this.prisma.viewer.count({ where }),
     ]);
     return toPage(
-      viewers.map((viewer) => toViewerAdminView(viewer, viewer._count.sessions)),
+      viewers.map((viewer) =>
+        toViewerAdminView(viewer, viewer._count.sessions, toPlanRef(viewer.subscriptions[0])),
+      ),
       total,
       input,
     );
@@ -69,9 +100,13 @@ export class ViewersAdminService {
     if (!viewer) {
       throw new NotFoundException('Viewer not found');
     }
-    const sessions = await this.sessions.listActive(id);
+    const [sessions, profiles] = await Promise.all([
+      this.sessions.listActive(id),
+      this.profiles.list(viewer),
+    ]);
     return {
-      ...toViewerAdminView(viewer, sessions.length),
+      ...toViewerAdminView(viewer, sessions.length, await this.planOf(id)),
+      profiles: profiles.map(toProfileView),
       sessions: sessions.map((session) => ({
         id: session.id,
         userAgent: session.userAgent,
@@ -94,7 +129,7 @@ export class ViewersAdminService {
           emailVerifiedAt: input.emailVerified ? new Date() : null,
         },
       });
-      return toViewerAdminView(viewer, 0);
+      return toViewerAdminView(viewer, 0, null);
     } catch (error) {
       if (isUniqueViolation(error)) {
         throw new ConflictException(EMAIL_TAKEN);
@@ -141,7 +176,11 @@ export class ViewersAdminService {
     const disabled = before.status === 'ACTIVE' && viewer.status === 'DISABLED';
     const sessionsEnded = disabled ? await this.sessions.revokeAll(id) : 0;
     const active = disabled ? 0 : (await this.sessions.listActive(id)).length;
-    return { viewer: toViewerAdminView(viewer, active), changed, sessionsEnded };
+    return {
+      viewer: toViewerAdminView(viewer, active, await this.planOf(id)),
+      changed,
+      sessionsEnded,
+    };
   }
 
   /**
@@ -169,6 +208,15 @@ export class ViewersAdminService {
     const viewer = await this.find(id);
     await this.prisma.viewer.delete({ where: { id } });
     return viewer;
+  }
+
+  /** The plan a viewer watches through right now. */
+  private async planOf(viewerId: string): Promise<ViewerPlanRef | null> {
+    const subscription = await this.prisma.subscription.findFirst({
+      where: { viewerId, ...runningAt() },
+      ...RUNNING_PLAN,
+    });
+    return toPlanRef(subscription ?? undefined);
   }
 
   /** @throws NotFoundException */

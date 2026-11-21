@@ -70,6 +70,7 @@ export class TitlesService {
     const where: Prisma.TitleWhereInput = {
       type: input.type,
       status: input.status,
+      access: input.access,
       ...(input.categoryId ? { categories: { some: { categoryId: input.categoryId } } } : {}),
       ...(input.q
         ? {

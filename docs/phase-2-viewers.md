@@ -17,7 +17,7 @@ A viewer token opens nothing in the panel, and an admin session is not a viewer.
 
 ## What is stored about a viewer
 
-Email address, name, a hash of the password, whether the account is disabled, and when they last signed in. For each device they are signed in on: a hash of its token, what the browser or app called itself, and the address it signed in from. For each video they began: how far they are, whether they finished it, and when they last watched (see Watch history).
+Email address, name, a hash of the password, whether the account is disabled, and when they last signed in. For each device they are signed in on: a hash of its token, what the browser or app called itself, and the address it signed in from. The names and colours of their profiles. For each video a profile began: how far it is, whether it was finished, and when it was last watched (see Watch history).
 
 Nothing else. The audit log names a viewer by id and never stores an email address or a name. Deleting a viewer deletes all of it. Sessions that ended more than seven days ago are deleted by the scheduler.
 
@@ -121,18 +121,41 @@ Email is off until a mail server is set (`SMTP_URL`). With it on, viewers get th
 
 The panel has an **Email** page: how email is set up (never the password of the mail server), what the mail server said to the last email, and a test email that waits for the server's answer. On the **Viewers** page an admin sees which addresses are confirmed, can mark one as confirmed or not, and can send both links.
 
+## Profiles
+
+One account is often used by a household. Profiles give each person their own watch history.
+
+- **Every account has a main profile,** named like the account. It is made when it is first needed, so accounts created before profiles existed, or by an admin, have one too. It can be renamed and cannot be deleted.
+- **Up to five profiles.** Each has a name, unique within the account apart from capital letters, and one of eight colours. A new profile gets a colour no other profile of the account has.
+- **Which profile is in use is kept per device.** The phone can be on one profile while the television is on another. A device that never chose uses the main profile.
+- **Watch history belongs to the profile:** "Continue watching", resume positions and watched marks. Clearing the history clears that of the profile in use.
+- **Deleting a profile deletes what it watched.** Devices that used it go back to the main profile and stay signed in.
+- **Profiles are not a lock.** Anyone signed in to the account can choose any profile.
+
+| Method and path              | Purpose                                                             |
+| ---------------------------- | ------------------------------------------------------------------- |
+| `GET /profiles`              | The profiles, the one in use on this device, the limit, the colours |
+| `POST /profiles`             | Add a profile: `{ name, color? }`                                   |
+| `PATCH /profiles/{id}`       | Change name or colour                                               |
+| `DELETE /profiles/{id}`      | Delete a profile and its watch history                              |
+| `POST /profiles/{id}/select` | Use this profile on this device                                     |
+
+All under `/v1/viewer`. `GET /session`, `POST /register` and `POST /login` also return the profile in use as `profile`. The watch history endpoints work on the profile in use.
+
+On the website, signing in to an account with more than one profile asks "Who is watching?". The header shows the profile in use and switches between them, and other open tabs follow. In the panel, a viewer's sheet lists the profiles and says who watched what.
+
 ## Watch history
 
-The account remembers where a viewer is in each video, so "Continue watching" and the resume position are the same on every device.
+Each profile of an account remembers where it is in each video, so "Continue watching" and the resume position are the same on every device.
 
-- **One entry per viewer and video.** A video is a movie or an episode.
+- **One entry per profile and video.** A video is a movie or an episode.
 - **The rules are applied by the API,** so every device agrees: the first 15 seconds do not count as begun, and from 95 % on the video counts as watched. A watched video leaves "Continue watching" and keeps a "Watched" mark. Watching it again brings it back and keeps the mark.
 - **The later report wins,** whichever arrives first. A device that was offline hands over its positions with the time they were noted. A time in the future is not believed.
 - **Positions for something viewers cannot watch are left out without an error.** While a title is unpublished its entries are hidden, and they return with it.
 - **The player reports about every 15 seconds,** and at once when the viewer leaves the video.
 - **The viewer can remove a video from the row, or clear everything** on the account page.
 - **Admins who may see viewers can see what a viewer watched.** That is personal data: the permission `viewers:read` covers it, and editors do not have it.
-- Entries are deleted with the account, the title or the episode.
+- Entries are deleted with the account, the profile, the title or the episode.
 
 On the website the list is also kept in the browser. For a visitor that is the only place. For a viewer it is a copy of the account's list: pages have it at once, and what was noted without a connection is handed over when the next page opens. Signing in hands over what the device kept as a visitor. Signing out removes the copy from the device.
 
@@ -151,7 +174,8 @@ On the website the list is also kept in the browser. For a visitor that is the o
 
 - Changing the email address by the viewer. An admin can change it
 - Emails in other languages, and editing their text in the panel
-- Profiles: several people with their own history under one account
+- Profiles for children that show only what suits them, and a PIN on a profile
+- A picture of one's own for a profile
 - A "watch next" row that offers the following episode of a series
 - Subscriptions and payments
 - A limit on devices or on streams at the same time

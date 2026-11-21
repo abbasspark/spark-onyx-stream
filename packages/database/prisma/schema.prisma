@@ -39,10 +39,11 @@ model AdminUser {
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
 
-  sessions  AdminSession[]
-  apiKeys   ApiKey[]
-  auditLogs AuditLog[]
-  assets    Asset[]
+  sessions             AdminSession[]
+  apiKeys              ApiKey[]
+  auditLogs            AuditLog[]
+  assets               Asset[]
+  subscriptionsGranted Subscription[]
 
   @@map("admin_users")
 }
@@ -88,9 +89,11 @@ model Viewer {
   createdAt       DateTime     @default(now())
   updatedAt       DateTime     @updatedAt
 
-  sessions ViewerSession[]
-  watching WatchProgress[]
-  tokens   ViewerToken[]
+  sessions      ViewerSession[]
+  profiles      ViewerProfile[]
+  subscriptions Subscription[]
+  watching      WatchProgress[]
+  tokens        ViewerToken[]
 
   @@index([createdAt])
   @@map("viewers")
@@ -99,17 +102,20 @@ model Viewer {
 /// A device a viewer is signed in on. As with admins, only a hash of the
 /// token is stored.
 model ViewerSession {
-  id         String    @id @default(uuid(7)) @db.Uuid
-  viewerId   String    @db.Uuid
-  viewer     Viewer    @relation(fields: [viewerId], references: [id], onDelete: Cascade)
+  id         String         @id @default(uuid(7)) @db.Uuid
+  viewerId   String         @db.Uuid
+  viewer     Viewer         @relation(fields: [viewerId], references: [id], onDelete: Cascade)
+  /// The profile chosen on this device. Empty means the main profile.
+  profileId  String?        @db.Uuid
+  profile    ViewerProfile? @relation(fields: [profileId], references: [id], onDelete: SetNull)
   /// SHA-256 hash of the session token.
-  tokenHash  String    @unique
+  tokenHash  String         @unique
   userAgent  String?
   ipAddress  String?
   expiresAt  DateTime
-  lastUsedAt DateTime  @default(now())
+  lastUsedAt DateTime       @default(now())
   revokedAt  DateTime?
-  createdAt  DateTime  @default(now())
+  createdAt  DateTime       @default(now())
 
   @@index([viewerId])
   @@index([expiresAt])
@@ -541,10 +547,10 @@ model Image {
 
 /// A movie or a series as viewers see it.
 model Title {
-  id               String    @id @default(uuid(7)) @db.Uuid
+  id               String      @id @default(uuid(7)) @db.Uuid
   type             TitleType
   /// Part of the web address, for example "the-long-road". Unique.
-  slug             String    @unique
+  slug             String      @unique
   name             String
   originalName     String?
   tagline          String?
@@ -555,7 +561,9 @@ model Title {
   /// Language code of the original audio, for example "en".
   originalLanguage String?
   /// Shown in prominent places of the viewer site.
-  isFeatured       Boolean   @default(false)
+  isFeatured       Boolean     @default(false)
+  /// Who may watch: everyone the installation lets watch, or only subscribers.
+  access           TitleAccess @default(FREE)
 
   status      PublishStatus @default(DRAFT)
   publishedAt DateTime?
@@ -668,19 +676,42 @@ model Episode {
   @@map("episodes")
 }
 
-/// How far a viewer is in one video: a movie, or an episode of a series.
-/// One row per viewer and video.
-model WatchProgress {
+/// One of the people who share a viewer account. Each has their own watch
+/// history. Every account has a main profile, which is created with it.
+model ViewerProfile {
   id        String   @id @default(uuid(7)) @db.Uuid
   viewerId  String   @db.Uuid
   viewer    Viewer   @relation(fields: [viewerId], references: [id], onDelete: Cascade)
-  titleId   String   @db.Uuid
-  title     Title    @relation(fields: [titleId], references: [id], onDelete: Cascade)
+  name      String
+  /// Name of one of the colours clients draw a profile in, such as "amber".
+  color     String
+  /// The profile the account starts with. It cannot be deleted.
+  isMain    Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  sessions ViewerSession[]
+  watching WatchProgress[]
+
+  @@index([viewerId])
+  @@map("viewer_profiles")
+}
+
+/// How far a profile is in one video: a movie, or an episode of a series.
+/// One row per profile and video.
+model WatchProgress {
+  id        String        @id @default(uuid(7)) @db.Uuid
+  viewerId  String        @db.Uuid
+  viewer    Viewer        @relation(fields: [viewerId], references: [id], onDelete: Cascade)
+  profileId String        @db.Uuid
+  profile   ViewerProfile @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  titleId   String        @db.Uuid
+  title     Title         @relation(fields: [titleId], references: [id], onDelete: Cascade)
   /// Set for an episode of a series, empty for a movie.
-  episodeId String?  @db.Uuid
-  episode   Episode? @relation(fields: [episodeId], references: [id], onDelete: Cascade)
+  episodeId String?       @db.Uuid
+  episode   Episode?      @relation(fields: [episodeId], references: [id], onDelete: Cascade)
   /// The video itself: the id of the episode, or of the title for a movie.
-  itemId    String   @db.Uuid
+  itemId    String        @db.Uuid
 
   /// Where to go on. 0 when there is nothing to resume, for example after the end.
   positionSeconds Int
@@ -693,7 +724,8 @@ model WatchProgress {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  @@unique([viewerId, itemId])
+  @@unique([profileId, itemId])
+  @@index([profileId, watchedAt])
   @@index([viewerId, watchedAt])
   @@index([titleId])
   @@index([episodeId])
@@ -723,4 +755,101 @@ model ViewerToken {
   @@index([viewerId, kind])
   @@index([expiresAt])
   @@map("viewer_tokens")
+}
+
+enum TitleAccess {
+  /// Open to everyone the installation lets watch.
+  FREE
+  /// Needs a subscription.
+  PAID
+}
+
+enum BillingInterval {
+  MONTH
+  YEAR
+}
+
+/// What a viewer can subscribe to. A plan has a price per month, per year, or both.
+/// In this version every plan opens all paid titles.
+model Plan {
+  id            String   @id @default(uuid(7)) @db.Uuid
+  name          String
+  description   String?
+  /// Short lines shown as a list under the price, such as "Watch on any device".
+  features      String[]
+  /// Prices in the smallest unit of the installation's currency, such as cents.
+  /// A missing price means the plan is not sold for that interval.
+  monthlyAmount Int?
+  yearlyAmount  Int?
+  /// Days a new subscriber watches before the first payment.
+  trialDays     Int      @default(0)
+  /// Whether viewers are offered the plan. Existing subscribers keep it either way.
+  isOffered     Boolean  @default(true)
+  /// Marks the plan viewers are steered to.
+  isRecommended Boolean  @default(false)
+  /// Order on the page of plans, lowest first.
+  position      Int      @default(0)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  subscriptions Subscription[]
+
+  @@index([position])
+  @@map("plans")
+}
+
+enum SubscriptionStatus {
+  /// Watching without having paid yet.
+  TRIALING
+  ACTIVE
+  /// A payment failed. Access continues while the payment is retried.
+  PAST_DUE
+  /// Ended by the viewer or an admin. Nothing more is charged.
+  CANCELED
+  /// The paid time ran out.
+  EXPIRED
+}
+
+enum SubscriptionSource {
+  /// Granted by an admin: cash, bank transfer, a gift.
+  MANUAL
+  /// Paid online.
+  STRIPE
+}
+
+/// A viewer's hold on a plan over a stretch of time. A viewer has at most one
+/// that is running. Ended ones are kept as the history of the account.
+model Subscription {
+  id       String             @id @default(uuid(7)) @db.Uuid
+  viewerId String             @db.Uuid
+  viewer   Viewer             @relation(fields: [viewerId], references: [id], onDelete: Cascade)
+  planId   String             @db.Uuid
+  plan     Plan               @relation(fields: [planId], references: [id], onDelete: Restrict)
+  status   SubscriptionStatus
+  source   SubscriptionSource
+  /// How often it is paid. Empty for access an admin granted.
+  interval BillingInterval?
+
+  startedAt         DateTime  @default(now())
+  /// Until when the viewer may watch. Empty means until an admin ends it.
+  endsAt            DateTime?
+  /// Set when it will not be renewed at endsAt.
+  cancelAtPeriodEnd Boolean   @default(false)
+  /// When it was ended before its time, by the viewer or an admin.
+  canceledAt        DateTime?
+
+  /// A remark of the admin who granted it, such as "paid in cash".
+  note        String?
+  grantedById String?    @db.Uuid
+  grantedBy   AdminUser? @relation(fields: [grantedById], references: [id], onDelete: SetNull)
+  /// Id of the subscription at the payment provider.
+  externalId  String?    @unique
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([viewerId, status])
+  @@index([planId])
+  @@index([status, endsAt])
+  @@map("subscriptions")
 }

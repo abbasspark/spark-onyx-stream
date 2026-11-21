@@ -6,6 +6,7 @@ import {
   Film,
   KeyRound,
   LayoutDashboard,
+  CreditCard,
   type LucideIcon,
   Mail,
   ScrollText,
@@ -65,6 +66,18 @@ export const NAVIGATION: NavGroup[] = [
         icon: UsersRound,
         permission: 'viewers:read',
         keywords: 'accounts users customers members subscribers sign-up devices',
+      },
+    ],
+  },
+  {
+    label: 'Billing',
+    items: [
+      {
+        to: '/plans',
+        label: 'Plans',
+        icon: CreditCard,
+        permission: 'billing:read',
+        keywords: 'subscriptions prices pricing payment paywall revenue money',
       },
     ],
   },

@@ -81,6 +81,15 @@ export function startSync(viewerSignedIn: boolean): void {
   });
 }
 
+/**
+ * Called when another profile is chosen on this device: the list in the
+ * browser was that of the profile before, and is replaced by the new one's.
+ */
+export function restartSync(): void {
+  replaceEntries([]);
+  startSync(true);
+}
+
 /** Called on sign-out: what the account watched does not stay on the device. */
 export function endSync(): void {
   signedIn = false;

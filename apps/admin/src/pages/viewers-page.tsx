@@ -69,10 +69,17 @@ import {
   DropdownMenuTrigger,
   Tooltip,
 } from '@/components/ui/overlay';
+import { ViewerSubscription } from '@/components/viewer-subscription';
 import { useAddressParams } from '@/lib/address-params';
 import { cn } from '@/lib/cn';
 import { formatDateTime, formatRelative, humanize } from '@/lib/format';
-import { describeDevice, generatePassword, initialsOf, summarizeWatching } from '@/lib/viewers';
+import {
+  describeDevice,
+  generatePassword,
+  initialsOf,
+  profileColor,
+  summarizeWatching,
+} from '@/lib/viewers';
 
 const PAGE_SIZE = 25;
 const SEARCH_DELAY_MS = 300;
@@ -197,6 +204,9 @@ export function ViewersPage() {
       ? params.get('status')
       : ''
   ) as ViewerStatus | '';
+  const subscribed = (
+    ['yes', 'no'].includes(params.get('subscribed') ?? '') ? params.get('subscribed') : ''
+  ) as 'yes' | 'no' | '';
   const q = params.get('q') ?? '';
   const sort = (VIEWER_SORT_FIELDS as readonly string[]).includes(params.get('sort') ?? '')
     ? (params.get('sort') as ViewerSortField)
@@ -220,13 +230,14 @@ export function ViewersPage() {
   }, [search]);
 
   const viewers = useQuery({
-    queryKey: ['viewers', 'list', { page, status, q, sort, order }],
+    queryKey: ['viewers', 'list', { page, status, subscribed, q, sort, order }],
     queryFn: ({ signal }) =>
       viewersApi.list(
         {
           page,
           pageSize: PAGE_SIZE,
           status: status || undefined,
+          subscribed: subscribed || undefined,
           q: q || undefined,
           sort,
           order,
@@ -242,7 +253,7 @@ export function ViewersPage() {
   });
   const mailOn = access.data?.email ?? false;
   const items = viewers.data?.items ?? [];
-  const filtered = Boolean(q || status);
+  const filtered = Boolean(q || status || subscribed);
 
   const refresh = () => {
     void queryClient.invalidateQueries({ queryKey: ['viewers'] });
@@ -485,6 +496,19 @@ export function ViewersPage() {
           ]}
         />
         <Select
+          aria-label="Filter by subscription"
+          className="w-44"
+          value={subscribed || 'ALL'}
+          onValueChange={(value) =>
+            change({ subscribed: value === 'ALL' ? null : value, page: null })
+          }
+          options={[
+            { value: 'ALL', label: 'With or without plan' },
+            { value: 'yes', label: 'Subscribers' },
+            { value: 'no', label: 'No subscription' },
+          ]}
+        />
+        <Select
           aria-label="Sort by"
           className="w-40"
           value={sort}
@@ -595,6 +619,11 @@ export function ViewersPage() {
                               Not confirmed
                             </Badge>
                           )}
+                          {viewer.plan ? (
+                            <Badge tone="info" className="shrink-0">
+                              {viewer.plan.name}
+                            </Badge>
+                          ) : null}
                         </span>
                       </span>
                     </button>
@@ -940,6 +969,8 @@ function DetailSheet({
     queryFn: ({ signal }) => viewersApi.watching((viewer as Viewer).id, signal),
     enabled: viewer !== null,
   });
+  // Who watched is worth saying only when several people share the account.
+  const sharedAccount = (detail.data?.profiles.length ?? 1) > 1;
   // The list row is shown at once and replaced by the fresh answer when it arrives.
   const shown = detail.data ?? viewer;
 
@@ -965,6 +996,40 @@ function DetailSheet({
                 ['Changed', formatDateTime(shown.updatedAt)],
               ]}
             />
+
+            {shown ? (
+              <ViewerSubscription viewerId={shown.id} viewerName={shown.displayName} />
+            ) : null}
+
+            {detail.data ? (
+              <div>
+                <h3 className="mb-2 text-[13px] font-medium">
+                  {detail.data.profiles.length === 1
+                    ? '1 profile'
+                    : `${detail.data.profiles.length} profiles`}
+                </h3>
+                <ul className="flex flex-wrap gap-2">
+                  {detail.data.profiles.map((profile) => (
+                    <li
+                      key={profile.id}
+                      className="flex items-center gap-2 rounded-md border py-1 pr-2.5 pl-1 text-sm"
+                    >
+                      <span
+                        aria-hidden="true"
+                        className="grid size-6 place-items-center rounded-[3px] text-xs font-bold text-black"
+                        style={{ background: profileColor(profile.color) }}
+                      >
+                        {[...profile.name.trim()][0]?.toUpperCase() ?? '?'}
+                      </span>
+                      {profile.name}
+                      {profile.isMain ? (
+                        <span className="text-xs text-muted-foreground">main</span>
+                      ) : null}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ) : null}
 
             <div>
               <h3 className="mb-2 text-[13px] font-medium">
@@ -1049,9 +1114,11 @@ function DetailSheet({
                                 {formatRelative(item.watchedAt)}
                               </span>
                             </div>
-                            {summary.episode ? (
+                            {summary.episode || sharedAccount ? (
                               <p className="truncate text-xs text-muted-foreground">
-                                {summary.episode}
+                                {[summary.episode, sharedAccount ? `by ${item.profile.name}` : null]
+                                  .filter(Boolean)
+                                  .join(', ')}
                               </p>
                             ) : null}
                             <div className="mt-1.5 flex items-center gap-2.5">

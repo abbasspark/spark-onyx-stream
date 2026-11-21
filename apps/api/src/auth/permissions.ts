@@ -23,6 +23,8 @@ export const PERMISSIONS = [
   'catalog:write',
   'viewers:read',
   'viewers:write',
+  'billing:read',
+  'billing:write',
   'settings:read',
   'settings:write',
 ] as const;

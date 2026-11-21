@@ -1,0 +1,103 @@
+// SPDX-License-Identifier: AGPL-3.0-only
+import { describe, expect, it } from 'vitest';
+import {
+  describePrices,
+  describeSubscription,
+  endOfDay,
+  fractionDigits,
+  parsePrice,
+  presetEnd,
+  toPriceText,
+  yearlySaving,
+} from './billing';
+
+describe('currencies', () => {
+  it('knows how many digits follow the point', () => {
+    expect(fractionDigits('EUR')).toBe(2);
+    expect(fractionDigits('JPY')).toBe(0);
+    expect(fractionDigits('KWD')).toBe(3);
+  });
+
+  it('falls back to two digits for letters that are no currency', () => {
+    expect(fractionDigits('??')).toBe(2);
+  });
+});
+
+describe('parsePrice', () => {
+  it('reads a price with a point or a comma', () => {
+    expect(parsePrice('7.99', 'EUR')).toBe(799);
+    expect(parsePrice('7,99', 'EUR')).toBe(799);
+    expect(parsePrice(' 8 ', 'EUR')).toBe(800);
+    expect(parsePrice('7.9', 'EUR')).toBe(790);
+    // Without the rounding, 19.99 would become 1998.
+    expect(parsePrice('19.99', 'EUR')).toBe(1999);
+  });
+
+  it('follows the currency', () => {
+    expect(parsePrice('980', 'JPY')).toBe(980);
+    expect(parsePrice('9.80', 'JPY')).toBe('invalid');
+    expect(parsePrice('2.500', 'KWD')).toBe(2500);
+  });
+
+  it('tells an empty field from a wrong one', () => {
+    expect(parsePrice('', 'EUR')).toBeNull();
+    expect(parsePrice('   ', 'EUR')).toBeNull();
+    for (const text of ['free', '7.999', '-5', '0', '0.00', '1e3', '7.99 €']) {
+      expect(parsePrice(text, 'EUR')).toBe('invalid');
+    }
+  });
+
+  it('shows an amount the way it is typed', () => {
+    expect(toPriceText(799, 'EUR')).toBe('7.99');
+    expect(toPriceText(800, 'EUR')).toBe('8.00');
+    expect(toPriceText(980, 'JPY')).toBe('980');
+    expect(toPriceText(null, 'EUR')).toBe('');
+    expect(parsePrice(toPriceText(1999, 'EUR'), 'EUR')).toBe(1999);
+  });
+});
+
+describe('plans', () => {
+  it('says what a year saves', () => {
+    expect(yearlySaving({ monthlyAmount: 799, yearlyAmount: 7990 })).toBe(17);
+    expect(yearlySaving({ monthlyAmount: 799, yearlyAmount: 9588 })).toBeNull();
+    expect(yearlySaving({ monthlyAmount: 799, yearlyAmount: null })).toBeNull();
+    expect(yearlySaving({ monthlyAmount: null, yearlyAmount: 7990 })).toBeNull();
+  });
+
+  it('names the prices a plan has', () => {
+    expect(describePrices({ monthlyAmount: 799, yearlyAmount: null }, 'USD')).toMatch(
+      /7\.99 a month$/,
+    );
+    expect(describePrices({ monthlyAmount: 799, yearlyAmount: 7990 }, 'USD')).toContain(' · ');
+  });
+});
+
+describe('granting access', () => {
+  const now = new Date('2026-11-21T12:00:00Z');
+
+  it('counts a preset from now', () => {
+    expect(presetEnd(30, now)).toBe('2026-12-21T12:00:00.000Z');
+    expect(presetEnd(null, now)).toBeNull();
+  });
+
+  it('lets a chosen day last until its end', () => {
+    const end = endOfDay('2026-12-24');
+    expect(end).not.toBeNull();
+    expect(new Date(end as string).getHours()).toBe(23);
+    expect(endOfDay('nonsense')).toBeNull();
+  });
+});
+
+describe('describeSubscription', () => {
+  it('puts the state in words', () => {
+    expect(describeSubscription({ status: 'ACTIVE', running: true }).label).toBe('Running');
+    expect(describeSubscription({ status: 'TRIALING', running: true }).label).toBe('Trial');
+    expect(describeSubscription({ status: 'PAST_DUE', running: true }).label).toBe(
+      'Payment failed',
+    );
+    expect(describeSubscription({ status: 'CANCELED', running: false }).label).toBe('Ended');
+    expect(describeSubscription({ status: 'EXPIRED', running: false }).label).toBe('Expired');
+    // Out of time, though nothing has marked it yet.
+    expect(describeSubscription({ status: 'ACTIVE', running: false }).label).toBe('Expired');
+  });
+});

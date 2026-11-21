@@ -36,6 +36,35 @@ export const changeViewerPasswordSchema = z.object({
 });
 export type ChangeViewerPasswordInput = z.infer<typeof changeViewerPasswordSchema>;
 
+/** Kept in step with PROFILE_COLORS of the profiles service. */
+const profileColorSchema = z.enum([
+  'amber',
+  'coral',
+  'rose',
+  'violet',
+  'blue',
+  'teal',
+  'green',
+  'slate',
+]);
+const profileNameSchema = z
+  .string()
+  .transform((value) => value.replace(/\s+/g, ' ').trim())
+  .pipe(z.string().min(1, 'Enter a name').max(40, 'Use at most 40 characters'));
+
+export const createProfileSchema = z.object({
+  name: profileNameSchema,
+  /** Left out, the profile gets a colour no other profile of the account has. */
+  color: profileColorSchema.optional(),
+});
+export type CreateProfileInput = z.infer<typeof createProfileSchema>;
+
+export const updateProfileSchema = z
+  .object({ name: profileNameSchema, color: profileColorSchema })
+  .partial()
+  .refine((value) => Object.keys(value).length > 0, { message: 'Nothing to change' });
+export type UpdateProfileInput = z.infer<typeof updateProfileSchema>;
+
 export const forgotViewerPasswordSchema = z.object({ email: emailSchema });
 export type ForgotViewerPasswordInput = z.infer<typeof forgotViewerPasswordSchema>;
 
@@ -63,6 +92,8 @@ export const VIEWER_SORT_FIELDS = ['createdAt', 'lastLoginAt', 'email', 'display
 
 export const listViewersSchema = paginationSchema.extend({
   status: z.enum(VIEWER_STATUSES).optional(),
+  /** "yes": only viewers with a running subscription. "no": only those without. */
+  subscribed: z.enum(['yes', 'no']).optional(),
   /** Matches the email address and the name, ignoring case. */
   q: z.string().trim().min(1).max(200).optional(),
   sort: z.enum(VIEWER_SORT_FIELDS).default('createdAt'),

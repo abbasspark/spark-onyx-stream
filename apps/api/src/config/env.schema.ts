@@ -125,6 +125,32 @@ export const envSchema = z
       .transform((value) => value.trim() || 'Onyx Stream'),
 
     /**
+     * Currency of all prices, as three capital letters such as EUR or USD.
+     * Decide before the first plan: prices are stored as numbers and do not
+     * convert themselves.
+     */
+    BILLING_CURRENCY: z
+      .string()
+      .default('EUR')
+      .refine((value) => /^[A-Z]{3}$/.test(value), {
+        message: 'BILLING_CURRENCY must be three capital letters, such as EUR',
+      }),
+    /**
+     * Where viewers ask for a subscription while there is no online payment:
+     * a web address or "mailto:billing@example.com". Empty shows no link.
+     */
+    BILLING_CONTACT_URL: z
+      .string()
+      .default('')
+      .transform((value) => value.trim())
+      .refine(
+        (value) => value === '' || /^(https?:\/\/[^\s]+|mailto:[^\s@]+@[^\s@]+)$/.test(value),
+        {
+          message: 'BILLING_CONTACT_URL must start with https://, http:// or mailto:',
+        },
+      ),
+
+    /**
      * Access to The Movie Database (TMDB), to import details and artwork of
      * titles. Either the "API Read Access Token" or the shorter "API Key" of a
      * TMDB account. Empty turns the import off.

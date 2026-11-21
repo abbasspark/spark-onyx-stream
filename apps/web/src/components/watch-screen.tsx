@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 'use client';
 
-import { Loader2, Mail, Play, RotateCcw, SkipForward } from 'lucide-react';
+import { Loader2, Lock, Mail, Play, RotateCcw, SkipForward } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -41,7 +41,9 @@ type Loaded =
   /** Playback needs a signed-in viewer and there is none. */
   | { state: 'sign-in' }
   /** Playback needs a confirmed email address and the viewer has yet to confirm. */
-  | { state: 'confirm-email' };
+  | { state: 'confirm-email' }
+  /** The title needs a subscription and the viewer has none. */
+  | { state: 'subscribe' };
 
 /** Explains a refused playback request in the viewer's terms. */
 function refusal(status: number): { message: string; retry: boolean } {
@@ -71,7 +73,7 @@ export function WatchScreen({
   next,
 }: WatchScreenProps) {
   const router = useRouter();
-  const { state: sessionState, viewer, access } = useViewerSession();
+  const { state: sessionState, viewer, profile, access } = useViewerSession();
   const [loaded, setLoaded] = useState<Loaded>({ state: 'loading' });
   const [attempt, setAttempt] = useState(0);
   const [ended, setEnded] = useState(false);
@@ -118,6 +120,10 @@ export function WatchScreen({
           setLoaded({ state: 'sign-in' });
           return;
         }
+        if (response.status === 402) {
+          setLoaded({ state: 'subscribe' });
+          return;
+        }
         if (response.status === 403) {
           const body = (await response.json().catch(() => null)) as { code?: string } | null;
           if (body?.code === 'email_unverified') {
@@ -147,7 +153,7 @@ export function WatchScreen({
     // The progress key belongs to the page and does not change while it is open.
     // eslint-disable-next-line react-hooks/exhaustive-deps
     // Signing in, or out, in this or another tab asks again.
-  }, [playbackPath, attempt, sessionState, viewer?.id]);
+  }, [playbackPath, attempt, sessionState, viewer?.id, profile?.id]);
 
   useEffect(() => {
     if (resumedAt === null) {
@@ -269,6 +275,38 @@ export function WatchScreen({
               Create an account
             </Link>
           )}
+        </div>
+        <Link
+          href={backHref}
+          className="text-sm text-smoke underline underline-offset-4 hover:text-vein"
+        >
+          Back to {heading}
+        </Link>
+      </div>
+    );
+  }
+
+  if (loaded.state === 'subscribe') {
+    const here = typeof window === 'undefined' ? backHref : window.location.pathname;
+    return (
+      <div className="flex h-dvh flex-col items-center justify-center gap-6 bg-onyx px-6 text-center">
+        <Lock className="size-8 text-sard" aria-hidden="true" />
+        <h1 className="display max-w-xl text-3xl sm:text-4xl">Subscribe to watch {heading}</h1>
+        <p className="max-w-md text-smoke">
+          This title is for subscribers. A plan opens it together with everything else that needs
+          one.
+        </p>
+        <div className="flex flex-wrap justify-center gap-3">
+          <Link href={`/plans?next=${encodeURIComponent(here)}`} className="button button-play">
+            See the plans
+          </Link>
+          <button
+            type="button"
+            className="button button-quiet"
+            onClick={() => setAttempt((value) => value + 1)}
+          >
+            <RotateCcw />I subscribed, play
+          </button>
         </div>
         <Link
           href={backHref}

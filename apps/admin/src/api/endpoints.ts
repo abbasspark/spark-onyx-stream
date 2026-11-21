@@ -44,7 +44,14 @@ import type {
   UpdateViewerInput,
   Viewer,
   ViewerAccessConfig,
+  BillingOverview,
+  GrantSubscriptionInput,
   ImportResult,
+  TitleAccess,
+  Plan,
+  PlanInput,
+  Subscription,
+  ViewerSubscriptions,
   MailStatus,
   MetadataParts,
   MetadataPreview,
@@ -139,10 +146,30 @@ export interface ViewerListQuery {
   page: number;
   pageSize: number;
   status?: ViewerStatus;
+  /** Only viewers with ("yes") or without ("no") a running subscription. */
+  subscribed?: 'yes' | 'no';
   q?: string;
   sort?: ViewerSortField;
   order?: SortOrder;
 }
+
+export const billingApi = {
+  overview: (signal?: AbortSignal) => request<BillingOverview>('/v1/billing', { signal }),
+  plans: (signal?: AbortSignal) => request<Plan[]>('/v1/plans', { signal }),
+  createPlan: (body: PlanInput) => request<Plan>('/v1/plans', { method: 'POST', body }),
+  updatePlan: (id: string, body: Partial<PlanInput>) =>
+    request<Plan>(`/v1/plans/${id}`, { method: 'PATCH', body }),
+  deletePlan: (id: string) => request<void>(`/v1/plans/${id}`, { method: 'DELETE' }),
+  orderPlans: (ids: string[]) =>
+    request<Plan[]>('/v1/plans/order', { method: 'PUT', body: { ids } }),
+  subscriptionsOf: (viewerId: string, signal?: AbortSignal) =>
+    request<ViewerSubscriptions>(`/v1/viewers/${viewerId}/subscriptions`, { signal }),
+  grant: (viewerId: string, body: GrantSubscriptionInput) =>
+    request<Subscription>(`/v1/viewers/${viewerId}/subscriptions`, { method: 'POST', body }),
+  change: (id: string, body: Partial<GrantSubscriptionInput>) =>
+    request<Subscription>(`/v1/subscriptions/${id}`, { method: 'PATCH', body }),
+  end: (id: string) => request<Subscription>(`/v1/subscriptions/${id}/end`, { method: 'POST' }),
+};
 
 export const mailApi = {
   status: (signal?: AbortSignal) => request<MailStatus>('/v1/mail', { signal }),
@@ -201,6 +228,7 @@ export interface TitleListQuery {
   pageSize: number;
   type?: TitleType;
   status?: PublishStatus;
+  access?: TitleAccess;
   categoryId?: string;
   q?: string;
   sort?: TitleSortField;

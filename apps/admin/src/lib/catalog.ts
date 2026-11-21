@@ -31,6 +31,8 @@ export interface DetailsForm {
   originalLanguage: string;
   slug: string;
   isFeatured: boolean;
+  /** Whether watching needs a subscription. */
+  isPaid: boolean;
   categoryIds: string[];
 }
 
@@ -45,6 +47,7 @@ export function toForm(title: TitleDetail): DetailsForm {
     originalLanguage: title.originalLanguage ?? '',
     slug: title.slug,
     isFeatured: title.isFeatured,
+    isPaid: title.access === 'PAID',
     categoryIds: title.categories.map((category) => category.id).sort(),
   };
 }
@@ -76,6 +79,9 @@ export function changedFields(saved: DetailsForm, form: DetailsForm): UpdateTitl
   }
   if (form.isFeatured !== saved.isFeatured) {
     changes.isFeatured = form.isFeatured;
+  }
+  if (form.isPaid !== saved.isPaid) {
+    changes.access = form.isPaid ? 'PAID' : 'FREE';
   }
   if ([...form.categoryIds].sort().join() !== saved.categoryIds.join()) {
     changes.categoryIds = form.categoryIds;

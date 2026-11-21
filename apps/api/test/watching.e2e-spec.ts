@@ -462,6 +462,7 @@ describe.skipIf(!TEST_DATABASE_URL)('Watch history (e2e)', () => {
         items: [
           {
             id: series.pilot,
+            profile: { id: expect.any(String), name: 'Anna' },
             title: { id: series.id, name: 'Deep Water', type: 'SERIES' },
             episode: { id: series.pilot, seasonNumber: 1, number: 1, name: 'Pilot' },
             position: 0,
@@ -471,6 +472,7 @@ describe.skipIf(!TEST_DATABASE_URL)('Watch history (e2e)', () => {
           },
           {
             id: movie.id,
+            profile: { id: expect.any(String), name: 'Anna' },
             title: { id: movie.id, name: 'Night Train', type: 'MOVIE' },
             episode: null,
             position: 40,

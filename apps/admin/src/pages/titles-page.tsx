@@ -8,6 +8,7 @@ import {
   Film,
   LayoutGrid,
   List,
+  Lock,
   MoreHorizontal,
   Pencil,
   Plus,
@@ -27,6 +28,7 @@ import {
   TITLE_SORT_FIELDS,
   type PublishStatus,
   type SortOrder,
+  type TitleAccess,
   type TitleSortField,
   type TitleSummary,
   type TitleType,
@@ -153,6 +155,9 @@ export function TitlesPage() {
       : ''
   ) as PublishStatus | '';
   const categoryId = params.get('category') ?? '';
+  const access = (
+    ['FREE', 'PAID'].includes(params.get('access') ?? '') ? params.get('access') : ''
+  ) as TitleAccess | '';
   const q = params.get('q') ?? '';
   const sort = (TITLE_SORT_FIELDS as readonly string[]).includes(params.get('sort') ?? '')
     ? (params.get('sort') as TitleSortField)
@@ -184,7 +189,7 @@ export function TitlesPage() {
   }, [search]);
 
   const titles = useQuery({
-    queryKey: ['titles', 'list', { page, type, status, categoryId, q, sort, order }],
+    queryKey: ['titles', 'list', { page, type, status, categoryId, access, q, sort, order }],
     queryFn: ({ signal }) =>
       titlesApi.list(
         {
@@ -193,6 +198,7 @@ export function TitlesPage() {
           type: type || undefined,
           status: status || undefined,
           categoryId: categoryId || undefined,
+          access: access || undefined,
           q: q || undefined,
           sort,
           order,
@@ -206,7 +212,7 @@ export function TitlesPage() {
     queryFn: ({ signal }) => categoriesApi.list(signal),
   });
   const items = titles.data?.items ?? [];
-  const filtered = Boolean(q || status || categoryId || type);
+  const filtered = Boolean(q || status || categoryId || type || access);
 
   const remove = useMutation({
     mutationFn: (title: TitleSummary) => titlesApi.remove(title.id),
@@ -359,6 +365,17 @@ export function TitlesPage() {
           />
         ) : null}
         <Select
+          aria-label="Filter by access"
+          className="w-40"
+          value={access || 'ALL'}
+          onValueChange={(value) => change({ access: value === 'ALL' ? null : value, page: null })}
+          options={[
+            { value: 'ALL', label: 'Free and paid' },
+            { value: 'FREE', label: 'Free' },
+            { value: 'PAID', label: 'Subscribers only' },
+          ]}
+        />
+        <Select
           aria-label="Sort by"
           className="w-40"
           value={sort}
@@ -462,6 +479,15 @@ export function TitlesPage() {
                     <span className="sr-only">Featured</span>
                   </span>
                 ) : null}
+                {title.access === 'PAID' ? (
+                  <span
+                    className="flex size-6 items-center justify-center rounded-full bg-card text-info shadow-sm"
+                    title="Needs a subscription"
+                  >
+                    <Lock className="size-3.5" aria-hidden="true" />
+                    <span className="sr-only">Needs a subscription</span>
+                  </span>
+                ) : null}
               </div>
               <div className="flex items-start gap-1 p-3">
                 <div className="min-w-0 flex-1">
@@ -553,6 +579,12 @@ export function TitlesPage() {
                           <span className="inline-flex items-center gap-1 text-xs text-primary">
                             <Star className="size-3 fill-current" aria-hidden="true" />
                             Featured
+                          </span>
+                        ) : null}
+                        {title.access === 'PAID' ? (
+                          <span className="inline-flex items-center gap-1 text-xs text-info">
+                            <Lock className="size-3" aria-hidden="true" />
+                            Subscribers
                           </span>
                         ) : null}
                       </div>

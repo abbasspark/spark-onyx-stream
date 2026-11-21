@@ -26,7 +26,13 @@ import {
   type ViewerSessionView,
   type ViewerView,
 } from './viewer.view.js';
+import { runningAt } from '../billing/entitlement.js';
 import { ViewerEmailService } from './viewer-email.service.js';
+import {
+  type ProfileView,
+  toProfileView,
+  ViewerProfilesService,
+} from './viewer-profiles.service.js';
 import { type ViewerIdentity, ViewerSessionService } from './viewer-session.service.js';
 
 /**
@@ -40,6 +46,8 @@ const throttleKey = (email: string) => `viewer:${email}`;
 
 export interface ViewerSignIn {
   viewer: ViewerView;
+  /** The profile in use after signing in: the main one. */
+  profile: ProfileView;
   /** For apps, which send it in the Authorization header. The website gets it as a cookie. */
   token: string;
   expiresAt: Date;
@@ -66,7 +74,20 @@ export class ViewerAuthService {
     @Inject(LoginThrottleService) private readonly throttle: LoginThrottleService,
     @Inject(AppConfig) private readonly config: AppConfig,
     @Inject(ViewerEmailService) private readonly emails: ViewerEmailService,
+    @Inject(ViewerProfilesService) private readonly profiles: ViewerProfilesService,
   ) {}
+
+  /**
+   * Whether the viewer has a running subscription. Asked here with the rule of
+   * the billing module, so a page learns it together with who is signed in.
+   */
+  async isEntitled(viewerId: string): Promise<boolean> {
+    const running = await this.prisma.subscription.findFirst({
+      where: { viewerId, ...runningAt() },
+      select: { id: true },
+    });
+    return running !== null;
+  }
 
   accessConfig(): ViewerAccessConfig {
     return {
@@ -108,7 +129,12 @@ export class ViewerAuthService {
 
     await this.emails.sendWelcomeVerification(viewer);
     const { token, session } = await this.sessions.create(viewer.id, info);
-    return { viewer: toViewerView(viewer), token, expiresAt: session.expiresAt };
+    return {
+      viewer: toViewerView(viewer),
+      profile: toProfileView(await this.profiles.main(viewer)),
+      token,
+      expiresAt: session.expiresAt,
+    };
   }
 
   /** @throws UnauthorizedException with one message for every cause. */
@@ -149,7 +175,12 @@ export class ViewerAuthService {
       },
     });
     const { token, session } = await this.sessions.create(viewer.id, info);
-    return { viewer: toViewerView(updated), token, expiresAt: session.expiresAt };
+    return {
+      viewer: toViewerView(updated),
+      profile: toProfileView(await this.profiles.main(updated)),
+      token,
+      expiresAt: session.expiresAt,
+    };
   }
 
   async logout(identity: ViewerIdentity): Promise<void> {

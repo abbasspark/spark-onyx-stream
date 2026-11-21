@@ -19,6 +19,7 @@ import { RateLimitModule } from './rate-limit/rate-limit.module.js';
 import { RedisModule } from './redis/redis.module.js';
 import { StatsModule } from './stats/stats.module.js';
 import { StorageModule, StoragePoolsModule } from './storage/storage.module.js';
+import { BillingModule } from './billing/billing.module.js';
 import { MailModule } from './mail/mail.module.js';
 import { MetadataModule } from './metadata/metadata.module.js';
 import { ViewersModule } from './viewers/viewers.module.js';
@@ -39,6 +40,7 @@ const ROLE_MODULES: Record<AppRole, Type[]> = {
     StatsModule,
     CatalogModule,
     MailModule,
+    BillingModule,
     MetadataModule,
     ViewersModule,
     WatchingModule,

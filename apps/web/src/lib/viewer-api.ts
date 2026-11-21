@@ -2,6 +2,7 @@
 //
 // Calls the browser makes about the viewer's own account. They go to the same
 // origin, so the session cookie travels with them by itself.
+import type { OwnSubscription } from './plans';
 
 export interface Viewer {
   id: string;
@@ -13,6 +14,14 @@ export interface Viewer {
 }
 
 /** A device the viewer is signed in on. */
+/** A viewer with the profile in use. The type of a profile lives in lib/profiles. */
+export interface SignedIn {
+  viewer: Viewer;
+  profile: { id: string; name: string; color: string; isMain: boolean };
+  /** Whether titles that need a subscription are open to this viewer. */
+  entitled?: boolean;
+}
+
 export interface ViewerDevice {
   id: string;
   userAgent: string | null;
@@ -112,11 +121,15 @@ export async function call<Result>(
 export const viewerApi = {
   config: () => call<AccessConfig>('GET', '/config'),
   /** The signed-in viewer, or null when nobody is signed in. */
-  me: () => call<{ viewer: Viewer | null }>('GET', '/session').then((result) => result.viewer),
+  /** Who is signed in and which profile is in use on this device. Both null for a visitor. */
+  session: () =>
+    call<SignedIn | { viewer: null; profile: null; entitled?: boolean }>('GET', '/session'),
+  /** The viewer's own subscription, or null. */
+  subscription: () =>
+    call<{ subscription: OwnSubscription | null; entitled: boolean }>('GET', '/subscription'),
   register: (input: { email: string; displayName: string; password: string }) =>
-    call<{ viewer: Viewer }>('POST', '/register', input).then((result) => result.viewer),
-  login: (input: { email: string; password: string }) =>
-    call<{ viewer: Viewer }>('POST', '/login', input).then((result) => result.viewer),
+    call<SignedIn>('POST', '/register', input),
+  login: (input: { email: string; password: string }) => call<SignedIn>('POST', '/login', input),
   logout: () => call<void>('POST', '/logout'),
   rename: (displayName: string) => call<Viewer>('PATCH', '/me', { displayName }),
   changePassword: (currentPassword: string, newPassword: string) =>

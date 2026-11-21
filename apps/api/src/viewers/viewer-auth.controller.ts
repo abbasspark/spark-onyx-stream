@@ -48,6 +48,11 @@ import {
   type ViewerSignIn,
 } from './viewer-auth.service.js';
 import { ViewerEmailService } from './viewer-email.service.js';
+import {
+  type ProfileView,
+  toProfileView,
+  ViewerProfilesService,
+} from './viewer-profiles.service.js';
 import { type ViewerIdentity, ViewerSessionService } from './viewer-session.service.js';
 
 /** Route of the viewer accounts, relative to the API prefix. */
@@ -72,6 +77,7 @@ export class ViewerAuthController {
     @Inject(ViewerAuthService) private readonly auth: ViewerAuthService,
     @Inject(ViewerSessionService) private readonly viewerSessions: ViewerSessionService,
     @Inject(ViewerEmailService) private readonly emails: ViewerEmailService,
+    @Inject(ViewerProfilesService) private readonly profiles: ViewerProfilesService,
   ) {}
 
   /** What the website needs to know to show the right buttons. */
@@ -90,9 +96,24 @@ export class ViewerAuthController {
   @Public()
   @Get('session')
   @Header('Cache-Control', 'no-store')
-  async session(@Req() request: Request): Promise<{ viewer: ViewerView | null }> {
+  async session(
+    @Req() request: Request,
+  ): Promise<{ viewer: ViewerView | null; profile: ProfileView | null; entitled: boolean }> {
     const identity = await this.viewerSessions.identify(request);
-    return { viewer: identity ? toViewerView(identity.viewer) : null };
+    if (!identity) {
+      return { viewer: null, profile: null, entitled: false };
+    }
+    const [profile, entitled] = await Promise.all([
+      this.profiles.current(identity),
+      this.auth.isEntitled(identity.viewer.id),
+    ]);
+    return {
+      viewer: toViewerView(identity.viewer),
+      // Who is watching on this device.
+      profile: toProfileView(profile),
+      // Whether titles that need a subscription are open to this viewer.
+      entitled,
+    };
   }
 
   @Public()
