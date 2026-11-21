@@ -13,6 +13,8 @@ export default defineConfig({
     globals: true,
     root: './',
     include: ['test/**/*.e2e-spec.ts'],
+    // Migrates the test database before the first suite.
+    globalSetup: ['./test/support/global-setup.ts'],
     // The suites share one database, so they must not run at the same time.
     fileParallelism: false,
   },
