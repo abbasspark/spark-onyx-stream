@@ -1,6 +1,6 @@
 # Phase 2: catalog
 
-The catalog turns videos into things a viewer can find: movies and series with names, texts, artwork and categories. This document describes what is built: the admin side and the public catalog API. The viewer website follows in the same phase.
+The catalog turns videos into things a viewer can find: movies and series with names, texts, artwork and categories. This document describes the admin side and the public catalog API. The viewer website that reads this API is described in [apps/web/README.md](../apps/web/README.md).
 
 ## Model
 
@@ -112,7 +112,6 @@ With `open`, publishing a title makes it watchable by everyone on the internet w
 
 ## Not built yet
 
-- The viewer website
 - Viewer accounts, and with them playback that needs a sign-in or a purchase
 - People and credits (cast, directors)
 - Collections and rows for the home page
