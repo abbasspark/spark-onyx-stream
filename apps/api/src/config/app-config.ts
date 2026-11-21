@@ -38,6 +38,21 @@ export class AppConfig {
   readonly viewerRegistrationOpen: boolean;
   /** Origin that serves media files. Empty when the API serves them itself. */
   readonly mediaBaseUrl: string;
+  /** Currency of all prices, such as "EUR". */
+  readonly billingCurrency: string;
+  /** Where viewers ask for a subscription. Empty when not set. */
+  readonly billingContactUrl: string;
+  /** How long a rented title can be watched. */
+  readonly rental: { readonly startDays: number; readonly watchHours: number };
+  /** Access to Stripe for selling subscriptions online. Null when there is no online payment. */
+  readonly stripe: {
+    readonly secretKey: string;
+    readonly webhookSecret: string;
+    readonly apiUrl: string;
+    /** False while the key is one for testing, where no money moves. */
+    readonly livemode: boolean;
+    readonly automaticTax: boolean;
+  } | null;
   /** Access to TMDB for importing details of titles. Null when the import is off. */
   readonly tmdb: {
     readonly token: string;
@@ -83,6 +98,18 @@ export class AppConfig {
     this.catalogPlayback = env.CATALOG_PLAYBACK;
     this.viewerRegistrationOpen = env.VIEWER_REGISTRATION === 'open';
     this.mediaBaseUrl = env.MEDIA_BASE_URL;
+    this.billingCurrency = env.BILLING_CURRENCY;
+    this.billingContactUrl = env.BILLING_CONTACT_URL;
+    this.rental = { startDays: env.RENTAL_START_DAYS, watchHours: env.RENTAL_WATCH_HOURS };
+    this.stripe = env.STRIPE_SECRET_KEY
+      ? {
+          secretKey: env.STRIPE_SECRET_KEY,
+          webhookSecret: env.STRIPE_WEBHOOK_SECRET,
+          apiUrl: env.STRIPE_API_URL,
+          livemode: /^(sk|rk)_live_/.test(env.STRIPE_SECRET_KEY),
+          automaticTax: env.STRIPE_AUTOMATIC_TAX === 'true',
+        }
+      : null;
     this.tmdb = env.TMDB_API_TOKEN
       ? { token: env.TMDB_API_TOKEN, apiUrl: env.TMDB_API_URL, imageUrl: env.TMDB_IMAGE_URL }
       : null;

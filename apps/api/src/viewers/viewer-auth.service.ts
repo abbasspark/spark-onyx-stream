@@ -26,6 +26,8 @@ import {
   type ViewerSessionView,
   type ViewerView,
 } from './viewer.view.js';
+import { ACCESS_SELECT, accessOf, runningAt, type ViewerAccess } from '../billing/entitlement.js';
+import { type OwnedTitle, toOwnedTitles, validAt } from '../purchases/purchase-rules.js';
 import { ViewerEmailService } from './viewer-email.service.js';
 import {
   type ProfileView,
@@ -65,6 +67,8 @@ export interface ViewerAccessConfig {
 }
 
 /** Everything a viewer does with their own account. */
+export type OwnedTitleRef = OwnedTitle;
+
 @Injectable()
 export class ViewerAuthService {
   constructor(
@@ -75,6 +79,26 @@ export class ViewerAuthService {
     @Inject(ViewerEmailService) private readonly emails: ViewerEmailService,
     @Inject(ViewerProfilesService) private readonly profiles: ViewerProfilesService,
   ) {}
+
+  /** What the viewer's subscription opens: everything, or some packages. Null without one. */
+  async subscriptionAccess(viewerId: string): Promise<ViewerAccess> {
+    const running = await this.prisma.subscription.findMany({
+      where: { viewerId, ...runningAt() },
+      select: ACCESS_SELECT,
+    });
+    return accessOf(running);
+  }
+
+  /** Titles the viewer rented or bought and can watch now. */
+  async ownedTitles(viewerId: string): Promise<OwnedTitleRef[]> {
+    const now = new Date();
+    const purchases = await this.prisma.purchase.findMany({
+      where: { viewerId, ...validAt(now) },
+      orderBy: { createdAt: 'desc' },
+      take: 500,
+    });
+    return toOwnedTitles(purchases);
+  }
 
   accessConfig(): ViewerAccessConfig {
     return {
@@ -214,6 +238,19 @@ export class ViewerAuthService {
   async deleteOwn(identity: ViewerIdentity, password: string): Promise<void> {
     if (!(await verifyPassword(password, identity.viewer.passwordHash))) {
       throw new BadRequestException('Password is incorrect');
+    }
+    const paying = await this.prisma.subscription.findFirst({
+      where: { viewerId: identity.viewer.id, source: 'STRIPE', ...runningAt() },
+      select: { cancelAtPeriodEnd: true },
+    });
+    if (paying && !paying.cancelAtPeriodEnd) {
+      // Deleting the account would not stop the payments.
+      throw new ConflictException({
+        statusCode: 409,
+        error: 'Conflict',
+        code: 'subscription_running',
+        message: 'Cancel your subscription first, so you are not charged again.',
+      });
     }
     await this.prisma.viewer.delete({ where: { id: identity.viewer.id } });
   }

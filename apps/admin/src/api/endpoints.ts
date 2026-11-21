@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-only
-import { request, uploadFile } from './client';
+import { download, request, uploadFile } from './client';
 import type {
   Admin,
   ApiKey,
@@ -8,6 +8,7 @@ import type {
   AssetSortField,
   AssetStatus,
   AuditEntry,
+  BillingOverview,
   CatalogImage,
   Category,
   CreateAdminInput,
@@ -21,19 +22,39 @@ import type {
   EncodingProfileInput,
   Episode,
   EpisodeInput,
+  GrantPurchaseInput,
+  GrantSubscriptionInput,
   ImageKind,
+  ImportResult,
   Job,
   JobStatus,
   LoginResult,
+  MailStatus,
   Me,
+  MetadataParts,
+  MetadataPreview,
+  MetadataSearchResult,
+  MetadataStatus,
   OverviewStats,
+  Package,
   Page,
+  Payment,
+  PaymentListQuery,
+  Plan,
+  PlanInput,
   Playback,
   PublishStatus,
+  Purchase,
+  RecordPaymentInput,
   ReprocessInput,
+  RevenueReport,
   SortOrder,
   StoragePool,
   StoragePoolTestResult,
+  StripeAccount,
+  StripeEvent,
+  Subscription,
+  TitleAccess,
   TitleDetail,
   TitleSortField,
   TitleSummary,
@@ -44,16 +65,11 @@ import type {
   UpdateViewerInput,
   Viewer,
   ViewerAccessConfig,
-  ImportResult,
-  MailStatus,
-  MetadataParts,
-  MetadataPreview,
-  MetadataSearchResult,
-  MetadataStatus,
   ViewerDetail,
-  ViewerWatching,
   ViewerSortField,
   ViewerStatus,
+  ViewerSubscriptions,
+  ViewerWatching,
 } from './types';
 
 export const authApi = {
@@ -139,10 +155,84 @@ export interface ViewerListQuery {
   page: number;
   pageSize: number;
   status?: ViewerStatus;
+  /** Only viewers with ("yes") or without ("no") a running subscription. */
+  subscribed?: 'yes' | 'no';
   q?: string;
   sort?: ViewerSortField;
   order?: SortOrder;
 }
+
+export const billingApi = {
+  overview: (signal?: AbortSignal) => request<BillingOverview>('/v1/billing', { signal }),
+  plans: (signal?: AbortSignal) => request<Plan[]>('/v1/plans', { signal }),
+  createPlan: (body: PlanInput) => request<Plan>('/v1/plans', { method: 'POST', body }),
+  updatePlan: (id: string, body: Partial<PlanInput>) =>
+    request<Plan>(`/v1/plans/${id}`, { method: 'PATCH', body }),
+  deletePlan: (id: string) => request<void>(`/v1/plans/${id}`, { method: 'DELETE' }),
+  orderPlans: (ids: string[]) =>
+    request<Plan[]>('/v1/plans/order', { method: 'PUT', body: { ids } }),
+  subscriptionsOf: (viewerId: string, signal?: AbortSignal) =>
+    request<ViewerSubscriptions>(`/v1/viewers/${viewerId}/subscriptions`, { signal }),
+  grant: (viewerId: string, body: GrantSubscriptionInput) =>
+    request<Subscription>(`/v1/viewers/${viewerId}/subscriptions`, { method: 'POST', body }),
+  change: (id: string, body: Partial<GrantSubscriptionInput>) =>
+    request<Subscription>(`/v1/subscriptions/${id}`, { method: 'PATCH', body }),
+  end: (id: string) => request<Subscription>(`/v1/subscriptions/${id}/end`, { method: 'POST' }),
+  /** Reads a subscription paid online from Stripe again. */
+  refresh: (id: string) =>
+    request<Subscription>(`/v1/subscriptions/${id}/refresh`, { method: 'POST' }),
+  /** Asks Stripe which account the key belongs to. */
+  checkStripe: () => request<StripeAccount>('/v1/billing/stripe/check', { method: 'POST' }),
+  stripeEvents: (signal?: AbortSignal) =>
+    request<StripeEvent[]>('/v1/billing/stripe/events', { signal }),
+};
+
+export const packagesApi = {
+  list: (signal?: AbortSignal) => request<Package[]>('/v1/packages', { signal }),
+  create: (body: { name: string; description: string | null }) =>
+    request<Package>('/v1/packages', { method: 'POST', body }),
+  update: (id: string, body: { name?: string; description?: string | null }) =>
+    request<Package>(`/v1/packages/${id}`, { method: 'PATCH', body }),
+  remove: (id: string) => request<void>(`/v1/packages/${id}`, { method: 'DELETE' }),
+  order: (ids: string[]) =>
+    request<Package[]>('/v1/packages/order', { method: 'PUT', body: { ids } }),
+  /** Puts titles into a package and takes titles out of it. */
+  changeTitles: (id: string, body: { add?: string[]; remove?: string[] }) =>
+    request<Package>(`/v1/packages/${id}/titles`, { method: 'PUT', body }),
+};
+
+export const purchasesApi = {
+  ofViewer: (viewerId: string, signal?: AbortSignal) =>
+    request<{ items: Purchase[] }>(`/v1/viewers/${viewerId}/purchases`, { signal }),
+  /** Gives a viewer a title by hand. */
+  grant: (viewerId: string, body: GrantPurchaseInput) =>
+    request<Purchase>(`/v1/viewers/${viewerId}/purchases`, { method: 'POST', body }),
+  revoke: (id: string) => request<Purchase>(`/v1/purchases/${id}/revoke`, { method: 'POST' }),
+  /** The currency of all prices, which is public. For those who set prices without billing rights. */
+  currency: async (signal?: AbortSignal) =>
+    (await request<{ currency: string }>('/v1/catalog/plans', { signal })).currency,
+};
+
+export const paymentsApi = {
+  revenue: (query: { months: number; timeZone: string }, signal?: AbortSignal) =>
+    request<RevenueReport>('/v1/billing/revenue', { query, signal }),
+  list: (query: PaymentListQuery, signal?: AbortSignal) =>
+    request<Page<Payment>>('/v1/payments', { query: { ...query }, signal }),
+  /** The payments as a CSV file, with the same filters as the list. */
+  exportCsv: (query: Omit<PaymentListQuery, 'page' | 'pageSize'>) =>
+    download('/v1/payments/export', { ...query }),
+  ofViewer: (viewerId: string, signal?: AbortSignal) =>
+    request<{ items: Payment[] }>(`/v1/viewers/${viewerId}/payments`, { signal }),
+  record: (viewerId: string, body: RecordPaymentInput) =>
+    request<Payment>(`/v1/viewers/${viewerId}/payments`, { method: 'POST', body }),
+  remove: (id: string) => request<void>(`/v1/payments/${id}`, { method: 'DELETE' }),
+  /** Reads the paid invoices from Stripe into the books. */
+  importFromStripe: () =>
+    request<{ checked: number; added: number; complete: boolean }>(
+      '/v1/billing/stripe/import-payments',
+      { method: 'POST' },
+    ),
+};
 
 export const mailApi = {
   status: (signal?: AbortSignal) => request<MailStatus>('/v1/mail', { signal }),
@@ -201,7 +291,11 @@ export interface TitleListQuery {
   pageSize: number;
   type?: TitleType;
   status?: PublishStatus;
+  access?: TitleAccess;
   categoryId?: string;
+  packageId?: string;
+  /** "none": paid titles in no package. */
+  packaged?: 'none';
   q?: string;
   sort?: TitleSortField;
   order?: SortOrder;

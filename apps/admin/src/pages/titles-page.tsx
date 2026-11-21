@@ -8,6 +8,7 @@ import {
   Film,
   LayoutGrid,
   List,
+  Lock,
   MoreHorizontal,
   Pencil,
   Plus,
@@ -21,12 +22,13 @@ import { type FormEvent, type ReactNode, useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router';
 import { toast } from 'sonner';
 import { apiUrl } from '@/api/client';
-import { categoriesApi, titlesApi } from '@/api/endpoints';
+import { categoriesApi, packagesApi, titlesApi } from '@/api/endpoints';
 import {
   PUBLISH_STATUSES,
   TITLE_SORT_FIELDS,
   type PublishStatus,
   type SortOrder,
+  type TitleAccess,
   type TitleSortField,
   type TitleSummary,
   type TitleType,
@@ -153,6 +155,11 @@ export function TitlesPage() {
       : ''
   ) as PublishStatus | '';
   const categoryId = params.get('category') ?? '';
+  const access = (
+    ['FREE', 'PAID'].includes(params.get('access') ?? '') ? params.get('access') : ''
+  ) as TitleAccess | '';
+  // A package by its id, or "none" for paid titles that are in no package.
+  const packageFilter = params.get('package') ?? (params.get('packaged') === 'none' ? 'none' : '');
   const q = params.get('q') ?? '';
   const sort = (TITLE_SORT_FIELDS as readonly string[]).includes(params.get('sort') ?? '')
     ? (params.get('sort') as TitleSortField)
@@ -184,7 +191,11 @@ export function TitlesPage() {
   }, [search]);
 
   const titles = useQuery({
-    queryKey: ['titles', 'list', { page, type, status, categoryId, q, sort, order }],
+    queryKey: [
+      'titles',
+      'list',
+      { page, type, status, categoryId, access, packageFilter, q, sort, order },
+    ],
     queryFn: ({ signal }) =>
       titlesApi.list(
         {
@@ -193,6 +204,9 @@ export function TitlesPage() {
           type: type || undefined,
           status: status || undefined,
           categoryId: categoryId || undefined,
+          access: access || undefined,
+          packageId: packageFilter && packageFilter !== 'none' ? packageFilter : undefined,
+          packaged: packageFilter === 'none' ? 'none' : undefined,
           q: q || undefined,
           sort,
           order,
@@ -205,8 +219,13 @@ export function TitlesPage() {
     queryKey: ['categories'],
     queryFn: ({ signal }) => categoriesApi.list(signal),
   });
+  const packages = useQuery({
+    queryKey: ['billing', 'packages'],
+    queryFn: ({ signal }) => packagesApi.list(signal),
+    staleTime: 60_000,
+  });
   const items = titles.data?.items ?? [];
-  const filtered = Boolean(q || status || categoryId || type);
+  const filtered = Boolean(q || status || categoryId || type || access || packageFilter);
 
   const remove = useMutation({
     mutationFn: (title: TitleSummary) => titlesApi.remove(title.id),
@@ -359,6 +378,32 @@ export function TitlesPage() {
           />
         ) : null}
         <Select
+          aria-label="Filter by access"
+          className="w-40"
+          value={access || 'ALL'}
+          onValueChange={(value) => change({ access: value === 'ALL' ? null : value, page: null })}
+          options={[
+            { value: 'ALL', label: 'Free and paid' },
+            { value: 'FREE', label: 'Free' },
+            { value: 'PAID', label: 'Paid' },
+          ]}
+        />
+        {packages.data && packages.data.length > 0 ? (
+          <Select
+            aria-label="Filter by package"
+            className="w-44"
+            value={packageFilter || 'ALL'}
+            onValueChange={(value) =>
+              change({ package: value === 'ALL' ? null : value, packaged: null, page: null })
+            }
+            options={[
+              { value: 'ALL', label: 'Any package' },
+              ...packages.data.map((item) => ({ value: item.id, label: item.name })),
+              { value: 'none', label: 'Paid, in no package' },
+            ]}
+          />
+        ) : null}
+        <Select
           aria-label="Sort by"
           className="w-40"
           value={sort}
@@ -379,7 +424,16 @@ export function TitlesPage() {
             variant="ghost"
             onClick={() => {
               setSearch('');
-              change({ q: null, status: null, category: null, type: null, page: null });
+              change({
+                q: null,
+                status: null,
+                category: null,
+                type: null,
+                access: null,
+                package: null,
+                packaged: null,
+                page: null,
+              });
             }}
           >
             <X />
@@ -460,6 +514,15 @@ export function TitlesPage() {
                   >
                     <Star className="size-3.5 fill-current" aria-hidden="true" />
                     <span className="sr-only">Featured</span>
+                  </span>
+                ) : null}
+                {title.access === 'PAID' ? (
+                  <span
+                    className="flex size-6 items-center justify-center rounded-full bg-card text-info shadow-sm"
+                    title="Paid title"
+                  >
+                    <Lock className="size-3.5" aria-hidden="true" />
+                    <span className="sr-only">Paid title</span>
                   </span>
                 ) : null}
               </div>
@@ -553,6 +616,12 @@ export function TitlesPage() {
                           <span className="inline-flex items-center gap-1 text-xs text-primary">
                             <Star className="size-3 fill-current" aria-hidden="true" />
                             Featured
+                          </span>
+                        ) : null}
+                        {title.access === 'PAID' ? (
+                          <span className="inline-flex items-center gap-1 text-xs text-info">
+                            <Lock className="size-3" aria-hidden="true" />
+                            Subscribers
                           </span>
                         ) : null}
                       </div>

@@ -9,6 +9,7 @@ import type {
   PublishStatus,
   Season,
   Title,
+  TitleAccess,
   TitleType,
 } from '@onyx/database';
 
@@ -113,8 +114,17 @@ export interface TitleSummary {
   status: PublishStatus;
   publishedAt: Date | null;
   isFeatured: boolean;
+  /** FREE, or PAID when watching needs a subscription. */
+  access: TitleAccess;
+  /** What renting and buying cost, in the smallest unit of the currency. Null: not on offer. */
+  rentAmount: number | null;
+  buyAmount: number | null;
+  /** True when no subscription opens the title: it is rented or bought only. */
+  purchaseOnly: boolean;
   poster: ImageView | null;
   categories: { id: string; name: string }[];
+  /** The packages the title is in. Plans open a paid title through them. */
+  packages: { id: string; name: string }[];
   /** Movies: the film's asset. Series: null. */
   asset: AssetRef | null;
   seasonCount: number;
@@ -180,6 +190,7 @@ export type TitleSummaryRecord = Title & {
   poster: Image | null;
   asset: Asset | null;
   categories: { category: Category }[];
+  packages: PackageLink[];
   seasons: { _count: { episodes: number } }[];
 };
 
@@ -190,6 +201,7 @@ export type TitleDetailRecord = Title & {
   asset: Asset | null;
   trailerAsset: Asset | null;
   categories: { category: Category }[];
+  packages: PackageLink[];
   seasons: SeasonRecord[];
 };
 
@@ -205,6 +217,15 @@ export function toEpisodeView(episode: EpisodeRecord, mediaBaseUrl: string): Epi
     asset: toAssetRef(episode.asset),
     still: episode.still ? toImageView(episode.still, mediaBaseUrl) : null,
   };
+}
+
+type PackageLink = { package: { id: string; name: string; position: number } };
+
+function sortedPackages(links: PackageLink[]): { id: string; name: string }[] {
+  return links
+    .map((link) => link.package)
+    .sort((a, b) => a.position - b.position || a.name.localeCompare(b.name))
+    .map(({ id, name }) => ({ id, name }));
 }
 
 function sortedCategories(links: { category: Category }[]): { id: string; name: string }[] {
@@ -228,8 +249,13 @@ export function toTitleSummary(
     status: title.status,
     publishedAt: title.publishedAt,
     isFeatured: title.isFeatured,
+    access: title.access,
+    rentAmount: title.rentAmount,
+    buyAmount: title.buyAmount,
+    purchaseOnly: title.purchaseOnly,
     poster: title.poster ? toImageView(title.poster, mediaBaseUrl) : null,
     categories: sortedCategories(title.categories),
+    packages: sortedPackages(title.packages),
     asset: title.type === 'MOVIE' ? toAssetRef(title.asset) : null,
     seasonCount: title.seasons.length,
     episodeCount: title.seasons.reduce((total, season) => total + season._count.episodes, 0),
@@ -326,10 +352,15 @@ export function toTitleDetail(title: TitleDetailRecord, mediaBaseUrl: string): T
     status: title.status,
     publishedAt: title.publishedAt,
     isFeatured: title.isFeatured,
+    access: title.access,
+    rentAmount: title.rentAmount,
+    buyAmount: title.buyAmount,
+    purchaseOnly: title.purchaseOnly,
     poster: image(title.poster),
     backdrop: image(title.backdrop),
     logo: image(title.logo),
     categories: sortedCategories(title.categories),
+    packages: sortedPackages(title.packages),
     asset: title.type === 'MOVIE' ? toAssetRef(title.asset) : null,
     trailerAsset: toAssetRef(title.trailerAsset),
     metadata:

@@ -133,6 +133,37 @@ export async function request<Result>(path: string, options: RequestOptions = {}
 }
 
 /**
+ * Fetches a file the API builds, such as an export, with the session's token.
+ *
+ * @returns The file and the name the API gave it.
+ * @throws ApiError when the server refuses the request.
+ */
+export async function download(
+  path: string,
+  query?: RequestOptions['query'],
+): Promise<{ blob: Blob; fileName: string | null }> {
+  const token = readToken();
+  let response: Response;
+  try {
+    response = await fetch(`${API_ORIGIN}${path}${toQueryString(query)}`, {
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    });
+  } catch (error) {
+    throw new Error('The server cannot be reached. Check that the API is running', {
+      cause: error,
+    });
+  }
+  if (!response.ok) {
+    if (response.status === 401 && token) {
+      onUnauthorized();
+    }
+    throw await toApiError(response);
+  }
+  const named = /filename="([^"]+)"/.exec(response.headers.get('Content-Disposition') ?? '');
+  return { blob: await response.blob(), fileName: named?.[1] ?? null };
+}
+
+/**
  * Sends a file as the body of a request and returns the parsed answer.
  * Used for pictures, which the API takes as the raw file and not as a form.
  *

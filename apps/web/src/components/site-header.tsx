@@ -12,6 +12,8 @@ import { BandMark } from './brand';
 interface SiteHeaderProps {
   siteName: string;
   categories: Category[];
+  /** Whether the site offers plans, which puts a link to them in the menu. */
+  hasPlans?: boolean;
 }
 
 const LINKS = [
@@ -23,7 +25,7 @@ const LINKS = [
  * The bar at the top of every page. It lies over the artwork and is
  * see-through at the top of a page, then turns solid once the page scrolls.
  */
-export function SiteHeader({ siteName, categories }: SiteHeaderProps) {
+export function SiteHeader({ siteName, categories, hasPlans = false }: SiteHeaderProps) {
   const pathname = usePathname();
   const params = useSearchParams();
   const [solid, setSolid] = useState(false);
@@ -142,6 +144,15 @@ export function SiteHeader({ siteName, categories }: SiteHeaderProps) {
               ) : null}
             </div>
           ) : null}
+          {hasPlans ? (
+            <Link
+              href="/plans"
+              aria-current={pathname === '/plans' ? 'page' : undefined}
+              className={linkClass(pathname === '/plans')}
+            >
+              Plans
+            </Link>
+          ) : null}
         </nav>
 
         <form action="/search" role="search" className="ml-auto hidden md:block">
@@ -193,7 +204,11 @@ export function SiteHeader({ siteName, categories }: SiteHeaderProps) {
           className="gutter h-[calc(100dvh-4rem)] overflow-y-auto bg-onyx pt-4 pb-12 md:hidden"
         >
           <ul className="grid gap-1">
-            {[{ href: '/browse', label: 'Everything' }, ...LINKS].map((link) => (
+            {[
+              { href: '/browse', label: 'Everything' },
+              ...LINKS,
+              ...(hasPlans ? [{ href: '/plans', label: 'Plans' }] : []),
+            ].map((link) => (
               <li key={link.href}>
                 <Link href={link.href} className="display block py-2 text-2xl">
                   {link.label}

@@ -2,6 +2,7 @@
 //
 // Calls the browser makes about the viewer's own account. They go to the same
 // origin, so the session cookie travels with them by itself.
+import type { Opens, OwnedTitle, OwnPayment, OwnSubscription } from './plans';
 
 export interface Viewer {
   id: string;
@@ -17,6 +18,21 @@ export interface Viewer {
 export interface SignedIn {
   viewer: Viewer;
   profile: { id: string; name: string; color: string; isMain: boolean };
+  /** Whether the viewer has a running subscription. */
+  entitled?: boolean;
+  /** Which paid titles it opens. Left out by an API older than packages. */
+  access?: Opens;
+  /** Titles rented or bought. Left out by an API older than renting. */
+  purchases?: OwnedTitle[];
+}
+
+/** A rented or bought title in the viewer's own list. */
+export interface OwnPurchase extends OwnedTitle {
+  id: string;
+  title: { slug: string; name: string; type: string; poster: { url: string } | null };
+  purchasedAt: string;
+  /** Whether it can be watched right now. */
+  valid: boolean;
 }
 
 export interface ViewerDevice {
@@ -119,7 +135,48 @@ export const viewerApi = {
   config: () => call<AccessConfig>('GET', '/config'),
   /** The signed-in viewer, or null when nobody is signed in. */
   /** Who is signed in and which profile is in use on this device. Both null for a visitor. */
-  session: () => call<SignedIn | { viewer: null; profile: null }>('GET', '/session'),
+  session: () =>
+    call<
+      | SignedIn
+      | {
+          viewer: null;
+          profile: null;
+          entitled?: boolean;
+          access?: Opens;
+          purchases?: OwnedTitle[];
+        }
+    >('GET', '/session'),
+  /** The viewer's own subscription, or null. */
+  subscription: () =>
+    call<{
+      subscription: OwnSubscription | null;
+      entitled: boolean;
+      access?: Opens;
+      trialUsed?: boolean;
+      purchases?: OwnedTitle[];
+    }>('GET', '/subscription'),
+  /** The viewer's own payments, newest first. */
+  payments: () => call<{ items: OwnPayment[] }>('GET', '/payments'),
+  /** Opens the payment page for a plan. Answers with the address to go to. */
+  checkout: (planId: string, interval: 'MONTH' | 'YEAR') =>
+    call<{ url: string }>('POST', '/checkout', { planId, interval }),
+  /** Tells the site that the viewer is back from paying. */
+  confirmCheckout: (sessionId: string) =>
+    call<{
+      subscription: OwnSubscription | null;
+      entitled: boolean;
+      access?: Opens;
+      purchases?: OwnedTitle[];
+    }>('POST', '/checkout/confirm', {
+      sessionId,
+    }),
+  /** Opens the payment page for renting or buying a title. Answers with the address to go to. */
+  purchase: (titleId: string, kind: 'RENT' | 'BUY') =>
+    call<{ url: string }>('POST', '/purchases/checkout', { titleId, kind }),
+  /** The viewer's rented and bought titles, newest first. */
+  purchases: () => call<{ items: OwnPurchase[] }>('GET', '/purchases'),
+  /** Opens the page for changing the card, reading invoices and cancelling. */
+  billingPortal: () => call<{ url: string }>('POST', '/billing-portal'),
   register: (input: { email: string; displayName: string; password: string }) =>
     call<SignedIn>('POST', '/register', input),
   login: (input: { email: string; password: string }) => call<SignedIn>('POST', '/login', input),

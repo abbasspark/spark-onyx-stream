@@ -16,7 +16,7 @@ import { Link } from 'react-router';
 import { metadataApi } from '@/api/endpoints';
 import type { ImportResult, MetadataSearchResult, TitleDetail, TitleType } from '@/api/types';
 import { Button } from '@/components/ui/button';
-import { Badge, EmptyState, ErrorNote, Facts, Skeleton } from '@/components/ui/display';
+import { Badge, ErrorNote, Facts, Skeleton } from '@/components/ui/display';
 import { Checkbox, Input, Label, Select, ToggleRow } from '@/components/ui/form';
 import { Dialog, DialogBody, DialogContent, DialogFooter } from '@/components/ui/overlay';
 import { cn } from '@/lib/cn';
@@ -156,20 +156,24 @@ function NotSetUp({ onClose }: { onClose: () => void }) {
   return (
     <>
       <DialogBody>
-        <EmptyState icon={DownloadCloud} title="The import is not set up">
-          <p>
+        <div className="grid justify-items-center gap-3 px-2 py-6 text-center">
+          <div className="flex size-11 items-center justify-center rounded-full bg-muted text-muted-foreground">
+            <DownloadCloud className="size-5" aria-hidden="true" />
+          </div>
+          <h3 className="text-sm font-semibold">The import is not set up</h3>
+          <p className="max-w-md text-sm text-muted-foreground">
             It needs a free account at The Movie Database. Create an API key in the settings of that
             account, add the line below to the <code className="font-mono">.env</code> file of the
             installation, and restart.
           </p>
-          <pre className="mt-3 rounded-lg border bg-muted px-4 py-3 text-left font-mono text-xs">
+          <pre className="rounded-lg border bg-muted px-4 py-3 text-left font-mono text-xs">
             TMDB_API_TOKEN=your-api-read-access-token
           </pre>
-          <p className="mt-3">
+          <p className="max-w-md text-sm text-muted-foreground">
             TMDB is free for sites that earn no money. A site that sells access needs an agreement
             with them.
           </p>
-        </EmptyState>
+        </div>
       </DialogBody>
       <DialogFooter>
         <Button asChild variant="ghost">

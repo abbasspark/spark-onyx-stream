@@ -11,6 +11,7 @@ import {
   ExternalLink,
   EyeOff,
   Film,
+  Lock,
   MoreHorizontal,
   Rocket,
   Star,
@@ -22,7 +23,7 @@ import { type FormEvent, useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router';
 import { toast } from 'sonner';
 import { ApiError, apiUrl } from '@/api/client';
-import { categoriesApi, titlesApi } from '@/api/endpoints';
+import { categoriesApi, packagesApi, purchasesApi, titlesApi } from '@/api/endpoints';
 import type { PublishStatus, TitleDetail, UpdateTitleInput } from '@/api/types';
 import { useSession } from '@/auth/session';
 import { useConfirm } from '@/components/confirm';
@@ -54,7 +55,14 @@ import {
   DropdownMenuTrigger,
   Tooltip,
 } from '@/components/ui/overlay';
-import { changedFields, describeContent, type DetailsForm, toForm } from '@/lib/catalog';
+import {
+  changedFields,
+  describeContent,
+  type DetailsForm,
+  priceProblem,
+  toForm,
+} from '@/lib/catalog';
+import { parsePrice } from '@/lib/billing';
 import { cn } from '@/lib/cn';
 import { formatDateTime, formatRelative } from '@/lib/format';
 import { announceImport } from '@/lib/metadata-toast';
@@ -254,6 +262,12 @@ export function TitleEditorPage() {
               <Badge tone="primary">
                 <Star className="size-3 fill-current" aria-hidden="true" />
                 Featured
+              </Badge>
+            ) : null}
+            {title.access === 'PAID' ? (
+              <Badge tone="info">
+                <Lock className="size-3" aria-hidden="true" />
+                Subscribers
               </Badge>
             ) : null}
           </p>
@@ -487,18 +501,31 @@ interface DetailsTabProps {
 
 /** The texts and categories of a title, saved together with one button. */
 function DetailsTab({ title, disabled, save }: DetailsTabProps) {
-  const saved = useMemo(() => toForm(title), [title]);
+  // The currency of all prices. It is public, so editors without billing rights learn it too.
+  const currencyQuery = useQuery({
+    queryKey: ['billing', 'currency'],
+    queryFn: ({ signal }) => purchasesApi.currency(signal),
+    staleTime: 300_000,
+  });
+  const currency = currencyQuery.data ?? 'EUR';
+  const saved = useMemo(() => toForm(title, currency), [title, currency]);
   const [form, setForm] = useState(saved);
   const set = <Key extends keyof DetailsForm>(key: Key, value: DetailsForm[Key]) =>
     setForm((current) => ({ ...current, [key]: value }));
 
+  const packages = useQuery({
+    queryKey: ['billing', 'packages'],
+    queryFn: ({ signal }) => packagesApi.list(signal),
+    staleTime: 60_000,
+  });
   const categories = useQuery({
     queryKey: ['categories'],
     queryFn: ({ signal }) => categoriesApi.list(signal),
   });
 
-  const changes = changedFields(saved, form);
+  const changes = changedFields(saved, form, currency);
   const dirty = Object.keys(changes).length > 0;
+  const pricesWrong = priceProblem(form, currency);
 
   // What was saved elsewhere (another admin, another tab) shows up unless there are unsaved edits.
   useEffect(() => {
@@ -525,8 +552,20 @@ function DetailsTab({ title, disabled, save }: DetailsTabProps) {
 
   const onSubmit = (event: FormEvent) => {
     event.preventDefault();
+    if (pricesWrong) {
+      toast.error(pricesWrong);
+      return;
+    }
     submit.mutate();
   };
+
+  const togglePackage = (packageId: string) =>
+    set(
+      'packageIds',
+      form.packageIds.includes(packageId)
+        ? form.packageIds.filter((value) => value !== packageId)
+        : [...form.packageIds, packageId],
+    );
 
   const toggleCategory = (categoryId: string) =>
     set(
@@ -691,6 +730,103 @@ function DetailsTab({ title, disabled, save }: DetailsTabProps) {
             disabled={disabled}
             onCheckedChange={(checked) => set('isFeatured', checked)}
           />
+          <ToggleRow
+            label="Paid title"
+            description="On, watching needs a subscription that includes the title, or renting or buying it. The trailer stays open to everyone. Off, the title is as open as the installation is."
+            checked={form.isPaid}
+            disabled={disabled}
+            onCheckedChange={(checked) => set('isPaid', checked)}
+          />
+          {form.isPaid ? (
+            <div className="rounded-lg border p-4">
+              <p className="text-sm font-medium">Rent or buy</p>
+              <p className="mt-0.5 mb-3 text-xs text-muted-foreground">
+                Lets a viewer pay for this title alone, with or without a subscription. Leave a
+                price empty to not offer it that way.
+              </p>
+              <div className="grid max-w-md gap-4 sm:grid-cols-2">
+                <Field label={`Rent (${currency})`}>
+                  {(id) => (
+                    <Input
+                      id={id}
+                      inputMode="decimal"
+                      placeholder="Not for rent"
+                      disabled={disabled}
+                      aria-invalid={parsePrice(form.rentPrice, currency) === 'invalid'}
+                      value={form.rentPrice}
+                      onChange={(event) => set('rentPrice', event.target.value)}
+                    />
+                  )}
+                </Field>
+                <Field label={`Buy (${currency})`}>
+                  {(id) => (
+                    <Input
+                      id={id}
+                      inputMode="decimal"
+                      placeholder="Not for sale"
+                      disabled={disabled}
+                      aria-invalid={parsePrice(form.buyPrice, currency) === 'invalid'}
+                      value={form.buyPrice}
+                      onChange={(event) => set('buyPrice', event.target.value)}
+                    />
+                  )}
+                </Field>
+              </div>
+              <div className="mt-4">
+                <ToggleRow
+                  label="Not part of any subscription"
+                  description="On, no plan opens this title: it is watched by renting or buying only. For a premiere, for example."
+                  checked={form.purchaseOnly}
+                  disabled={disabled}
+                  onCheckedChange={(checked) => set('purchaseOnly', checked)}
+                />
+              </div>
+              {pricesWrong ? (
+                <p role="alert" className="mt-3 text-sm text-destructive">
+                  {pricesWrong}
+                </p>
+              ) : null}
+            </div>
+          ) : null}
+          {form.isPaid && !form.purchaseOnly && packages.data && packages.data.length > 0 ? (
+            <div className="rounded-lg border p-4">
+              <div className="flex flex-wrap items-baseline justify-between gap-2">
+                <p className="text-sm font-medium">Packages</p>
+                <Button asChild variant="link" size="sm">
+                  <Link to="/packages">Manage packages</Link>
+                </Button>
+              </div>
+              <p className="mt-0.5 mb-3 text-xs text-muted-foreground">
+                Plans with chosen packages open the title through them.{' '}
+                {form.packageIds.length === 0
+                  ? 'In no package, only plans that open everything show it.'
+                  : 'Plans that open everything show it either way.'}
+              </p>
+              <div className="flex flex-wrap gap-2">
+                {packages.data.map((item) => {
+                  const chosen = form.packageIds.includes(item.id);
+                  return (
+                    <button
+                      key={item.id}
+                      type="button"
+                      role="checkbox"
+                      aria-checked={chosen}
+                      disabled={disabled}
+                      onClick={() => togglePackage(item.id)}
+                      className={cn(
+                        'inline-flex h-8 items-center gap-1.5 rounded-full border px-3 text-[13px] font-medium transition-colors hover:bg-accent disabled:pointer-events-none disabled:opacity-60',
+                        chosen &&
+                          'border-primary bg-primary text-primary-foreground hover:bg-primary/90',
+                      )}
+                    >
+                      {chosen ? <Check className="size-3.5" aria-hidden="true" /> : null}
+                      {item.name}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          ) : null}
           <Field
             label="Slug"
             hint="Part of the title's web address. Changing it breaks links that people saved."

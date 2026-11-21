@@ -22,6 +22,8 @@ export type Permission =
   | 'catalog:write'
   | 'viewers:read'
   | 'viewers:write'
+  | 'billing:read'
+  | 'billing:write'
   | 'settings:read'
   | 'settings:write';
 
@@ -423,8 +425,17 @@ export interface TitleSummary {
   status: PublishStatus;
   publishedAt: string | null;
   isFeatured: boolean;
+  /** FREE, or PAID when watching needs a subscription. */
+  access: TitleAccess;
+  /** What renting and buying cost, in the smallest unit of the currency. Null: not on offer. */
+  rentAmount: number | null;
+  buyAmount: number | null;
+  /** True when no subscription opens the title: it is rented or bought only. */
+  purchaseOnly: boolean;
   poster: CatalogImage | null;
   categories: { id: string; name: string }[];
+  /** The packages the title is in. Plans open a paid title through them. */
+  packages: { id: string; name: string }[];
   asset: AssetRef | null;
   seasonCount: number;
   episodeCount: number;
@@ -547,7 +558,12 @@ export interface UpdateTitleInput {
   ageRating?: string | null;
   originalLanguage?: string | null;
   isFeatured?: boolean;
+  access?: TitleAccess;
+  rentAmount?: number | null;
+  buyAmount?: number | null;
+  purchaseOnly?: boolean;
   categoryIds?: string[];
+  packageIds?: string[];
   assetId?: string | null;
   trailerAssetId?: string | null;
   posterId?: string | null;
@@ -591,6 +607,8 @@ export interface Viewer {
   updatedAt: string;
   /** Devices signed in right now. */
   activeSessions: number;
+  /** The plan the viewer watches through right now, if any. */
+  plan: { id: string; name: string; endsAt: string | null } | null;
 }
 
 /** A device a viewer is signed in on. */
@@ -679,4 +697,278 @@ export interface MailStatus {
   verification: 'optional' | 'required';
   /** The last attempt to send, of the API process that answered. */
   lastDelivery: { at: string; error: string | null } | null;
+}
+
+// --- Billing -------------------------------------------------------------------
+
+export type TitleAccess = 'FREE' | 'PAID';
+
+export interface Plan {
+  id: string;
+  name: string;
+  description: string | null;
+  /** Short lines shown under the price. */
+  features: string[];
+  /** Prices in the smallest unit of the currency, such as cents. Null when not sold. */
+  monthlyAmount: number | null;
+  yearlyAmount: number | null;
+  trialDays: number;
+  isRecommended: boolean;
+  /** Whether the plan opens every paid title. Otherwise it opens its packages. */
+  includesAll: boolean;
+  packages: { id: string; name: string }[];
+  /** Whether viewers are offered the plan. */
+  isOffered: boolean;
+  position: number;
+  /** Viewers who can watch through this plan right now. */
+  subscribers: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export type PlanInput = Pick<
+  Plan,
+  | 'name'
+  | 'description'
+  | 'features'
+  | 'monthlyAmount'
+  | 'yearlyAmount'
+  | 'trialDays'
+  | 'isRecommended'
+  | 'isOffered'
+  | 'includesAll'
+> & {
+  /** The packages the plan opens while it does not open everything. */
+  packageIds: string[];
+};
+
+/** A group of paid titles that plans open together. */
+export interface Package {
+  id: string;
+  name: string;
+  description: string | null;
+  position: number;
+  /** Titles in it, and how many of them are published and need a subscription. */
+  titles: number;
+  sellableTitles: number;
+  /** The plans that open it by name. Plans that open everything are not listed. */
+  plans: { id: string; name: string }[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+export type SubscriptionStatus = 'TRIALING' | 'ACTIVE' | 'PAST_DUE' | 'CANCELED' | 'EXPIRED';
+
+export interface Subscription {
+  id: string;
+  plan: { id: string; name: string };
+  status: SubscriptionStatus;
+  /** MANUAL: granted by an admin. STRIPE: paid online. */
+  source: 'MANUAL' | 'STRIPE';
+  interval: 'MONTH' | 'YEAR' | null;
+  /** Whether it lets the viewer watch right now. */
+  running: boolean;
+  startedAt: string;
+  /** Until when. Null means it has no end. */
+  endsAt: string | null;
+  cancelAtPeriodEnd: boolean;
+  canceledAt: string | null;
+  note: string | null;
+  grantedBy: { id: string; displayName: string } | null;
+  /** When the next payment is due. Null when it is not renewed. */
+  renewsAt: string | null;
+  /** Whether it is paid online and follows the payment provider. */
+  online: boolean;
+  /** Id of the subscription at Stripe, and where to open it there. */
+  externalId: string | null;
+  externalUrl: string | null;
+  createdAt: string;
+}
+
+export interface ViewerSubscriptions {
+  current: Subscription | null;
+  /** All of them, newest first. */
+  history: Subscription[];
+}
+
+export interface GrantSubscriptionInput {
+  planId: string;
+  /** Null means until an admin ends it. */
+  endsAt: string | null;
+  note?: string | null;
+}
+
+export interface BillingOverview {
+  /** Currency of all prices, such as "EUR". */
+  currency: string;
+  /** Whether viewers can pay online. */
+  checkout: boolean;
+  contactUrl: string | null;
+  plans: number;
+  subscribers: number;
+  grantedByHand: number;
+  /** Subscribers who pay online. */
+  paidOnline: number;
+  /** Paying subscribers whose last payment failed and is being tried again. */
+  pastDue: number;
+  /** How online payment is set up. Null when it is off. */
+  stripe: StripeStatus | null;
+  /** Running subscriptions that end within seven days and are not renewed. */
+  endingSoon: number;
+  paidTitles: number;
+  publishedTitles: number;
+  packages: number;
+  /** Plans that open only their packages. */
+  limitedPlans: number;
+  /** Published paid titles in no package, which only plans that open everything show. */
+  unpackagedPaidTitles: number;
+}
+
+/** A message Stripe sent to this installation. */
+export interface StripeEvent {
+  id: string;
+  type: string;
+  receivedAt: string;
+  state: 'handled' | 'failed' | 'pending';
+  error: string | null;
+}
+
+export interface StripeStatus {
+  /** False while the key is one for testing, where no money moves. */
+  livemode: boolean;
+  /** Path of the endpoint Stripe reports to, after the address of the API. */
+  webhookPath: string;
+  /** The events the endpoint must be subscribed to at Stripe. */
+  webhookEvents: string[];
+  /** Where viewers return after paying. */
+  siteUrl: string;
+  automaticTax: boolean;
+  lastEvent: StripeEvent | null;
+  /** Messages of the last day that could not be handled. */
+  failedEvents: number;
+}
+
+/** The Stripe account behind the key. */
+export interface StripeAccount {
+  id: string;
+  name: string | null;
+  country: string | null;
+  defaultCurrency: string | null;
+  chargesEnabled: boolean;
+  livemode: boolean;
+  /** Set when the account's currency is not the one prices are in here. */
+  currencyMismatch: boolean;
+}
+
+export type PaymentStatus = 'PAID' | 'PARTIALLY_REFUNDED' | 'REFUNDED';
+export type PaymentKind = 'SUBSCRIPTION' | 'RENTAL' | 'PURCHASE';
+
+/** A title a viewer rented or bought, or was given by an admin. */
+export interface Purchase {
+  id: string;
+  title: { id: string; name: string; slug: string };
+  kind: 'RENT' | 'BUY';
+  status: 'ACTIVE' | 'REVOKED';
+  source: 'MANUAL' | 'STRIPE';
+  /** Whether it can be watched right now. */
+  valid: boolean;
+  purchasedAt: string;
+  /** When a rental was first played. */
+  startedAt: string | null;
+  /** Until when it may be watched. Null for a bought title. */
+  expiresAt: string | null;
+  amount: number | null;
+  currency: string | null;
+  note: string | null;
+  grantedBy: { id: string; displayName: string } | null;
+}
+
+export interface GrantPurchaseInput {
+  titleId: string;
+  kind: 'RENT' | 'BUY';
+  amount?: number | null;
+  note?: string | null;
+}
+
+/** Money a viewer paid for a subscription. Amounts are in the smallest unit of the currency. */
+export interface Payment {
+  id: string;
+  /** Null once the account is deleted. The email address stays. */
+  viewer: { id: string; displayName: string } | null;
+  viewerEmail: string;
+  /** What was paid for: a subscription, or renting or buying one title. */
+  kind: PaymentKind;
+  planId: string | null;
+  planName: string | null;
+  /** The title that was rented or bought. */
+  titleName: string | null;
+  /** MANUAL: written down by an admin. STRIPE: collected online. */
+  source: 'MANUAL' | 'STRIPE';
+  status: PaymentStatus;
+  amount: number;
+  taxAmount: number;
+  refundedAmount: number;
+  /** What stays after refunds. */
+  netAmount: number;
+  currency: string;
+  paidAt: string;
+  periodStart: string | null;
+  periodEnd: string | null;
+  invoiceNumber: string | null;
+  invoiceUrl: string | null;
+  note: string | null;
+  recordedBy: { id: string; displayName: string } | null;
+  /** Where to open it at Stripe. */
+  externalUrl: string | null;
+  createdAt: string;
+}
+
+export interface PaymentListQuery {
+  page?: number;
+  pageSize?: number;
+  q?: string;
+  source?: 'MANUAL' | 'STRIPE';
+  kind?: PaymentKind;
+  status?: PaymentStatus;
+  planId?: string;
+  /** Paid at or after this moment, and before that one. */
+  from?: string;
+  to?: string;
+}
+
+export interface RecordPaymentInput {
+  amount: number;
+  paidAt?: string;
+  planId?: string;
+  note?: string | null;
+}
+
+export interface RevenueMonth {
+  /** "2026-11" */
+  month: string;
+  gross: number;
+  refunded: number;
+  net: number;
+  tax: number;
+  payments: number;
+  /** Of net: collected online, and written down by an admin. */
+  online: number;
+  byHand: number;
+  /** Subscriptions paid online that started, and that ended. */
+  started: number;
+  ended: number;
+}
+
+export interface RevenueReport {
+  currency: string;
+  timeZone: string;
+  months: RevenueMonth[];
+  totals: { gross: number; refunded: number; net: number; tax: number; payments: number };
+  byPlan: { planId: string | null; planName: string; net: number; payments: number }[];
+  /** What the subscriptions paid online bring in per month as they stand. */
+  monthlyRecurring: number;
+  payingSubscribers: number;
+  trialing: number;
+  /** Payments in other currencies, left out of every sum. */
+  otherCurrencies: { currency: string; payments: number }[];
 }

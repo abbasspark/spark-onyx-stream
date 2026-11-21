@@ -10,6 +10,7 @@ import { PrismaClient } from '@onyx/database';
 import type { Redis } from 'ioredis';
 import { PipelineService } from '../processing/pipeline.service.js';
 import { REDIS_CLIENT } from '../redis/redis.module.js';
+import { StripeSyncService } from '../stripe/stripe-sync.service.js';
 
 /** How often the repairs run. */
 export const SWEEP_INTERVAL_MS = 60_000;
@@ -50,6 +51,7 @@ export class MaintenanceService implements OnApplicationBootstrap, OnApplication
     @Inject(PrismaClient) private readonly prisma: PrismaClient,
     @Inject(PipelineService) private readonly pipeline: PipelineService,
     @Inject(REDIS_CLIENT) private readonly redis: Redis,
+    @Inject(StripeSyncService) private readonly stripeSync: StripeSyncService,
   ) {}
 
   onApplicationBootstrap(): void {
@@ -73,6 +75,10 @@ export class MaintenanceService implements OnApplicationBootstrap, OnApplication
 
       await this.purgeEndedViewerSessions();
       await this.purgeExpiredViewerTokens();
+      await this.expireSubscriptions();
+      // Asks Stripe about renewals it has not reported: the net under a lost message.
+      await this.stripeSync.reconcile();
+      await this.stripeSync.purgeEvents();
       const result = await this.sweep();
       if (result.started > 0 || result.cleanups > 0) {
         this.logger.log(
@@ -94,6 +100,21 @@ export class MaintenanceService implements OnApplicationBootstrap, OnApplication
     const before = new Date(now.getTime() - KEEP_ENDED_SESSIONS_MS);
     const result = await this.prisma.viewerSession.deleteMany({
       where: { OR: [{ expiresAt: { lt: before } }, { revokedAt: { lt: before } }] },
+    });
+    return result.count;
+  }
+
+  /**
+   * Marks access an admin granted as expired once its time has run out.
+   * Whether a viewer may watch is decided by the end time itself: this only
+   * keeps the stored state true for lists and counts.
+   *
+   * @returns The number of subscriptions marked.
+   */
+  async expireSubscriptions(now = new Date()): Promise<number> {
+    const result = await this.prisma.subscription.updateMany({
+      where: { source: 'MANUAL', status: { in: ['ACTIVE', 'TRIALING'] }, endsAt: { lte: now } },
+      data: { status: 'EXPIRED' },
     });
     return result.count;
   }

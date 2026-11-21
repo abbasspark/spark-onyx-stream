@@ -156,7 +156,10 @@ describe.skipIf(!TEST_DATABASE_URL || !hasFfmpeg)('Encryption (e2e, real FFmpeg)
 
     const base = await playbackBase(assetId);
     const [prefix, token] = [base.split('/').slice(0, 4).join('/'), base.split('/')[4] as string];
-    const changed = `${token.slice(0, -1)}${token.endsWith('A') ? 'B' : 'A'}`;
+    // One character of the signature is changed. Not the last one: its lowest
+    // bits are padding, so some changes there leave the signature the same.
+    const at = token.length - 10;
+    const changed = `${token.slice(0, at)}${token[at] === 'A' ? 'B' : 'A'}${token.slice(at + 1)}`;
     await http().get(`${prefix}/${changed}/hls/key`).expect(404);
     await http()
       .get(`${prefix}/0.${token.split('.')[1]}/hls/key`)

@@ -36,6 +36,7 @@ const SUMMARY_INCLUDE = {
   poster: true,
   asset: true,
   categories: { include: { category: true } },
+  packages: { include: { package: { select: { id: true, name: true, position: true } } } },
   seasons: { select: { _count: { select: { episodes: true } } } },
 } satisfies Prisma.TitleInclude;
 
@@ -46,6 +47,7 @@ const DETAIL_INCLUDE = {
   asset: true,
   trailerAsset: true,
   categories: { include: { category: true } },
+  packages: { include: { package: { select: { id: true, name: true, position: true } } } },
   seasons: { include: { episodes: { include: { asset: true, still: true } } } },
 } satisfies Prisma.TitleInclude;
 
@@ -70,7 +72,10 @@ export class TitlesService {
     const where: Prisma.TitleWhereInput = {
       type: input.type,
       status: input.status,
+      access: input.access,
       ...(input.categoryId ? { categories: { some: { categoryId: input.categoryId } } } : {}),
+      ...(input.packageId ? { packages: { some: { packageId: input.packageId } } } : {}),
+      ...(input.packaged === 'none' ? { access: 'PAID', packages: { none: {} } } : {}),
       ...(input.q
         ? {
             OR: [
@@ -137,7 +142,7 @@ export class TitlesService {
 
   async update(id: string, input: UpdateTitleInput): Promise<TitleDetail> {
     const current = await this.findOrThrow(id);
-    const { categoryIds, ...fields } = input;
+    const { categoryIds, packageIds, ...fields } = input;
 
     if (current.type === 'SERIES' && fields.assetId) {
       throw new BadRequestException(
@@ -150,6 +155,27 @@ export class TitlesService {
       const found = await this.prisma.category.count({ where: { id: { in: categoryIds } } });
       if (found !== new Set(categoryIds).size) {
         throw new BadRequestException('One of the chosen categories does not exist');
+      }
+    }
+
+    const after = { ...current, ...fields };
+    if (after.purchaseOnly && after.rentAmount === null && after.buyAmount === null) {
+      throw new BadRequestException({
+        statusCode: 400,
+        error: 'Bad Request',
+        message: 'Validation failed',
+        issues: [
+          {
+            field: 'purchaseOnly',
+            message: 'Set a price for renting or buying, or nobody could watch the title',
+          },
+        ],
+      });
+    }
+    if (packageIds) {
+      const found = await this.prisma.package.count({ where: { id: { in: packageIds } } });
+      if (found !== new Set(packageIds).size) {
+        throw new BadRequestException('One of the chosen packages does not exist');
       }
     }
 
@@ -177,6 +203,12 @@ export class TitlesService {
           await tx.titleCategory.deleteMany({ where: { titleId: id } });
           await tx.titleCategory.createMany({
             data: [...new Set(categoryIds)].map((categoryId) => ({ titleId: id, categoryId })),
+          });
+        }
+        if (packageIds) {
+          await tx.titlePackage.deleteMany({ where: { titleId: id } });
+          await tx.titlePackage.createMany({
+            data: [...new Set(packageIds)].map((packageId) => ({ titleId: id, packageId })),
           });
         }
       });

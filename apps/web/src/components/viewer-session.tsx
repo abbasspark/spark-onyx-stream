@@ -13,6 +13,7 @@ import {
 } from 'react';
 import type { Profile } from '@/lib/profiles';
 import { type AccessConfig, type Viewer, viewerApi } from '@/lib/viewer-api';
+import { type Opens, opensFrom, type OwnedTitle } from '@/lib/plans';
 import { endSync, restartSync, startSync } from '@/lib/watch-sync';
 
 interface ViewerSession {
@@ -24,6 +25,18 @@ interface ViewerSession {
   viewer: Viewer | null;
   /** Who of the account is watching on this device. Null for a visitor. */
   profile: Profile | null;
+  /** Whether the viewer has a running subscription, which opens paid titles. */
+  entitled: boolean;
+  /** Which paid titles the subscription opens: all, or those of some packages. Null without one. */
+  opens: Opens;
+  /** Takes over what the API said about the subscription, after paying for one. */
+  setSubscription: (result: {
+    entitled: boolean;
+    access?: Opens;
+    purchases?: OwnedTitle[];
+  }) => void;
+  /** Titles the viewer rented or bought and can watch now. */
+  purchases: OwnedTitle[];
   /** What is open on this site. Null while loading, or when it could not be asked. */
   access: AccessConfig | null;
   /**
@@ -51,6 +64,19 @@ export function ViewerSessionProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState<'loading' | 'ready'>('loading');
   const [viewer, setViewerState] = useState<Viewer | null>(null);
   const [profile, setProfileState] = useState<Profile | null>(null);
+  const [opens, setOpens] = useState<Opens>(null);
+  const entitled = opens !== null;
+  const [purchases, setPurchases] = useState<OwnedTitle[]>([]);
+  const setSubscription = useCallback(
+    (result: { entitled: boolean; access?: Opens; purchases?: OwnedTitle[] }) => {
+      setOpens(opensFrom(result));
+      // An answer that does not name them leaves what is known.
+      if (result.purchases) {
+        setPurchases(result.purchases);
+      }
+    },
+    [],
+  );
   const [access, setAccess] = useState<AccessConfig | null>(null);
 
   /** The viewer and the profile whose watch history this browser holds. */
@@ -62,6 +88,8 @@ export function ViewerSessionProvider({ children }: { children: ReactNode }) {
     const known = me.status === 'fulfilled' ? me.value : { viewer: null, profile: null };
     setViewerState(known.viewer);
     setProfileState(known.profile);
+    setOpens(opensFrom({ entitled: known.entitled === true, access: known.access }));
+    setPurchases(known.purchases ?? []);
     if (me.status === 'fulfilled') {
       const before = signedInAs.current;
       signedInAs.current = known.viewer
@@ -98,24 +126,36 @@ export function ViewerSessionProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  const setViewer = useCallback((next: Viewer | null, nextProfile?: Profile) => {
-    // A change of name is the same viewer and has nothing to hand over.
-    if ((next?.id ?? null) !== (signedInAs.current?.viewer ?? null)) {
-      signedInAs.current = next ? { viewer: next.id, profile: nextProfile?.id ?? null } : null;
-      if (next) {
-        startSync(true);
-      } else {
-        endSync();
+  const setViewer = useCallback(
+    (next: Viewer | null, nextProfile?: Profile) => {
+      // A change of name is the same viewer and has nothing to hand over.
+      if ((next?.id ?? null) !== (signedInAs.current?.viewer ?? null)) {
+        signedInAs.current = next ? { viewer: next.id, profile: nextProfile?.id ?? null } : null;
+        if (next) {
+          startSync(true);
+          // Signing in does not say whether the viewer is subscribed.
+          viewerApi
+            .subscription()
+            .then(setSubscription)
+            .catch(() => {
+              // Stays as for a viewer without one. The player asks the API anyway.
+            });
+        } else {
+          endSync();
+        }
       }
-    }
-    setViewerState(next);
-    if (!next) {
-      setProfileState(null);
-    } else if (nextProfile) {
-      setProfileState(nextProfile);
-    }
-    announce();
-  }, []);
+      setViewerState(next);
+      if (!next) {
+        setProfileState(null);
+        setOpens(null);
+        setPurchases([]);
+      } else if (nextProfile) {
+        setProfileState(nextProfile);
+      }
+      announce();
+    },
+    [setSubscription],
+  );
 
   const setProfile = useCallback((next: Profile) => {
     const current = signedInAs.current;
@@ -143,13 +183,41 @@ export function ViewerSessionProvider({ children }: { children: ReactNode }) {
       endSync();
       setViewerState(null);
       setProfileState(null);
+      setOpens(null);
+      setPurchases([]);
       announce();
     }
   }, []);
 
   const value = useMemo(
-    () => ({ state, viewer, profile, access, setViewer, setProfile, updateViewer, signOut }),
-    [state, viewer, profile, access, setViewer, setProfile, updateViewer, signOut],
+    () => ({
+      state,
+      viewer,
+      profile,
+      entitled,
+      opens,
+      purchases,
+      setSubscription,
+      access,
+      setViewer,
+      setProfile,
+      updateViewer,
+      signOut,
+    }),
+    [
+      state,
+      viewer,
+      profile,
+      entitled,
+      opens,
+      purchases,
+      setSubscription,
+      access,
+      setViewer,
+      setProfile,
+      updateViewer,
+      signOut,
+    ],
   );
   return <Context.Provider value={value}>{children}</Context.Provider>;
 }

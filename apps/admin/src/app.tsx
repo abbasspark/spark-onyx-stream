@@ -14,6 +14,9 @@ import { TooltipProvider } from './components/ui/overlay';
 import { LiveProvider } from './live/live';
 import { AccountPage } from './pages/account-page';
 import { EmailPage } from './pages/email-page';
+import { PackagesPage } from './pages/packages-page';
+import { PlansPage } from './pages/plans-page';
+import { RevenuePage } from './pages/revenue-page';
 import { AdminsPage } from './pages/admins-page';
 import { ApiKeysPage } from './pages/api-keys-page';
 import { AssetsPage } from './pages/assets-page';
@@ -82,6 +85,9 @@ function Pages() {
             <Route path="jobs" element={<JobsPage />} />
             <Route path="encoding-profiles" element={<EncodingProfilesPage />} />
             <Route path="storage" element={<StoragePage />} />
+            <Route path="plans" element={<PlansPage />} />
+            <Route path="packages" element={<PackagesPage />} />
+            <Route path="revenue" element={<RevenuePage />} />
             <Route path="email" element={<EmailPage />} />
             <Route path="admins" element={<AdminsPage />} />
             <Route path="api-keys" element={<ApiKeysPage />} />

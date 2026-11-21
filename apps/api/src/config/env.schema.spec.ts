@@ -116,4 +116,67 @@ describe('validateEnv', () => {
       ).toBe('required');
     });
   });
+
+  describe('billing', () => {
+    it('prices are in euros unless told otherwise', () => {
+      expect(validateEnv(validEnv).BILLING_CURRENCY).toBe('EUR');
+      expect(validateEnv({ ...validEnv, BILLING_CURRENCY: 'USD' }).BILLING_CURRENCY).toBe('USD');
+    });
+
+    it('rejects a currency or a contact address of the wrong form', () => {
+      expect(() => validateEnv({ ...validEnv, BILLING_CURRENCY: 'euro' })).toThrow(
+        /BILLING_CURRENCY must be three capital letters/,
+      );
+      expect(() => validateEnv({ ...validEnv, BILLING_CONTACT_URL: 'call us' })).toThrow(
+        /BILLING_CONTACT_URL must start with/,
+      );
+      expect(
+        validateEnv({ ...validEnv, BILLING_CONTACT_URL: 'mailto:billing@example.com' })
+          .BILLING_CONTACT_URL,
+      ).toBe('mailto:billing@example.com');
+    });
+  });
+  describe('Stripe', () => {
+    const stripe = {
+      ...validEnv,
+      SITE_URL: 'https://watch.example.com',
+      STRIPE_SECRET_KEY: ' sk_test_abc123 ',
+      STRIPE_WEBHOOK_SECRET: 'whsec_abc123',
+    };
+
+    it('is off unless a key is set', () => {
+      const env = validateEnv(validEnv);
+      expect(env.STRIPE_SECRET_KEY).toBe('');
+      expect(env.STRIPE_API_URL).toBe('https://api.stripe.com');
+      expect(env.STRIPE_AUTOMATIC_TAX).toBe('false');
+    });
+
+    it('accepts test, live and restricted keys', () => {
+      expect(validateEnv(stripe).STRIPE_SECRET_KEY).toBe('sk_test_abc123');
+      for (const key of ['sk_live_abc', 'rk_test_abc', 'rk_live_abc']) {
+        expect(validateEnv({ ...stripe, STRIPE_SECRET_KEY: key }).STRIPE_SECRET_KEY).toBe(key);
+      }
+    });
+
+    it('rejects a publishable key and other mix-ups', () => {
+      expect(() => validateEnv({ ...stripe, STRIPE_SECRET_KEY: 'pk_test_abc' })).toThrow(
+        /STRIPE_SECRET_KEY must start with/,
+      );
+      expect(() => validateEnv({ ...stripe, STRIPE_WEBHOOK_SECRET: 'sk_test_abc' })).toThrow(
+        /STRIPE_WEBHOOK_SECRET must start with whsec_/,
+      );
+    });
+
+    it('needs the webhook secret and the address of the site with the key', () => {
+      expect(() => validateEnv({ ...stripe, STRIPE_WEBHOOK_SECRET: '' })).toThrow(
+        /STRIPE_WEBHOOK_SECRET is required when STRIPE_SECRET_KEY is set/,
+      );
+      expect(() => validateEnv({ ...stripe, SITE_URL: '' })).toThrow(
+        /SITE_URL is required when STRIPE_SECRET_KEY is set/,
+      );
+      expect(() => validateEnv({ ...validEnv, STRIPE_WEBHOOK_SECRET: 'whsec_abc' })).toThrow(
+        /STRIPE_SECRET_KEY is required when STRIPE_WEBHOOK_SECRET is set/,
+      );
+    });
+  });
 });

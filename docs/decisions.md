@@ -392,3 +392,82 @@ This replaces the "plain CSS without a component library" part of D-018.
 **Why:** a household on one account is the normal case, and a shared "Continue watching" is the first thing people complain about. Storing the choice on the session keeps every other endpoint unchanged: watch history simply works on "the profile in use", and an old client that knows nothing of profiles keeps working on the main one. A lazily created main profile needs no step in any of the places that create accounts.
 
 **Consequence:** a profile gives no privacy from the others on the account. Profiles for children need age ratings that mean the same in every country, which the catalog does not have yet. On a shared computer, what a visitor watched joins the profile in use after sign-in, as in D-028.
+
+## D-032 Billing starts with plans and access, before any payment provider
+
+**Date:** 2026-11-21
+
+- **Stripe is the first payment provider, and subscriptions are what is sold first.** Renting and buying single titles come later.
+- **Each title is free or paid.** A paid title needs a running subscription. Every plan opens all paid titles.
+- **The first step has no provider in it:** plans, subscriptions, the rule that decides who may watch, and access granted by an admin. Stripe is the next step and writes into the same subscriptions.
+- **Whether a viewer may watch is decided by state and end time together,** at the moment of asking.
+- **Prices are whole numbers of the smallest unit of one currency per installation.**
+- **`billing:read` and `billing:write` are permissions of their own.**
+
+**Why:** the rule for who may watch is the part every other part depends on, and it can be built and tested completely without a provider. Granting by hand is not a stopgap: operators who sell through resellers, take cash or give access away need it for good. A provider that only has to create and update subscriptions is small and can be replaced or joined by another. Whole numbers avoid the rounding faults of decimal prices. One currency keeps every sum on a page meaningful.
+
+**Consequence:** until the next step, a site can show its prices and cannot take money online. Plans cannot yet differ in what they open. An installation that changes its currency after creating plans shows the same numbers in the new currency, which is wrong, and has to correct the prices by hand. Money is the operator's business: taxes, invoices and the terms of the provider are theirs to handle.
+
+## D-033 Stripe is the authority for subscriptions paid online
+
+**Date:** 2026-11-21
+
+- **Payments run on Stripe's own pages:** Checkout for paying, the customer portal for the card, invoices and cancelling. No card detail reaches this application.
+- **Stripe is spoken to directly over HTTP,** with a small client of the six calls needed, and one API version asked for in every request. No SDK.
+- **A message from Stripe is a hint, not the truth.** On every message the subscription is read from Stripe again and recorded as it is. The return from the payment page does the same, and the scheduler asks about subscriptions whose renewal is overdue.
+- **Messages are checked by their signature and handled once.** They are kept for 30 days.
+- **A renewing subscription runs three days past its next payment date here.**
+- **A plan is a product at Stripe with an id derived from the plan. Prices are sent with each payment** and not kept at Stripe.
+- **An admin can cancel a subscription paid online, and nothing else about it.**
+
+**Why:** Stripe's pages carry the burden of card data, of strong customer authentication and of the many ways to pay, and they stay current without work here. Reading the state again on each message removes a whole class of faults: duplicates, messages out of order, and a webhook that was down for a day all end in the same correct record. Three ways to learn of a change (the return, the message, the hourly check) mean that none of them has to be reliable alone. The days of grace exist because locking out somebody who paid is worse than a few free days for somebody who did not. A derived product id and prices sent along need no bookkeeping that could drift from Stripe. The API version is fixed because Stripe moved the billing period of a subscription to its items in 2025, and an account upgraded later must not change what this code reads.
+
+**Consequence:** Stripe has to be reachable when a message arrives, or the message is refused and Stripe sends it again. A viewer cannot change plans while subscribed: they cancel and subscribe again. A change of price reaches new subscribers only. Each price a viewer pays is its own price object at Stripe, which Stripe's reports group by product. Changing from a test key to a live key ends the subscriptions made in test mode. Refunds, disputes, invoices and taxes are handled in Stripe. Another provider would be a second source beside `STRIPE`, with the same rule for who may watch.
+
+## D-034 Payments are kept here as the books, and Stripe stays the place for money
+
+**Date:** 2026-11-21
+
+- **Every payment is a row of its own:** a paid invoice from Stripe, or money an admin writes down. Revenue is always computed from these rows.
+- **A payment keeps the email address and the plan name of its day,** and outlives the account and the plan.
+- **Refunds are made in Stripe and only noted here.** A payment collected by Stripe cannot be changed or deleted here.
+- **A refund counts against the month of its payment.**
+- **Monthly recurring revenue is computed from the subscriptions as they stand,** from the price each one carries, not from past payments.
+- **Months are cut in a time zone the caller names.**
+- **Recording a payment by hand does not grant access, and granting access does not record a payment.**
+
+**Why:** an operator who also sells for cash or through resellers has no single place that knows the whole income, and Stripe's reports know only Stripe's half. Rows that are never recomputed stay true when a plan is renamed, a price changes or a viewer leaves. Moving money is where mistakes cost most, so it stays with the provider that is built for it, and this application cannot send money anywhere. Counting a refund in the month of its payment keeps each month equal to what its sales were worth in the end, which is what a small operator asks. Keeping access and money apart avoids a form that does two things and half-fails: a gift is access without money, and a late payment is money without a change of access.
+
+**Consequence:** the figures of a past month change when one of its payments is refunded later, so they are not a ledger for tax filing: for that, the export and Stripe's own reports are the source. Fees of Stripe are not known here, so revenue is before fees. Payments in a currency other than the configured one are listed and left out of sums. An endpoint at Stripe from before this decision needs two more events, and earlier invoices are brought in with the import.
+
+## D-035 Plans differ through packages
+
+**Date:** 2026-11-21
+
+- **A package is a named group of paid titles.** A title can be in several packages, a plan can name several.
+- **A plan opens everything, or its packages.** "Everything" is a state of the plan, not a package that has to be kept complete.
+- **A paid title in no package is opened only by plans that open everything.**
+- **Whether a viewer may watch is worked out at the moment of asking** from the plan and the packages as they are then. Nothing is copied to the subscription.
+- **Packages are managed with billing rights and read with catalog rights.** An editor of the catalog sorts a title into packages, as they mark it paid.
+- **The website learns what a viewer's subscription opens with the session,** and which packages a paid title is in with the title, and decides the buttons itself. The API decides again when playback is asked for.
+
+**Why:** operators think in bundles: a kids offer, a sports offer, everything. Levels, where a higher plan includes all lower ones, cannot say "sports without kids". Packages can say both, and are what live channels will be sorted into in the next phase, so one structure serves films, series and channels. Keeping "everything" as a state means a new title is in every full plan without anybody remembering to add it. Refusing by default for an unsorted title costs a click when it was meant to be open, and costs revenue when it was not: the first mistake is the cheaper one. Working access out when asked means a title moved between packages, or a plan changed, takes effect at once and cannot leave stale copies behind.
+
+**Consequence:** changing the packages of a plan changes what its current subscribers get, including those who paid for a year: the operator has to judge that. A viewer cannot move between plans in place yet. The ids of the packages of paid titles are public, which names no title that is not public anyway. Sites without packages behave exactly as before.
+
+## D-036 A single title can be rented or bought, beside the subscriptions
+
+**Date:** 2026-11-21
+
+- **Prices for renting and buying are part of a paid title.** A missing price means the title is not offered that way.
+- **A purchase is a right to one title,** separate from subscriptions. A paid title is open through a plan that opens it, or through a valid purchase.
+- **A title can be kept out of every plan** and is then rented or bought only.
+- **A rental has two clocks:** days to start, and hours to finish from the first play, never past the first deadline. Both are settings of the installation.
+- **The first play of a rental is the first playback request that the rental was needed for.** Watching through a plan starts nothing.
+- **A single payment through Stripe Checkout,** recorded from the checkout itself. An invoice that belongs to no subscription is not counted.
+- **A refund in full revokes the purchase.** An admin can give and take back titles by hand.
+- **A series is one thing to rent or buy.**
+
+**Why:** new releases and special titles earn more sold one by one than inside a flat price, and many operators run both models side by side. Keeping the purchase apart from the subscription keeps both rules small: one asks what the plan opens, the other whether this viewer holds this title, and either is enough. The two clocks are what viewers know from every large shop for films, so nothing has to be explained. Starting the clock only when the rental is needed spares a subscriber a rental they did not use. Recording from the checkout avoids depending on whether an account makes invoices for single payments, which is a setting at Stripe and would count a sale twice or not at all.
+
+**Consequence:** rental times are the same for every title. Seasons and episodes cannot be sold one by one. A title that is taken off the site is gone for those who bought it too, which the page says as "for as long as it is on this site". A partial refund leaves the title with the viewer. Prices of titles are in the one currency of the installation, as the plans are.

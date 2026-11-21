@@ -9,10 +9,21 @@ import {
   authHref,
   describeDevice,
   formatDay,
-  ViewerApiError,
+  type OwnPurchase,
   viewerApi,
+  ViewerApiError,
   type ViewerDevice,
 } from '@/lib/viewer-api';
+import {
+  describeEnd,
+  describeOwned,
+  describeRefund,
+  formatDate,
+  formatMoney,
+  type OwnPayment,
+  type OwnSubscription,
+  type Plans,
+} from '@/lib/plans';
 import { type Profile, profilesApi } from '@/lib/profiles';
 import { clearHistory } from '@/lib/watch-sync';
 import { FormField } from './form-field';
@@ -104,6 +115,9 @@ export function AccountScreen() {
       />
       <NameSection name={viewer.displayName} onSaved={setViewer} />
       <PasswordSection />
+      <SubscriptionSection />
+      <PurchasesSection />
+      <PaymentsSection />
       <ProfilesSection />
       <DevicesSection />
       <HistorySection />
@@ -406,6 +420,274 @@ function DevicesSection() {
             </li>
           ))}
         </ul>
+      ) : null}
+    </Section>
+  );
+}
+
+/** The plan the account watches through, if any. */
+function SubscriptionSection() {
+  const { entitled, opens } = useViewerSession();
+  const [own, setOwn] = useState<OwnSubscription | null | undefined>(undefined);
+  const [plansOffered, setPlansOffered] = useState(false);
+  // Set while Stripe's page for the subscription is being opened.
+  const [opening, setOpening] = useState(false);
+  const [problem, setProblem] = useState<string | null>(null);
+
+  useEffect(() => {
+    let current = true;
+    fetch('/v1/catalog/plans', { headers: { Accept: 'application/json' } })
+      .then((response) => (response.ok ? (response.json() as Promise<Plans>) : null))
+      .then((offer) => {
+        if (current) {
+          setPlansOffered((offer?.plans.length ?? 0) > 0);
+        }
+      })
+      .catch(() => {
+        // Without an answer no link to the plans is shown.
+      });
+    return () => {
+      current = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    let current = true;
+    viewerApi
+      .subscription()
+      .then((result) => {
+        if (current) {
+          setOwn(result.subscription);
+        }
+      })
+      .catch(() => {
+        // A site whose API is older than plans has no subscriptions: nothing is shown.
+        if (current) {
+          setOwn(undefined);
+        }
+      });
+    return () => {
+      current = false;
+    };
+  }, [entitled]);
+
+  // Nothing to say on a site that sells no plans, unless the viewer has one anyway.
+  if (own === undefined || (own === null && !plansOffered)) {
+    return null;
+  }
+
+  async function manage() {
+    setOpening(true);
+    setProblem(null);
+    try {
+      const { url } = await viewerApi.billingPortal();
+      // The page is Stripe's. The button stays busy until the browser has left.
+      window.location.assign(url);
+    } catch (caught) {
+      setOpening(false);
+      setProblem(asError(caught).message);
+    }
+  }
+  const failed = own?.status === 'PAST_DUE';
+  // A plan with chosen packages does not open everything.
+  const what =
+    opens && !opens.all ? 'the titles your plan includes' : 'every title that needs a subscription';
+
+  return (
+    <Section heading="Subscription">
+      {own ? (
+        <>
+          <p className="flex flex-wrap items-center gap-x-3 gap-y-1">
+            <span className="font-medium">{own.plan.name}</span>
+            {failed ? (
+              <span className="text-sm text-alarm">Payment failed</span>
+            ) : (
+              <span className="inline-flex items-center gap-1 text-sm text-sard">
+                <Check className="size-4" aria-hidden="true" />
+                {own.cancelAtPeriodEnd && own.online
+                  ? 'Cancelled'
+                  : own.status === 'TRIALING'
+                    ? 'Free trial'
+                    : 'Running'}
+              </span>
+            )}
+          </p>
+          <p className="mt-2 text-smoke">
+            {failed
+              ? 'The last payment did not go through. You can still watch while it is tried again. Check your card so your subscription does not end.'
+              : own.cancelAtPeriodEnd && own.online && own.endsAt
+                ? `You cancelled. You can watch ${what} until ${formatDate(own.endsAt)}, and nothing more is charged.`
+                : `You can watch ${what}, ${describeEnd(own)}.`}
+          </p>
+          {own.online ? (
+            <>
+              <button
+                type="button"
+                className={`button mt-5 ${failed ? 'button-play' : 'button-quiet'}`}
+                disabled={opening}
+                aria-busy={opening}
+                onClick={() => void manage()}
+              >
+                {opening ? <Spinner /> : null}
+                {failed
+                  ? 'Update your card'
+                  : own.cancelAtPeriodEnd
+                    ? 'Manage or resume'
+                    : 'Manage subscription'}
+              </button>
+              <p className="mt-3 text-sm text-dust">
+                Opens a page of Stripe: change the card, read your invoices, or cancel.
+              </p>
+              {problem ? (
+                <p role="alert" className="mt-3 text-sm text-alarm">
+                  {problem}
+                </p>
+              ) : null}
+            </>
+          ) : null}
+        </>
+      ) : (
+        <>
+          <p className="mb-5 text-smoke">
+            You have no subscription. Titles marked with a lock need one.
+          </p>
+          <Link href="/plans" className="button button-quiet">
+            See the plans
+          </Link>
+        </>
+      )}
+    </Section>
+  );
+}
+
+/** The titles the viewer rented or bought. Not shown to someone who has none. */
+function PurchasesSection() {
+  const [items, setItems] = useState<OwnPurchase[]>([]);
+
+  useEffect(() => {
+    let current = true;
+    viewerApi
+      .purchases()
+      .then((result) => {
+        if (current) {
+          setItems(result.items);
+        }
+      })
+      .catch(() => {
+        // A site whose API is older than renting has none to show.
+      });
+    return () => {
+      current = false;
+    };
+  }, []);
+
+  // What ran out is left out, unless nothing else is there to show.
+  const valid = items.filter((item) => item.valid);
+  const shown = valid.length > 0 ? valid : items.slice(0, 3);
+  if (shown.length === 0) {
+    return null;
+  }
+
+  return (
+    <Section heading="Rented and bought">
+      <ul className="divide-y divide-line border-y border-line">
+        {shown.map((item) => (
+          <li key={item.id} className="flex items-baseline justify-between gap-4 py-3">
+            <div className="min-w-0">
+              <p className={item.valid ? '' : 'text-dust'}>{item.title.name}</p>
+              <p className="mt-0.5 text-sm text-dust">
+                {item.valid ? describeOwned(item) : 'The rental ran out.'}
+              </p>
+            </div>
+            <Link
+              href={item.valid ? `/watch/${item.title.slug}` : `/title/${item.title.slug}`}
+              className="shrink-0 text-sm text-smoke underline underline-offset-4 hover:text-vein"
+            >
+              {item.valid ? 'Watch' : 'Rent again'}
+            </Link>
+          </li>
+        ))}
+      </ul>
+    </Section>
+  );
+}
+
+/** What the viewer paid, with the way to each invoice. Not shown to someone who never paid. */
+/** " for Standard", " to rent Night Train", or nothing when it is not known. */
+function paidFor(payment: OwnPayment): string {
+  if (payment.kind === 'RENTAL' || payment.kind === 'PURCHASE') {
+    return ` to ${payment.kind === 'RENTAL' ? 'rent' : 'buy'} ${payment.titleName ?? 'a title'}`;
+  }
+  return payment.planName ? ` for ${payment.planName}` : '';
+}
+
+function PaymentsSection() {
+  const [payments, setPayments] = useState<OwnPayment[]>([]);
+  const [all, setAll] = useState(false);
+
+  useEffect(() => {
+    let current = true;
+    viewerApi
+      .payments()
+      .then((result) => {
+        if (current) {
+          setPayments(result.items);
+        }
+      })
+      .catch(() => {
+        // A site whose API is older than payments has none to show.
+      });
+    return () => {
+      current = false;
+    };
+  }, []);
+
+  if (payments.length === 0) {
+    return null;
+  }
+  const shown = all ? payments : payments.slice(0, 4);
+
+  return (
+    <Section heading="Payments">
+      <ul className="divide-y divide-line border-y border-line">
+        {shown.map((payment) => {
+          const refund = describeRefund(payment);
+          return (
+            <li key={payment.id} className="flex items-baseline justify-between gap-4 py-3">
+              <div className="min-w-0">
+                <p>
+                  <span className={payment.status === 'REFUNDED' ? 'line-through opacity-60' : ''}>
+                    {formatMoney(payment.amount, payment.currency)}
+                  </span>
+                  <span className="text-smoke">{paidFor(payment)}</span>
+                </p>
+                <p className="mt-0.5 text-sm text-dust">
+                  {formatDate(payment.paidAt)}
+                  {refund ? `, ${refund.charAt(0).toLowerCase()}${refund.slice(1)}` : ''}
+                </p>
+              </div>
+              {payment.invoiceUrl ? (
+                <a
+                  href={payment.invoiceUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="shrink-0 text-sm text-smoke underline underline-offset-4 hover:text-vein"
+                >
+                  Invoice<span className="sr-only"> {payment.invoiceNumber ?? ''}</span>
+                </a>
+              ) : null}
+            </li>
+          );
+        })}
+      </ul>
+      {payments.length > shown.length ? (
+        <button
+          type="button"
+          className="mt-4 text-sm text-smoke underline underline-offset-4 hover:text-vein"
+          onClick={() => setAll(true)}
+        >
+          Show all {payments.length}
+        </button>
       ) : null}
     </Section>
   );

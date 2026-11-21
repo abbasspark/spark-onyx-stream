@@ -29,6 +29,15 @@ export interface TitleCard {
   releaseYear: number | null;
   ageRating: string | null;
   isFeatured: boolean;
+  /** PAID when watching needs a subscription. Left out by an API older than plans. */
+  access?: 'FREE' | 'PAID';
+  /** Ids of the packages a paid title is in. Left out by an API older than packages. */
+  packageIds?: string[];
+  /** What renting and buying cost, in the smallest unit of the currency. Null or left out: not on offer. */
+  rentAmount?: number | null;
+  buyAmount?: number | null;
+  /** True when no subscription opens the title: it is rented or bought only. */
+  purchaseOnly?: boolean;
   poster: CatalogImage | null;
   backdrop: CatalogImage | null;
   logo: CatalogImage | null;
