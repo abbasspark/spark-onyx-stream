@@ -12,9 +12,10 @@ const NONE: ReadonlySet<string> = new Set();
  * for a visitor, and until the account has answered.
  */
 export function useWatchedVideos(slug: string): ReadonlySet<string> {
-  const { viewer } = useViewerSession();
+  const { viewer, profile } = useViewerSession();
   const [watched, setWatched] = useState(NONE);
-  const viewerId = viewer?.id;
+  // Each profile of an account has its own.
+  const viewerId = viewer && profile ? `${viewer.id}:${profile.id}` : undefined;
 
   useEffect(() => {
     if (!viewerId) {

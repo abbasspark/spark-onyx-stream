@@ -11,8 +11,9 @@ import {
   useRef,
   useState,
 } from 'react';
+import type { Profile } from '@/lib/profiles';
 import { type AccessConfig, type Viewer, viewerApi } from '@/lib/viewer-api';
-import { endSync, startSync } from '@/lib/watch-sync';
+import { endSync, restartSync, startSync } from '@/lib/watch-sync';
 
 interface ViewerSession {
   /**
@@ -21,10 +22,20 @@ interface ViewerSession {
    */
   state: 'loading' | 'ready';
   viewer: Viewer | null;
+  /** Who of the account is watching on this device. Null for a visitor. */
+  profile: Profile | null;
   /** What is open on this site. Null while loading, or when it could not be asked. */
   access: AccessConfig | null;
-  /** Takes over a viewer after sign-in, sign-up or a change of name. */
-  setViewer: (viewer: Viewer | null) => void;
+  /**
+   * Takes over a viewer after sign-in, sign-up or a change of name. The
+   * profile is given at sign-in; left out, the one in use stays.
+   */
+  setViewer: (viewer: Viewer | null, profile?: Profile) => void;
+  /**
+   * Takes over the profile in use: another one after a choice, or the same
+   * one after a change of its name or colour.
+   */
+  setProfile: (profile: Profile) => void;
   /** Changes what is known about the signed-in viewer. Does nothing for a visitor. */
   updateViewer: (change: (viewer: Viewer) => Viewer) => void;
   signOut: () => Promise<void>;
@@ -39,19 +50,31 @@ const CHANNEL = 'onyx.web.viewer';
 export function ViewerSessionProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState<'loading' | 'ready'>('loading');
   const [viewer, setViewerState] = useState<Viewer | null>(null);
+  const [profile, setProfileState] = useState<Profile | null>(null);
   const [access, setAccess] = useState<AccessConfig | null>(null);
 
-  const signedInAs = useRef<string | null>(null);
+  /** The viewer and the profile whose watch history this browser holds. */
+  const signedInAs = useRef<{ viewer: string; profile: string | null } | null>(null);
 
   const load = useCallback(async () => {
-    const [me, config] = await Promise.allSettled([viewerApi.me(), viewerApi.config()]);
+    const [me, config] = await Promise.allSettled([viewerApi.session(), viewerApi.config()]);
     // Without an answer the page behaves as for a visitor, which is always safe.
-    setViewerState(me.status === 'fulfilled' ? me.value : null);
+    const known = me.status === 'fulfilled' ? me.value : { viewer: null, profile: null };
+    setViewerState(known.viewer);
+    setProfileState(known.profile);
     if (me.status === 'fulfilled') {
+      const before = signedInAs.current;
+      signedInAs.current = known.viewer
+        ? { viewer: known.viewer.id, profile: known.profile.id }
+        : null;
       // Before "ready", so a player that waits for the session also finds
       // the watch history on its way.
-      signedInAs.current = me.value?.id ?? null;
-      startSync(me.value !== null);
+      if (before && known.viewer && before.profile !== known.profile.id) {
+        // Another profile was chosen in another tab.
+        restartSync();
+      } else {
+        startSync(known.viewer !== null);
+      }
     }
     setAccess(config.status === 'fulfilled' ? config.value : null);
     setState('ready');
@@ -75,10 +98,10 @@ export function ViewerSessionProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  const setViewer = useCallback((next: Viewer | null) => {
+  const setViewer = useCallback((next: Viewer | null, nextProfile?: Profile) => {
     // A change of name is the same viewer and has nothing to hand over.
-    if ((next?.id ?? null) !== signedInAs.current) {
-      signedInAs.current = next?.id ?? null;
+    if ((next?.id ?? null) !== (signedInAs.current?.viewer ?? null)) {
+      signedInAs.current = next ? { viewer: next.id, profile: nextProfile?.id ?? null } : null;
       if (next) {
         startSync(true);
       } else {
@@ -86,6 +109,24 @@ export function ViewerSessionProvider({ children }: { children: ReactNode }) {
       }
     }
     setViewerState(next);
+    if (!next) {
+      setProfileState(null);
+    } else if (nextProfile) {
+      setProfileState(nextProfile);
+    }
+    announce();
+  }, []);
+
+  const setProfile = useCallback((next: Profile) => {
+    const current = signedInAs.current;
+    if (!current) {
+      return;
+    }
+    if (current.profile !== next.id) {
+      signedInAs.current = { ...current, profile: next.id };
+      restartSync();
+    }
+    setProfileState(next);
     announce();
   }, []);
 
@@ -101,13 +142,14 @@ export function ViewerSessionProvider({ children }: { children: ReactNode }) {
       signedInAs.current = null;
       endSync();
       setViewerState(null);
+      setProfileState(null);
       announce();
     }
   }, []);
 
   const value = useMemo(
-    () => ({ state, viewer, access, setViewer, updateViewer, signOut }),
-    [state, viewer, access, setViewer, updateViewer, signOut],
+    () => ({ state, viewer, profile, access, setViewer, setProfile, updateViewer, signOut }),
+    [state, viewer, profile, access, setViewer, setProfile, updateViewer, signOut],
   );
   return <Context.Provider value={value}>{children}</Context.Provider>;
 }

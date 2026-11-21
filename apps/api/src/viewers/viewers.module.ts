@@ -4,6 +4,8 @@ import { ViewerAuthController } from './viewer-auth.controller.js';
 import { ViewerAuthGuard } from './viewer-auth.guard.js';
 import { ViewerAuthService } from './viewer-auth.service.js';
 import { ViewerEmailService } from './viewer-email.service.js';
+import { ViewerProfilesController } from './viewer-profiles.controller.js';
+import { ViewerProfilesService } from './viewer-profiles.service.js';
 import { ViewerSessionService } from './viewer-session.service.js';
 import { ViewersAdminController } from './viewers-admin.controller.js';
 import { ViewersAdminService } from './viewers-admin.service.js';
@@ -14,14 +16,15 @@ import { ViewersAdminService } from './viewers-admin.service.js';
  * is watching.
  */
 @Module({
-  controllers: [ViewerAuthController, ViewersAdminController],
+  controllers: [ViewerAuthController, ViewersAdminController, ViewerProfilesController],
   providers: [
     ViewerSessionService,
+    ViewerProfilesService,
     ViewerEmailService,
     ViewerAuthService,
     ViewerAuthGuard,
     ViewersAdminService,
   ],
-  exports: [ViewerSessionService, ViewerAuthGuard],
+  exports: [ViewerSessionService, ViewerAuthGuard, ViewerProfilesService],
 })
 export class ViewersModule {}

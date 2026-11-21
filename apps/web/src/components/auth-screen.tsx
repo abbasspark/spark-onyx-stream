@@ -5,6 +5,7 @@ import { Loader2 } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { type FormEvent, useEffect, useState } from 'react';
+import { profilesApi } from '@/lib/profiles';
 import { authHref, safeNextPath, ViewerApiError, viewerApi } from '@/lib/viewer-api';
 import { FormField } from './form-field';
 import { useViewerSession } from './viewer-session';
@@ -45,8 +46,15 @@ export function AuthScreen({ mode }: { mode: 'sign-in' | 'sign-up' }) {
       const signedIn = isSignUp
         ? await viewerApi.register({ email, displayName, password })
         : await viewerApi.login({ email, password });
-      setViewer(signedIn);
-      router.replace(next);
+      setViewer(signedIn.viewer, signedIn.profile);
+      // An account that several people share asks who is watching.
+      const shared = isSignUp
+        ? false
+        : await profilesApi
+            .list()
+            .then((result) => result.profiles.length > 1)
+            .catch(() => false);
+      router.replace(shared ? `/profiles?next=${encodeURIComponent(next)}` : next);
       // The button stays busy until the next page is there.
     } catch (caught) {
       setError(

@@ -36,6 +36,35 @@ export const changeViewerPasswordSchema = z.object({
 });
 export type ChangeViewerPasswordInput = z.infer<typeof changeViewerPasswordSchema>;
 
+/** Kept in step with PROFILE_COLORS of the profiles service. */
+const profileColorSchema = z.enum([
+  'amber',
+  'coral',
+  'rose',
+  'violet',
+  'blue',
+  'teal',
+  'green',
+  'slate',
+]);
+const profileNameSchema = z
+  .string()
+  .transform((value) => value.replace(/\s+/g, ' ').trim())
+  .pipe(z.string().min(1, 'Enter a name').max(40, 'Use at most 40 characters'));
+
+export const createProfileSchema = z.object({
+  name: profileNameSchema,
+  /** Left out, the profile gets a colour no other profile of the account has. */
+  color: profileColorSchema.optional(),
+});
+export type CreateProfileInput = z.infer<typeof createProfileSchema>;
+
+export const updateProfileSchema = z
+  .object({ name: profileNameSchema, color: profileColorSchema })
+  .partial()
+  .refine((value) => Object.keys(value).length > 0, { message: 'Nothing to change' });
+export type UpdateProfileInput = z.infer<typeof updateProfileSchema>;
+
 export const forgotViewerPasswordSchema = z.object({ email: emailSchema });
 export type ForgotViewerPasswordInput = z.infer<typeof forgotViewerPasswordSchema>;
 

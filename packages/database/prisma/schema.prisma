@@ -89,6 +89,7 @@ model Viewer {
   updatedAt       DateTime     @updatedAt
 
   sessions ViewerSession[]
+  profiles ViewerProfile[]
   watching WatchProgress[]
   tokens   ViewerToken[]
 
@@ -99,17 +100,20 @@ model Viewer {
 /// A device a viewer is signed in on. As with admins, only a hash of the
 /// token is stored.
 model ViewerSession {
-  id         String    @id @default(uuid(7)) @db.Uuid
-  viewerId   String    @db.Uuid
-  viewer     Viewer    @relation(fields: [viewerId], references: [id], onDelete: Cascade)
+  id         String         @id @default(uuid(7)) @db.Uuid
+  viewerId   String         @db.Uuid
+  viewer     Viewer         @relation(fields: [viewerId], references: [id], onDelete: Cascade)
+  /// The profile chosen on this device. Empty means the main profile.
+  profileId  String?        @db.Uuid
+  profile    ViewerProfile? @relation(fields: [profileId], references: [id], onDelete: SetNull)
   /// SHA-256 hash of the session token.
-  tokenHash  String    @unique
+  tokenHash  String         @unique
   userAgent  String?
   ipAddress  String?
   expiresAt  DateTime
-  lastUsedAt DateTime  @default(now())
+  lastUsedAt DateTime       @default(now())
   revokedAt  DateTime?
-  createdAt  DateTime  @default(now())
+  createdAt  DateTime       @default(now())
 
   @@index([viewerId])
   @@index([expiresAt])
@@ -668,19 +672,42 @@ model Episode {
   @@map("episodes")
 }
 
-/// How far a viewer is in one video: a movie, or an episode of a series.
-/// One row per viewer and video.
-model WatchProgress {
+/// One of the people who share a viewer account. Each has their own watch
+/// history. Every account has a main profile, which is created with it.
+model ViewerProfile {
   id        String   @id @default(uuid(7)) @db.Uuid
   viewerId  String   @db.Uuid
   viewer    Viewer   @relation(fields: [viewerId], references: [id], onDelete: Cascade)
-  titleId   String   @db.Uuid
-  title     Title    @relation(fields: [titleId], references: [id], onDelete: Cascade)
+  name      String
+  /// Name of one of the colours clients draw a profile in, such as "amber".
+  color     String
+  /// The profile the account starts with. It cannot be deleted.
+  isMain    Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  sessions ViewerSession[]
+  watching WatchProgress[]
+
+  @@index([viewerId])
+  @@map("viewer_profiles")
+}
+
+/// How far a profile is in one video: a movie, or an episode of a series.
+/// One row per profile and video.
+model WatchProgress {
+  id        String        @id @default(uuid(7)) @db.Uuid
+  viewerId  String        @db.Uuid
+  viewer    Viewer        @relation(fields: [viewerId], references: [id], onDelete: Cascade)
+  profileId String        @db.Uuid
+  profile   ViewerProfile @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  titleId   String        @db.Uuid
+  title     Title         @relation(fields: [titleId], references: [id], onDelete: Cascade)
   /// Set for an episode of a series, empty for a movie.
-  episodeId String?  @db.Uuid
-  episode   Episode? @relation(fields: [episodeId], references: [id], onDelete: Cascade)
+  episodeId String?       @db.Uuid
+  episode   Episode?      @relation(fields: [episodeId], references: [id], onDelete: Cascade)
   /// The video itself: the id of the episode, or of the title for a movie.
-  itemId    String   @db.Uuid
+  itemId    String        @db.Uuid
 
   /// Where to go on. 0 when there is nothing to resume, for example after the end.
   positionSeconds Int
@@ -693,7 +720,8 @@ model WatchProgress {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  @@unique([viewerId, itemId])
+  @@unique([profileId, itemId])
+  @@index([profileId, watchedAt])
   @@index([viewerId, watchedAt])
   @@index([titleId])
   @@index([episodeId])

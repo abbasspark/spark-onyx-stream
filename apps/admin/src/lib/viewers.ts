@@ -110,3 +110,20 @@ export function summarizeWatching(item: ViewerWatchingItem): WatchingSummary {
       item.duration > 0 ? Math.min(100, Math.round((item.position / item.duration) * 100)) : 0,
   };
 }
+
+/** The colours of profiles, as the viewer website draws them. */
+const PROFILE_COLORS: Record<string, string> = {
+  amber: '#e6a85c',
+  coral: '#e8785f',
+  rose: '#dc7ba0',
+  violet: '#a493e6',
+  blue: '#74a8ea',
+  teal: '#52b8aa',
+  green: '#8dbd70',
+  slate: '#a3abb5',
+};
+
+/** A colour this panel does not know yet is drawn as slate. */
+export function profileColor(name: string): string {
+  return PROFILE_COLORS[name] ?? (PROFILE_COLORS.slate as string);
+}

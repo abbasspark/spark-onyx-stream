@@ -20,6 +20,12 @@ const RESUMABLE = {
   OR: [{ episodeId: null }, { episode: VISIBLE_EPISODE }],
 } satisfies Prisma.WatchProgressWhereInput;
 
+/** Whose history: a profile, and the account it belongs to. */
+export interface WatchScope {
+  viewerId: string;
+  profileId: string;
+}
+
 interface Target {
   titleId: string;
   episodeId: string | null;
@@ -27,7 +33,7 @@ interface Target {
 }
 
 /**
- * Where each viewer is in each video. Positions come from the player; the
+ * Where each profile of each viewer is in each video. Positions come from the player; the
  * rules for "begun" and "finished" are applied here, so every device agrees.
  */
 @Injectable()
@@ -37,10 +43,10 @@ export class WatchingService {
     @Inject(AppConfig) private readonly config: AppConfig,
   ) {}
 
-  /** What the viewer began and did not finish, the latest first. */
-  async list(viewerId: string): Promise<WatchingItem[]> {
+  /** What the profile began and did not finish, the latest first. */
+  async list({ profileId }: WatchScope): Promise<WatchingItem[]> {
     const rows = await this.prisma.watchProgress.findMany({
-      where: { viewerId, ...RESUMABLE },
+      where: { profileId, ...RESUMABLE },
       orderBy: [{ watchedAt: 'desc' }, { id: 'desc' }],
       take: WATCHING_LIMIT,
       include: {
@@ -72,7 +78,7 @@ export class WatchingService {
    *
    * @throws NotFoundException when viewers cannot see the title.
    */
-  async forTitle(viewerId: string, slug: string): Promise<TitleWatchState[]> {
+  async forTitle({ profileId }: WatchScope, slug: string): Promise<TitleWatchState[]> {
     const title = await this.prisma.title.findFirst({
       where: { slug, ...VISIBLE_TITLE },
       select: { id: true },
@@ -81,7 +87,7 @@ export class WatchingService {
       throw new NotFoundException('Title not found');
     }
     const rows = await this.prisma.watchProgress.findMany({
-      where: { viewerId, titleId: title.id },
+      where: { profileId, titleId: title.id },
       orderBy: [{ watchedAt: 'desc' }, { id: 'desc' }],
     });
     return rows.map((row) => ({
@@ -101,7 +107,8 @@ export class WatchingService {
    *
    * @returns how many positions were taken over.
    */
-  async save(viewerId: string, items: readonly WatchPositionInput[]): Promise<number> {
+  async save(scope: WatchScope, items: readonly WatchPositionInput[]): Promise<number> {
+    const { viewerId, profileId } = scope;
     const targets = await this.resolve(items);
     const now = new Date();
 
@@ -124,7 +131,7 @@ export class WatchingService {
     const existing = new Map(
       (
         await this.prisma.watchProgress.findMany({
-          where: { viewerId, itemId: { in: [...reports.keys()] } },
+          where: { profileId, itemId: { in: [...reports.keys()] } },
           select: { itemId: true, watchedAt: true, completedAt: true },
         })
       ).map((row) => [row.itemId, row]),
@@ -137,7 +144,7 @@ export class WatchingService {
         continue;
       }
       const outcome = judgePosition(item.position, item.duration);
-      const where = { viewerId_itemId: { viewerId, itemId: target.itemId } };
+      const where = { profileId_itemId: { profileId, itemId: target.itemId } };
 
       if (outcome.kind === 'not-started') {
         // Back at the beginning. That the video was once finished stays known.
@@ -149,7 +156,7 @@ export class WatchingService {
             }),
           );
         } else if (stored) {
-          writes.push(this.prisma.watchProgress.deleteMany({ where: { viewerId, ...target } }));
+          writes.push(this.prisma.watchProgress.deleteMany({ where: { profileId, ...target } }));
         }
         continue;
       }
@@ -164,7 +171,7 @@ export class WatchingService {
       writes.push(
         this.prisma.watchProgress.upsert({
           where,
-          create: { viewerId, ...target, ...data, watchedAt: at },
+          create: { viewerId, profileId, ...target, ...data, watchedAt: at },
           update: { ...data, watchedAt: at },
         }),
       );
@@ -176,14 +183,14 @@ export class WatchingService {
   }
 
   /** Forgets one video. @returns false when there was nothing to forget. */
-  async remove(viewerId: string, itemId: string): Promise<boolean> {
-    const { count } = await this.prisma.watchProgress.deleteMany({ where: { viewerId, itemId } });
+  async remove({ profileId }: WatchScope, itemId: string): Promise<boolean> {
+    const { count } = await this.prisma.watchProgress.deleteMany({ where: { profileId, itemId } });
     return count > 0;
   }
 
-  /** Forgets everything the viewer watched. @returns the number of videos. */
-  async clear(viewerId: string): Promise<number> {
-    const { count } = await this.prisma.watchProgress.deleteMany({ where: { viewerId } });
+  /** Forgets everything the profile watched. @returns the number of videos. */
+  async clear({ profileId }: WatchScope): Promise<number> {
+    const { count } = await this.prisma.watchProgress.deleteMany({ where: { profileId } });
     return count;
   }
 
@@ -209,6 +216,7 @@ export class WatchingService {
         take: ADMIN_WATCHING_LIMIT,
         include: {
           title: { select: { id: true, name: true, type: true } },
+          profile: { select: { id: true, name: true } },
           episode: {
             select: { id: true, number: true, name: true, season: { select: { number: true } } },
           },
@@ -220,6 +228,7 @@ export class WatchingService {
       completed,
       items: rows.map((row) => ({
         id: row.itemId,
+        profile: row.profile,
         title: row.title,
         episode: row.episode
           ? {

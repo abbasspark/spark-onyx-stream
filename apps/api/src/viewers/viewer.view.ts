@@ -74,5 +74,7 @@ export interface ViewerSessionAdminView extends Omit<ViewerSessionView, 'current
 }
 
 export interface ViewerAdminDetail extends ViewerAdminView {
+  /** The people who share the account, the main profile first. */
+  profiles: { id: string; name: string; color: string; isMain: boolean }[];
   sessions: ViewerSessionAdminView[];
 }

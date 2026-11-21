@@ -1,7 +1,13 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 import { describe, expect, it } from 'vitest';
 import type { ViewerWatchingItem } from '@/api/types';
-import { describeDevice, generatePassword, initialsOf, summarizeWatching } from './viewers';
+import {
+  describeDevice,
+  generatePassword,
+  initialsOf,
+  profileColor,
+  summarizeWatching,
+} from './viewers';
 
 describe('describeDevice', () => {
   it('names the browser and the system', () => {
@@ -86,6 +92,7 @@ describe('initialsOf', () => {
 describe('summarizeWatching', () => {
   const movie: ViewerWatchingItem = {
     id: 'm',
+    profile: { id: 'p', name: 'Anna' },
     title: { id: 'm', name: 'Night Train', type: 'MOVIE' },
     episode: null,
     position: 750,
@@ -120,5 +127,12 @@ describe('summarizeWatching', () => {
       state: '12:30 of 50:00, watched before',
       percent: 25,
     });
+  });
+});
+
+describe('profileColor', () => {
+  it('draws a known colour, and an unknown one as slate', () => {
+    expect(profileColor('amber')).toBe('#e6a85c');
+    expect(profileColor('ultraviolet')).toBe(profileColor('slate'));
   });
 });

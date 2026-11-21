@@ -71,7 +71,7 @@ export function WatchScreen({
   next,
 }: WatchScreenProps) {
   const router = useRouter();
-  const { state: sessionState, viewer, access } = useViewerSession();
+  const { state: sessionState, viewer, profile, access } = useViewerSession();
   const [loaded, setLoaded] = useState<Loaded>({ state: 'loading' });
   const [attempt, setAttempt] = useState(0);
   const [ended, setEnded] = useState(false);
@@ -147,7 +147,7 @@ export function WatchScreen({
     // The progress key belongs to the page and does not change while it is open.
     // eslint-disable-next-line react-hooks/exhaustive-deps
     // Signing in, or out, in this or another tab asks again.
-  }, [playbackPath, attempt, sessionState, viewer?.id]);
+  }, [playbackPath, attempt, sessionState, viewer?.id, profile?.id]);
 
   useEffect(() => {
     if (resumedAt === null) {

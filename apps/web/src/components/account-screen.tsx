@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 'use client';
 
-import { Check, History, Loader2, LogOut, Mail, MonitorSmartphone } from 'lucide-react';
+import { Check, History, Loader2, LogOut, Mail, MonitorSmartphone, UsersRound } from 'lucide-react';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { type FormEvent, type ReactNode, useCallback, useEffect, useState } from 'react';
 import {
@@ -12,8 +13,10 @@ import {
   viewerApi,
   type ViewerDevice,
 } from '@/lib/viewer-api';
+import { type Profile, profilesApi } from '@/lib/profiles';
 import { clearHistory } from '@/lib/watch-sync';
 import { FormField } from './form-field';
+import { ProfileAvatar } from './profile-avatar';
 import { useViewerSession } from './viewer-session';
 
 const MIN_PASSWORD_LENGTH = 8;
@@ -101,6 +104,7 @@ export function AccountScreen() {
       />
       <NameSection name={viewer.displayName} onSaved={setViewer} />
       <PasswordSection />
+      <ProfilesSection />
       <DevicesSection />
       <HistorySection />
       <Section heading="Sign out">
@@ -407,8 +411,57 @@ function DevicesSection() {
   );
 }
 
-/** What the account remembers of what was watched, and forgetting it. */
+/** The people who share the account, and the way to the page that manages them. */
+function ProfilesSection() {
+  const { profile } = useViewerSession();
+  const [profiles, setProfiles] = useState<Profile[] | null>(null);
+
+  useEffect(() => {
+    let current = true;
+    profilesApi
+      .list()
+      .then((result) => {
+        if (current) {
+          setProfiles(result.profiles);
+        }
+      })
+      .catch(() => {
+        // The link below still leads to them.
+      });
+    return () => {
+      current = false;
+    };
+  }, [profile]);
+
+  return (
+    <Section heading="Profiles">
+      <p className="mb-5 text-smoke">
+        For everyone who watches on this account. Each profile has its own "Continue watching".
+      </p>
+      {profiles ? (
+        <ul className="mb-6 flex flex-wrap gap-x-5 gap-y-3">
+          {profiles.map((item) => (
+            <li key={item.id} className="flex items-center gap-2.5">
+              <ProfileAvatar profile={item} className="size-9" />
+              <span>{item.name}</span>
+              {item.id === profile?.id ? (
+                <span className="text-sm text-sard">in use here</span>
+              ) : null}
+            </li>
+          ))}
+        </ul>
+      ) : null}
+      <Link href="/profiles" className="button button-quiet">
+        <UsersRound />
+        Manage profiles
+      </Link>
+    </Section>
+  );
+}
+
+/** What the profile in use remembers of what was watched, and forgetting it. */
 function HistorySection() {
+  const { profile } = useViewerSession();
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<ViewerApiError | null>(null);
@@ -431,14 +484,16 @@ function HistorySection() {
   return (
     <Section heading="Watch history">
       <p className="mb-5 text-smoke">
-        Your account remembers where you stopped and what you finished, so you can go on with a
-        video on any device you sign in on.
+        Each profile remembers where it stopped and what it finished, so you can go on with a video
+        on any device you sign in on. This is the history of{' '}
+        <span className="text-vein">{profile?.name ?? 'your profile'}</span>.
       </p>
       {open ? (
         <div className="grid gap-4">
           <p>
-            Clearing empties "Continue watching" and removes the "Watched" marks, on all your
-            devices. This cannot be undone.
+            Clearing empties "Continue watching" and removes the "Watched" marks of{' '}
+            {profile?.name ?? 'this profile'}, on all your devices. Other profiles keep theirs. This
+            cannot be undone.
           </p>
           {error ? (
             <p role="alert" className="text-sm text-alarm">

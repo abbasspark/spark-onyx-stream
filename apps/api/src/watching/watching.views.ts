@@ -37,6 +37,8 @@ export interface TitleWatchState {
 /** What a viewer watched, as an admin sees it. Includes what is no longer published. */
 export interface ViewerWatchingAdminItem {
   id: string;
+  /** Who of the account watched. */
+  profile: { id: string; name: string };
   title: { id: string; name: string; type: TitleType };
   episode: WatchingEpisodeRef | null;
   position: number;

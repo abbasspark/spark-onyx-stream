@@ -5,6 +5,7 @@ import { hashPassword } from '../auth/password-hasher.js';
 import { type Page, toPage, toSkipTake } from '../common/pagination.js';
 import type { CreateViewerInput, ListViewersInput, UpdateViewerInput } from './viewer.schemas.js';
 import { toViewerAdminView, type ViewerAdminDetail, type ViewerAdminView } from './viewer.view.js';
+import { toProfileView, ViewerProfilesService } from './viewer-profiles.service.js';
 import { ACTIVE_SESSION, ViewerSessionService } from './viewer-session.service.js';
 
 /** What changing a viewer did, for the audit log. */
@@ -27,6 +28,7 @@ export class ViewersAdminService {
   constructor(
     @Inject(PrismaClient) private readonly prisma: PrismaClient,
     @Inject(ViewerSessionService) private readonly sessions: ViewerSessionService,
+    @Inject(ViewerProfilesService) private readonly profiles: ViewerProfilesService,
   ) {}
 
   async list(input: ListViewersInput): Promise<Page<ViewerAdminView>> {
@@ -69,9 +71,13 @@ export class ViewersAdminService {
     if (!viewer) {
       throw new NotFoundException('Viewer not found');
     }
-    const sessions = await this.sessions.listActive(id);
+    const [sessions, profiles] = await Promise.all([
+      this.sessions.listActive(id),
+      this.profiles.list(viewer),
+    ]);
     return {
       ...toViewerAdminView(viewer, sessions.length),
+      profiles: profiles.map(toProfileView),
       sessions: sessions.map((session) => ({
         id: session.id,
         userAgent: session.userAgent,

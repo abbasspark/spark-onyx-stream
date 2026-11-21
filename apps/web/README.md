@@ -14,6 +14,7 @@ The site people watch on: a home page with rows of titles, pages for each movie 
 | `/search`                                              | Search by name while typing                                               |
 | `/sign-in`, `/sign-up`                                 | Sign in, and create an account                                            |
 | `/forgot-password`, `/reset-password`, `/verify-email` | Asking for a new password, and the pages the emailed links open           |
+| `/profiles`                                            | "Who is watching?", and adding, changing and deleting profiles            |
 | `/account`                                             | The viewer's name, password, devices, and deleting the account            |
 | `/sitemap.xml`, `/robots.txt`                          | For search engines                                                        |
 

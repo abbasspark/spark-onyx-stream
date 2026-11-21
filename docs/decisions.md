@@ -378,3 +378,17 @@ This replaces the "plain CSS without a component library" part of D-018.
 **Why:** TMDB is the one large source with a free API, seasons and episodes, artwork, and many languages. Copying keeps the site independent of it at run time and lets the operator edit everything afterwards. Importing only into what is empty makes "update" safe to press on a title someone worked on. A request is simpler than a job and fast enough: a series of eight episodes takes under a second against a local stand-in, and a long one is bounded by its stills.
 
 **Consequence:** the terms of TMDB apply to operators who use the import, including that selling access needs an agreement with TMDB. The project cannot settle that for them and says so where the import is set up. A very long series with stills may take longer than a proxy waits for an answer; the stills can be left out and added by a second run. Cast and crew are not imported, because the catalog has no people yet.
+
+## D-031 Profiles share an account and split the watch history
+
+**Date:** 2026-11-21
+
+- **A profile is a name, a colour and a watch history.** It has no password and no settings of its own.
+- **Every account has a main profile,** created when first needed. Existing watch history moved to it in the migration.
+- **The profile in use is stored on the session,** so it is a choice per device and needs nothing from the client on each request.
+- **Colours are names in the API.** Each client draws them to fit its own design.
+- **"One history per account" of D-028 no longer holds.**
+
+**Why:** a household on one account is the normal case, and a shared "Continue watching" is the first thing people complain about. Storing the choice on the session keeps every other endpoint unchanged: watch history simply works on "the profile in use", and an old client that knows nothing of profiles keeps working on the main one. A lazily created main profile needs no step in any of the places that create accounts.
+
+**Consequence:** a profile gives no privacy from the others on the account. Profiles for children need age ratings that mean the same in every country, which the catalog does not have yet. On a shared computer, what a visitor watched joins the profile in use after sign-in, as in D-028.

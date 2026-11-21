@@ -607,6 +607,8 @@ export interface ViewerSession {
 export interface ViewerWatchingItem {
   /** Id of the video: of the episode, or of the title for a movie. */
   id: string;
+  /** Who of the account watched. */
+  profile: { id: string; name: string };
   title: { id: string; name: string; type: TitleType };
   episode: { id: string; seasonNumber: number; number: number; name: string } | null;
   /** Seconds. A position of 0 means there is nothing to resume. */
@@ -623,7 +625,18 @@ export interface ViewerWatching {
   items: ViewerWatchingItem[];
 }
 
+/** One of the people who share a viewer account. */
+export interface ViewerProfile {
+  id: string;
+  name: string;
+  /** Name of a colour, such as "amber". */
+  color: string;
+  isMain: boolean;
+}
+
 export interface ViewerDetail extends Viewer {
+  /** The main profile first. */
+  profiles: ViewerProfile[];
   sessions: ViewerSession[];
 }
 
