@@ -70,9 +70,12 @@ Check that it runs: `curl http://localhost:3000/v1/health`
 ```bash
 pnpm dev                    # the API on http://localhost:3000
 pnpm dev:admin              # the admin panel on http://localhost:5174
+pnpm dev:web                # the viewer website on http://localhost:3001
 ```
 
 Open http://localhost:5174. On a fresh installation the panel asks you to create the first admin. After that you can upload videos, watch them being processed, preview them and manage their jobs. See the [admin README](apps/admin/README.md).
+
+Open http://localhost:3001 for the site viewers use. It shows the titles you published in the panel. See the [website README](apps/web/README.md).
 
 There is also a single-page development player (`pnpm dev:player`, http://localhost:5173) for testing the API without the panel. It needs `http://localhost:5173` in `CORS_ORIGINS`.
 
