@@ -531,6 +531,26 @@ export interface ViewerSession {
   expiresAt: string;
 }
 
+/** One video a viewer began or finished. */
+export interface ViewerWatchingItem {
+  /** Id of the video: of the episode, or of the title for a movie. */
+  id: string;
+  title: { id: string; name: string; type: TitleType };
+  episode: { id: string; seasonNumber: number; number: number; name: string } | null;
+  /** Seconds. A position of 0 means there is nothing to resume. */
+  position: number;
+  duration: number;
+  completedAt: string | null;
+  watchedAt: string;
+}
+
+export interface ViewerWatching {
+  total: number;
+  completed: number;
+  /** The latest, newest first. */
+  items: ViewerWatchingItem[];
+}
+
 export interface ViewerDetail extends Viewer {
   sessions: ViewerSession[];
 }

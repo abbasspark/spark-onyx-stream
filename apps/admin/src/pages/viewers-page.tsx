@@ -6,6 +6,7 @@ import {
   Ban,
   Check,
   Copy,
+  Film,
   KeyRound,
   LogOut,
   MonitorSmartphone,
@@ -15,11 +16,13 @@ import {
   RefreshCw,
   Search,
   Trash2,
+  Tv,
   UserCheck,
   UsersRound,
   X,
 } from 'lucide-react';
 import { type FormEvent, type ReactNode, useEffect, useState } from 'react';
+import { Link } from 'react-router';
 import { toast } from 'sonner';
 import { viewersApi } from '@/api/endpoints';
 import {
@@ -65,7 +68,7 @@ import {
 import { useAddressParams } from '@/lib/address-params';
 import { cn } from '@/lib/cn';
 import { formatDateTime, formatRelative, humanize } from '@/lib/format';
-import { describeDevice, generatePassword, initialsOf } from '@/lib/viewers';
+import { describeDevice, generatePassword, initialsOf, summarizeWatching } from '@/lib/viewers';
 
 const PAGE_SIZE = 25;
 const SEARCH_DELAY_MS = 300;
@@ -816,6 +819,11 @@ function DetailSheet({
     queryFn: ({ signal }) => viewersApi.get((viewer as Viewer).id, signal),
     enabled: viewer !== null,
   });
+  const watching = useQuery({
+    queryKey: ['viewers', 'watching', viewer?.id],
+    queryFn: ({ signal }) => viewersApi.watching((viewer as Viewer).id, signal),
+    enabled: viewer !== null,
+  });
   // The list row is shown at once and replaced by the fresh answer when it arrives.
   const shown = detail.data ?? viewer;
 
@@ -869,6 +877,93 @@ function DetailSheet({
                     </li>
                   ))}
                 </ul>
+              ) : null}
+            </div>
+
+            <div>
+              <div className="mb-2 flex items-baseline justify-between gap-3">
+                <h3 className="text-[13px] font-medium">Watching</h3>
+                {watching.data && watching.data.total > 0 ? (
+                  <p className="text-xs text-muted-foreground">
+                    {watching.data.total} {watching.data.total === 1 ? 'video' : 'videos'},{' '}
+                    {watching.data.completed} watched to the end
+                  </p>
+                ) : null}
+              </div>
+              <ErrorNote error={watching.error} />
+              {watching.isPending ? <Skeleton className="h-20 rounded-lg" /> : null}
+              {watching.data && watching.data.items.length === 0 ? (
+                <p className="rounded-lg border border-dashed p-3 text-sm text-muted-foreground">
+                  Nothing watched yet.
+                </p>
+              ) : null}
+              {watching.data && watching.data.items.length > 0 ? (
+                <>
+                  <ul className="divide-y rounded-lg border">
+                    {watching.data.items.map((item) => {
+                      const summary = summarizeWatching(item);
+                      return (
+                        <li key={item.id} className="flex items-start gap-3 p-3">
+                          {item.title.type === 'SERIES' ? (
+                            <Tv
+                              className="mt-0.5 size-4 shrink-0 text-muted-foreground"
+                              aria-hidden="true"
+                            />
+                          ) : (
+                            <Film
+                              className="mt-0.5 size-4 shrink-0 text-muted-foreground"
+                              aria-hidden="true"
+                            />
+                          )}
+                          <div className="min-w-0 flex-1 text-sm">
+                            <div className="flex items-baseline justify-between gap-3">
+                              <Link
+                                to={`/titles/${item.title.id}`}
+                                className="truncate font-medium underline-offset-4 hover:underline"
+                              >
+                                {item.title.name}
+                              </Link>
+                              <span className="shrink-0 text-xs text-muted-foreground">
+                                {formatRelative(item.watchedAt)}
+                              </span>
+                            </div>
+                            {summary.episode ? (
+                              <p className="truncate text-xs text-muted-foreground">
+                                {summary.episode}
+                              </p>
+                            ) : null}
+                            <div className="mt-1.5 flex items-center gap-2.5">
+                              <div
+                                className="h-1 flex-1 overflow-hidden rounded-full bg-muted"
+                                role="progressbar"
+                                aria-valuemin={0}
+                                aria-valuemax={100}
+                                aria-valuenow={summary.percent}
+                                aria-label={`${item.title.name}: ${summary.state}`}
+                              >
+                                <div
+                                  className="h-full rounded-full bg-primary"
+                                  style={{ width: `${summary.percent}%` }}
+                                />
+                              </div>
+                              <span className="flex shrink-0 items-center gap-1 text-xs text-muted-foreground tabular-nums">
+                                {summary.percent === 100 ? (
+                                  <Check className="size-3.5" aria-hidden="true" />
+                                ) : null}
+                                {summary.state}
+                              </span>
+                            </div>
+                          </div>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                  {watching.data.total > watching.data.items.length ? (
+                    <p className="mt-2 text-xs text-muted-foreground">
+                      The latest {watching.data.items.length} of {watching.data.total}.
+                    </p>
+                  ) : null}
+                </>
               ) : null}
             </div>
           </DialogBody>

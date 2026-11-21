@@ -45,6 +45,7 @@ import type {
   Viewer,
   ViewerAccessConfig,
   ViewerDetail,
+  ViewerWatching,
   ViewerSortField,
   ViewerStatus,
 } from './types';
@@ -141,6 +142,8 @@ export const viewersApi = {
   list: (query: ViewerListQuery, signal?: AbortSignal) =>
     request<Page<Viewer>>('/v1/viewers', { query: { ...query }, signal }),
   get: (id: string, signal?: AbortSignal) => request<ViewerDetail>(`/v1/viewers/${id}`, { signal }),
+  watching: (id: string, signal?: AbortSignal) =>
+    request<ViewerWatching>(`/v1/viewers/${id}/watching`, { signal }),
   create: (body: CreateViewerInput) => request<Viewer>('/v1/viewers', { method: 'POST', body }),
   update: (id: string, body: UpdateViewerInput) =>
     request<Viewer>(`/v1/viewers/${id}`, { method: 'PATCH', body }),

@@ -5,15 +5,18 @@ import { Clapperboard, Play } from 'lucide-react';
 import Link from 'next/link';
 import { formatClock } from '@/lib/format';
 import type { TitleDetail } from '@/lib/types';
-import { episodeCode, firstEpisode, movieKey, watchHref } from '@/lib/watch';
+import { episodeCode, movieKey, nextUnwatched, watchHref } from '@/lib/watch';
 import { useWatching } from './continue-watching';
+import { useWatchedVideos } from './watched-videos';
 
 /**
  * The buttons of a title page. The main one knows where this viewer stopped:
- * it resumes a movie, or goes on with the episode that was last watched.
+ * it resumes a movie, goes on with the episode that was last watched, or
+ * starts the episode after the ones that are finished.
  */
 export function TitleActions({ title }: { title: TitleDetail }) {
   const watching = useWatching();
+  const watched = useWatchedVideos(title.slug);
 
   let href: string;
   let label: string;
@@ -27,7 +30,7 @@ export function TitleActions({ title }: { title: TitleDetail }) {
   } else {
     // The list is ordered by time, so the first match is the episode watched last.
     const entry = watching.find((item) => item.href.startsWith(`${watchHref(title.slug)}/`));
-    const first = firstEpisode(title);
+    const first = nextUnwatched(title, watched);
     if (entry) {
       href = entry.href;
       label = `Resume ${entry.detail?.split(' ').slice(0, 2).join(' ') ?? 'episode'}`;

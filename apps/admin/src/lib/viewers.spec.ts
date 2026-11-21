@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 import { describe, expect, it } from 'vitest';
-import { describeDevice, generatePassword, initialsOf } from './viewers';
+import type { ViewerWatchingItem } from '@/api/types';
+import { describeDevice, generatePassword, initialsOf, summarizeWatching } from './viewers';
 
 describe('describeDevice', () => {
   it('names the browser and the system', () => {
@@ -79,5 +80,45 @@ describe('initialsOf', () => {
 
   it('keeps letters outside the Latin alphabet whole', () => {
     expect(initialsOf('عباس بندر')).toBe('عب');
+  });
+});
+
+describe('summarizeWatching', () => {
+  const movie: ViewerWatchingItem = {
+    id: 'm',
+    title: { id: 'm', name: 'Night Train', type: 'MOVIE' },
+    episode: null,
+    position: 750,
+    duration: 3000,
+    completedAt: null,
+    watchedAt: '2026-11-20T10:00:00.000Z',
+  };
+
+  it('says how far a video was watched', () => {
+    expect(summarizeWatching(movie)).toEqual({
+      episode: null,
+      state: '12:30 of 50:00',
+      percent: 25,
+    });
+  });
+
+  it('names the episode', () => {
+    const summary = summarizeWatching({
+      ...movie,
+      episode: { id: 'e', seasonNumber: 2, number: 5, name: 'The Trench' },
+    });
+    expect(summary.episode).toBe('S2 E5 The Trench');
+  });
+
+  it('tells a finished video from one that is watched again', () => {
+    const completedAt = '2026-11-19T10:00:00.000Z';
+    expect(summarizeWatching({ ...movie, position: 0, completedAt })).toMatchObject({
+      state: 'Watched',
+      percent: 100,
+    });
+    expect(summarizeWatching({ ...movie, completedAt })).toMatchObject({
+      state: '12:30 of 50:00, watched before',
+      percent: 25,
+    });
   });
 });

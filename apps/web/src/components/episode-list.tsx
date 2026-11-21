@@ -1,17 +1,19 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 'use client';
 
-import { Play } from 'lucide-react';
+import { Check, Play } from 'lucide-react';
 import Link from 'next/link';
 import { useState } from 'react';
 import { formatRuntime } from '@/lib/format';
 import type { TitleDetail } from '@/lib/types';
 import { episodeKey, watchHref } from '@/lib/watch';
 import { useWatching } from './continue-watching';
+import { useWatchedVideos } from './watched-videos';
 
 /** The episodes of a series, one season at a time. */
 export function EpisodeList({ title }: { title: TitleDetail }) {
   const watching = useWatching();
+  const watched = useWatchedVideos(title.slug);
   // Opens on the season of the episode watched last, otherwise on the first.
   const lastWatched = watching.find((entry) => entry.href.startsWith(`${watchHref(title.slug)}/`));
   const startSeason =
@@ -61,6 +63,14 @@ export function EpisodeList({ title }: { title: TitleDetail }) {
         {season.episodes.map((episode) => {
           const entry = watching.find((item) => item.key === episodeKey(episode.id));
           const runtime = formatRuntime(episode.durationMs);
+          // An episode that is being watched again shows its progress instead.
+          const isWatched = !entry && watched.has(episode.id);
+          const watchedMark = (
+            <span className="inline-flex items-center gap-1 text-xs text-sard">
+              <Check className="size-3.5" aria-hidden="true" />
+              Watched
+            </span>
+          );
           return (
             <li key={episode.id} className="border-b border-line">
               <Link
@@ -102,12 +112,18 @@ export function EpisodeList({ title }: { title: TitleDetail }) {
                       {episode.synopsis}
                     </span>
                   ) : null}
-                  {runtime ? (
-                    <span className="mt-1 block text-xs text-dust sm:hidden">{runtime}</span>
+                  {runtime || isWatched ? (
+                    <span className="mt-1 flex items-center gap-2 text-xs text-dust sm:hidden">
+                      {runtime}
+                      {isWatched ? watchedMark : null}
+                    </span>
                   ) : null}
                 </span>
-                {runtime ? (
-                  <span className="hidden text-sm text-smoke tabular-nums sm:block">{runtime}</span>
+                {runtime || isWatched ? (
+                  <span className="hidden flex-col items-end gap-1 text-sm text-smoke tabular-nums sm:flex">
+                    {runtime}
+                    {isWatched ? watchedMark : null}
+                  </span>
                 ) : null}
               </Link>
             </li>

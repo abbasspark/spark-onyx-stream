@@ -5,7 +5,8 @@ import { X } from 'lucide-react';
 import Link from 'next/link';
 import { useSyncExternalStore } from 'react';
 import { formatClock } from '@/lib/format';
-import { CHANGE_EVENT, readEntries, removeEntry, type WatchEntry } from '@/lib/progress';
+import { CHANGE_EVENT, readEntries, type WatchEntry } from '@/lib/progress';
+import { forgetEntry } from '@/lib/watch-sync';
 import { StripRow } from './title-row';
 
 const NOTHING: WatchEntry[] = [];
@@ -30,7 +31,10 @@ function snapshot(): WatchEntry[] {
   return cache.entries;
 }
 
-/** What this viewer began and did not finish, as kept in this browser. */
+/**
+ * What this viewer began and did not finish. Read from the browser, where the
+ * list of a signed-in viewer's account is kept up to date.
+ */
 export function useWatching(): WatchEntry[] {
   return useSyncExternalStore(subscribe, snapshot, () => NOTHING);
 }
@@ -67,7 +71,7 @@ export function ContinueWatching() {
               type="button"
               aria-label={`Remove ${entry.name} from continue watching`}
               className="absolute top-1.5 right-1.5 flex size-8 items-center justify-center rounded-full bg-onyx/80 text-vein opacity-0 transition-opacity group-hover/card:opacity-100 hover:bg-onyx focus-visible:opacity-100 pointer-coarse:opacity-100"
-              onClick={() => removeEntry(entry.key)}
+              onClick={() => forgetEntry(entry)}
             >
               <X className="size-4" />
             </button>

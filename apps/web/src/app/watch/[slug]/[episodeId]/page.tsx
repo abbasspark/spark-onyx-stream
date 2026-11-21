@@ -42,6 +42,7 @@ export default async function EpisodePage({ params }: EpisodePageProps) {
       detail={label(season.number, episode.number, episode.name)}
       backHref={`/title/${title.slug}#episodes`}
       progress={{
+        id: episode.id,
         key: episodeKey(episode.id),
         href: watchHref(title.slug, episode.id),
         image: (episode.still ?? title.backdrop ?? title.poster)?.url ?? null,

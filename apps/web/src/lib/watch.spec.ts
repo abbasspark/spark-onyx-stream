@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 import type { Episode, Season, TitleDetail } from './types';
-import { episodeCode, findEpisode, firstEpisode, watchHref } from './watch';
+import { episodeCode, findEpisode, firstEpisode, nextUnwatched, watchHref } from './watch';
 
 function episode(id: string, number: number): Episode {
   return { id, number, name: `Episode ${id}`, synopsis: null, still: null, durationMs: 60_000 };
@@ -45,5 +45,28 @@ describe('names and addresses', () => {
     expect(episodeCode(2, 5)).toBe('S2 E5');
     expect(watchHref('deep-ocean')).toBe('/watch/deep-ocean');
     expect(watchHref('deep-ocean', 'abc')).toBe('/watch/deep-ocean/abc');
+  });
+});
+
+describe('nextUnwatched', () => {
+  const next = (...watched: string[]) => nextUnwatched(series, new Set(watched))?.episode.id;
+
+  it('starts at the beginning when nothing is finished', () => {
+    expect(next()).toBe('a');
+  });
+
+  it('goes on after the furthest finished episode, into the next season', () => {
+    expect(next('a')).toBe('b');
+    expect(next('a', 'b')).toBe('c');
+    // An episode that was skipped does not pull the viewer back.
+    expect(next('b')).toBe('c');
+  });
+
+  it('starts over when everything is finished', () => {
+    expect(next('a', 'b', 'c')).toBe('a');
+  });
+
+  it('has nothing for a series without episodes', () => {
+    expect(nextUnwatched({ seasons: [] } as unknown as TitleDetail, new Set())).toBeNull();
   });
 });

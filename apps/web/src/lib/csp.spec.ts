@@ -24,7 +24,7 @@ describe('buildCsp', () => {
       mediaOrigin: 'https://cdn.example.org/media/',
     });
     expect(policy).toContain("img-src 'self' data: blob: https://cdn.example.org;");
-    expect(policy).toContain("media-src 'self' blob: https://cdn.example.org;");
+    expect(policy).toContain("media-src 'self' blob: data: https://cdn.example.org;");
     expect(policy).toContain("connect-src 'self' https://cdn.example.org;");
     expect(policy).not.toMatch(/script-src[^;]*cdn\.example\.org/);
   });

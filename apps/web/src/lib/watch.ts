@@ -48,3 +48,24 @@ export function firstEpisode(title: TitleDetail): { season: Season; episode: Epi
   }
   return null;
 }
+
+/**
+ * Where a viewer goes on with a series when no episode is half watched: the
+ * episode after the furthest one they finished. From the start when nothing
+ * is finished, and again from the start when everything is.
+ */
+export function nextUnwatched(
+  title: TitleDetail,
+  watched: ReadonlySet<string>,
+): { season: Season; episode: Episode } | null {
+  const all = title.seasons.flatMap((season) =>
+    season.episodes.map((episode) => ({ season, episode })),
+  );
+  let furthest = -1;
+  all.forEach((item, index) => {
+    if (watched.has(item.episode.id)) {
+      furthest = index;
+    }
+  });
+  return all[furthest + 1] ?? all[0] ?? null;
+}

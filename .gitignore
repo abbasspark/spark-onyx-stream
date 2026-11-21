@@ -69,3 +69,6 @@ Thumbs.db
 .next
 next-env.d.ts
 *.tsbuildinfo
+
+# Redis writes this where it is started
+dump.rdb
