@@ -111,11 +111,45 @@ Browsing the catalog works in every case. With `open`, publishing a title makes 
 - The dashboard shows the number of titles, and the command palette can start a new title.
 - A published title that viewers cannot see is marked as hidden in the list and explained in the editor. The editor links to the title's public data.
 
+## Import of details
+
+Typing the details of a title is the slow part of building a catalog. With `TMDB_API_TOKEN` set, the panel fills them from The Movie Database (TMDB).
+
+- **Search, look, then import.** The admin searches by name (and year), sees what an entry would bring, chooses the parts, and imports. Nothing changes before the last step.
+- **A new title or an existing one.** "Import" on the Titles page creates a draft. "Get details from TMDB" in a title's menu fills that title.
+- **What comes over:** names, tagline, synopsis, year, age rating of the configured country, original language, genres as categories, poster, backdrop and logo, and for a series its seasons and episodes with name, synopsis and a still. Specials (season 0) only when asked for.
+- **Pictures are copied into the catalog's own storage.** The site never loads pictures from TMDB when viewers browse, and keeps working when TMDB does not.
+- **An existing title only gains.** By default empty fields are filled and missing seasons and episodes added, so nothing typed by hand is lost. "Replace" overwrites texts and pictures with those of the source. In both cases the address of the title, its videos and what is published stay as they are, and nothing is ever deleted.
+- **A placeholder name such as "Episode 3" gives way** to the real name of the episode, also without "Replace".
+- **Genres match categories by name,** ignoring capital letters. Missing ones are created unless that is turned off.
+- **What cannot be had is skipped and reported:** a picture that is missing or too large, a season the source fails to deliver. The rest is imported.
+- **The catalog remembers where a title came from** (`metadata` on the title), marks entries that are in the catalog already, and refuses a second import of the same entry unless a copy is wanted.
+- **Only paths of pictures that look like TMDB's are downloaded,** and only from TMDB's picture server, so an answer cannot make the API fetch something else.
+
+| Setting             | Default | Meaning                                                                                    |
+| ------------------- | ------- | ------------------------------------------------------------------------------------------ |
+| `TMDB_API_TOKEN`    | empty   | The "API Read Access Token" or the "API Key" of a TMDB account. Empty turns the import off |
+| `METADATA_LANGUAGE` | `en-US` | Language of the details when the admin does not choose one                                 |
+| `METADATA_REGION`   | `US`    | Country whose age ratings are imported                                                     |
+
+| Method and path              | Purpose                                                                 |
+| ---------------------------- | ----------------------------------------------------------------------- |
+| `GET /metadata`              | Whether the import is set up, and its defaults                          |
+| `GET /metadata/search`       | Entries at the source by name. `type`, `q`, optional `year`, `language` |
+| `GET /metadata/preview`      | What an import of one entry would bring. Changes nothing                |
+| `POST /metadata/import`      | Creates a draft title from an entry                                     |
+| `POST /titles/{id}/metadata` | Brings an entry's details into an existing title. `overwrite` replaces  |
+
+All need `catalog:write`, except the first, which needs `catalog:read`.
+
+**Terms of the source.** TMDB asks to be named where its material is used. The panel shows its notice in the import dialog, and the viewer website shows it on the page of every imported title (the public catalog API tells clients with `metadataSource`). Apps you build must do the same. TMDB's API is free for sites that earn no money; a site that sells access needs an agreement with TMDB. That is between the operator and TMDB.
+
 ## Not built yet
 
 - Playback that needs a purchase or a subscription
 - People and credits (cast, directors)
 - Collections and rows for the home page
-- Importing metadata from outside sources
+- Other sources than TMDB, and importing many titles at once
+- Trailers from the source. A trailer is a video of your own library
 - Resized artwork, and choosing a poster from a video's own pictures
 - Subtitles uploaded as separate files

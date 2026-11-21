@@ -4,6 +4,7 @@ import {
   ArrowDown,
   ArrowUp,
   Clapperboard,
+  DownloadCloud,
   Film,
   LayoutGrid,
   List,
@@ -61,7 +62,9 @@ import {
   Tooltip,
 } from '@/components/ui/overlay';
 import { describeContent } from '@/lib/catalog';
+import { MetadataDialog } from '@/components/metadata-dialog';
 import { useAddressParams } from '@/lib/address-params';
+import { announceImport } from '@/lib/metadata-toast';
 import { cn } from '@/lib/cn';
 import { formatRelative, humanize } from '@/lib/format';
 
@@ -158,6 +161,7 @@ export function TitlesPage() {
 
   const [view, setView] = useState<View>(readView);
   const [createOpen, setCreateOpen] = useState(false);
+  const [importOpen, setImportOpen] = useState(false);
 
   // A link such as /titles?new=1 opens the dialog for a new title.
   useEffect(() => {
@@ -272,10 +276,16 @@ export function TitlesPage() {
   );
 
   const newButton = mayWrite ? (
-    <Button variant="primary" onClick={() => setCreateOpen(true)}>
-      <Plus />
-      New title
-    </Button>
+    <>
+      <Button onClick={() => setImportOpen(true)}>
+        <DownloadCloud />
+        Import
+      </Button>
+      <Button variant="primary" onClick={() => setCreateOpen(true)}>
+        <Plus />
+        New title
+      </Button>
+    </>
   ) : null;
 
   return (
@@ -592,6 +602,17 @@ export function TitlesPage() {
         onCreated={(id) => {
           void queryClient.invalidateQueries({ queryKey: ['titles'] });
           void navigate(`/titles/${id}`);
+        }}
+      />
+      <MetadataDialog
+        open={importOpen}
+        onOpenChange={setImportOpen}
+        onDone={(result) => {
+          setImportOpen(false);
+          void queryClient.invalidateQueries({ queryKey: ['titles'] });
+          void queryClient.invalidateQueries({ queryKey: ['categories'] });
+          announceImport(result);
+          void navigate(`/titles/${result.title.id}`);
         }}
       />
     </>

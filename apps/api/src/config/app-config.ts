@@ -38,6 +38,15 @@ export class AppConfig {
   readonly viewerRegistrationOpen: boolean;
   /** Origin that serves media files. Empty when the API serves them itself. */
   readonly mediaBaseUrl: string;
+  /** Access to TMDB for importing details of titles. Null when the import is off. */
+  readonly tmdb: {
+    readonly token: string;
+    readonly apiUrl: string;
+    readonly imageUrl: string;
+  } | null;
+  /** Language and country that imported details default to. */
+  readonly metadataLanguage: string;
+  readonly metadataRegion: string;
   /** The mail server and the sender. Null when email is off. */
   readonly mail: { readonly smtpUrl: string; readonly from: string } | null;
   /** Address of the viewer website, for links in emails. Empty when not set. */
@@ -74,6 +83,11 @@ export class AppConfig {
     this.catalogPlayback = env.CATALOG_PLAYBACK;
     this.viewerRegistrationOpen = env.VIEWER_REGISTRATION === 'open';
     this.mediaBaseUrl = env.MEDIA_BASE_URL;
+    this.tmdb = env.TMDB_API_TOKEN
+      ? { token: env.TMDB_API_TOKEN, apiUrl: env.TMDB_API_URL, imageUrl: env.TMDB_IMAGE_URL }
+      : null;
+    this.metadataLanguage = env.METADATA_LANGUAGE;
+    this.metadataRegion = env.METADATA_REGION;
     this.mail = env.SMTP_URL ? { smtpUrl: env.SMTP_URL, from: env.MAIL_FROM } : null;
     this.siteUrl = env.SITE_URL;
     this.siteName = env.SITE_NAME;

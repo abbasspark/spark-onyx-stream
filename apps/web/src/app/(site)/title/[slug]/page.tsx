@@ -202,6 +202,22 @@ export default async function TitlePage({ params }: TitlePageProps) {
           </StripRow>
         </div>
       ) : null}
+
+      {title.metadataSource === 'tmdb' ? (
+        // TMDB asks to be named where its material is shown, in these words.
+        <p className="gutter mt-16 text-xs text-dust">
+          Details and artwork of this title come from{' '}
+          <a
+            href="https://www.themoviedb.org"
+            target="_blank"
+            rel="noreferrer"
+            className="underline underline-offset-4 hover:text-smoke"
+          >
+            TMDB
+          </a>
+          . This product uses the TMDB API but is not endorsed or certified by TMDB.
+        </p>
+      ) : null}
     </article>
   );
 }

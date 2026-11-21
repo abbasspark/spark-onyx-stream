@@ -7,6 +7,7 @@ import {
   Check,
   CircleAlert,
   CircleDashed,
+  DownloadCloud,
   ExternalLink,
   EyeOff,
   Film,
@@ -25,6 +26,7 @@ import { categoriesApi, titlesApi } from '@/api/endpoints';
 import type { PublishStatus, TitleDetail, UpdateTitleInput } from '@/api/types';
 import { useSession } from '@/auth/session';
 import { useConfirm } from '@/components/confirm';
+import { MetadataDialog } from '@/components/metadata-dialog';
 import { TitleEpisodes } from '@/components/title-episodes';
 import { TitleMedia } from '@/components/title-media';
 import { Button } from '@/components/ui/button';
@@ -54,7 +56,8 @@ import {
 } from '@/components/ui/overlay';
 import { changedFields, describeContent, type DetailsForm, toForm } from '@/lib/catalog';
 import { cn } from '@/lib/cn';
-import { formatDateTime } from '@/lib/format';
+import { formatDateTime, formatRelative } from '@/lib/format';
+import { announceImport } from '@/lib/metadata-toast';
 import { SITE_URL } from '@/lib/site';
 import { usePollInterval } from '@/live/live';
 
@@ -88,6 +91,7 @@ export function TitleEditorPage() {
     },
   });
   const title = query.data;
+  const [metadataOpen, setMetadataOpen] = useState(false);
 
   const refresh = () => {
     void queryClient.invalidateQueries({ queryKey: ['titles'] });
@@ -222,6 +226,19 @@ export function TitleEditorPage() {
         Titles
       </Link>
 
+      {mayWrite ? (
+        <MetadataDialog
+          open={metadataOpen}
+          onOpenChange={setMetadataOpen}
+          title={title}
+          onDone={(result) => {
+            setMetadataOpen(false);
+            store(result.title);
+            announceImport(result, 'updated');
+          }}
+        />
+      ) : null}
+
       <header className="mb-6 flex flex-wrap items-start justify-between gap-4">
         <div className="grid min-w-0 gap-1.5">
           <h1 className="flex flex-wrap items-center gap-3 text-2xl leading-tight font-semibold tracking-tight break-words">
@@ -281,6 +298,11 @@ export function TitleEditorPage() {
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
+                  <DropdownMenuItem onSelect={() => setMetadataOpen(true)}>
+                    <DownloadCloud />
+                    {title.metadata ? 'Update details from TMDB' : 'Get details from TMDB'}
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
                   {title.status !== 'ARCHIVED' ? (
                     <DropdownMenuItem onSelect={() => void askArchive()}>
                       <Archive />
@@ -424,6 +446,12 @@ export function TitleEditorPage() {
                     ['Created', formatDateTime(title.createdAt)],
                     ['Changed', formatDateTime(title.updatedAt)],
                     ['Published', title.publishedAt ? formatDateTime(title.publishedAt) : '–'],
+                    [
+                      'Details from',
+                      title.metadata
+                        ? `TMDB, ${title.metadata.syncedAt ? formatRelative(title.metadata.syncedAt) : 'imported'}`
+                        : 'Typed by hand',
+                    ],
                     [
                       'Public data',
                       title.isVisible ? (

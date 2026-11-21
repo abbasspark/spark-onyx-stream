@@ -363,3 +363,18 @@ This replaces the "plain CSS without a component library" part of D-018.
 **Why:** SMTP is the one thing every mail service offers, so an operator is never tied to one company. Putting emails on the queue would write addresses and usable tokens into Redis and its backups; a lost email costs a viewer one more click, which is the cheaper risk. A token in the fragment stays out of proxy and server logs. Requiring confirmation by default would lock out every installation that has no mail server, which is how most start.
 
 **Consequence:** an email that is still being retried is lost when the API restarts, and the viewer has to ask again. What the mail server said to the last email is known per API process, not across several. Emails are in English only. Whether an email reaches the inbox depends on the operator's sender address and DNS records, which the panel cannot check beyond a test email.
+
+## D-030 Details of titles are imported from TMDB, and copied
+
+**Date:** 2026-11-21
+
+- **One source, The Movie Database,** reached with the operator's own key. No key, no import, and nothing else changes.
+- **An import is a copy.** Texts go into the title, pictures into the catalog's storage. Nothing is loaded from TMDB when viewers use the site.
+- **An import adds and fills. It replaces only when told to, and never deletes.**
+- **The import runs inside the request,** a few pictures at a time. There is no job for it.
+- **Answers of the source are treated as untrusted:** every field is checked and cut to size, and only picture paths of TMDB's own form are downloaded, from TMDB's picture server.
+- **A title remembers its source,** and the public catalog says so, so clients can show the notice TMDB asks for.
+
+**Why:** TMDB is the one large source with a free API, seasons and episodes, artwork, and many languages. Copying keeps the site independent of it at run time and lets the operator edit everything afterwards. Importing only into what is empty makes "update" safe to press on a title someone worked on. A request is simpler than a job and fast enough: a series of eight episodes takes under a second against a local stand-in, and a long one is bounded by its stills.
+
+**Consequence:** the terms of TMDB apply to operators who use the import, including that selling access needs an agreement with TMDB. The project cannot settle that for them and says so where the import is set up. A very long series with stills may take longer than a proxy waits for an answer; the stills can be left out and added by a second run. Cast and crew are not imported, because the catalog has no people yet.

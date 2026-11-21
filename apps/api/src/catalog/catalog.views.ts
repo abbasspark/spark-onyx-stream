@@ -148,6 +148,15 @@ export interface SeasonView {
   episodes: EpisodeView[];
 }
 
+export interface TitleMetadataRef {
+  /** For example "tmdb". */
+  source: string;
+  /** The id there with its kind, for example "movie:603". */
+  id: string;
+  language: string | null;
+  syncedAt: Date | null;
+}
+
 export interface TitleDetail extends TitleSummary {
   originalName: string | null;
   tagline: string | null;
@@ -157,6 +166,8 @@ export interface TitleDetail extends TitleSummary {
   backdrop: ImageView | null;
   logo: ImageView | null;
   trailerAsset: AssetRef | null;
+  /** Where the details were imported from. Null for a title typed by hand. */
+  metadata: TitleMetadataRef | null;
   seasons: SeasonView[];
   /** What is done and what is missing before the title can be published. */
   checklist: ChecklistItem[];
@@ -321,6 +332,15 @@ export function toTitleDetail(title: TitleDetailRecord, mediaBaseUrl: string): T
     categories: sortedCategories(title.categories),
     asset: title.type === 'MOVIE' ? toAssetRef(title.asset) : null,
     trailerAsset: toAssetRef(title.trailerAsset),
+    metadata:
+      title.metadataSource && title.metadataId
+        ? {
+            source: title.metadataSource,
+            id: title.metadataId,
+            language: title.metadataLanguage,
+            syncedAt: title.metadataSyncedAt,
+          }
+        : null,
     seasonCount: seasons.length,
     episodeCount: seasons.reduce((total, season) => total + season.episodes.length, 0),
     isVisible: isTitleVisible(title),
