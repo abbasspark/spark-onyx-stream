@@ -125,12 +125,15 @@ function ThemedToaster() {
   );
 }
 
+/** The path the panel is served under, without the slash at the end. Empty at the root. */
+const ROUTER_BASE = import.meta.env.BASE_URL.replace(/\/+$/, '');
+
 export function App() {
   return (
     <ThemeProvider>
       <QueryClientProvider client={queryClient}>
         <TooltipProvider delayDuration={250}>
-          <BrowserRouter>
+          <BrowserRouter basename={ROUTER_BASE}>
             <SessionProvider>
               <ConfirmProvider>
                 <Pages />

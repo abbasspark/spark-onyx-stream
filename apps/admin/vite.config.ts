@@ -12,8 +12,12 @@ import { defineConfig, loadEnv } from 'vite';
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '');
   const apiTarget = env.ONYX_API_URL ?? 'http://localhost:3000';
+  // Where the panel lives on its origin. The gateway serves it under /admin/,
+  // because the root belongs to the viewer website.
+  const base = env.ADMIN_BASE_PATH ?? '/';
 
   return {
+    base,
     plugins: [react(), tailwindcss()],
     resolve: {
       alias: { '@': path.resolve(import.meta.dirname, 'src') },

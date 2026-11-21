@@ -22,7 +22,7 @@ The API must be running, with at least one published title to see anything. See 
 pnpm dev:web
 ```
 
-The site is then at <http://localhost:3001>. Requests to `/v1` are passed on to the API, so the browser talks to one address.
+The site is then at <http://localhost:3001>. Requests to `/v1` are passed on to the API (`src/proxy.ts`), so the browser talks to one address.
 
 For a production build:
 
@@ -31,22 +31,26 @@ pnpm --filter @onyx/web build
 pnpm --filter @onyx/web start
 ```
 
+In the Docker installation the website is the `web` service and the gateway serves it at `/`. See [deploy/compose](../../deploy/compose/README.md).
+
 ## Settings
 
-They are read from the `.env` file at the repository root when the server starts. A change needs a restart, not a new build.
+They are read when the server starts: from the `.env` file at the repository root, or from the environment in Docker. A change needs a restart, not a new build.
 
-| Name                   | Default                               | Meaning                                                       |
-| ---------------------- | ------------------------------------- | ------------------------------------------------------------- |
-| `WEB_SITE_NAME`        | `Onyx Stream`                         | Name in the header, the browser tab and link previews         |
-| `WEB_SITE_DESCRIPTION` | `Movies and series, streamed to you.` | One sentence for search engines                               |
-| `WEB_SITE_URL`         | `http://localhost:3001`               | Public address of the site, for the sitemap and link previews |
-| `WEB_API_URL`          | `http://localhost:3000`               | Where the server reaches the API                              |
+| Name                   | Default                               | Meaning                                                                                |
+| ---------------------- | ------------------------------------- | -------------------------------------------------------------------------------------- |
+| `WEB_SITE_NAME`        | `Onyx Stream`                         | Name in the header, the browser tab and link previews                                  |
+| `WEB_SITE_DESCRIPTION` | `Movies and series, streamed to you.` | One sentence for search engines                                                        |
+| `WEB_SITE_URL`         | `http://localhost:3001`               | Public address of the site, for the sitemap and link previews                          |
+| `WEB_API_URL`          | `http://localhost:3000`               | Where the server reaches the API                                                       |
+| `WEB_MEDIA_ORIGIN`     | empty                                 | Origin of media and artwork when it is not the site itself: the API's `MEDIA_BASE_URL` |
 
 ## How it works
 
 - **Pages are built on the server** from the catalog, so they load with their content and search engines can read them. Title pages carry link-preview data and structured data for search engines.
 - **Catalog answers are kept for 30 seconds** and shared between all viewers. A change in the admin panel shows up within about a minute.
 - **A title that is not published answers 404**, the same as one that never existed.
+- **Scripts run only with a nonce** that is new for every page (content security policy). Injected markup cannot run script.
 - **Search and playback requests go from the browser straight to the API.** Each viewer then uses their own request allowance, and signed playback addresses are never cached.
 - **"Continue watching" lives in the browser.** There are no viewer accounts yet, so positions are stored on the device and nowhere else.
 

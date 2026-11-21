@@ -2,6 +2,7 @@
 import {
   ChevronRight,
   ChevronsUpDown,
+  ExternalLink,
   LogOut,
   Monitor,
   Moon,
@@ -16,6 +17,7 @@ import { useSession } from '@/auth/session';
 import { cn } from '@/lib/cn';
 import { humanize } from '@/lib/format';
 import { findNavItem, NAVIGATION } from '@/lib/navigation';
+import { SITE_URL } from '@/lib/site';
 import { useLiveState } from '@/live/live';
 import { type ThemeChoice, useTheme } from '@/theme/theme';
 import { useUploads } from '@/uploads/uploads';
@@ -254,6 +256,14 @@ export function AppShell() {
           </nav>
 
           <div className="ml-auto flex items-center gap-2">
+            {SITE_URL !== null ? (
+              <Button asChild variant="ghost" size="sm" className="hidden md:inline-flex">
+                <a href={`${SITE_URL}/`} target="_blank" rel="noreferrer">
+                  View site
+                  <ExternalLink />
+                </a>
+              </Button>
+            ) : null}
             <Tooltip
               content={
                 live === 'live'

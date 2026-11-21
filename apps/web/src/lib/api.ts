@@ -2,14 +2,19 @@
 import 'server-only';
 import { connection } from 'next/server';
 import { siteConfig } from './config';
+import { TtlCache } from './ttl-cache';
 import type { Category, Home, Page, TitleCard, TitleDetail, TitleSort, TitleType } from './types';
 
 /**
  * How long the website keeps an answer of the catalog before asking again.
- * The same time the API allows others to cache it, so a change in the admin
- * panel reaches viewers within about a minute at most.
+ * The same time the API allows others to cache it. A change in the admin
+ * panel therefore reaches viewers within about a minute at most.
  */
-const REVALIDATE_SECONDS = 30;
+const KEEP_MS = 30_000;
+/** Distinct catalog addresses kept at once. Far more than a site has popular pages. */
+const MAX_KEPT = 1000;
+
+const answers = new TtlCache<unknown>(KEEP_MS, MAX_KEPT);
 
 /** The API answered, but not with success. */
 export class CatalogError extends Error {
@@ -20,6 +25,19 @@ export class CatalogError extends Error {
     super(message);
     this.name = 'CatalogError';
   }
+}
+
+async function load(path: string): Promise<unknown> {
+  const response = await fetch(`${siteConfig.apiUrl}/v1/catalog${path}`, {
+    headers: { Accept: 'application/json' },
+    // Kept by the cache below, which, unlike the built-in one, never hands
+    // out an answer that is older than its time.
+    cache: 'no-store',
+  });
+  if (!response.ok) {
+    throw new CatalogError(response.status, `The catalog answered ${response.status} for ${path}`);
+  }
+  return response.json();
 }
 
 /**
@@ -35,15 +53,7 @@ async function read<Result>(path: string): Promise<Result> {
   // Pages are built when they are asked for, not when the site is built:
   // the catalog is not known, and the API may not even run, at build time.
   await connection();
-
-  const response = await fetch(`${siteConfig.apiUrl}/v1/catalog${path}`, {
-    headers: { Accept: 'application/json' },
-    next: { revalidate: REVALIDATE_SECONDS },
-  });
-  if (!response.ok) {
-    throw new CatalogError(response.status, `The catalog answered ${response.status} for ${path}`);
-  }
-  return (await response.json()) as Result;
+  return (await answers.get(path, () => load(path))) as Result;
 }
 
 export function getHome(): Promise<Home> {
@@ -76,15 +86,24 @@ export function getTitles(query: TitleQuery = {}): Promise<Page<TitleCard>> {
   return read<Page<TitleCard>>(`/titles${search ? `?${search}` : ''}`);
 }
 
-/** @returns Null when no title that viewers can see has this slug. */
+/**
+ * @returns Null when no title that viewers can see has this slug. That answer
+ *   is kept like any other, so asking again and again for a title that does
+ *   not exist does not reach the API each time.
+ */
 export async function getTitle(slug: string): Promise<TitleDetail | null> {
-  try {
-    return await read<TitleDetail>(`/titles/${encodeURIComponent(slug)}`);
-  } catch (error) {
-    // 400 is a slug that cannot exist, which for a visitor is the same as not found.
-    if (error instanceof CatalogError && (error.status === 404 || error.status === 400)) {
-      return null;
+  await connection();
+  const path = `/titles/${encodeURIComponent(slug)}`;
+  const answer = await answers.get(path, async () => {
+    try {
+      return await load(path);
+    } catch (error) {
+      // 400 is a slug that cannot exist, which for a visitor is the same as not found.
+      if (error instanceof CatalogError && (error.status === 404 || error.status === 400)) {
+        return null;
+      }
+      throw error;
     }
-    throw error;
-  }
+  });
+  return answer as TitleDetail | null;
 }
