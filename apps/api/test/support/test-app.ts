@@ -194,7 +194,7 @@ export async function createTestApp(
     .useValue(mail)
     .compile();
 
-  const app = moduleRef.createNestApplication<INestApplication<App>>();
+  const app = moduleRef.createNestApplication<INestApplication<App>>({ rawBody: true });
   app.setGlobalPrefix('v1');
   await app.init();
 
@@ -243,6 +243,7 @@ export async function createTestApp(
       await prisma.viewer.deleteMany();
       // After the viewers, whose subscriptions point to plans.
       await prisma.plan.deleteMany();
+      await prisma.stripeEvent.deleteMany();
     },
     close: () => app.close(),
   };

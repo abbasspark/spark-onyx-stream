@@ -126,7 +126,20 @@ export const viewerApi = {
     call<SignedIn | { viewer: null; profile: null; entitled?: boolean }>('GET', '/session'),
   /** The viewer's own subscription, or null. */
   subscription: () =>
-    call<{ subscription: OwnSubscription | null; entitled: boolean }>('GET', '/subscription'),
+    call<{ subscription: OwnSubscription | null; entitled: boolean; trialUsed?: boolean }>(
+      'GET',
+      '/subscription',
+    ),
+  /** Opens the payment page for a plan. Answers with the address to go to. */
+  checkout: (planId: string, interval: 'MONTH' | 'YEAR') =>
+    call<{ url: string }>('POST', '/checkout', { planId, interval }),
+  /** Tells the site that the viewer is back from paying. */
+  confirmCheckout: (sessionId: string) =>
+    call<{ subscription: OwnSubscription | null; entitled: boolean }>('POST', '/checkout/confirm', {
+      sessionId,
+    }),
+  /** Opens the page for changing the card, reading invoices and cancelling. */
+  billingPortal: () => call<{ url: string }>('POST', '/billing-portal'),
   register: (input: { email: string; displayName: string; password: string }) =>
     call<SignedIn>('POST', '/register', input),
   login: (input: { email: string; password: string }) => call<SignedIn>('POST', '/login', input),

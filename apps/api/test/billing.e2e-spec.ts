@@ -318,7 +318,7 @@ describe.skipIf(!TEST_DATABASE_URL)('Billing (e2e)', () => {
       const plan = await createPlan();
       const { id, cookie } = await register();
       const before = await http().get('/v1/viewer/subscription').set('Cookie', cookie).expect(200);
-      expect(before.body).toEqual({ subscription: null, entitled: false });
+      expect(before.body).toEqual({ subscription: null, entitled: false, trialUsed: false });
       expect(before.headers['cache-control']).toBe('no-store');
 
       const endsAt = inDays(30);
@@ -338,12 +338,17 @@ describe.skipIf(!TEST_DATABASE_URL)('Billing (e2e)', () => {
         canceledAt: null,
         note: 'Paid in cash',
         grantedBy: { id: expect.any(String), displayName: expect.any(String) },
+        renewsAt: null,
+        online: false,
+        externalId: null,
+        externalUrl: null,
         createdAt: expect.any(String),
       });
 
       const own = await http().get('/v1/viewer/subscription').set('Cookie', cookie).expect(200);
       expect(own.body).toEqual({
         entitled: true,
+        trialUsed: false,
         subscription: {
           plan: { id: plan.id, name: 'Standard' },
           status: 'ACTIVE',
@@ -351,6 +356,8 @@ describe.skipIf(!TEST_DATABASE_URL)('Billing (e2e)', () => {
           startedAt: expect.any(String),
           endsAt,
           cancelAtPeriodEnd: false,
+          renewsAt: null,
+          online: false,
         },
       });
       // Notes of admins and who granted it are not for the viewer.
@@ -413,7 +420,7 @@ describe.skipIf(!TEST_DATABASE_URL)('Billing (e2e)', () => {
       expect(ended.body).toMatchObject({ status: 'CANCELED', running: false });
       expect(ended.body.canceledAt).toEqual(expect.any(String));
       const own = await http().get('/v1/viewer/subscription').set('Cookie', cookie).expect(200);
-      expect(own.body).toEqual({ subscription: null, entitled: false });
+      expect(own.body).toEqual({ subscription: null, entitled: false, trialUsed: false });
 
       // What is over cannot be changed or ended again. A new grant can follow.
       await http().post(`/v1/subscriptions/${subscriptionId}/end`).set(admin()).expect(409);
@@ -626,6 +633,9 @@ describe.skipIf(!TEST_DATABASE_URL)('Billing (e2e)', () => {
         plans: 1,
         subscribers: 2,
         grantedByHand: 2,
+        paidOnline: 0,
+        pastDue: 0,
+        stripe: null,
         endingSoon: 1,
         paidTitles: 1,
         publishedTitles: 2,

@@ -228,6 +228,19 @@ export class ViewerAuthService {
     if (!(await verifyPassword(password, identity.viewer.passwordHash))) {
       throw new BadRequestException('Password is incorrect');
     }
+    const paying = await this.prisma.subscription.findFirst({
+      where: { viewerId: identity.viewer.id, source: 'STRIPE', ...runningAt() },
+      select: { cancelAtPeriodEnd: true },
+    });
+    if (paying && !paying.cancelAtPeriodEnd) {
+      // Deleting the account would not stop the payments.
+      throw new ConflictException({
+        statusCode: 409,
+        error: 'Conflict',
+        code: 'subscription_running',
+        message: 'Cancel your subscription first, so you are not charged again.',
+      });
+    }
     await this.prisma.viewer.delete({ where: { id: identity.viewer.id } });
   }
 }

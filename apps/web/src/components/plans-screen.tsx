@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 'use client';
 
-import { Check, Mail } from 'lucide-react';
+import { Check, Loader2, Mail } from 'lucide-react';
 import Link from 'next/link';
-import { useSearchParams } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import {
   bestYearlySaving,
@@ -13,10 +13,13 @@ import {
   intervalsOf,
   type OwnSubscription,
   type Plans,
+  type Plan,
   priceOf,
+  rememberAfterCheckout,
+  subscribeLabel,
   yearlySaving,
 } from '@/lib/plans';
-import { authHref, safeNextPath, viewerApi } from '@/lib/viewer-api';
+import { authHref, safeNextPath, ViewerApiError, viewerApi } from '@/lib/viewer-api';
 import { useViewerSession } from './viewer-session';
 
 /**
@@ -26,6 +29,7 @@ import { useViewerSession } from './viewer-session';
  */
 export function PlansScreen({ offer }: { offer: Plans }) {
   const params = useSearchParams();
+  const router = useRouter();
   const next = safeNextPath(params.get('next'));
   const { state, viewer, entitled } = useViewerSession();
   const { plans, currency } = offer;
@@ -36,10 +40,13 @@ export function PlansScreen({ offer }: { offer: Plans }) {
 
   // What the viewer has already, to say so and not sell it twice.
   const [own, setOwn] = useState<OwnSubscription | null>(null);
+  // A free trial is offered once. Until the site says otherwise, it is on offer.
+  const [trialUsed, setTrialUsed] = useState(false);
   const viewerId = viewer?.id;
   useEffect(() => {
-    if (!viewerId || !entitled) {
+    if (!viewerId) {
       setOwn(null);
+      setTrialUsed(false);
       return;
     }
     let current = true;
@@ -48,6 +55,7 @@ export function PlansScreen({ offer }: { offer: Plans }) {
       .then((result) => {
         if (current) {
           setOwn(result.subscription);
+          setTrialUsed(result.trialUsed === true);
         }
       })
       .catch(() => {
@@ -59,6 +67,35 @@ export function PlansScreen({ offer }: { offer: Plans }) {
   }, [viewerId, entitled]);
 
   const shown = plans.filter((plan) => priceOf(plan, interval) !== null);
+
+  // The plan whose payment page is being opened, and what went wrong with the last try.
+  const [opening, setOpening] = useState<string | null>(null);
+  const [problem, setProblem] = useState<string | null>(null);
+
+  async function subscribe(plan: Plan) {
+    if (!viewer) {
+      // Back here after signing up, to choose with an account.
+      router.push(
+        authHref('sign-up', next === '/' ? '/plans' : `/plans?next=${encodeURIComponent(next)}`),
+      );
+      return;
+    }
+    setOpening(plan.id);
+    setProblem(null);
+    try {
+      const { url } = await viewerApi.checkout(plan.id, interval === 'month' ? 'MONTH' : 'YEAR');
+      rememberAfterCheckout(next);
+      // The payment page is Stripe's. The button stays busy until the browser has left.
+      window.location.assign(url);
+    } catch (caught) {
+      setOpening(null);
+      setProblem(
+        caught instanceof ViewerApiError
+          ? caught.message
+          : 'The payment page could not be opened. Try again in a moment.',
+      );
+    }
+  }
 
   return (
     <div className="gutter pt-32 pb-10">
@@ -139,7 +176,7 @@ export function PlansScreen({ offer }: { offer: Plans }) {
               <p className="mt-1 min-h-5 text-sm text-sard">
                 {planSaving
                   ? `${planSaving}% less than paying monthly`
-                  : plan.trialDays > 0 && offer.checkout
+                  : plan.trialDays > 0 && offer.checkout && !trialUsed
                     ? `First ${plan.trialDays} days free`
                     : ''}
               </p>
@@ -154,12 +191,52 @@ export function PlansScreen({ offer }: { offer: Plans }) {
                   ))}
                 </ul>
               ) : null}
+              {offer.checkout && !own ? (
+                <div className="mt-auto pt-8">
+                  <button
+                    type="button"
+                    className={`button w-full ${plan.isRecommended || shown.length === 1 ? 'button-play' : 'button-quiet'}`}
+                    disabled={state !== 'ready' || opening !== null}
+                    aria-busy={opening === plan.id}
+                    onClick={() => void subscribe(plan)}
+                  >
+                    {opening === plan.id ? (
+                      <Loader2
+                        className="animate-[player-spin_0.9s_linear_infinite]"
+                        aria-hidden="true"
+                      />
+                    ) : null}
+                    {opening === plan.id
+                      ? 'Opening the payment page'
+                      : subscribeLabel(plan, !trialUsed)}
+                  </button>
+                </div>
+              ) : null}
             </li>
           );
         })}
       </ul>
 
-      {own ? null : (
+      {problem ? (
+        <p role="alert" className="mt-6 max-w-2xl border-l-2 border-alarm py-1 pl-4 text-alarm">
+          {problem}
+        </p>
+      ) : null}
+
+      {offer.checkout ? (
+        <p className="mt-8 max-w-2xl text-sm text-dust">
+          {own
+            ? own.online
+              ? 'You change the card, read your invoices and cancel on your account page.'
+              : 'Your access was set up by the people who run this site.'
+            : 'You pay on a page of Stripe, by card or another way it offers. Cancel whenever you like on your account page: you keep watching until the end of what you paid for.'}{' '}
+          {own?.online ? (
+            <Link href="/account" className="text-smoke underline underline-offset-4">
+              Go to your account
+            </Link>
+          ) : null}
+        </p>
+      ) : own ? null : (
         <div className="mt-10 max-w-2xl">
           <h2 className="heading text-2xl">How to subscribe</h2>
           <p className="mt-3 text-smoke">

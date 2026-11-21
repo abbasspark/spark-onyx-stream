@@ -2,6 +2,7 @@
 import {
   bestYearlySaving,
   describeEnd,
+  subscribeLabel,
   formatMoney,
   intervalsOf,
   type Plan,
@@ -63,7 +64,32 @@ describe('prices of plans', () => {
 
 describe('describeEnd', () => {
   it('names the day, or says there is none', () => {
-    expect(describeEnd({ endsAt: '2026-12-24T12:00:00.000Z' })).toBe('until 24 December 2026');
-    expect(describeEnd({ endsAt: null })).toBe('with no end date');
+    expect(describeEnd({ endsAt: '2026-12-24T12:00:00.000Z', status: 'ACTIVE' })).toBe(
+      'until 24 December 2026',
+    );
+    expect(describeEnd({ endsAt: null, status: 'ACTIVE' })).toBe('with no end date');
+  });
+
+  it('names the day of the next payment, not the days of grace after it', () => {
+    const paid = { endsAt: '2026-12-27T12:00:00.000Z', renewsAt: '2026-12-24T12:00:00.000Z' };
+    expect(describeEnd({ ...paid, status: 'ACTIVE' })).toBe('renewed on 24 December 2026');
+    expect(describeEnd({ ...paid, status: 'TRIALING' })).toBe(
+      'free until 24 December 2026, then paid',
+    );
+  });
+
+  it('names the end once a paid subscription is cancelled', () => {
+    expect(
+      describeEnd({ endsAt: '2026-12-24T12:00:00.000Z', renewsAt: null, status: 'ACTIVE' }),
+    ).toBe('until 24 December 2026');
+  });
+});
+
+describe('subscribeLabel', () => {
+  it('offers the trial where there is one', () => {
+    expect(subscribeLabel({ trialDays: 7 }, true)).toBe('Start 7 days free');
+    expect(subscribeLabel({ trialDays: 1 }, true)).toBe('Start 1 day free');
+    expect(subscribeLabel({ trialDays: 0 }, true)).toBe('Subscribe');
+    expect(subscribeLabel({ trialDays: 7 }, false)).toBe('Subscribe');
   });
 });

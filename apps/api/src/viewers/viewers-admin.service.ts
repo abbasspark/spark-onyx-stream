@@ -206,6 +206,16 @@ export class ViewersAdminService {
   /** Deletes a viewer with everything stored about them. */
   async remove(id: string): Promise<Viewer> {
     const viewer = await this.find(id);
+    const paying = await this.prisma.subscription.findFirst({
+      where: { viewerId: id, source: 'STRIPE', ...runningAt() },
+      select: { id: true },
+    });
+    if (paying) {
+      // Deleting the account would not stop the payments at Stripe.
+      throw new ConflictException(
+        'This viewer pays for a subscription online. End the subscription first, then delete the account.',
+      );
+    }
     await this.prisma.viewer.delete({ where: { id } });
     return viewer;
   }

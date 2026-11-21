@@ -95,3 +95,18 @@ export const changeSubscriptionSchema = z
   .partial()
   .refine((value) => Object.keys(value).length > 0, { message: 'Nothing to change' });
 export type ChangeSubscriptionInput = z.infer<typeof changeSubscriptionSchema>;
+
+/** What a viewer chooses on the page of plans. */
+export const startCheckoutSchema = z.object({
+  planId: z.uuid(),
+  interval: z.enum(['MONTH', 'YEAR']),
+});
+export type StartCheckoutInput = z.infer<typeof startCheckoutSchema>;
+
+/** The payment a viewer returns from, as Stripe names it in the address. */
+export const confirmCheckoutSchema = z.object({
+  sessionId: z
+    .string()
+    .regex(/^cs_(test|live)_[A-Za-z0-9]{8,200}$/, 'This is not a payment of this site'),
+});
+export type ConfirmCheckoutInput = z.infer<typeof confirmCheckoutSchema>;

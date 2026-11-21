@@ -54,7 +54,10 @@ async function bootstrap(): Promise<void> {
   logger.log(`Roles: ${config.roles.join(', ')}`);
 
   if (config.hasRole('api')) {
-    const app = await NestFactory.create<NestExpressApplication>(rootModule);
+    const app = await NestFactory.create<NestExpressApplication>(rootModule, {
+      // Kept beside the parsed body: the signature of a message from Stripe covers every byte.
+      rawBody: true,
+    });
     app.setGlobalPrefix(API_PREFIX);
     // Behind a proxy, the audit log and the sign-in limit need the real client address.
     app.set('trust proxy', config.trustProxyHops);

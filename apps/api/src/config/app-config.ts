@@ -42,6 +42,15 @@ export class AppConfig {
   readonly billingCurrency: string;
   /** Where viewers ask for a subscription. Empty when not set. */
   readonly billingContactUrl: string;
+  /** Access to Stripe for selling subscriptions online. Null when there is no online payment. */
+  readonly stripe: {
+    readonly secretKey: string;
+    readonly webhookSecret: string;
+    readonly apiUrl: string;
+    /** False while the key is one for testing, where no money moves. */
+    readonly livemode: boolean;
+    readonly automaticTax: boolean;
+  } | null;
   /** Access to TMDB for importing details of titles. Null when the import is off. */
   readonly tmdb: {
     readonly token: string;
@@ -89,6 +98,15 @@ export class AppConfig {
     this.mediaBaseUrl = env.MEDIA_BASE_URL;
     this.billingCurrency = env.BILLING_CURRENCY;
     this.billingContactUrl = env.BILLING_CONTACT_URL;
+    this.stripe = env.STRIPE_SECRET_KEY
+      ? {
+          secretKey: env.STRIPE_SECRET_KEY,
+          webhookSecret: env.STRIPE_WEBHOOK_SECRET,
+          apiUrl: env.STRIPE_API_URL,
+          livemode: /^(sk|rk)_live_/.test(env.STRIPE_SECRET_KEY),
+          automaticTax: env.STRIPE_AUTOMATIC_TAX === 'true',
+        }
+      : null;
     this.tmdb = env.TMDB_API_TOKEN
       ? { token: env.TMDB_API_TOKEN, apiUrl: env.TMDB_API_URL, imageUrl: env.TMDB_IMAGE_URL }
       : null;

@@ -10,6 +10,7 @@ import { PrismaClient } from '@onyx/database';
 import type { Redis } from 'ioredis';
 import { PipelineService } from '../processing/pipeline.service.js';
 import { REDIS_CLIENT } from '../redis/redis.module.js';
+import { StripeSyncService } from '../stripe/stripe-sync.service.js';
 
 /** How often the repairs run. */
 export const SWEEP_INTERVAL_MS = 60_000;
@@ -50,6 +51,7 @@ export class MaintenanceService implements OnApplicationBootstrap, OnApplication
     @Inject(PrismaClient) private readonly prisma: PrismaClient,
     @Inject(PipelineService) private readonly pipeline: PipelineService,
     @Inject(REDIS_CLIENT) private readonly redis: Redis,
+    @Inject(StripeSyncService) private readonly stripeSync: StripeSyncService,
   ) {}
 
   onApplicationBootstrap(): void {
@@ -74,6 +76,9 @@ export class MaintenanceService implements OnApplicationBootstrap, OnApplication
       await this.purgeEndedViewerSessions();
       await this.purgeExpiredViewerTokens();
       await this.expireSubscriptions();
+      // Asks Stripe about renewals it has not reported: the net under a lost message.
+      await this.stripeSync.reconcile();
+      await this.stripeSync.purgeEvents();
       const result = await this.sweep();
       if (result.started > 0 || result.cleanups > 0) {
         this.logger.log(

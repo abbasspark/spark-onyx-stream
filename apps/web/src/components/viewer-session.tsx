@@ -26,6 +26,8 @@ interface ViewerSession {
   profile: Profile | null;
   /** Whether the viewer has a running subscription, which opens paid titles. */
   entitled: boolean;
+  /** Takes over what the API said about the subscription, after paying for one. */
+  setEntitled: (entitled: boolean) => void;
   /** What is open on this site. Null while loading, or when it could not be asked. */
   access: AccessConfig | null;
   /**
@@ -166,6 +168,7 @@ export function ViewerSessionProvider({ children }: { children: ReactNode }) {
       viewer,
       profile,
       entitled,
+      setEntitled,
       access,
       setViewer,
       setProfile,
