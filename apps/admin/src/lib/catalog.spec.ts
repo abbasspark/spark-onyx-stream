@@ -20,6 +20,7 @@ const title: TitleDetail = {
   asset: null,
   seasonCount: 0,
   episodeCount: 0,
+  isVisible: false,
   createdAt: '2026-11-20T10:00:00.000Z',
   updatedAt: '2026-11-20T10:00:00.000Z',
   originalName: null,
@@ -69,7 +70,13 @@ describe('changedFields', () => {
 describe('describeContent', () => {
   it('describes a movie by its video', () => {
     expect(describeContent(title)).toBe('No video yet');
-    const video = { id: 'a1', title: 'Master', durationMs: 5_400_000, height: 1080 };
+    const video = {
+      id: 'a1',
+      title: 'Master',
+      durationMs: 5_400_000,
+      height: 1080,
+      playable: true,
+    };
     expect(describeContent({ ...title, asset: { ...video, status: 'PROCESSING' } })).toBe(
       'Video processing',
     );

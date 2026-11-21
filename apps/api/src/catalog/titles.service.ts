@@ -29,6 +29,7 @@ import {
   toTitleDetail,
   toTitleSummary,
 } from './catalog.views.js';
+import { isPlayable, VISIBLE_TITLE } from './playable.js';
 import { slugify, uniqueSlug } from './slug.js';
 
 const SUMMARY_INCLUDE = {
@@ -94,8 +95,21 @@ export class TitlesService {
       this.prisma.title.count({ where }),
     ]);
 
+    // Which of the published titles on this page viewers can actually see.
+    const published = titles.filter((title) => title.status === 'PUBLISHED');
+    const visible = new Set(
+      published.length === 0
+        ? []
+        : (
+            await this.prisma.title.findMany({
+              where: { id: { in: published.map((title) => title.id) }, ...VISIBLE_TITLE },
+              select: { id: true },
+            })
+          ).map((title) => title.id),
+    );
+
     return toPage(
-      titles.map((title) => toTitleSummary(title, this.config.mediaBaseUrl)),
+      titles.map((title) => toTitleSummary(title, this.config.mediaBaseUrl, visible.has(title.id))),
       total,
       input,
     );
@@ -149,7 +163,7 @@ export class TitlesService {
         throw new ConflictException('Unpublish the title before removing its video');
       }
       const next = await this.prisma.asset.findUnique({ where: { id: fields.assetId } });
-      if (next?.status !== 'READY') {
+      if (!isPlayable(next)) {
         throw new ConflictException(
           'A published title can only get a video that is processed and ready to play',
         );
@@ -304,7 +318,7 @@ export class TitlesService {
       const asset = nextAssetId
         ? await this.prisma.asset.findUnique({ where: { id: nextAssetId } })
         : null;
-      if (!asset || asset.status !== 'READY') {
+      if (!asset || !isPlayable(asset)) {
         throw new ConflictException(
           asset
             ? 'The episode cannot be published before its video is processed and ready'

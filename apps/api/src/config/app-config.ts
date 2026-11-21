@@ -32,6 +32,8 @@ export class AppConfig {
   readonly processingTempPath: string;
   readonly workerConcurrency: number;
   readonly playbackUrlTtlSeconds: number;
+  /** Whether anyone may play published titles through the public catalog. */
+  readonly catalogPlaybackOpen: boolean;
   /** Origin that serves media files. Empty when the API serves them itself. */
   readonly mediaBaseUrl: string;
 
@@ -60,6 +62,7 @@ export class AppConfig {
     this.processingTempPath = path.resolve(baseDirectory, env.PROCESSING_TEMP_PATH);
     this.workerConcurrency = env.WORKER_CONCURRENCY;
     this.playbackUrlTtlSeconds = env.PLAYBACK_URL_TTL_SECONDS;
+    this.catalogPlaybackOpen = env.CATALOG_PLAYBACK === 'open';
     this.mediaBaseUrl = env.MEDIA_BASE_URL;
   }
 

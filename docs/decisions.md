@@ -275,3 +275,18 @@ This replaces the "plain CSS without a component library" part of D-018.
 **Why:** the library is about files and processing, the catalog is about what viewers see. Keeping them apart lets a video be re-encoded, replaced or reused without touching what is published, and lets the catalog grow (people, collections, imported metadata) without changing the media engine.
 
 **Consequence:** a video can still be deleted in the library while a published title uses it. The title then shows as incomplete in the panel, and the public catalog API must leave such titles out. Artwork is stored only as uploaded. Resized variants are a later addition.
+
+## D-024 The public catalog shows only what can be watched, and playback is open until accounts exist
+
+**Date:** 2026-11-21
+
+- **Viewers read the catalog through its own routes**, `/v1/catalog`, with their own response shapes. The admin routes and shapes are never reused for viewers.
+- **One filter decides what is visible:** published, and playable right now. It is defined once and used by every public query and by the panel's "hidden" mark.
+- **A title that cannot be played is hidden, not unpublished.** When its video is processed again and becomes ready, it is back without anyone touching it.
+- **Public reads may be cached for 30 seconds** and are limited per client address in Redis.
+- **Until viewer accounts exist, `CATALOG_PLAYBACK` is the only gate:** `open` lets anyone play published titles, `off` lets nobody.
+- **"Ready" is not enough to publish.** A video must also have a stream. This closes a gap in D-023, where a video stored without processing could be published.
+
+**Why:** separate shapes keep internal details from leaking and let the panel change freely without breaking apps. Hiding instead of unpublishing means reprocessing a video is safe and needs no follow-up. Short caching takes most read load off the API once many viewers browse, at the cost of a small delay.
+
+**Consequence:** with the default `open`, published means public. An operator who needs paid or private viewing has to wait for viewer accounts or set `off`. The request limit counts by IP address, so many viewers behind one address share one allowance. The limits are generous for that reason and are a guard against floods, not a precise control.

@@ -51,6 +51,8 @@ describe.skipIf(!TEST_DATABASE_URL)('Catalog (e2e)', () => {
       where: { id },
       data: {
         status,
+        // Processing leaves a stream behind. Without one a video cannot be played.
+        manifestPath: status === 'READY' ? `assets/${id}/hls/master.m3u8` : null,
         durationMs: 90_000,
         height: 1080,
         readyAt: status === 'READY' ? new Date() : null,
@@ -279,7 +281,15 @@ describe.skipIf(!TEST_DATABASE_URL)('Catalog (e2e)', () => {
       const notReady = await setStatus(title.id, 'PUBLISHED').expect(409);
       expect(notReady.body.message).toContain('ready to play');
 
+      // A video stored without processing is ready, but has no stream to play.
       await testApp.prisma.asset.update({ where: { id: processing }, data: { status: 'READY' } });
+      const noStream = await setStatus(title.id, 'PUBLISHED').expect(409);
+      expect(noStream.body.message).toContain('ready to play');
+
+      await testApp.prisma.asset.update({
+        where: { id: processing },
+        data: { status: 'READY', manifestPath: `assets/${processing}/hls/master.m3u8` },
+      });
       const published = await setStatus(title.id, 'PUBLISHED').expect(200);
       expect(published.body).toMatchObject({ status: 'PUBLISHED' });
       expect(published.body.publishedAt).not.toBeNull();
@@ -428,7 +438,10 @@ describe.skipIf(!TEST_DATABASE_URL)('Catalog (e2e)', () => {
         .send({ assetId: processing })
         .expect(200);
       await publishEpisode('PUBLISHED').expect(409);
-      await testApp.prisma.asset.update({ where: { id: processing }, data: { status: 'READY' } });
+      await testApp.prisma.asset.update({
+        where: { id: processing },
+        data: { status: 'READY', manifestPath: `assets/${processing}/hls/master.m3u8` },
+      });
       const published = await publishEpisode('PUBLISHED').expect(200);
       expect(published.body).toMatchObject({ status: 'PUBLISHED' });
 

@@ -65,6 +65,12 @@ export const envSchema = z.object({
     .max(7 * 24 * 60 * 60)
     .default(6 * 60 * 60),
   /**
+   * Who may play published titles through the public catalog.
+   * "open": anyone who can reach the site. "off": nobody, the catalog can
+   * still be browsed. Viewer accounts will add further choices.
+   */
+  CATALOG_PLAYBACK: z.enum(['open', 'off']).default('open'),
+  /**
    * Origin that serves media files, for example "https://media.example.com".
    * Empty means the API itself, and playback URLs are then relative paths.
    */
