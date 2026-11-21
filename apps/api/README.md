@@ -58,14 +58,13 @@ Send the token on later requests as `Authorization: Bearer <token>`.
 | Unit       | `pnpm --filter @onyx/api test` | Nothing                                      |
 | End-to-end | `pnpm test:e2e`                | A test database for the authentication suite |
 
-The authentication, storage pool, upload, processing and playback suites run against a real PostgreSQL database and are skipped when `TEST_DATABASE_URL` is not set. They delete data in that database, so it must be a separate database. Prepare it once, and again after every new migration:
+The authentication, storage pool, upload, processing and playback suites run against a real PostgreSQL database and are skipped when `TEST_DATABASE_URL` is not set. They delete data in that database, so it must be a separate database. Create it once:
 
 ```bash
 docker compose -f deploy/dev/docker-compose.yml exec postgres createdb -U onyx onyx_test
-DATABASE_URL="postgresql://onyx:<your password>@localhost:5432/onyx_test" pnpm --filter @onyx/database migrate:deploy
 ```
 
-The first command fails harmlessly if the database already exists.
+The command fails harmlessly if the database already exists. The test run brings the database up to the newest migration by itself before the first suite.
 
 The processing and playback suites also need FFmpeg and are skipped without it. They generate their own test videos.
 

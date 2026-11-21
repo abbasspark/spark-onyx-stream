@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
+import { Logger } from '@nestjs/common';
 import type { Redis } from 'ioredis';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { RateLimitService } from './rate-limit.service.js';
 
 /** The few Redis commands the service uses, kept in memory. */
@@ -81,7 +82,11 @@ describe('RateLimitService', () => {
       },
     };
     const service = new RateLimitService(broken as unknown as Redis);
+    // The warning is expected here and would only clutter the test output.
+    const warn = vi.spyOn(Logger.prototype, 'warn').mockImplementation(() => undefined);
 
     expect((await service.hit(rule, '203.0.113.5')).allowed).toBe(true);
+    expect(warn).toHaveBeenCalledOnce();
+    warn.mockRestore();
   });
 });
