@@ -4,6 +4,7 @@
 import { Clapperboard, Lock, Play } from 'lucide-react';
 import Link from 'next/link';
 import { formatClock } from '@/lib/format';
+import { opensTitle } from '@/lib/plans';
 import type { TitleDetail } from '@/lib/types';
 import { episodeCode, movieKey, nextUnwatched, watchHref } from '@/lib/watch';
 import { useWatching } from './continue-watching';
@@ -18,9 +19,9 @@ import { useWatchedVideos } from './watched-videos';
 export function TitleActions({ title }: { title: TitleDetail }) {
   const watching = useWatching();
   const watched = useWatchedVideos(title.slug);
-  const { state, entitled } = useViewerSession();
+  const { state, entitled, opens } = useViewerSession();
   // Until it is known who is here the button says "Play": the player explains the rest.
-  const locked = title.access === 'PAID' && state === 'ready' && !entitled;
+  const locked = state === 'ready' && !opensTitle(opens, title);
 
   let href: string;
   let label: string;
@@ -53,7 +54,7 @@ export function TitleActions({ title }: { title: TitleDetail }) {
           className="button button-play"
         >
           <Lock />
-          Subscribe to watch
+          {entitled ? 'Not in your plan' : 'Subscribe to watch'}
         </Link>
       ) : null}
       <Link

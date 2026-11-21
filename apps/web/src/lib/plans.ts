@@ -15,6 +15,66 @@ export interface Plan {
   yearlyAmount: number | null;
   trialDays: number;
   isRecommended: boolean;
+  /** Whether the plan opens every paid title. Left out by an API older than packages. */
+  includesAll?: boolean;
+  /** The packages the plan opens when it does not open everything. */
+  packages?: { id: string; name: string }[];
+}
+
+/**
+ * What a viewer's subscription opens: every paid title, or the titles of
+ * some packages. Null for a viewer without a running subscription.
+ */
+export type Opens = { all: boolean; packageIds: string[] } | null;
+
+/** What a subscription opens when the site only says that there is one. */
+export function opensFrom(result: { entitled: boolean; access?: Opens }): Opens {
+  if (result.access !== undefined) {
+    return result.access;
+  }
+  // An API older than packages: every plan opens everything.
+  return result.entitled ? { all: true, packageIds: [] } : null;
+}
+
+type Lockable = { access?: 'FREE' | 'PAID'; packageIds?: string[] };
+
+/** Whether a title is open to a viewer as far as their subscription goes. */
+export function opensTitle(opens: Opens, title: Lockable): boolean {
+  if (title.access !== 'PAID') {
+    return true;
+  }
+  if (!opens) {
+    return false;
+  }
+  return opens.all || (title.packageIds ?? []).some((id) => opens.packageIds.includes(id));
+}
+
+/** Whether a plan opens a title. */
+export function planOpensTitle(
+  plan: Pick<Plan, 'includesAll' | 'packages'>,
+  title: Lockable,
+): boolean {
+  if (title.access !== 'PAID' || plan.includesAll !== false) {
+    return true;
+  }
+  const ids = (plan.packages ?? []).map((item) => item.id);
+  return (title.packageIds ?? []).some((id) => ids.includes(id));
+}
+
+/** "Kids, Sports and Films" */
+export function listNames(names: readonly string[]): string {
+  if (names.length <= 1) {
+    return names[0] ?? '';
+  }
+  return `${names.slice(0, -1).join(', ')} and ${names.at(-1)}`;
+}
+
+/** What a plan opens, in words for the page of plans. */
+export function describeOpens(plan: Pick<Plan, 'includesAll' | 'packages'>): string {
+  if (plan.includesAll !== false || !plan.packages || plan.packages.length === 0) {
+    return 'every title with a lock';
+  }
+  return listNames(plan.packages.map((item) => item.name));
 }
 
 export interface Plans {

@@ -2,7 +2,7 @@
 //
 // Calls the browser makes about the viewer's own account. They go to the same
 // origin, so the session cookie travels with them by itself.
-import type { OwnPayment, OwnSubscription } from './plans';
+import type { Opens, OwnPayment, OwnSubscription } from './plans';
 
 export interface Viewer {
   id: string;
@@ -18,8 +18,10 @@ export interface Viewer {
 export interface SignedIn {
   viewer: Viewer;
   profile: { id: string; name: string; color: string; isMain: boolean };
-  /** Whether titles that need a subscription are open to this viewer. */
+  /** Whether the viewer has a running subscription. */
   entitled?: boolean;
+  /** Which paid titles it opens. Left out by an API older than packages. */
+  access?: Opens;
 }
 
 export interface ViewerDevice {
@@ -123,13 +125,18 @@ export const viewerApi = {
   /** The signed-in viewer, or null when nobody is signed in. */
   /** Who is signed in and which profile is in use on this device. Both null for a visitor. */
   session: () =>
-    call<SignedIn | { viewer: null; profile: null; entitled?: boolean }>('GET', '/session'),
+    call<SignedIn | { viewer: null; profile: null; entitled?: boolean; access?: Opens }>(
+      'GET',
+      '/session',
+    ),
   /** The viewer's own subscription, or null. */
   subscription: () =>
-    call<{ subscription: OwnSubscription | null; entitled: boolean; trialUsed?: boolean }>(
-      'GET',
-      '/subscription',
-    ),
+    call<{
+      subscription: OwnSubscription | null;
+      entitled: boolean;
+      access?: Opens;
+      trialUsed?: boolean;
+    }>('GET', '/subscription'),
   /** The viewer's own payments, newest first. */
   payments: () => call<{ items: OwnPayment[] }>('GET', '/payments'),
   /** Opens the payment page for a plan. Answers with the address to go to. */
@@ -137,9 +144,13 @@ export const viewerApi = {
     call<{ url: string }>('POST', '/checkout', { planId, interval }),
   /** Tells the site that the viewer is back from paying. */
   confirmCheckout: (sessionId: string) =>
-    call<{ subscription: OwnSubscription | null; entitled: boolean }>('POST', '/checkout/confirm', {
-      sessionId,
-    }),
+    call<{ subscription: OwnSubscription | null; entitled: boolean; access?: Opens }>(
+      'POST',
+      '/checkout/confirm',
+      {
+        sessionId,
+      },
+    ),
   /** Opens the page for changing the card, reading invoices and cancelling. */
   billingPortal: () => call<{ url: string }>('POST', '/billing-portal'),
   register: (input: { email: string; displayName: string; password: string }) =>

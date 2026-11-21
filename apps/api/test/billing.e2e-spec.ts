@@ -149,6 +149,8 @@ describe.skipIf(!TEST_DATABASE_URL)('Billing (e2e)', () => {
         yearlyAmount: 7990,
         trialDays: 7,
         isRecommended: false,
+        includesAll: true,
+        packages: [],
         isOffered: true,
         position: 0,
         subscribers: 0,
@@ -172,6 +174,8 @@ describe.skipIf(!TEST_DATABASE_URL)('Billing (e2e)', () => {
             yearlyAmount: 7990,
             trialDays: 7,
             isRecommended: false,
+            includesAll: true,
+            packages: [],
           },
         ],
       });
@@ -318,7 +322,12 @@ describe.skipIf(!TEST_DATABASE_URL)('Billing (e2e)', () => {
       const plan = await createPlan();
       const { id, cookie } = await register();
       const before = await http().get('/v1/viewer/subscription').set('Cookie', cookie).expect(200);
-      expect(before.body).toEqual({ subscription: null, entitled: false, trialUsed: false });
+      expect(before.body).toEqual({
+        subscription: null,
+        entitled: false,
+        access: null,
+        trialUsed: false,
+      });
       expect(before.headers['cache-control']).toBe('no-store');
 
       const endsAt = inDays(30);
@@ -348,6 +357,7 @@ describe.skipIf(!TEST_DATABASE_URL)('Billing (e2e)', () => {
       const own = await http().get('/v1/viewer/subscription').set('Cookie', cookie).expect(200);
       expect(own.body).toEqual({
         entitled: true,
+        access: { all: true, packageIds: [] },
         trialUsed: false,
         subscription: {
           plan: { id: plan.id, name: 'Standard' },
@@ -420,7 +430,12 @@ describe.skipIf(!TEST_DATABASE_URL)('Billing (e2e)', () => {
       expect(ended.body).toMatchObject({ status: 'CANCELED', running: false });
       expect(ended.body.canceledAt).toEqual(expect.any(String));
       const own = await http().get('/v1/viewer/subscription').set('Cookie', cookie).expect(200);
-      expect(own.body).toEqual({ subscription: null, entitled: false, trialUsed: false });
+      expect(own.body).toEqual({
+        subscription: null,
+        entitled: false,
+        access: null,
+        trialUsed: false,
+      });
 
       // What is over cannot be changed or ended again. A new grant can follow.
       await http().post(`/v1/subscriptions/${subscriptionId}/end`).set(admin()).expect(409);
@@ -639,6 +654,9 @@ describe.skipIf(!TEST_DATABASE_URL)('Billing (e2e)', () => {
         endingSoon: 1,
         paidTitles: 1,
         publishedTitles: 2,
+        packages: 0,
+        limitedPlans: 0,
+        unpackagedPaidTitles: 1,
       });
     });
   });

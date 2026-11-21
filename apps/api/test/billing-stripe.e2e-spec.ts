@@ -298,7 +298,12 @@ describe.skipIf(!TEST_DATABASE_URL)('Billing with Stripe (e2e)', () => {
         .set('Cookie', anna.cookie)
         .send({ sessionId })
         .expect(200);
-      expect(early.body).toEqual({ subscription: null, entitled: false, trialUsed: false });
+      expect(early.body).toEqual({
+        subscription: null,
+        entitled: false,
+        access: null,
+        trialUsed: false,
+      });
 
       const remote = stripe.pay(sessionId);
       const confirmed = await http()
@@ -309,6 +314,7 @@ describe.skipIf(!TEST_DATABASE_URL)('Billing with Stripe (e2e)', () => {
       const periodEnd = (remote.items.data[0]?.current_period_end as number) * 1000;
       expect(confirmed.body).toEqual({
         entitled: true,
+        access: { all: true, packageIds: [] },
         trialUsed: true,
         subscription: {
           plan: { id: plan.id, name: 'Standard' },
@@ -496,6 +502,7 @@ describe.skipIf(!TEST_DATABASE_URL)('Billing with Stripe (e2e)', () => {
       expect(await own(anna.cookie)).toEqual({
         subscription: null,
         entitled: false,
+        access: null,
         trialUsed: true,
       });
       const refused = await play(movie.slug, anna.cookie).expect(402);

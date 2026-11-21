@@ -23,7 +23,7 @@ import { type FormEvent, useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router';
 import { toast } from 'sonner';
 import { ApiError, apiUrl } from '@/api/client';
-import { categoriesApi, titlesApi } from '@/api/endpoints';
+import { categoriesApi, packagesApi, titlesApi } from '@/api/endpoints';
 import type { PublishStatus, TitleDetail, UpdateTitleInput } from '@/api/types';
 import { useSession } from '@/auth/session';
 import { useConfirm } from '@/components/confirm';
@@ -499,6 +499,11 @@ function DetailsTab({ title, disabled, save }: DetailsTabProps) {
   const set = <Key extends keyof DetailsForm>(key: Key, value: DetailsForm[Key]) =>
     setForm((current) => ({ ...current, [key]: value }));
 
+  const packages = useQuery({
+    queryKey: ['billing', 'packages'],
+    queryFn: ({ signal }) => packagesApi.list(signal),
+    staleTime: 60_000,
+  });
   const categories = useQuery({
     queryKey: ['categories'],
     queryFn: ({ signal }) => categoriesApi.list(signal),
@@ -534,6 +539,14 @@ function DetailsTab({ title, disabled, save }: DetailsTabProps) {
     event.preventDefault();
     submit.mutate();
   };
+
+  const togglePackage = (packageId: string) =>
+    set(
+      'packageIds',
+      form.packageIds.includes(packageId)
+        ? form.packageIds.filter((value) => value !== packageId)
+        : [...form.packageIds, packageId],
+    );
 
   const toggleCategory = (categoryId: string) =>
     set(
@@ -705,6 +718,45 @@ function DetailsTab({ title, disabled, save }: DetailsTabProps) {
             disabled={disabled}
             onCheckedChange={(checked) => set('isPaid', checked)}
           />
+          {form.isPaid && packages.data && packages.data.length > 0 ? (
+            <div className="rounded-lg border p-4">
+              <div className="flex flex-wrap items-baseline justify-between gap-2">
+                <p className="text-sm font-medium">Packages</p>
+                <Button asChild variant="link" size="sm">
+                  <Link to="/packages">Manage packages</Link>
+                </Button>
+              </div>
+              <p className="mt-0.5 mb-3 text-xs text-muted-foreground">
+                Plans with chosen packages open the title through them.{' '}
+                {form.packageIds.length === 0
+                  ? 'In no package, only plans that open everything show it.'
+                  : 'Plans that open everything show it either way.'}
+              </p>
+              <div className="flex flex-wrap gap-2">
+                {packages.data.map((item) => {
+                  const chosen = form.packageIds.includes(item.id);
+                  return (
+                    <button
+                      key={item.id}
+                      type="button"
+                      role="checkbox"
+                      aria-checked={chosen}
+                      disabled={disabled}
+                      onClick={() => togglePackage(item.id)}
+                      className={cn(
+                        'inline-flex h-8 items-center gap-1.5 rounded-full border px-3 text-[13px] font-medium transition-colors hover:bg-accent disabled:pointer-events-none disabled:opacity-60',
+                        chosen &&
+                          'border-primary bg-primary text-primary-foreground hover:bg-primary/90',
+                      )}
+                    >
+                      {chosen ? <Check className="size-3.5" aria-hidden="true" /> : null}
+                      {item.name}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          ) : null}
           <Field
             label="Slug"
             hint="Part of the title's web address. Changing it breaks links that people saved."

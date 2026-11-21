@@ -19,7 +19,19 @@ export interface PublicPlan {
   yearlyAmount: number | null;
   trialDays: number;
   isRecommended: boolean;
+  /** Whether the plan opens every paid title. Otherwise it opens its packages. */
+  includesAll: boolean;
+  packages: { id: string; name: string }[];
 }
+
+type PlanWithPackages = Plan & {
+  packages: { package: { id: string; name: string; position: number } }[];
+};
+
+/** What to read of a plan to show what it opens. */
+export const PLAN_INCLUDE = {
+  packages: { include: { package: { select: { id: true, name: true, position: true } } } },
+} as const;
 
 /** What a site offers, for its page of plans. */
 export interface PublicPlans {
@@ -32,7 +44,7 @@ export interface PublicPlans {
   plans: PublicPlan[];
 }
 
-export function toPublicPlan(plan: Plan): PublicPlan {
+export function toPublicPlan(plan: PlanWithPackages): PublicPlan {
   return {
     id: plan.id,
     name: plan.name,
@@ -42,6 +54,13 @@ export function toPublicPlan(plan: Plan): PublicPlan {
     yearlyAmount: plan.yearlyAmount,
     trialDays: plan.trialDays,
     isRecommended: plan.isRecommended,
+    includesAll: plan.includesAll,
+    packages: plan.includesAll
+      ? []
+      : plan.packages
+          .map((link) => link.package)
+          .sort((a, b) => a.position - b.position || a.name.localeCompare(b.name))
+          .map(({ id, name }) => ({ id, name })),
   };
 }
 
@@ -55,7 +74,7 @@ export interface PlanAdminView extends PublicPlan {
   updatedAt: Date;
 }
 
-export function toPlanAdminView(plan: Plan, subscribers: number): PlanAdminView {
+export function toPlanAdminView(plan: PlanWithPackages, subscribers: number): PlanAdminView {
   return {
     ...toPublicPlan(plan),
     isOffered: plan.isOffered,
@@ -162,6 +181,11 @@ export interface BillingOverview {
   /** Published titles that need a subscription, and all published titles. */
   paidTitles: number;
   publishedTitles: number;
+  packages: number;
+  /** Plans that open only their packages. */
+  limitedPlans: number;
+  /** Published paid titles in no package, which only plans that open everything show. */
+  unpackagedPaidTitles: number;
 }
 
 /** A message from Stripe, as the panel lists it. */

@@ -178,6 +178,7 @@ describe.skipIf(!TEST_DATABASE_URL)('Public catalog (e2e)', () => {
         ageRating: '16',
         isFeatured: false,
         access: 'FREE',
+        packageIds: [],
         poster: null,
         backdrop: null,
         logo: null,

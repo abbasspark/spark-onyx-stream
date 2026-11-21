@@ -6,6 +6,7 @@ import {
   Film,
   KeyRound,
   LayoutDashboard,
+  Boxes,
   CreditCard,
   Receipt,
   type LucideIcon,
@@ -79,6 +80,13 @@ export const NAVIGATION: NavGroup[] = [
         icon: CreditCard,
         permission: 'billing:read',
         keywords: 'subscriptions prices pricing paywall stripe checkout',
+      },
+      {
+        to: '/packages',
+        label: 'Packages',
+        icon: Boxes,
+        permission: 'catalog:read',
+        keywords: 'bouquets bundles groups tiers what a plan opens includes kids sports',
       },
       {
         to: '/revenue',

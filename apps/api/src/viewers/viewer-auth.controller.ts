@@ -41,6 +41,7 @@ import {
   updateOwnViewerSchema,
 } from './viewer.schemas.js';
 import { toViewerView, type ViewerSessionView, type ViewerView } from './viewer.view.js';
+import type { ViewerAccess } from '../billing/entitlement.js';
 import { CurrentViewer, ViewerOnly } from './viewer-auth.guard.js';
 import {
   type ViewerAccessConfig,
@@ -96,23 +97,28 @@ export class ViewerAuthController {
   @Public()
   @Get('session')
   @Header('Cache-Control', 'no-store')
-  async session(
-    @Req() request: Request,
-  ): Promise<{ viewer: ViewerView | null; profile: ProfileView | null; entitled: boolean }> {
+  async session(@Req() request: Request): Promise<{
+    viewer: ViewerView | null;
+    profile: ProfileView | null;
+    entitled: boolean;
+    access: ViewerAccess;
+  }> {
     const identity = await this.viewerSessions.identify(request);
     if (!identity) {
-      return { viewer: null, profile: null, entitled: false };
+      return { viewer: null, profile: null, entitled: false, access: null };
     }
-    const [profile, entitled] = await Promise.all([
+    const [profile, access] = await Promise.all([
       this.profiles.current(identity),
-      this.auth.isEntitled(identity.viewer.id),
+      this.auth.subscriptionAccess(identity.viewer.id),
     ]);
+    const entitled = access !== null;
     return {
       viewer: toViewerView(identity.viewer),
       // Who is watching on this device.
       profile: toProfileView(profile),
-      // Whether titles that need a subscription are open to this viewer.
+      // Whether the viewer has a running subscription, and which paid titles it opens.
       entitled,
+      access,
     };
   }
 

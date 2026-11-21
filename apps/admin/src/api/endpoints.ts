@@ -35,6 +35,7 @@ import type {
   MetadataSearchResult,
   MetadataStatus,
   OverviewStats,
+  Package,
   Page,
   Payment,
   PaymentListQuery,
@@ -184,6 +185,20 @@ export const billingApi = {
     request<StripeEvent[]>('/v1/billing/stripe/events', { signal }),
 };
 
+export const packagesApi = {
+  list: (signal?: AbortSignal) => request<Package[]>('/v1/packages', { signal }),
+  create: (body: { name: string; description: string | null }) =>
+    request<Package>('/v1/packages', { method: 'POST', body }),
+  update: (id: string, body: { name?: string; description?: string | null }) =>
+    request<Package>(`/v1/packages/${id}`, { method: 'PATCH', body }),
+  remove: (id: string) => request<void>(`/v1/packages/${id}`, { method: 'DELETE' }),
+  order: (ids: string[]) =>
+    request<Package[]>('/v1/packages/order', { method: 'PUT', body: { ids } }),
+  /** Puts titles into a package and takes titles out of it. */
+  changeTitles: (id: string, body: { add?: string[]; remove?: string[] }) =>
+    request<Package>(`/v1/packages/${id}/titles`, { method: 'PUT', body }),
+};
+
 export const paymentsApi = {
   revenue: (query: { months: number; timeZone: string }, signal?: AbortSignal) =>
     request<RevenueReport>('/v1/billing/revenue', { query, signal }),
@@ -264,6 +279,9 @@ export interface TitleListQuery {
   status?: PublishStatus;
   access?: TitleAccess;
   categoryId?: string;
+  packageId?: string;
+  /** "none": paid titles in no package. */
+  packaged?: 'none';
   q?: string;
   sort?: TitleSortField;
   order?: SortOrder;

@@ -31,6 +31,8 @@ export interface TitleCard {
   isFeatured: boolean;
   /** PAID when watching needs a subscription. Left out by an API older than plans. */
   access?: 'FREE' | 'PAID';
+  /** Ids of the packages a paid title is in. Left out by an API older than packages. */
+  packageIds?: string[];
   poster: CatalogImage | null;
   backdrop: CatalogImage | null;
   logo: CatalogImage | null;

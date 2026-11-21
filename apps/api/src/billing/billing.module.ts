@@ -7,6 +7,8 @@ import { CheckoutService } from './checkout.service.js';
 import { StripeWebhookController } from './stripe-webhook.controller.js';
 import { StripeWebhookService } from './stripe-webhook.service.js';
 import { PaymentsAdminController, ViewerPaymentsController } from './payments.controller.js';
+import { PackagesController } from './packages.controller.js';
+import { PackagesService } from './packages.service.js';
 import { PaymentsService } from './payments.service.js';
 import { PlansService } from './plans.service.js';
 import { SubscriptionsService } from './subscriptions.service.js';
@@ -24,6 +26,7 @@ import { SubscriptionsService } from './subscriptions.service.js';
     StripeWebhookController,
     ViewerPaymentsController,
     PaymentsAdminController,
+    PackagesController,
   ],
   providers: [
     PlansService,
@@ -31,6 +34,7 @@ import { SubscriptionsService } from './subscriptions.service.js';
     CheckoutService,
     StripeWebhookService,
     PaymentsService,
+    PackagesService,
   ],
   exports: [SubscriptionsService],
 })

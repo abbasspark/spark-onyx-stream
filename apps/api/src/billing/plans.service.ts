@@ -10,6 +10,7 @@ import { type Plan, PrismaClient } from '@onyx/database';
 import { AppConfig } from '../config/app-config.js';
 import type { CreatePlanInput, UpdatePlanInput } from './billing.schemas.js';
 import {
+  PLAN_INCLUDE,
   type PlanAdminView,
   type PublicPlans,
   toPlanAdminView,
@@ -30,6 +31,7 @@ export class PlansService {
     const plans = await this.prisma.plan.findMany({
       where: { isOffered: true },
       orderBy: [{ position: 'asc' }, { createdAt: 'asc' }],
+      include: PLAN_INCLUDE,
     });
     return {
       currency: this.config.billingCurrency,
@@ -42,7 +44,10 @@ export class PlansService {
   /** Every plan, with how many viewers watch through it. */
   async list(): Promise<PlanAdminView[]> {
     const [plans, counts] = await Promise.all([
-      this.prisma.plan.findMany({ orderBy: [{ position: 'asc' }, { createdAt: 'asc' }] }),
+      this.prisma.plan.findMany({
+        orderBy: [{ position: 'asc' }, { createdAt: 'asc' }],
+        include: PLAN_INCLUDE,
+      }),
       this.prisma.subscription.groupBy({
         by: ['planId'],
         where: runningAt(),
@@ -54,58 +59,85 @@ export class PlansService {
   }
 
   /** @throws NotFoundException */
-  async find(id: string): Promise<Plan> {
-    const plan = await this.prisma.plan.findUnique({ where: { id } });
+  async find(id: string) {
+    const plan = await this.prisma.plan.findUnique({ where: { id }, include: PLAN_INCLUDE });
     if (!plan) {
       throw new NotFoundException('Plan not found');
     }
     return plan;
   }
 
+  /** @throws BadRequestException when a chosen package does not exist. */
   async create(input: CreatePlanInput): Promise<PlanAdminView> {
+    const { packageIds, ...fields } = input;
+    const chosen = [...new Set(packageIds)];
+    await this.assertPackages(chosen);
     const last = await this.prisma.plan.aggregate({ _max: { position: true } });
     const plan = await this.prisma.$transaction(async (tx) => {
-      if (input.isRecommended) {
+      if (fields.isRecommended) {
         await tx.plan.updateMany({ data: { isRecommended: false } });
       }
-      return tx.plan.create({ data: { ...input, position: (last._max.position ?? -1) + 1 } });
+      return tx.plan.create({
+        data: {
+          ...fields,
+          position: (last._max.position ?? -1) + 1,
+          packages: { create: chosen.map((packageId) => ({ packageId })) },
+        },
+        include: PLAN_INCLUDE,
+      });
     });
     return toPlanAdminView(plan, 0);
   }
 
   /**
    * @throws NotFoundException
-   * @throws BadRequestException when the change would leave the plan without a price.
+   * @throws BadRequestException when the change would leave the plan without
+   *   a price, or opening nothing.
    */
   async update(
     id: string,
     input: UpdatePlanInput,
   ): Promise<{ plan: PlanAdminView; changed: string[] }> {
     const before = await this.find(id);
-    const after = { ...before, ...input };
+    const { packageIds, ...fields } = input;
+    const after = { ...before, ...fields };
     if (after.monthlyAmount === null && after.yearlyAmount === null) {
-      throw new BadRequestException({
-        statusCode: 400,
-        error: 'Bad Request',
-        message: 'Validation failed',
-        issues: [{ field: 'monthlyAmount', message: 'Set a price per month, per year, or both' }],
-      });
+      throw invalid('monthlyAmount', 'Set a price per month, per year, or both');
     }
-    const changed = (Object.keys(input) as (keyof UpdatePlanInput)[]).filter(
-      (key) => JSON.stringify(input[key]) !== JSON.stringify(before[key]),
+    const had = before.packages.map((link) => link.package.id).sort();
+    const chosen = packageIds ? [...new Set(packageIds)].sort() : had;
+    if (!after.includesAll && chosen.length === 0) {
+      throw invalid('packageIds', 'Choose at least one package, or let the plan open everything');
+    }
+    if (packageIds) {
+      await this.assertPackages(chosen);
+    }
+
+    const changed: string[] = (Object.keys(fields) as (keyof typeof fields)[]).filter(
+      (key) => JSON.stringify(fields[key]) !== JSON.stringify(before[key]),
     );
+    const packagesChanged = packageIds !== undefined && chosen.join() !== had.join();
+    if (packagesChanged) {
+      changed.push('packageIds');
+    }
     const plan =
       changed.length === 0
         ? before
         : await this.prisma.$transaction(async (tx) => {
             // One plan at most is the recommended one.
-            if (input.isRecommended) {
+            if (fields.isRecommended) {
               await tx.plan.updateMany({
                 where: { id: { not: id } },
                 data: { isRecommended: false },
               });
             }
-            return tx.plan.update({ where: { id }, data: input });
+            if (packagesChanged) {
+              await tx.planPackage.deleteMany({ where: { planId: id } });
+              await tx.planPackage.createMany({
+                data: chosen.map((packageId) => ({ planId: id, packageId })),
+              });
+            }
+            return tx.plan.update({ where: { id }, data: fields, include: PLAN_INCLUDE });
           });
     const subscribers = await this.prisma.subscription.count({
       where: { planId: id, ...runningAt() },
@@ -151,4 +183,23 @@ export class PlansService {
     );
     return this.list();
   }
+
+  private async assertPackages(ids: readonly string[]): Promise<void> {
+    if (ids.length === 0) {
+      return;
+    }
+    const found = await this.prisma.package.count({ where: { id: { in: [...ids] } } });
+    if (found !== ids.length) {
+      throw invalid('packageIds', 'One of the chosen packages does not exist');
+    }
+  }
+}
+
+function invalid(field: string, message: string): BadRequestException {
+  return new BadRequestException({
+    statusCode: 400,
+    error: 'Bad Request',
+    message: 'Validation failed',
+    issues: [{ field, message }],
+  });
 }

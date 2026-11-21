@@ -14,6 +14,7 @@ import { SubscriptionsService } from '../billing/subscriptions.service.js';
 import { type Page, toPage, toSkipTake } from '../common/pagination.js';
 import { AppConfig } from '../config/app-config.js';
 import { type PlaybackInfo, PlaybackService } from '../playback/playback.service.js';
+import { opensTitle } from '../billing/entitlement.js';
 import { isPlayable, VISIBLE_EPISODE, VISIBLE_TITLE } from './playable.js';
 import type { ListPublicTitlesInput } from './public-catalog.schemas.js';
 import {
@@ -40,11 +41,14 @@ const CARD_INCLUDE = {
   logo: true,
   asset: { select: { durationMs: true } },
   categories: { include: { category: true } },
+  packages: { select: { packageId: true } },
   seasons: {
     where: { episodes: { some: VISIBLE_EPISODE } },
     select: { _count: { select: { episodes: { where: VISIBLE_EPISODE } } } },
   },
 } satisfies Prisma.TitleInclude;
+
+const PACKAGE_IDS = { select: { packageId: true } } as const;
 
 const NEWEST_FIRST = [
   { publishedAt: 'desc' },
@@ -219,12 +223,12 @@ export class PublicCatalogService {
     this.assertOpen();
     const title = await this.prisma.title.findFirst({
       where: { slug, ...VISIBLE_TITLE },
-      select: { type: true, assetId: true, access: true },
+      select: { type: true, assetId: true, access: true, packages: PACKAGE_IDS },
     });
     if (!title) {
       throw new NotFoundException('Title not found');
     }
-    await this.assertMayPlay(watcher, title.access);
+    await this.assertMayPlay(watcher, title);
     if (title.type !== 'MOVIE' || !title.assetId) {
       throw new ConflictException('A series is played episode by episode');
     }
@@ -234,7 +238,7 @@ export class PublicCatalogService {
   /** Signed addresses for playing the trailer of a title. */
   async playTrailer(slug: string, watcher: Watcher): Promise<PlaybackInfo> {
     // A trailer is an invitation, also to a paid title.
-    await this.assertMayPlay(watcher, 'FREE');
+    await this.assertMayPlay(watcher, { access: 'FREE', packages: [] });
     const title = await this.prisma.title.findFirst({
       where: { slug, ...VISIBLE_TITLE },
       select: { trailerAsset: { select: { id: true, status: true, manifestPath: true } } },
@@ -250,13 +254,16 @@ export class PublicCatalogService {
     this.assertOpen();
     const episode = await this.prisma.episode.findFirst({
       where: { id: episodeId, ...VISIBLE_EPISODE, season: { title: { status: 'PUBLISHED' } } },
-      select: { assetId: true, season: { select: { title: { select: { access: true } } } } },
+      select: {
+        assetId: true,
+        season: { select: { title: { select: { access: true, packages: PACKAGE_IDS } } } },
+      },
     });
     if (!episode?.assetId) {
       throw new NotFoundException('Episode not found');
     }
     // An episode is as open as its series.
-    await this.assertMayPlay(watcher, episode.season.title.access);
+    await this.assertMayPlay(watcher, episode.season.title);
     return this.playback.createPlayback(episode.assetId);
   }
 
@@ -277,11 +284,14 @@ export class PublicCatalogService {
   /**
    * Checks that the one who asks may watch. A free title follows the setting
    * of the installation. A paid title always needs a signed-in viewer with a
-   * running subscription.
+   * running subscription whose plan opens the title.
    */
-  private async assertMayPlay(watcher: Watcher, access: TitleAccess): Promise<void> {
+  private async assertMayPlay(
+    watcher: Watcher,
+    title: { access: TitleAccess; packages: { packageId: string }[] },
+  ): Promise<void> {
     this.assertOpen();
-    const paid = access === 'PAID';
+    const paid = title.access === 'PAID';
     if (!paid && this.config.catalogPlayback !== 'viewers') {
       return;
     }
@@ -297,13 +307,23 @@ export class PublicCatalogService {
         code: 'email_unverified',
       });
     }
-    if (paid && !(await this.subscriptions.isEntitled(watcher.viewerId))) {
+    if (!paid) {
+      return;
+    }
+    const access = await this.subscriptions.accessOf(watcher.viewerId);
+    const open = opensTitle(
+      access,
+      title.packages.map((link) => link.packageId),
+    );
+    if (!open) {
       throw new HttpException(
         {
           statusCode: HttpStatus.PAYMENT_REQUIRED,
           error: 'Payment Required',
-          message: 'Subscribe to watch',
-          code: 'subscription_required',
+          // Lets a player tell "no subscription" from "a subscription that does not reach this far".
+          ...(access
+            ? { message: 'Your plan does not include this title', code: 'plan_required' }
+            : { message: 'Subscribe to watch', code: 'subscription_required' }),
         },
         HttpStatus.PAYMENT_REQUIRED,
       );

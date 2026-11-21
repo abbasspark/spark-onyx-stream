@@ -37,6 +37,11 @@ export interface PublicTitleCard {
   isFeatured: boolean;
   /** FREE, or PAID when watching needs a subscription. */
   access: TitleAccess;
+  /**
+   * Ids of the packages a paid title is in. A plan opens the title when it
+   * opens everything or names one of them. Empty for a free title.
+   */
+  packageIds: string[];
   poster: PublicImage | null;
   backdrop: PublicImage | null;
   logo: PublicImage | null;
@@ -104,6 +109,7 @@ export interface CardRecord {
   ageRating: string | null;
   isFeatured: boolean;
   access: TitleAccess;
+  packages: { packageId: string }[];
   publishedAt: Date | null;
   poster: Image | null;
   backdrop: Image | null;
@@ -140,6 +146,7 @@ export function toPublicCard(title: CardRecord, mediaBaseUrl: string): PublicTit
     ageRating: title.ageRating,
     isFeatured: title.isFeatured,
     access: title.access,
+    packageIds: title.access === 'PAID' ? title.packages.map((link) => link.packageId).sort() : [],
     poster: toPublicImage(title.poster, mediaBaseUrl),
     backdrop: toPublicImage(title.backdrop, mediaBaseUrl),
     logo: toPublicImage(title.logo, mediaBaseUrl),

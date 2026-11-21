@@ -19,7 +19,7 @@ import {
 } from './billing.views.js';
 import { StripeClient, StripeError } from '../stripe/stripe.client.js';
 import { StripeSyncService } from '../stripe/stripe-sync.service.js';
-import { runningAt } from './entitlement.js';
+import { ACCESS_SELECT, accessOf, runningAt, type ViewerAccess } from './entitlement.js';
 import {
   STRIPE_WEBHOOK_EVENTS,
   STRIPE_WEBHOOK_ROUTE,
@@ -54,6 +54,15 @@ export class SubscriptionsService {
       select: { id: true },
     });
     return running !== null;
+  }
+
+  /** What the viewer's subscription opens. Null without a running one. */
+  async accessOf(viewerId: string): Promise<ViewerAccess> {
+    const running = await this.prisma.subscription.findMany({
+      where: { viewerId, ...runningAt() },
+      select: ACCESS_SELECT,
+    });
+    return accessOf(running);
   }
 
   /** Whether the viewer paid online before. A free trial is offered once. */
@@ -238,6 +247,13 @@ export class SubscriptionsService {
       this.prisma.title.count({ where: { status: 'PUBLISHED' } }),
       this.stripeStatus(now),
     ]);
+    const [packages, limitedPlans, unpackagedPaidTitles] = await Promise.all([
+      this.prisma.package.count(),
+      this.prisma.plan.count({ where: { includesAll: false } }),
+      this.prisma.title.count({
+        where: { status: 'PUBLISHED', access: 'PAID', packages: { none: {} } },
+      }),
+    ]);
     return {
       currency: this.config.billingCurrency,
       checkout: stripe !== null,
@@ -251,6 +267,9 @@ export class SubscriptionsService {
       endingSoon,
       paidTitles,
       publishedTitles,
+      packages,
+      limitedPlans,
+      unpackagedPaidTitles,
     };
   }
 

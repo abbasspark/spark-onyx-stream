@@ -1,13 +1,14 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 'use client';
 
-import { Check, Loader2, Mail } from 'lucide-react';
+import { Check, Loader2, Lock, Mail } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import {
   bestYearlySaving,
   describeEnd,
+  describeOpens,
   formatMoney,
   type Interval,
   intervalsOf,
@@ -67,6 +68,8 @@ export function PlansScreen({ offer }: { offer: Plans }) {
   }, [viewerId, entitled]);
 
   const shown = plans.filter((plan) => priceOf(plan, interval) !== null);
+  // Said on each plan only where plans differ in what they open.
+  const limited = plans.some((plan) => plan.includesAll === false);
 
   // The plan whose payment page is being opened, and what went wrong with the last try.
   const [opening, setOpening] = useState<string | null>(null);
@@ -101,8 +104,9 @@ export function PlansScreen({ offer }: { offer: Plans }) {
     <div className="gutter pt-32 pb-10">
       <h1 className="display text-5xl sm:text-7xl">Plans</h1>
       <p className="mt-5 max-w-xl text-lg text-smoke">
-        One subscription opens every title marked with a lock. Everything else on this site stays
-        free to watch.
+        {plans.some((plan) => plan.includesAll === false)
+          ? 'A subscription opens the titles marked with a lock that its plan includes. Everything else on this site stays free to watch.'
+          : 'One subscription opens every title marked with a lock. Everything else on this site stays free to watch.'}
       </p>
 
       {own ? (
@@ -181,6 +185,15 @@ export function PlansScreen({ offer }: { offer: Plans }) {
                     : ''}
               </p>
               {plan.description ? <p className="mt-5 text-smoke">{plan.description}</p> : null}
+              {limited ? (
+                <p className="mt-5 flex items-start gap-3">
+                  <Lock className="mt-0.5 size-4 shrink-0 text-sard" aria-hidden="true" />
+                  <span>
+                    <span className="text-smoke">Opens </span>
+                    {describeOpens(plan)}
+                  </span>
+                </p>
+              ) : null}
               {plan.features.length > 0 ? (
                 <ul className="mt-6 grid gap-2.5">
                   {plan.features.map((feature) => (

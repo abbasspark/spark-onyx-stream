@@ -19,7 +19,7 @@ import { type FormEvent, useEffect, useState } from 'react';
 import { Link } from 'react-router';
 import { toast } from 'sonner';
 import { ApiError } from '@/api/client';
-import { billingApi } from '@/api/endpoints';
+import { billingApi, packagesApi } from '@/api/endpoints';
 import type { BillingOverview, Plan, PlanInput } from '@/api/types';
 import { useSession } from '@/auth/session';
 import { useConfirm } from '@/components/confirm';
@@ -230,6 +230,25 @@ function Overview({ overview }: { overview: BillingOverview }) {
           ))}
         </CardContent>
       </Card>
+      {overview.limitedPlans > 0 && overview.unpackagedPaidTitles > 0 ? (
+        <div className="flex flex-wrap items-start gap-3 rounded-lg border border-warning/30 bg-warning/5 p-4 text-sm">
+          <Lock className="mt-0.5 size-4 shrink-0 text-warning" aria-hidden="true" />
+          <p className="min-w-0 flex-1">
+            <span className="font-medium">
+              {overview.unpackagedPaidTitles === 1
+                ? '1 paid title is in no package.'
+                : `${overview.unpackagedPaidTitles} paid titles are in no package.`}
+            </span>{' '}
+            <span className="text-muted-foreground">
+              Subscribers of a plan with chosen packages cannot watch{' '}
+              {overview.unpackagedPaidTitles === 1 ? 'it' : 'them'}.
+            </span>{' '}
+            <Link to="/titles?packaged=none" className="underline underline-offset-4">
+              Show {overview.unpackagedPaidTitles === 1 ? 'it' : 'them'}
+            </Link>
+          </p>
+        </div>
+      ) : null}
       <StripePanel overview={overview} />
     </div>
   );
@@ -371,24 +390,34 @@ function PlanCard({
           </ul>
         ) : null}
 
-        <div className="mt-auto flex items-center justify-between gap-3 border-t pt-4 text-sm">
-          <span className="flex items-center gap-2 text-muted-foreground">
-            <UsersRound className="size-4" aria-hidden="true" />
-            {plan.subscribers === 1 ? '1 subscriber' : `${plan.subscribers} subscribers`}
-          </span>
-          {plan.subscribers > 0 ? (
-            <Link
-              to="/viewers?subscribed=yes"
-              className="text-xs underline underline-offset-4 hover:text-foreground"
-            >
-              See subscribers
-            </Link>
-          ) : (
-            <span className="flex items-center gap-1 text-xs text-muted-foreground">
-              <Lock className="size-3" aria-hidden="true" />
-              Opens all paid titles
+        <div className="mt-auto grid gap-3 border-t pt-4 text-sm">
+          <div className="flex items-start gap-2">
+            <Lock className="mt-0.5 size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+            {plan.includesAll ? (
+              <span className="text-muted-foreground">Opens every paid title</span>
+            ) : (
+              <span className="flex min-w-0 flex-wrap items-center gap-1.5">
+                <span className="text-muted-foreground">Opens</span>
+                {plan.packages.map((item) => (
+                  <Badge key={item.id}>{item.name}</Badge>
+                ))}
+              </span>
+            )}
+          </div>
+          <div className="flex items-center justify-between gap-3">
+            <span className="flex items-center gap-2 text-muted-foreground">
+              <UsersRound className="size-4" aria-hidden="true" />
+              {plan.subscribers === 1 ? '1 subscriber' : `${plan.subscribers} subscribers`}
             </span>
-          )}
+            {plan.subscribers > 0 ? (
+              <Link
+                to="/viewers?subscribed=yes"
+                className="text-xs underline underline-offset-4 hover:text-foreground"
+              >
+                See subscribers
+              </Link>
+            ) : null}
+          </div>
         </div>
       </CardContent>
     </Card>
@@ -413,7 +442,15 @@ function PlanDialog({ plan, open, currency, onOpenChange, onSaved }: PlanDialogP
   const [features, setFeatures] = useState('');
   const [isOffered, setOffered] = useState(true);
   const [isRecommended, setRecommended] = useState(false);
+  const [includesAll, setIncludesAll] = useState(true);
+  const [packageIds, setPackageIds] = useState<string[]>([]);
   const [problem, setProblem] = useState<string | null>(null);
+
+  const packages = useQuery({
+    queryKey: ['billing', 'packages'],
+    queryFn: ({ signal }) => packagesApi.list(signal),
+    enabled: open,
+  });
 
   useEffect(() => {
     if (open) {
@@ -425,6 +462,8 @@ function PlanDialog({ plan, open, currency, onOpenChange, onSaved }: PlanDialogP
       setFeatures((plan?.features ?? []).join('\n'));
       setOffered(plan?.isOffered ?? true);
       setRecommended(plan?.isRecommended ?? false);
+      setIncludesAll(plan?.includesAll ?? true);
+      setPackageIds(plan?.packages.map((item) => item.id) ?? []);
       setProblem(null);
     }
   }, [open, plan, currency]);
@@ -458,6 +497,10 @@ function PlanDialog({ plan, open, currency, onOpenChange, onSaved }: PlanDialogP
       setProblem('Set a price per month, per year, or both.');
       return;
     }
+    if (!includesAll && packageIds.length === 0) {
+      setProblem('Choose at least one package, or let the plan open every paid title.');
+      return;
+    }
     setProblem(null);
     save.mutate({
       name: name.trim(),
@@ -471,6 +514,8 @@ function PlanDialog({ plan, open, currency, onOpenChange, onSaved }: PlanDialogP
       trialDays: Number(trialDays) || 0,
       isOffered,
       isRecommended,
+      includesAll,
+      packageIds: includesAll ? [] : packageIds,
     });
   };
 
@@ -478,7 +523,7 @@ function PlanDialog({ plan, open, currency, onOpenChange, onSaved }: PlanDialogP
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
         title={plan ? `Edit ${plan.name}` : 'New plan'}
-        description="In this version every plan opens all titles that need a subscription. Plans differ in price and in how they are paid."
+        description="A plan opens every title that needs a subscription, or the titles of the packages you choose."
         size="lg"
       >
         <form onSubmit={submit} className="contents">
@@ -524,7 +569,10 @@ function PlanDialog({ plan, open, currency, onOpenChange, onSaved }: PlanDialogP
                   />
                 )}
               </Field>
-              <Field label="Free trial (days)" hint="0 for none. Used once online payment is on.">
+              <Field
+                label="Free trial (days)"
+                hint="0 for none. Given once per viewer, when paying online."
+              >
                 {(id) => (
                   <Input
                     id={id}
@@ -559,6 +607,83 @@ function PlanDialog({ plan, open, currency, onOpenChange, onSaved }: PlanDialogP
                 />
               )}
             </Field>
+            <fieldset className="grid gap-3 rounded-lg border p-4">
+              <legend className="px-1 text-sm font-medium">What it opens</legend>
+              <div
+                role="radiogroup"
+                aria-label="What it opens"
+                className="grid gap-2 sm:grid-cols-2"
+              >
+                {(
+                  [
+                    [true, 'Every paid title', 'Whatever you mark as needing a subscription.'],
+                    [false, 'Chosen packages', 'Only the titles of the packages below.'],
+                  ] as const
+                ).map(([value, label, hint]) => (
+                  <button
+                    key={label}
+                    type="button"
+                    role="radio"
+                    aria-checked={includesAll === value}
+                    onClick={() => setIncludesAll(value)}
+                    className={cn(
+                      'rounded-lg border p-3 text-left transition-colors hover:bg-accent',
+                      includesAll === value && 'border-primary bg-primary/5 ring-1 ring-primary',
+                    )}
+                  >
+                    <span className="block text-sm font-medium">{label}</span>
+                    <span className="mt-0.5 block text-xs text-muted-foreground">{hint}</span>
+                  </button>
+                ))}
+              </div>
+              {includesAll ? null : packages.data?.length === 0 ? (
+                <p className="text-sm text-muted-foreground">
+                  There are no packages yet.{' '}
+                  <Link to="/packages" className="underline underline-offset-4">
+                    Create packages
+                  </Link>{' '}
+                  and sort titles into them first.
+                </p>
+              ) : (
+                <div className="flex flex-wrap gap-2">
+                  {packages.data?.map((item) => {
+                    const chosen = packageIds.includes(item.id);
+                    return (
+                      <button
+                        key={item.id}
+                        type="button"
+                        role="checkbox"
+                        aria-checked={chosen}
+                        onClick={() =>
+                          setPackageIds((current) =>
+                            chosen ? current.filter((id) => id !== item.id) : [...current, item.id],
+                          )
+                        }
+                        className={cn(
+                          'inline-flex h-8 items-center gap-1.5 rounded-full border px-3 text-[13px] font-medium transition-colors hover:bg-accent',
+                          chosen &&
+                            'border-primary bg-primary text-primary-foreground hover:bg-primary/90',
+                        )}
+                      >
+                        {chosen ? <Check className="size-3.5" aria-hidden="true" /> : null}
+                        {item.name}
+                        <span
+                          className={cn('text-xs', chosen ? 'opacity-80' : 'text-muted-foreground')}
+                        >
+                          {item.sellableTitles}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+              {includesAll ? null : (
+                <p className="text-xs text-muted-foreground">
+                  The number is how many published paid titles a package holds. A paid title in no
+                  package is opened only by plans that open everything.
+                </p>
+              )}
+            </fieldset>
             <ToggleRow
               label="Offer to viewers"
               description="Off, the plan is not shown on the page of plans. Viewers who have it keep it."

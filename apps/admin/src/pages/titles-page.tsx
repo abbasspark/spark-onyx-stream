@@ -22,7 +22,7 @@ import { type FormEvent, type ReactNode, useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router';
 import { toast } from 'sonner';
 import { apiUrl } from '@/api/client';
-import { categoriesApi, titlesApi } from '@/api/endpoints';
+import { categoriesApi, packagesApi, titlesApi } from '@/api/endpoints';
 import {
   PUBLISH_STATUSES,
   TITLE_SORT_FIELDS,
@@ -158,6 +158,8 @@ export function TitlesPage() {
   const access = (
     ['FREE', 'PAID'].includes(params.get('access') ?? '') ? params.get('access') : ''
   ) as TitleAccess | '';
+  // A package by its id, or "none" for paid titles that are in no package.
+  const packageFilter = params.get('package') ?? (params.get('packaged') === 'none' ? 'none' : '');
   const q = params.get('q') ?? '';
   const sort = (TITLE_SORT_FIELDS as readonly string[]).includes(params.get('sort') ?? '')
     ? (params.get('sort') as TitleSortField)
@@ -189,7 +191,11 @@ export function TitlesPage() {
   }, [search]);
 
   const titles = useQuery({
-    queryKey: ['titles', 'list', { page, type, status, categoryId, access, q, sort, order }],
+    queryKey: [
+      'titles',
+      'list',
+      { page, type, status, categoryId, access, packageFilter, q, sort, order },
+    ],
     queryFn: ({ signal }) =>
       titlesApi.list(
         {
@@ -199,6 +205,8 @@ export function TitlesPage() {
           status: status || undefined,
           categoryId: categoryId || undefined,
           access: access || undefined,
+          packageId: packageFilter && packageFilter !== 'none' ? packageFilter : undefined,
+          packaged: packageFilter === 'none' ? 'none' : undefined,
           q: q || undefined,
           sort,
           order,
@@ -211,8 +219,13 @@ export function TitlesPage() {
     queryKey: ['categories'],
     queryFn: ({ signal }) => categoriesApi.list(signal),
   });
+  const packages = useQuery({
+    queryKey: ['billing', 'packages'],
+    queryFn: ({ signal }) => packagesApi.list(signal),
+    staleTime: 60_000,
+  });
   const items = titles.data?.items ?? [];
-  const filtered = Boolean(q || status || categoryId || type || access);
+  const filtered = Boolean(q || status || categoryId || type || access || packageFilter);
 
   const remove = useMutation({
     mutationFn: (title: TitleSummary) => titlesApi.remove(title.id),
@@ -375,6 +388,21 @@ export function TitlesPage() {
             { value: 'PAID', label: 'Subscribers only' },
           ]}
         />
+        {packages.data && packages.data.length > 0 ? (
+          <Select
+            aria-label="Filter by package"
+            className="w-44"
+            value={packageFilter || 'ALL'}
+            onValueChange={(value) =>
+              change({ package: value === 'ALL' ? null : value, packaged: null, page: null })
+            }
+            options={[
+              { value: 'ALL', label: 'Any package' },
+              ...packages.data.map((item) => ({ value: item.id, label: item.name })),
+              { value: 'none', label: 'Paid, in no package' },
+            ]}
+          />
+        ) : null}
         <Select
           aria-label="Sort by"
           className="w-40"
@@ -396,7 +424,16 @@ export function TitlesPage() {
             variant="ghost"
             onClick={() => {
               setSearch('');
-              change({ q: null, status: null, category: null, type: null, page: null });
+              change({
+                q: null,
+                status: null,
+                category: null,
+                type: null,
+                access: null,
+                package: null,
+                packaged: null,
+                page: null,
+              });
             }}
           >
             <X />

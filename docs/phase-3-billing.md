@@ -2,7 +2,7 @@
 
 Billing lets an operator earn from a site: viewers subscribe to a plan, and a subscription opens the titles that need one.
 
-It is built in steps. This document describes what is built so far: plans, subscriptions, paid titles, access granted by an admin, paying online with Stripe, and the books: every payment, and what the payments add up to.
+It is built in steps. This document describes what is built so far: plans, subscriptions, paid titles, access granted by an admin, paying online with Stripe, the books (every payment, and what the payments add up to), and packages, through which plans differ in what they open.
 
 ## Model
 
@@ -11,21 +11,42 @@ It is built in steps. This document describes what is built so far: plans, subsc
 - **Access of a title**: `FREE` or `PAID`, set per title. An episode is as open as its series.
 - **Payment**: money a viewer paid for a subscription. Collected by Stripe, or received by the operator and written down by an admin. It stays in the books when the account is deleted, with the email address it was paid under.
 
-In this version every plan opens all paid titles. Plans differ in price and in how they are paid.
+- **Package**: a group of paid titles that plans open together, such as Kids or Sports. A title can be in several. Live channels will be sorted into the same packages.
+
+A plan opens every paid title, or the packages chosen for it.
 
 ## Who may watch
 
-| Title  | Rule                                                                                          |
-| ------ | --------------------------------------------------------------------------------------------- |
-| `FREE` | As open as the installation: everyone, or signed-in viewers (`CATALOG_PLAYBACK`)              |
-| `PAID` | A signed-in viewer with a running subscription, whatever `CATALOG_PLAYBACK` says except `off` |
+| Title  | Rule                                                                                                                     |
+| ------ | ------------------------------------------------------------------------------------------------------------------------ |
+| `FREE` | As open as the installation: everyone, or signed-in viewers (`CATALOG_PLAYBACK`)                                         |
+| `PAID` | A signed-in viewer with a running subscription whose plan opens the title, whatever `CATALOG_PLAYBACK` says except `off` |
 
 - **A subscription is running** while its state is trialing, active or "payment failed" and its end has not passed. The end time decides to the moment. The stored state is tidied up afterwards by the scheduler and never decides access.
 - **A failed payment does not lock a viewer out at once.** Access continues while the payment is retried.
 - **Trailers stay open,** also of paid titles. They are the invitation.
 - **Browsing is never limited.** Everyone sees every published title. Paid ones are marked.
-- **The playback endpoints answer `402`** with the code `subscription_required` to a signed-in viewer without a subscription, and `401` to a visitor.
+- **A plan opens a paid title** when the plan opens everything, or when the title is in one of the plan's packages.
+- **A paid title in no package is opened only by plans that open everything.** A title that was not sorted yet is never given away by mistake. The panel counts such titles and lists them.
+- **A change counts at once:** putting a title into a package, or changing the packages of a plan, changes what its subscribers can watch with the next request.
+- **The playback endpoints answer `402`** with the code `subscription_required` to a signed-in viewer without a subscription, with `plan_required` to one whose plan does not open the title, and `401` to a visitor.
 - With `VIEWER_EMAIL_VERIFICATION=required`, a paid title also needs a confirmed address.
+
+## Packages
+
+Without packages every plan opens every paid title, and nothing has to be set up.
+
+To sell plans that differ in what they open:
+
+1. Create packages on the **Packages** page and put titles into them. A title's packages can also be set in the title itself.
+2. On the **Plans** page, set a plan to "Chosen packages" and choose them.
+3. Keep at least one plan that opens everything if some paid titles are to stay outside all packages.
+
+- A package that a plan names cannot be deleted. Take it out of the plan first.
+- Deleting a package keeps its titles. They lose only that membership.
+- A free title can be in a package. It matters once the title needs a subscription.
+- A viewer who wants another plan cancels and subscribes again. Changing plans in place is not built.
+- The page of plans tells viewers what each plan opens, by the names of its packages.
 
 ## Access granted by an admin
 
@@ -146,34 +167,38 @@ All under `/v1`.
 
 `POST /viewer/checkout` answers `409` with the code `already_subscribed` to a viewer with a running subscription, `503` with `checkout_unavailable` when there is no online payment, and `502` with `payment_provider_error` when Stripe cannot be reached.
 
-`GET /viewer/session` also returns `entitled`, so a page learns it together with who is signed in. Titles in the public catalog carry `access`.
+`GET /viewer/session` also returns `entitled` and `access`, so a page learns together with who is signed in whether there is a subscription and what it opens: `{ all, packageIds }`, or null. Titles in the public catalog carry `access` and, when paid, `packageIds`. Plans carry `includesAll` and `packages`.
 
 ### For admins
 
 Permissions `billing:read` and `billing:write`. Owners and admins have them. Editors do not.
 
-| Method and path                           | Purpose                                                                                      |
-| ----------------------------------------- | -------------------------------------------------------------------------------------------- |
-| `GET /billing`                            | How billing is set up, and counts for the panel                                              |
-| `GET /plans`, `POST /plans`               | List plans with their subscribers, create one                                                |
-| `PATCH /plans/{id}`, `DELETE /plans/{id}` | Change a plan. Delete one that nobody ever had                                               |
-| `PUT /plans/order`                        | Set the order of the page of plans                                                           |
-| `GET /viewers/{id}/subscriptions`         | A viewer's running subscription and the history                                              |
-| `POST /viewers/{id}/subscriptions`        | Grant access                                                                                 |
-| `PATCH /subscriptions/{id}`               | Change granted access                                                                        |
-| `POST /subscriptions/{id}/end`            | End access now. Cancels at Stripe when paid online                                           |
-| `POST /subscriptions/{id}/refresh`        | Read a subscription paid online from Stripe again                                            |
-| `POST /billing/stripe/check`              | Ask Stripe which account the key belongs to                                                  |
-| `GET /billing/stripe/events`              | The last messages from Stripe                                                                |
-| `GET /billing/revenue`                    | Revenue per month and by plan, and monthly recurring revenue. `months` (1 to 36), `timeZone` |
-| `GET /payments`                           | The payments, newest first. Filters `q`, `source`, `status`, `planId`, `from`, `to`          |
-| `GET /payments/export`                    | The same as a CSV file                                                                       |
-| `GET /viewers/{id}/payments`              | What one viewer paid                                                                         |
-| `POST /viewers/{id}/payments`             | Write down money received by hand                                                            |
-| `DELETE /payments/{id}`                   | Delete a payment that was written down by hand                                               |
-| `POST /billing/stripe/import-payments`    | Read the paid invoices from Stripe into the books                                            |
+| Method and path                                 | Purpose                                                                                      |
+| ----------------------------------------------- | -------------------------------------------------------------------------------------------- |
+| `GET /billing`                                  | How billing is set up, and counts for the panel                                              |
+| `GET /plans`, `POST /plans`                     | List plans with their subscribers, create one                                                |
+| `PATCH /plans/{id}`, `DELETE /plans/{id}`       | Change a plan. Delete one that nobody ever had                                               |
+| `PUT /plans/order`                              | Set the order of the page of plans                                                           |
+| `GET /packages`, `POST /packages`               | List packages with their titles and plans, create one. Reading needs `catalog:read`          |
+| `PATCH /packages/{id}`, `DELETE /packages/{id}` | Rename a package. Delete one that no plan names                                              |
+| `PUT /packages/order`                           | Set the order of the packages                                                                |
+| `PUT /packages/{id}/titles`                     | Put titles in and take titles out: `add`, `remove`                                           |
+| `GET /viewers/{id}/subscriptions`               | A viewer's running subscription and the history                                              |
+| `POST /viewers/{id}/subscriptions`              | Grant access                                                                                 |
+| `PATCH /subscriptions/{id}`                     | Change granted access                                                                        |
+| `POST /subscriptions/{id}/end`                  | End access now. Cancels at Stripe when paid online                                           |
+| `POST /subscriptions/{id}/refresh`              | Read a subscription paid online from Stripe again                                            |
+| `POST /billing/stripe/check`                    | Ask Stripe which account the key belongs to                                                  |
+| `GET /billing/stripe/events`                    | The last messages from Stripe                                                                |
+| `GET /billing/revenue`                          | Revenue per month and by plan, and monthly recurring revenue. `months` (1 to 36), `timeZone` |
+| `GET /payments`                                 | The payments, newest first. Filters `q`, `source`, `status`, `planId`, `from`, `to`          |
+| `GET /payments/export`                          | The same as a CSV file                                                                       |
+| `GET /viewers/{id}/payments`                    | What one viewer paid                                                                         |
+| `POST /viewers/{id}/payments`                   | Write down money received by hand                                                            |
+| `DELETE /payments/{id}`                         | Delete a payment that was written down by hand                                               |
+| `POST /billing/stripe/import-payments`          | Read the paid invoices from Stripe into the books                                            |
 
-A title's access is part of the title: `access` in `PATCH /titles/{id}`, and a filter of `GET /titles`. `GET /viewers` shows each viewer's plan and takes `subscribed=yes` or `no`.
+A title's access is part of the title: `access` and `packageIds` in `PATCH /titles/{id}`, and the filters `access`, `packageId` and `packaged=none` of `GET /titles`. A plan takes `includesAll` and `packageIds`. `GET /viewers` shows each viewer's plan and takes `subscribed=yes` or `no`.
 
 - **A plan that viewers have or had cannot be deleted.** It is part of their history. It can be taken off the offer instead.
 - **One plan at a time is the recommended one.**
@@ -184,9 +209,10 @@ A title's access is part of the title: `access` in `PATCH /titles/{id}`, and a f
 
 - **Plans** page: figures on subscribers, the plans as cards with prices and what a year saves, creating and editing, ordering, recommending, and taking a plan off the offer.
 - **Online payment** on the Plans page: test or live mode, a check of the connection, the webhook address and its events to copy, the last message from Stripe, and the list of recent messages with what went wrong, if anything.
+- **Packages** page: the packages as cards with their titles and plans, creating, renaming and ordering, and a dialog to put titles in and take them out with search.
 - **Revenue** page: monthly recurring revenue, this month against the last, a chart of the months split into online and by hand, revenue by plan, who started and ended, and every payment with search, filters and export.
 - **Viewers** page: the plan next to each viewer, a filter for subscribers, and in a viewer's sheet the subscription with granting, changing and ending, and the history. A subscription paid online shows its next payment, a link to Stripe, and can be refreshed and cancelled. Below it are the viewer's payments, and recording one received by hand.
-- **Titles**: a switch "Needs a subscription" in each title, a mark in the list, and a filter.
+- **Titles**: a switch "Needs a subscription" in each title with its packages, a mark in the list, and filters for access and package.
 
 ## Viewer website
 
@@ -202,6 +228,5 @@ A title's access is part of the title: `access` in `PATCH /titles/{id}`, and a f
 - Emails of this site about payments. Stripe sends receipts and, if turned on there, reminders
 - Gift codes. Codes for a reduced price work through Stripe's coupons
 - Payment providers other than Stripe
-- Plans that open only part of the catalog
 - Renting or buying a single title
 - A limit on how many devices play at the same time

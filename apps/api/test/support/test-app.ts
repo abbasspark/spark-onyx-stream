@@ -244,6 +244,7 @@ export async function createTestApp(
       await prisma.viewer.deleteMany();
       // After the viewers, whose subscriptions point to plans.
       await prisma.plan.deleteMany();
+      await prisma.package.deleteMany();
       await prisma.stripeEvent.deleteMany();
     },
     close: () => app.close(),
