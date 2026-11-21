@@ -384,6 +384,8 @@ export interface AssetRef {
   status: AssetStatus;
   durationMs: number | null;
   height: number | null;
+  /** Whether it can be streamed: ready, and stored with a stream. */
+  playable: boolean;
 }
 
 export interface Category {
@@ -419,6 +421,8 @@ export interface TitleSummary {
   asset: AssetRef | null;
   seasonCount: number;
   episodeCount: number;
+  /** Whether viewers can see the title right now. False for a published title with nothing that plays. */
+  isVisible: boolean;
   createdAt: string;
   updatedAt: string;
 }

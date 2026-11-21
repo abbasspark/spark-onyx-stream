@@ -199,7 +199,7 @@ export function TitleEpisodes({ title, disabled, refresh }: TitleEpisodesProps) 
                   </thead>
                   <tbody>
                     {season.episodes.map((episode) => {
-                      const ready = episode.asset?.status === 'READY';
+                      const ready = episode.asset?.playable === true;
                       const isPublished = episode.status === 'PUBLISHED';
                       const toggle = (
                         <Switch

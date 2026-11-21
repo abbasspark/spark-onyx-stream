@@ -7,12 +7,14 @@ import {
   Check,
   CircleAlert,
   CircleDashed,
+  ExternalLink,
   EyeOff,
   Film,
   MoreHorizontal,
   Rocket,
   Star,
   Trash2,
+  TriangleAlert,
   Tv,
 } from 'lucide-react';
 import { type FormEvent, useEffect, useMemo, useState } from 'react';
@@ -159,6 +161,7 @@ export function TitleEditorPage() {
   const open = title.checklist.filter((item) => item.required && !item.done);
   const canPublish = open.length === 0;
   const TypeIcon = title.type === 'SERIES' ? Tv : Film;
+  const hidden = title.status === 'PUBLISHED' && !title.isVisible;
 
   const askUnpublish = async () => {
     const confirmed = await confirm({
@@ -289,6 +292,23 @@ export function TitleEditorPage() {
         ) : null}
       </header>
 
+      {hidden ? (
+        <div
+          role="alert"
+          className="mb-6 flex items-start gap-3 rounded-xl border border-warning/40 bg-warning/10 px-4 py-3"
+        >
+          <TriangleAlert className="mt-0.5 size-5 shrink-0 text-warning" aria-hidden="true" />
+          <div className="text-sm">
+            <p className="font-medium">Viewers cannot see this title right now</p>
+            <p className="text-muted-foreground">
+              {title.type === 'SERIES'
+                ? 'It is published, but none of its published episodes has a video that can be played. It appears again by itself once one does.'
+                : 'It is published, but its video was deleted or is being processed. It appears again by itself once the video can be played.'}
+            </p>
+          </div>
+        </div>
+      ) : null}
+
       <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_20rem]">
         <Tabs
           key={title.id}
@@ -323,13 +343,15 @@ export function TitleEditorPage() {
             <CardHeader
               title="Publishing"
               description={
-                title.status === 'PUBLISHED'
-                  ? 'Viewers can see this title.'
-                  : title.status === 'ARCHIVED'
-                    ? 'Archived. Hidden from viewers.'
-                    : canPublish
-                      ? 'Ready to publish.'
-                      : 'A draft. Finish the required points to publish.'
+                hidden
+                  ? 'Published, but hidden from viewers.'
+                  : title.status === 'PUBLISHED'
+                    ? 'Viewers can see this title.'
+                    : title.status === 'ARCHIVED'
+                      ? 'Archived. Hidden from viewers.'
+                      : canPublish
+                        ? 'Ready to publish.'
+                        : 'A draft. Finish the required points to publish.'
               }
             />
             <CardContent>
@@ -391,6 +413,22 @@ export function TitleEditorPage() {
                     ['Created', formatDateTime(title.createdAt)],
                     ['Changed', formatDateTime(title.updatedAt)],
                     ['Published', title.publishedAt ? formatDateTime(title.publishedAt) : '–'],
+                    [
+                      'Public data',
+                      title.isVisible ? (
+                        <a
+                          href={apiUrl(`/v1/catalog/titles/${title.slug}`)}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="inline-flex items-center gap-1 text-primary hover:underline"
+                        >
+                          Open
+                          <ExternalLink className="size-3.5" aria-hidden="true" />
+                        </a>
+                      ) : (
+                        '–'
+                      ),
+                    ],
                   ]}
                 />
               </div>

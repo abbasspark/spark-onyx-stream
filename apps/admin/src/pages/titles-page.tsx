@@ -114,6 +114,23 @@ function PosterArt({ title, className }: { title: TitleSummary; className?: stri
   );
 }
 
+/**
+ * The publishing state of a title. A published title that viewers cannot see,
+ * because its video is gone or being processed, is marked as hidden.
+ */
+function TitleStatus({ title }: { title: TitleSummary }) {
+  if (title.status === 'PUBLISHED' && !title.isVisible) {
+    return (
+      <Tooltip content="Published, but viewers cannot see it: nothing in it can be played right now">
+        <Badge tone="warning" dot className="pointer-events-auto">
+          Hidden
+        </Badge>
+      </Tooltip>
+    );
+  }
+  return <StatusBadge status={title.status} />;
+}
+
 /** The catalog: every movie and series, as a wall of posters or a table. */
 export function TitlesPage() {
   const { can } = useSession();
@@ -424,7 +441,7 @@ export function TitlesPage() {
               <div className="pointer-events-none absolute inset-x-2 top-2 flex items-start justify-between gap-2">
                 {/* A solid backing keeps the labels readable on any artwork. */}
                 <span className="rounded-full bg-card shadow-sm">
-                  <StatusBadge status={title.status} />
+                  <TitleStatus title={title} />
                 </span>
                 {title.isFeatured ? (
                   <span
@@ -532,7 +549,7 @@ export function TitlesPage() {
                     </div>
                   </Td>
                   <Td>
-                    <StatusBadge status={title.status} />
+                    <TitleStatus title={title} />
                   </Td>
                   <Td>{title.type === 'SERIES' ? 'Series' : 'Movie'}</Td>
                   <Td className="tabular-nums">{title.releaseYear ?? '–'}</Td>

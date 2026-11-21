@@ -16,6 +16,7 @@ import { DatabaseModule } from '../../src/database/database.module.js';
 import type { QueuedJobData } from '../../src/jobs/jobs.service.js';
 import { ProcessingCoreModule } from '../../src/processing/processing.module.js';
 import { PROCESSING_QUEUE } from '../../src/queue/queue.constants.js';
+import { RateLimitModule } from '../../src/rate-limit/rate-limit.module.js';
 import { REDIS_CLIENT } from '../../src/redis/redis.module.js';
 import { StorageModule } from '../../src/storage/storage.module.js';
 
@@ -171,6 +172,7 @@ export async function createTestApp(
       ConfigModule.forRoot(config),
       DatabaseModule,
       FakeInfrastructureModule,
+      RateLimitModule,
       EventsModule,
       CryptoModule,
       AuthModule,

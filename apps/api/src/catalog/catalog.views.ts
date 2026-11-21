@@ -12,6 +12,8 @@ import type {
   TitleType,
 } from '@onyx/database';
 
+import { isPlayable } from './playable.js';
+
 /** Route under which artwork is served, relative to the API prefix. */
 export const ARTWORK_ROUTE = 'artwork';
 
@@ -49,6 +51,8 @@ export interface AssetRef {
   status: AssetStatus;
   durationMs: number | null;
   height: number | null;
+  /** Whether it can be streamed: ready, and stored with a stream. */
+  playable: boolean;
 }
 
 export function toAssetRef(asset: Asset | null): AssetRef | null {
@@ -62,6 +66,7 @@ export function toAssetRef(asset: Asset | null): AssetRef | null {
     status: asset.status,
     durationMs: asset.durationMs,
     height: asset.height,
+    playable: isPlayable(asset),
   };
 }
 
@@ -114,6 +119,11 @@ export interface TitleSummary {
   asset: AssetRef | null;
   seasonCount: number;
   episodeCount: number;
+  /**
+   * Whether viewers can see the title right now: it is published and has
+   * something that plays. False for a published title whose video is gone.
+   */
+  isVisible: boolean;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -193,7 +203,11 @@ function sortedCategories(links: { category: Category }[]): { id: string; name: 
     .map((category) => ({ id: category.id, name: category.name }));
 }
 
-export function toTitleSummary(title: TitleSummaryRecord, mediaBaseUrl: string): TitleSummary {
+export function toTitleSummary(
+  title: TitleSummaryRecord,
+  mediaBaseUrl: string,
+  isVisible: boolean,
+): TitleSummary {
   return {
     id: title.id,
     type: title.type,
@@ -208,6 +222,7 @@ export function toTitleSummary(title: TitleSummaryRecord, mediaBaseUrl: string):
     asset: title.type === 'MOVIE' ? toAssetRef(title.asset) : null,
     seasonCount: title.seasons.length,
     episodeCount: title.seasons.reduce((total, season) => total + season._count.episodes, 0),
+    isVisible,
     createdAt: title.createdAt,
     updatedAt: title.updatedAt,
   };
@@ -228,7 +243,7 @@ export function buildChecklist(title: TitleDetailRecord): ChecklistItem[] {
           {
             key: 'video-ready',
             label: 'The video is processed and ready to play',
-            done: asset?.status === 'READY',
+            done: asset?.playable === true,
             required: true,
           },
         ]
@@ -257,6 +272,19 @@ export function buildChecklist(title: TitleDetailRecord): ChecklistItem[] {
       required: false,
     },
   ];
+}
+
+/** Whether viewers can see a title right now. The same rule as the VISIBLE_TITLE filter. */
+export function isTitleVisible(title: TitleDetailRecord): boolean {
+  if (title.status !== 'PUBLISHED') {
+    return false;
+  }
+  if (title.type === 'MOVIE') {
+    return isPlayable(title.asset);
+  }
+  return title.seasons.some((season) =>
+    season.episodes.some((episode) => episode.status === 'PUBLISHED' && isPlayable(episode.asset)),
+  );
 }
 
 export function toTitleDetail(title: TitleDetailRecord, mediaBaseUrl: string): TitleDetail {
@@ -295,6 +323,7 @@ export function toTitleDetail(title: TitleDetailRecord, mediaBaseUrl: string): T
     trailerAsset: toAssetRef(title.trailerAsset),
     seasonCount: seasons.length,
     episodeCount: seasons.reduce((total, season) => total + season.episodes.length, 0),
+    isVisible: isTitleVisible(title),
     seasons,
     checklist: buildChecklist(title),
     createdAt: title.createdAt,
