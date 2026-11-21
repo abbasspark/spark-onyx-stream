@@ -15,6 +15,7 @@ import { type Page, toPage, toSkipTake } from '../common/pagination.js';
 import { AppConfig } from '../config/app-config.js';
 import { type PlaybackInfo, PlaybackService } from '../playback/playback.service.js';
 import { opensTitle } from '../billing/entitlement.js';
+import { PurchasesService } from '../purchases/purchases.service.js';
 import { isPlayable, VISIBLE_EPISODE, VISIBLE_TITLE } from './playable.js';
 import type { ListPublicTitlesInput } from './public-catalog.schemas.js';
 import {
@@ -50,6 +51,16 @@ const CARD_INCLUDE = {
 
 const PACKAGE_IDS = { select: { packageId: true } } as const;
 
+/** What the gate reads of a title to decide who may watch. */
+const GATE_SELECT = { access: true, purchaseOnly: true, packages: PACKAGE_IDS } as const;
+
+interface GatedTitle {
+  id: string;
+  access: TitleAccess;
+  purchaseOnly: boolean;
+  packages: { packageId: string }[];
+}
+
 const NEWEST_FIRST = [
   { publishedAt: 'desc' },
   { id: 'desc' },
@@ -73,6 +84,7 @@ export class PublicCatalogService {
     @Inject(AppConfig) private readonly config: AppConfig,
     @Inject(PlaybackService) private readonly playback: PlaybackService,
     @Inject(SubscriptionsService) private readonly subscriptions: SubscriptionsService,
+    @Inject(PurchasesService) private readonly purchases: PurchasesService,
   ) {}
 
   async list(input: ListPublicTitlesInput): Promise<Page<PublicTitleCard>> {
@@ -223,7 +235,7 @@ export class PublicCatalogService {
     this.assertOpen();
     const title = await this.prisma.title.findFirst({
       where: { slug, ...VISIBLE_TITLE },
-      select: { type: true, assetId: true, access: true, packages: PACKAGE_IDS },
+      select: { id: true, type: true, assetId: true, ...GATE_SELECT },
     });
     if (!title) {
       throw new NotFoundException('Title not found');
@@ -238,7 +250,7 @@ export class PublicCatalogService {
   /** Signed addresses for playing the trailer of a title. */
   async playTrailer(slug: string, watcher: Watcher): Promise<PlaybackInfo> {
     // A trailer is an invitation, also to a paid title.
-    await this.assertMayPlay(watcher, { access: 'FREE', packages: [] });
+    await this.assertMayPlay(watcher, null);
     const title = await this.prisma.title.findFirst({
       where: { slug, ...VISIBLE_TITLE },
       select: { trailerAsset: { select: { id: true, status: true, manifestPath: true } } },
@@ -256,7 +268,7 @@ export class PublicCatalogService {
       where: { id: episodeId, ...VISIBLE_EPISODE, season: { title: { status: 'PUBLISHED' } } },
       select: {
         assetId: true,
-        season: { select: { title: { select: { access: true, packages: PACKAGE_IDS } } } },
+        season: { select: { title: { select: { id: true, ...GATE_SELECT } } } },
       },
     });
     if (!episode?.assetId) {
@@ -286,12 +298,10 @@ export class PublicCatalogService {
    * of the installation. A paid title always needs a signed-in viewer with a
    * running subscription whose plan opens the title.
    */
-  private async assertMayPlay(
-    watcher: Watcher,
-    title: { access: TitleAccess; packages: { packageId: string }[] },
-  ): Promise<void> {
+  private async assertMayPlay(watcher: Watcher, title: GatedTitle | null): Promise<void> {
     this.assertOpen();
-    const paid = title.access === 'PAID';
+    // Null stands for what is open like a free title: a trailer.
+    const paid = title?.access === 'PAID';
     if (!paid && this.config.catalogPlayback !== 'viewers') {
       return;
     }
@@ -307,26 +317,37 @@ export class PublicCatalogService {
         code: 'email_unverified',
       });
     }
-    if (!paid) {
+    if (!paid || !title) {
       return;
     }
     const access = await this.subscriptions.accessOf(watcher.viewerId);
-    const open = opensTitle(
-      access,
-      title.packages.map((link) => link.packageId),
-    );
-    if (!open) {
-      throw new HttpException(
-        {
-          statusCode: HttpStatus.PAYMENT_REQUIRED,
-          error: 'Payment Required',
-          // Lets a player tell "no subscription" from "a subscription that does not reach this far".
-          ...(access
+    const throughPlan =
+      !title.purchaseOnly &&
+      opensTitle(
+        access,
+        title.packages.map((link) => link.packageId),
+      );
+    if (throughPlan) {
+      return;
+    }
+    // Rented or bought: open whatever plan the viewer has. Playing a rental starts its hours.
+    const owned = await this.purchases.validFor(watcher.viewerId, title.id);
+    if (owned) {
+      await this.purchases.markStarted(owned);
+      return;
+    }
+    throw new HttpException(
+      {
+        statusCode: HttpStatus.PAYMENT_REQUIRED,
+        error: 'Payment Required',
+        // Lets a player say what would open the title.
+        ...(title.purchaseOnly
+          ? { message: 'Rent or buy this title to watch', code: 'purchase_required' }
+          : access
             ? { message: 'Your plan does not include this title', code: 'plan_required' }
             : { message: 'Subscribe to watch', code: 'subscription_required' }),
-        },
-        HttpStatus.PAYMENT_REQUIRED,
-      );
-    }
+      },
+      HttpStatus.PAYMENT_REQUIRED,
+    );
   }
 }

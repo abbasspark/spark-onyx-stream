@@ -9,6 +9,7 @@ const filters = {
   source: z.enum(['MANUAL', 'STRIPE']).optional(),
   status: z.enum(['PAID', 'PARTIALLY_REFUNDED', 'REFUNDED']).optional(),
   planId: z.uuid().optional(),
+  kind: z.enum(['SUBSCRIPTION', 'RENTAL', 'PURCHASE']).optional(),
   /** Matches the email address, the invoice number and the note, ignoring case. */
   q: z.string().trim().min(1).max(200).optional(),
   /** Paid at or after this moment, and before that one. */

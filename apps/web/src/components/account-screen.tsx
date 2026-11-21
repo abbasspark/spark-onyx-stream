@@ -9,12 +9,14 @@ import {
   authHref,
   describeDevice,
   formatDay,
-  ViewerApiError,
+  type OwnPurchase,
   viewerApi,
+  ViewerApiError,
   type ViewerDevice,
 } from '@/lib/viewer-api';
 import {
   describeEnd,
+  describeOwned,
   describeRefund,
   formatDate,
   formatMoney,
@@ -114,6 +116,7 @@ export function AccountScreen() {
       <NameSection name={viewer.displayName} onSaved={setViewer} />
       <PasswordSection />
       <SubscriptionSection />
+      <PurchasesSection />
       <PaymentsSection />
       <ProfilesSection />
       <DevicesSection />
@@ -557,7 +560,67 @@ function SubscriptionSection() {
   );
 }
 
+/** The titles the viewer rented or bought. Not shown to someone who has none. */
+function PurchasesSection() {
+  const [items, setItems] = useState<OwnPurchase[]>([]);
+
+  useEffect(() => {
+    let current = true;
+    viewerApi
+      .purchases()
+      .then((result) => {
+        if (current) {
+          setItems(result.items);
+        }
+      })
+      .catch(() => {
+        // A site whose API is older than renting has none to show.
+      });
+    return () => {
+      current = false;
+    };
+  }, []);
+
+  // What ran out is left out, unless nothing else is there to show.
+  const valid = items.filter((item) => item.valid);
+  const shown = valid.length > 0 ? valid : items.slice(0, 3);
+  if (shown.length === 0) {
+    return null;
+  }
+
+  return (
+    <Section heading="Rented and bought">
+      <ul className="divide-y divide-line border-y border-line">
+        {shown.map((item) => (
+          <li key={item.id} className="flex items-baseline justify-between gap-4 py-3">
+            <div className="min-w-0">
+              <p className={item.valid ? '' : 'text-dust'}>{item.title.name}</p>
+              <p className="mt-0.5 text-sm text-dust">
+                {item.valid ? describeOwned(item) : 'The rental ran out.'}
+              </p>
+            </div>
+            <Link
+              href={item.valid ? `/watch/${item.title.slug}` : `/title/${item.title.slug}`}
+              className="shrink-0 text-sm text-smoke underline underline-offset-4 hover:text-vein"
+            >
+              {item.valid ? 'Watch' : 'Rent again'}
+            </Link>
+          </li>
+        ))}
+      </ul>
+    </Section>
+  );
+}
+
 /** What the viewer paid, with the way to each invoice. Not shown to someone who never paid. */
+/** " for Standard", " to rent Night Train", or nothing when it is not known. */
+function paidFor(payment: OwnPayment): string {
+  if (payment.kind === 'RENTAL' || payment.kind === 'PURCHASE') {
+    return ` to ${payment.kind === 'RENTAL' ? 'rent' : 'buy'} ${payment.titleName ?? 'a title'}`;
+  }
+  return payment.planName ? ` for ${payment.planName}` : '';
+}
+
 function PaymentsSection() {
   const [payments, setPayments] = useState<OwnPayment[]>([]);
   const [all, setAll] = useState(false);
@@ -596,9 +659,7 @@ function PaymentsSection() {
                   <span className={payment.status === 'REFUNDED' ? 'line-through opacity-60' : ''}>
                     {formatMoney(payment.amount, payment.currency)}
                   </span>
-                  {payment.planName ? (
-                    <span className="text-smoke"> for {payment.planName}</span>
-                  ) : null}
+                  <span className="text-smoke">{paidFor(payment)}</span>
                 </p>
                 <p className="mt-0.5 text-sm text-dust">
                   {formatDate(payment.paidAt)}

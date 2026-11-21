@@ -149,8 +149,10 @@ describe.skipIf(!TEST_DATABASE_URL)('Payments and revenue (e2e)', () => {
         id: expect.any(String),
         viewer: { id: anna.id, displayName: 'Anna' },
         viewerEmail: ANNA.email,
+        kind: 'SUBSCRIPTION',
         planId: anna.planId,
         planName: 'Standard',
+        titleName: null,
         source: 'STRIPE',
         status: 'PAID',
         amount: 799,
@@ -445,14 +447,14 @@ describe.skipIf(!TEST_DATABASE_URL)('Payments and revenue (e2e)', () => {
       expect(file.headers['cache-control']).toBe('no-store');
       const lines = file.text.replace(/^﻿/, '').trim().split('\r\n');
       expect(lines[0]).toBe(
-        'Paid at (UTC),Email,Name,Plan,Source,Status,Currency,Amount,Tax,Refunded,Net,Period start,Period end,Invoice,Note,Recorded by',
+        'Paid at (UTC),Email,Name,For,Plan,Title,Source,Status,Currency,Amount,Tax,Refunded,Net,Period start,Period end,Invoice,Note,Recorded by',
       );
       // Oldest first. The note that looks like a formula is defused.
       expect(lines[1]).toBe(
-        "2026-09-15T12:00:00.000Z,ben@example.com,Ben,,By hand,Paid,EUR,50.00,0.00,0.00,50.00,,,,'=SUM(A1:A9),Olivia Owner",
+        "2026-09-15T12:00:00.000Z,ben@example.com,Ben,Subscription,,,By hand,Paid,EUR,50.00,0.00,0.00,50.00,,,,'=SUM(A1:A9),Olivia Owner",
       );
       expect(lines[2]).toContain(
-        ',anna@example.com,Anna,Standard,Stripe,Paid,EUR,7.99,0.00,0.00,7.99,',
+        ',anna@example.com,Anna,Subscription,Standard,,Stripe,Paid,EUR,7.99,0.00,0.00,7.99,',
       );
       expect(lines).toHaveLength(3);
 
@@ -484,7 +486,9 @@ describe.skipIf(!TEST_DATABASE_URL)('Payments and revenue (e2e)', () => {
       expect(own.body.items).toEqual([
         {
           id: expect.any(String),
+          kind: 'SUBSCRIPTION',
           planName: 'Standard',
+          titleName: null,
           status: 'PAID',
           amount: 799,
           refundedAmount: 0,

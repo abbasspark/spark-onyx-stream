@@ -427,6 +427,11 @@ export interface TitleSummary {
   isFeatured: boolean;
   /** FREE, or PAID when watching needs a subscription. */
   access: TitleAccess;
+  /** What renting and buying cost, in the smallest unit of the currency. Null: not on offer. */
+  rentAmount: number | null;
+  buyAmount: number | null;
+  /** True when no subscription opens the title: it is rented or bought only. */
+  purchaseOnly: boolean;
   poster: CatalogImage | null;
   categories: { id: string; name: string }[];
   /** The packages the title is in. Plans open a paid title through them. */
@@ -554,6 +559,9 @@ export interface UpdateTitleInput {
   originalLanguage?: string | null;
   isFeatured?: boolean;
   access?: TitleAccess;
+  rentAmount?: number | null;
+  buyAmount?: number | null;
+  purchaseOnly?: boolean;
   categoryIds?: string[];
   packageIds?: string[];
   assetId?: string | null;
@@ -853,6 +861,34 @@ export interface StripeAccount {
 }
 
 export type PaymentStatus = 'PAID' | 'PARTIALLY_REFUNDED' | 'REFUNDED';
+export type PaymentKind = 'SUBSCRIPTION' | 'RENTAL' | 'PURCHASE';
+
+/** A title a viewer rented or bought, or was given by an admin. */
+export interface Purchase {
+  id: string;
+  title: { id: string; name: string; slug: string };
+  kind: 'RENT' | 'BUY';
+  status: 'ACTIVE' | 'REVOKED';
+  source: 'MANUAL' | 'STRIPE';
+  /** Whether it can be watched right now. */
+  valid: boolean;
+  purchasedAt: string;
+  /** When a rental was first played. */
+  startedAt: string | null;
+  /** Until when it may be watched. Null for a bought title. */
+  expiresAt: string | null;
+  amount: number | null;
+  currency: string | null;
+  note: string | null;
+  grantedBy: { id: string; displayName: string } | null;
+}
+
+export interface GrantPurchaseInput {
+  titleId: string;
+  kind: 'RENT' | 'BUY';
+  amount?: number | null;
+  note?: string | null;
+}
 
 /** Money a viewer paid for a subscription. Amounts are in the smallest unit of the currency. */
 export interface Payment {
@@ -860,8 +896,12 @@ export interface Payment {
   /** Null once the account is deleted. The email address stays. */
   viewer: { id: string; displayName: string } | null;
   viewerEmail: string;
+  /** What was paid for: a subscription, or renting or buying one title. */
+  kind: PaymentKind;
   planId: string | null;
   planName: string | null;
+  /** The title that was rented or bought. */
+  titleName: string | null;
   /** MANUAL: written down by an admin. STRIPE: collected online. */
   source: 'MANUAL' | 'STRIPE';
   status: PaymentStatus;
@@ -888,6 +928,7 @@ export interface PaymentListQuery {
   pageSize?: number;
   q?: string;
   source?: 'MANUAL' | 'STRIPE';
+  kind?: PaymentKind;
   status?: PaymentStatus;
   planId?: string;
   /** Paid at or after this moment, and before that one. */

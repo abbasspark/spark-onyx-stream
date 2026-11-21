@@ -2,7 +2,7 @@
 
 Billing lets an operator earn from a site: viewers subscribe to a plan, and a subscription opens the titles that need one.
 
-It is built in steps. This document describes what is built so far: plans, subscriptions, paid titles, access granted by an admin, paying online with Stripe, the books (every payment, and what the payments add up to), and packages, through which plans differ in what they open.
+It is built in steps. This document describes what is built so far: plans, subscriptions, paid titles, access granted by an admin, paying online with Stripe, the books (every payment, and what the payments add up to), packages, through which plans differ in what they open, and renting or buying a single title.
 
 ## Model
 
@@ -12,15 +12,16 @@ It is built in steps. This document describes what is built so far: plans, subsc
 - **Payment**: money a viewer paid for a subscription. Collected by Stripe, or received by the operator and written down by an admin. It stays in the books when the account is deleted, with the email address it was paid under.
 
 - **Package**: a group of paid titles that plans open together, such as Kids or Sports. A title can be in several. Live channels will be sorted into the same packages.
+- **Purchase**: a viewer's right to watch one title, rented for a time or bought for good, whatever plan they have or have not.
 
 A plan opens every paid title, or the packages chosen for it.
 
 ## Who may watch
 
-| Title  | Rule                                                                                                                     |
-| ------ | ------------------------------------------------------------------------------------------------------------------------ |
-| `FREE` | As open as the installation: everyone, or signed-in viewers (`CATALOG_PLAYBACK`)                                         |
-| `PAID` | A signed-in viewer with a running subscription whose plan opens the title, whatever `CATALOG_PLAYBACK` says except `off` |
+| Title  | Rule                                                                                                                                                 |
+| ------ | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `FREE` | As open as the installation: everyone, or signed-in viewers (`CATALOG_PLAYBACK`)                                                                     |
+| `PAID` | A signed-in viewer with a running subscription whose plan opens the title, or who rented or bought it, whatever `CATALOG_PLAYBACK` says except `off` |
 
 - **A subscription is running** while its state is trialing, active or "payment failed" and its end has not passed. The end time decides to the moment. The stored state is tidied up afterwards by the scheduler and never decides access.
 - **A failed payment does not lock a viewer out at once.** Access continues while the payment is retried.
@@ -29,7 +30,7 @@ A plan opens every paid title, or the packages chosen for it.
 - **A plan opens a paid title** when the plan opens everything, or when the title is in one of the plan's packages.
 - **A paid title in no package is opened only by plans that open everything.** A title that was not sorted yet is never given away by mistake. The panel counts such titles and lists them.
 - **A change counts at once:** putting a title into a package, or changing the packages of a plan, changes what its subscribers can watch with the next request.
-- **The playback endpoints answer `402`** with the code `subscription_required` to a signed-in viewer without a subscription, with `plan_required` to one whose plan does not open the title, and `401` to a visitor.
+- **The playback endpoints answer `402`** with the code `subscription_required` to a signed-in viewer without a subscription, with `plan_required` to one whose plan does not open the title, with `purchase_required` for a title that is rented or bought only, and `401` to a visitor.
 - With `VIEWER_EMAIL_VERIFICATION=required`, a paid title also needs a confirmed address.
 
 ## Packages
@@ -47,6 +48,22 @@ To sell plans that differ in what they open:
 - A free title can be in a package. It matters once the title needs a subscription.
 - A viewer who wants another plan cancels and subscribes again. Changing plans in place is not built.
 - The page of plans tells viewers what each plan opens, by the names of its packages.
+
+## Renting and buying
+
+A paid title can carry a price for renting, a price for buying, or both. A viewer who pays it can watch that title, with or without a subscription.
+
+- **Renting** gives a time to start (`RENTAL_START_DAYS`, 30) and, from the first play, a time to finish (`RENTAL_WATCH_HOURS`, 48). The rental never runs past the day it had to be started by. A rental that ran out can be rented again.
+- **Buying** opens the title for as long as it is on the site.
+- **A series** is rented or bought as a whole. Its episodes follow it.
+- **"Not part of any subscription"** on a title keeps it out of every plan: it is watched by renting or buying only. For a premiere, for example. Such a title needs at least one price.
+- **A subscriber whose plan opens a title** watches it through the plan. A rental they also hold is not started by that.
+- **Paying** runs through Stripe Checkout as a single payment, and the viewer returns to the page of the title. No further events have to be added to the webhook endpoint.
+- **A refund in full takes the title back.** A part of the money returned leaves it with the viewer.
+- **An admin can give a title by hand,** rented or bought, as a gift or with an amount that goes into the books, and can take any title back.
+- **A viewer who owns a title is not sold it again:** a bought title in no way, a running rental not as another rental. Buying while a rental runs is possible.
+- Without Stripe, the page of a title shows the prices and where to ask. Titles are then given by an admin.
+- In the books, rentals and purchases are payments of their own kind, beside the subscriptions.
 
 ## Access granted by an admin
 
@@ -139,6 +156,8 @@ Money received by hand is written down in a viewer on the Viewers page: an amoun
 | Setting                 | Default | Meaning                                                                                                                                    |
 | ----------------------- | ------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
 | `BILLING_CURRENCY`      | `EUR`   | Currency of all prices, as three capital letters. Decide before the first plan: prices are stored as numbers and do not convert themselves |
+| `RENTAL_START_DAYS`     | `30`    | Days a viewer has to start a rented title                                                                                                  |
+| `RENTAL_WATCH_HOURS`    | `48`    | Hours to finish a rented title once it was started                                                                                         |
 | `BILLING_CONTACT_URL`   | empty   | Where viewers ask for a subscription while there is no online payment: a web address or `mailto:` address                                  |
 | `STRIPE_SECRET_KEY`     | empty   | Secret key of the Stripe account (`sk_test_...`, `sk_live_...`, or a restricted key). Empty means no online payment                        |
 | `STRIPE_WEBHOOK_SECRET` | empty   | Signing secret of the webhook endpoint at Stripe (`whsec_...`). Required with the key                                                      |
@@ -155,19 +174,21 @@ All under `/v1`.
 
 ### For everyone
 
-| Method and path                 | Purpose                                                                                   |
-| ------------------------------- | ----------------------------------------------------------------------------------------- |
-| `GET /catalog/plans`            | The plans on offer, the currency, and whether one can pay online. Cached like the catalog |
-| `GET /viewer/subscription`      | The signed-in viewer's own subscription, and whether paid titles are open to them         |
-| `POST /viewer/checkout`         | Opens Stripe's payment page for a plan and an interval. Answers with the address to go to |
-| `POST /viewer/checkout/confirm` | Called on return from the payment page. Records the subscription at once                  |
-| `POST /viewer/billing-portal`   | Opens Stripe's customer portal. Answers with the address to go to                         |
-| `POST /billing/stripe/webhook`  | Where Stripe reports to. Trusted by the signature of each message alone                   |
-| `GET /viewer/payments`          | The signed-in viewer's own payments, with the address of each invoice                     |
+| Method and path                   | Purpose                                                                                        |
+| --------------------------------- | ---------------------------------------------------------------------------------------------- |
+| `GET /catalog/plans`              | The plans on offer, the currency, and whether one can pay online. Cached like the catalog      |
+| `GET /viewer/subscription`        | The signed-in viewer's own subscription, and whether paid titles are open to them              |
+| `POST /viewer/checkout`           | Opens Stripe's payment page for a plan and an interval. Answers with the address to go to      |
+| `POST /viewer/checkout/confirm`   | Called on return from the payment page. Records the subscription or the title at once          |
+| `POST /viewer/billing-portal`     | Opens Stripe's customer portal. Answers with the address to go to                              |
+| `POST /billing/stripe/webhook`    | Where Stripe reports to. Trusted by the signature of each message alone                        |
+| `GET /viewer/payments`            | The signed-in viewer's own payments, with the address of each invoice                          |
+| `POST /viewer/purchases/checkout` | Opens Stripe's payment page for renting or buying a title: `titleId`, `kind` (`RENT` or `BUY`) |
+| `GET /viewer/purchases`           | The viewer's rented and bought titles                                                          |
 
 `POST /viewer/checkout` answers `409` with the code `already_subscribed` to a viewer with a running subscription, `503` with `checkout_unavailable` when there is no online payment, and `502` with `payment_provider_error` when Stripe cannot be reached.
 
-`GET /viewer/session` also returns `entitled` and `access`, so a page learns together with who is signed in whether there is a subscription and what it opens: `{ all, packageIds }`, or null. Titles in the public catalog carry `access` and, when paid, `packageIds`. Plans carry `includesAll` and `packages`.
+`GET /viewer/session` also returns `entitled` and `access`, so a page learns together with who is signed in whether there is a subscription and what it opens: `{ all, packageIds }`, or null, and `purchases`, the titles rented or bought. Titles in the public catalog carry `access` and, when paid, `packageIds`, `rentAmount`, `buyAmount` and `purchaseOnly`. Plans carry `includesAll` and `packages`, and the answer names how long a rental lasts.
 
 ### For admins
 
@@ -197,8 +218,11 @@ Permissions `billing:read` and `billing:write`. Owners and admins have them. Edi
 | `POST /viewers/{id}/payments`                   | Write down money received by hand                                                            |
 | `DELETE /payments/{id}`                         | Delete a payment that was written down by hand                                               |
 | `POST /billing/stripe/import-payments`          | Read the paid invoices from Stripe into the books                                            |
+| `GET /viewers/{id}/purchases`                   | The titles a viewer rented or bought                                                         |
+| `POST /viewers/{id}/purchases`                  | Give a viewer a title by hand: `titleId`, `kind`, optional `amount` and `note`               |
+| `POST /purchases/{id}/revoke`                   | Take a title back                                                                            |
 
-A title's access is part of the title: `access` and `packageIds` in `PATCH /titles/{id}`, and the filters `access`, `packageId` and `packaged=none` of `GET /titles`. A plan takes `includesAll` and `packageIds`. `GET /viewers` shows each viewer's plan and takes `subscribed=yes` or `no`.
+A title's access is part of the title: `access`, `packageIds`, `rentAmount`, `buyAmount` and `purchaseOnly` in `PATCH /titles/{id}`, and the filters `access`, `packageId` and `packaged=none` of `GET /titles`. A plan takes `includesAll` and `packageIds`. `GET /viewers` shows each viewer's plan and takes `subscribed=yes` or `no`.
 
 - **A plan that viewers have or had cannot be deleted.** It is part of their history. It can be taken off the offer instead.
 - **One plan at a time is the recommended one.**
@@ -211,16 +235,16 @@ A title's access is part of the title: `access` and `packageIds` in `PATCH /titl
 - **Online payment** on the Plans page: test or live mode, a check of the connection, the webhook address and its events to copy, the last message from Stripe, and the list of recent messages with what went wrong, if anything.
 - **Packages** page: the packages as cards with their titles and plans, creating, renaming and ordering, and a dialog to put titles in and take them out with search.
 - **Revenue** page: monthly recurring revenue, this month against the last, a chart of the months split into online and by hand, revenue by plan, who started and ended, and every payment with search, filters and export.
-- **Viewers** page: the plan next to each viewer, a filter for subscribers, and in a viewer's sheet the subscription with granting, changing and ending, and the history. A subscription paid online shows its next payment, a link to Stripe, and can be refreshed and cancelled. Below it are the viewer's payments, and recording one received by hand.
-- **Titles**: a switch "Needs a subscription" in each title with its packages, a mark in the list, and filters for access and package.
+- **Viewers** page: the plan next to each viewer, a filter for subscribers, and in a viewer's sheet the subscription with granting, changing and ending, and the history. A subscription paid online shows its next payment, a link to Stripe, and can be refreshed and cancelled. Below it are the titles the viewer rented or bought, with giving one by hand and taking one back, and the viewer's payments, with recording one received by hand.
+- **Titles**: a switch "Paid title" in each title with its prices for renting and buying and its packages, a mark in the list, and filters for access and package.
 
 ## Viewer website
 
 - **Plans** page, linked in the menu when the site offers plans: the plans side by side, monthly and yearly, with a button to subscribe, or how to ask for access on a site without online payment.
 - **After paying** the viewer lands on a page that confirms the subscription and leads back to what they wanted to watch.
-- **Paid titles carry a lock** on their poster. Their main button reads "Subscribe to watch" for a viewer without a subscription.
+- **Paid titles carry a lock** on their poster. The page of a title a viewer cannot watch yet shows the ways to get it: subscribe, rent for a price, buy for a price.
 - **The player explains itself:** it asks a visitor to sign in, and a viewer without a subscription to subscribe, each with the way there and back.
-- **Account** page: the plan, when it is paid next or until when it runs, a failed payment, the way to Stripe's portal, and the payments with a link to each invoice.
+- **Account** page: the plan, when it is paid next or until when it runs, a failed payment, the way to Stripe's portal, the titles rented and bought with what is left of each, and the payments with a link to each invoice.
 
 ## Not built yet
 
@@ -228,5 +252,4 @@ A title's access is part of the title: `access` and `packageIds` in `PATCH /titl
 - Emails of this site about payments. Stripe sends receipts and, if turned on there, reminders
 - Gift codes. Codes for a reduced price work through Stripe's coupons
 - Payment providers other than Stripe
-- Renting or buying a single title
 - A limit on how many devices play at the same time

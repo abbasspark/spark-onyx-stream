@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-only
+import { parsePrice, toPriceText } from './billing';
 import type { TitleDetail, TitleSummary, UpdateTitleInput } from '@/api/types';
 import { formatDuration, humanize } from './format';
 
@@ -36,10 +37,18 @@ export interface DetailsForm {
   categoryIds: string[];
   /** The packages through which plans open the title. */
   packageIds: string[];
+  /** Prices as typed, such as "3.99". Empty: not on offer. */
+  rentPrice: string;
+  buyPrice: string;
+  /** Whether no subscription opens the title. */
+  purchaseOnly: boolean;
 }
 
-export function toForm(title: TitleDetail): DetailsForm {
+export function toForm(title: TitleDetail, currency = 'EUR'): DetailsForm {
   return {
+    rentPrice: toPriceText(title.rentAmount, currency),
+    buyPrice: toPriceText(title.buyAmount, currency),
+    purchaseOnly: title.purchaseOnly,
     name: title.name,
     originalName: title.originalName ?? '',
     tagline: title.tagline ?? '',
@@ -55,8 +64,28 @@ export function toForm(title: TitleDetail): DetailsForm {
   };
 }
 
-/** The fields that differ from what is saved, in the shape the API takes. */
-export function changedFields(saved: DetailsForm, form: DetailsForm): UpdateTitleInput {
+/** What stands in the way of saving the prices of a title, or null. */
+export function priceProblem(form: DetailsForm, currency: string): string | null {
+  const rent = parsePrice(form.rentPrice, currency);
+  const buy = parsePrice(form.buyPrice, currency);
+  if (rent === 'invalid' || buy === 'invalid') {
+    return `Write prices as numbers, such as ${toPriceText(399, currency)}.`;
+  }
+  if (form.isPaid && form.purchaseOnly && rent === null && buy === null) {
+    return 'Set a price for renting or buying, or nobody could watch the title.';
+  }
+  return null;
+}
+
+/**
+ * The fields that differ from what is saved, in the shape the API takes.
+ * Prices that cannot be read are left out: priceProblem names them first.
+ */
+export function changedFields(
+  saved: DetailsForm,
+  form: DetailsForm,
+  currency = 'EUR',
+): UpdateTitleInput {
   const changes: UpdateTitleInput = {};
   const text = (value: string) => value.trim() || null;
 
@@ -91,6 +120,18 @@ export function changedFields(saved: DetailsForm, form: DetailsForm): UpdateTitl
   }
   if ([...form.packageIds].sort().join() !== saved.packageIds.join()) {
     changes.packageIds = form.packageIds;
+  }
+  for (const [text, before, key] of [
+    [form.rentPrice, saved.rentPrice, 'rentAmount'],
+    [form.buyPrice, saved.buyPrice, 'buyAmount'],
+  ] as const) {
+    const amount = parsePrice(text, currency);
+    if (amount !== 'invalid' && amount !== parsePrice(before, currency)) {
+      changes[key] = amount;
+    }
+  }
+  if (form.purchaseOnly !== saved.purchaseOnly) {
+    changes.purchaseOnly = form.purchaseOnly;
   }
   return changes;
 }

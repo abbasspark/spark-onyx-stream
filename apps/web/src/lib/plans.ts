@@ -84,7 +84,96 @@ export interface Plans {
   checkout: boolean;
   /** Where to ask for a subscription when there is no payment on the site. */
   contactUrl: string | null;
+  /** How long a rented title can be watched. Left out by an API older than renting. */
+  rental?: { startDays: number; watchHours: number };
   plans: Plan[];
+}
+
+/** A title the viewer rented or bought and can watch now. */
+export interface OwnedTitle {
+  titleId: string;
+  kind: 'RENT' | 'BUY';
+  /** Until when it may be watched. Null for a bought title. */
+  expiresAt: string | null;
+  /** Whether a rental was started, so the hours to finish it are running. */
+  started: boolean;
+}
+
+/** The viewer's right to a title, if they rented or bought it. */
+export function ownedTitle(
+  purchases: readonly OwnedTitle[],
+  titleId: string,
+  now: Date = new Date(),
+): OwnedTitle | null {
+  const owned = purchases.find((purchase) => purchase.titleId === titleId);
+  if (!owned || (owned.expiresAt !== null && new Date(owned.expiresAt) <= now)) {
+    return null;
+  }
+  return owned;
+}
+
+/**
+ * "30 days", "48 hours", "20 minutes": what is left until a moment. Rounded
+ * up to the unit named, so thirty days read as thirty a second after paying.
+ */
+export function timeLeft(until: string, now: Date = new Date()): string {
+  const minutes = Math.max(1, Math.ceil((new Date(until).getTime() - now.getTime()) / 60_000));
+  const count = (value: number, unit: string) => `${value} ${unit}${value === 1 ? '' : 's'}`;
+  if (minutes > 48 * 60) {
+    return count(Math.ceil(minutes / (24 * 60)), 'day');
+  }
+  if (minutes > 60) {
+    return count(Math.ceil(minutes / 60), 'hour');
+  }
+  return count(minutes, 'minute');
+}
+
+/** What is said under the Play button of a rented or bought title. */
+export function describeOwned(owned: OwnedTitle, now: Date = new Date()): string {
+  if (owned.kind === 'BUY' || owned.expiresAt === null) {
+    return 'You bought this title.';
+  }
+  const left = timeLeft(owned.expiresAt, now);
+  return owned.started
+    ? `Rented. ${left} left to watch.`
+    : `Rented. Start within ${left}. Once you press play, the time to finish it runs.`;
+}
+
+/** "30 days to start, then 48 hours to finish." */
+export function describeRentalTerms(rental: { startDays: number; watchHours: number }): string {
+  const days = `${rental.startDays} ${rental.startDays === 1 ? 'day' : 'days'}`;
+  const hours = `${rental.watchHours} ${rental.watchHours === 1 ? 'hour' : 'hours'}`;
+  return `${days} to start, then ${hours} to finish.`;
+}
+
+type Sellable = Lockable & {
+  rentAmount?: number | null;
+  buyAmount?: number | null;
+  purchaseOnly?: boolean;
+};
+
+/**
+ * Whether a title is open to a viewer: free, opened by their plan, or rented
+ * or bought. A title for buyers only is not opened by any plan.
+ */
+export function canWatch(
+  title: Sellable & { id: string },
+  opens: Opens,
+  purchases: readonly OwnedTitle[],
+  now: Date = new Date(),
+): boolean {
+  if (title.access !== 'PAID') {
+    return true;
+  }
+  if (!title.purchaseOnly && opensTitle(opens, title)) {
+    return true;
+  }
+  return ownedTitle(purchases, title.id, now) !== null;
+}
+
+/** Whether a plan on offer opens the title, so "Subscribe" is one of the ways to watch it. */
+export function subscribable(title: Sellable, plans: readonly Plan[]): boolean {
+  return !title.purchaseOnly && plans.some((plan) => planOpensTitle(plan, title));
 }
 
 /** A viewer's own subscription. */
@@ -107,6 +196,10 @@ export interface OwnPayment {
   id: string;
   planName: string | null;
   status: 'PAID' | 'PARTIALLY_REFUNDED' | 'REFUNDED';
+  /** What was paid for. Left out by an API older than renting. */
+  kind?: 'SUBSCRIPTION' | 'RENTAL' | 'PURCHASE';
+  /** The title that was rented or bought. */
+  titleName?: string | null;
   amount: number;
   refundedAmount: number;
   currency: string;
@@ -133,6 +226,9 @@ export type Interval = 'month' | 'year';
 
 /** What a site without plans answers, also when its API is older than plans. */
 export const NO_PLANS: Plans = { currency: 'EUR', checkout: false, contactUrl: null, plans: [] };
+
+/** How long a rental lasts on a site that does not say. */
+export const DEFAULT_RENTAL = { startDays: 30, watchHours: 48 };
 
 /** How many digits a currency has after the point: 2 for EUR, 0 for JPY. */
 function fractionDigits(currency: string): number {

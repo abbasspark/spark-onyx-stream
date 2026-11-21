@@ -27,6 +27,7 @@ import {
   type ViewerView,
 } from './viewer.view.js';
 import { ACCESS_SELECT, accessOf, runningAt, type ViewerAccess } from '../billing/entitlement.js';
+import { type OwnedTitle, toOwnedTitles, validAt } from '../purchases/purchase-rules.js';
 import { ViewerEmailService } from './viewer-email.service.js';
 import {
   type ProfileView,
@@ -66,6 +67,8 @@ export interface ViewerAccessConfig {
 }
 
 /** Everything a viewer does with their own account. */
+export type OwnedTitleRef = OwnedTitle;
+
 @Injectable()
 export class ViewerAuthService {
   constructor(
@@ -84,6 +87,17 @@ export class ViewerAuthService {
       select: ACCESS_SELECT,
     });
     return accessOf(running);
+  }
+
+  /** Titles the viewer rented or bought and can watch now. */
+  async ownedTitles(viewerId: string): Promise<OwnedTitleRef[]> {
+    const now = new Date();
+    const purchases = await this.prisma.purchase.findMany({
+      where: { viewerId, ...validAt(now) },
+      orderBy: { createdAt: 'desc' },
+      take: 500,
+    });
+    return toOwnedTitles(purchases);
   }
 
   accessConfig(): ViewerAccessConfig {

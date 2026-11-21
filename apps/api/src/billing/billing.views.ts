@@ -41,6 +41,8 @@ export interface PublicPlans {
   checkout: boolean;
   /** Where to ask for access when there is no online payment. An https or mailto address. */
   contactUrl: string | null;
+  /** How long a rented title can be watched: days to start, hours to finish once started. */
+  rental: { startDays: number; watchHours: number };
   plans: PublicPlan[];
 }
 

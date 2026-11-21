@@ -105,7 +105,10 @@ export function RevenuePage() {
   const period = PERIODS.some((option) => option.value === params.get('period'))
     ? (params.get('period') as PaymentPeriod)
     : 'all';
-  const filtered = Boolean(q || source || status || period !== 'all');
+  const kind = (['SUBSCRIPTION', 'RENTAL', 'PURCHASE'] as const).find(
+    (value) => value === params.get('kind'),
+  );
+  const filtered = Boolean(q || source || status || kind || period !== 'all');
 
   const [search, setSearch] = useState(q);
   useEffect(() => {
@@ -132,10 +135,11 @@ export function RevenuePage() {
     q: q || undefined,
     source: source || undefined,
     status: status || undefined,
+    kind,
     ...periodRange(period),
   };
   const payments = useQuery({
-    queryKey: ['billing', 'payments', { page, q, source, status, period }],
+    queryKey: ['billing', 'payments', { page, q, source, status, kind, period }],
     queryFn: ({ signal }) => paymentsApi.list({ page, pageSize: PAGE_SIZE, ...filters }, signal),
     placeholderData: keepPreviousData,
   });
@@ -253,7 +257,7 @@ export function RevenuePage() {
               />
               <Input
                 type="search"
-                placeholder="Email, name, invoice or note"
+                placeholder="Email, name, title, invoice or note"
                 aria-label="Search payments"
                 className="pl-9"
                 value={search}
@@ -283,6 +287,20 @@ export function RevenuePage() {
               ]}
             />
             <Select
+              aria-label="Filter by kind"
+              className="w-40"
+              value={kind || 'ALL'}
+              onValueChange={(value) =>
+                change({ kind: value === 'ALL' ? null : value, page: null })
+              }
+              options={[
+                { value: 'ALL', label: 'Everything sold' },
+                { value: 'SUBSCRIPTION', label: 'Subscriptions' },
+                { value: 'RENTAL', label: 'Rentals' },
+                { value: 'PURCHASE', label: 'Purchases' },
+              ]}
+            />
+            <Select
               aria-label="Filter by state"
               className="w-40"
               value={status || 'ALL'}
@@ -303,7 +321,14 @@ export function RevenuePage() {
                 size="sm"
                 onClick={() => {
                   setSearch('');
-                  change({ q: null, source: null, status: null, period: null, page: null });
+                  change({
+                    q: null,
+                    source: null,
+                    status: null,
+                    kind: null,
+                    period: null,
+                    page: null,
+                  });
                 }}
               >
                 <X />
@@ -330,7 +355,7 @@ export function RevenuePage() {
                   <tr>
                     <Th>Paid</Th>
                     <Th>Viewer</Th>
-                    <Th>Plan</Th>
+                    <Th>For</Th>
                     <Th>Source</Th>
                     <Th className="text-right">Amount</Th>
                     <Th>State</Th>
@@ -397,7 +422,18 @@ function PaymentRow({
         <div className="text-xs text-muted-foreground">{payment.viewerEmail}</div>
         {payment.note ? <div className="mt-0.5 text-xs">{payment.note}</div> : null}
       </Td>
-      <Td>{payment.planName ?? <span className="text-muted-foreground">None</span>}</Td>
+      <Td>
+        {payment.kind === 'SUBSCRIPTION' ? (
+          (payment.planName ?? <span className="text-muted-foreground">None</span>)
+        ) : (
+          <>
+            {payment.titleName ?? 'A title'}
+            <div className="text-xs text-muted-foreground">
+              {payment.kind === 'RENTAL' ? 'Rental' : 'Purchase'}
+            </div>
+          </>
+        )}
+      </Td>
       <Td>
         <Badge>
           {payment.source === 'STRIPE' ? (
@@ -578,7 +614,7 @@ function Report({ report }: { report: RevenueReport }) {
         <div className="grid content-start gap-4">
           <Card>
             <CardHeader
-              title="By plan"
+              title="By what was sold"
               description={`Last ${months.length} months, after refunds.`}
             />
             <CardContent className="grid gap-3.5 p-5">
@@ -586,7 +622,7 @@ function Report({ report }: { report: RevenueReport }) {
                 <p className="text-sm text-muted-foreground">No payments in these months.</p>
               ) : (
                 report.byPlan.map((plan) => (
-                  <div key={plan.planId ?? 'none'}>
+                  <div key={`${plan.planId ?? 'none'}-${plan.planName}`}>
                     <div className="flex items-baseline justify-between gap-3 text-sm">
                       <span className="truncate font-medium">{plan.planName}</span>
                       <span className="tabular-nums">{money(plan.net)}</span>

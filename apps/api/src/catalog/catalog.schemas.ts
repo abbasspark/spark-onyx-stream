@@ -59,6 +59,13 @@ export type ReorderCategoriesInput = z.infer<typeof reorderCategoriesSchema>;
 
 export const TITLE_ACCESS = ['FREE', 'PAID'] as const;
 
+const price = z
+  .number()
+  .int('Use the smallest unit of the currency, without a decimal point')
+  .min(1, 'A price is at least 1')
+  .max(100_000_000)
+  .nullable();
+
 export const listTitlesSchema = paginationSchema.extend({
   type: z.enum(TITLE_TYPES).optional(),
   status: z.enum(PUBLISH_STATUSES).optional(),
@@ -103,6 +110,11 @@ export const updateTitleSchema = z
     isFeatured: z.boolean(),
     /** FREE: open to everyone the installation lets watch. PAID: needs a subscription. */
     access: z.enum(TITLE_ACCESS),
+    /** What renting and buying cost, in the smallest unit of the currency. Null: not on offer. */
+    rentAmount: price,
+    buyAmount: price,
+    /** True when no subscription opens the title: it is rented or bought only. */
+    purchaseOnly: z.boolean(),
     /** Replaces the title's categories. */
     categoryIds: z.array(z.uuid()).max(50),
     /** Replaces the packages the title is in. Plans open a paid title through them. */

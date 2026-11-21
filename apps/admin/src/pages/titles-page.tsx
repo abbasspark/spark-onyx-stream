@@ -385,7 +385,7 @@ export function TitlesPage() {
           options={[
             { value: 'ALL', label: 'Free and paid' },
             { value: 'FREE', label: 'Free' },
-            { value: 'PAID', label: 'Subscribers only' },
+            { value: 'PAID', label: 'Paid' },
           ]}
         />
         {packages.data && packages.data.length > 0 ? (
@@ -519,10 +519,10 @@ export function TitlesPage() {
                 {title.access === 'PAID' ? (
                   <span
                     className="flex size-6 items-center justify-center rounded-full bg-card text-info shadow-sm"
-                    title="Needs a subscription"
+                    title="Paid title"
                   >
                     <Lock className="size-3.5" aria-hidden="true" />
-                    <span className="sr-only">Needs a subscription</span>
+                    <span className="sr-only">Paid title</span>
                   </span>
                 ) : null}
               </div>

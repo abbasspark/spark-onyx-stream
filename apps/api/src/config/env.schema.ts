@@ -151,6 +151,13 @@ export const envSchema = z
       ),
 
     /**
+     * Renting a title: how many days a viewer has to start watching, and how
+     * many hours to finish once they started.
+     */
+    RENTAL_START_DAYS: z.coerce.number().int().min(1).max(365).default(30),
+    RENTAL_WATCH_HOURS: z.coerce.number().int().min(1).max(720).default(48),
+
+    /**
      * Secret key of a Stripe account, to sell subscriptions online. It starts
      * with "sk_test_" while testing and "sk_live_" for real payments; a
      * restricted key ("rk_") works too. Empty means no online payment: access

@@ -116,6 +116,11 @@ export interface TitleSummary {
   isFeatured: boolean;
   /** FREE, or PAID when watching needs a subscription. */
   access: TitleAccess;
+  /** What renting and buying cost, in the smallest unit of the currency. Null: not on offer. */
+  rentAmount: number | null;
+  buyAmount: number | null;
+  /** True when no subscription opens the title: it is rented or bought only. */
+  purchaseOnly: boolean;
   poster: ImageView | null;
   categories: { id: string; name: string }[];
   /** The packages the title is in. Plans open a paid title through them. */
@@ -245,6 +250,9 @@ export function toTitleSummary(
     publishedAt: title.publishedAt,
     isFeatured: title.isFeatured,
     access: title.access,
+    rentAmount: title.rentAmount,
+    buyAmount: title.buyAmount,
+    purchaseOnly: title.purchaseOnly,
     poster: title.poster ? toImageView(title.poster, mediaBaseUrl) : null,
     categories: sortedCategories(title.categories),
     packages: sortedPackages(title.packages),
@@ -345,6 +353,9 @@ export function toTitleDetail(title: TitleDetailRecord, mediaBaseUrl: string): T
     publishedAt: title.publishedAt,
     isFeatured: title.isFeatured,
     access: title.access,
+    rentAmount: title.rentAmount,
+    buyAmount: title.buyAmount,
+    purchaseOnly: title.purchaseOnly,
     poster: image(title.poster),
     backdrop: image(title.backdrop),
     logo: image(title.logo),

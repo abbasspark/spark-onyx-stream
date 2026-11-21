@@ -45,6 +45,7 @@ model AdminUser {
   assets               Asset[]
   subscriptionsGranted Subscription[]
   paymentsRecorded     Payment[]
+  purchasesGranted     Purchase[]
 
   @@map("admin_users")
 }
@@ -96,6 +97,7 @@ model Viewer {
   profiles      ViewerProfile[]
   subscriptions Subscription[]
   payments      Payment[]
+  purchases     Purchase[]
   watching      WatchProgress[]
   tokens        ViewerToken[]
 
@@ -568,6 +570,12 @@ model Title {
   isFeatured       Boolean     @default(false)
   /// Who may watch: everyone the installation lets watch, or only subscribers.
   access           TitleAccess @default(FREE)
+  /// What renting and buying the title costs, in the smallest unit of the
+  /// installation's currency. Empty means it is not rented or not sold.
+  rentAmount       Int?
+  buyAmount        Int?
+  /// Set when no subscription opens the title: it is watched by renting or buying only.
+  purchaseOnly     Boolean     @default(false)
 
   status      PublishStatus @default(DRAFT)
   publishedAt DateTime?
@@ -599,6 +607,8 @@ model Title {
 
   categories TitleCategory[]
   packages   TitlePackage[]
+  purchases  Purchase[]
+  payments   Payment[]
   seasons    Season[]
   watching   WatchProgress[]
 
@@ -911,6 +921,13 @@ model Payment {
   plan              Plan?              @relation(fields: [planId], references: [id], onDelete: SetNull)
   /// The name of the plan when it was paid for.
   planName          String?
+  /// What was paid for: a subscription, or renting or buying one title.
+  kind              PaymentKind        @default(SUBSCRIPTION)
+  titleId           String?            @db.Uuid
+  title             Title?             @relation(fields: [titleId], references: [id], onDelete: SetNull)
+  /// The name of the title when it was paid for.
+  titleName         String?
+  purchase          Purchase?
   source            SubscriptionSource
   status            PaymentStatus      @default(PAID)
   /// What was paid, tax included, in the smallest unit of the currency.
@@ -984,4 +1001,55 @@ model PlanPackage {
   @@id([planId, packageId])
   @@index([packageId])
   @@map("plan_packages")
+}
+
+enum PaymentKind {
+  SUBSCRIPTION
+  RENTAL
+  PURCHASE
+}
+
+enum PurchaseKind {
+  /// Watching for a limited time.
+  RENT
+  /// Watching for as long as the title is on the site.
+  BUY
+}
+
+enum PurchaseStatus {
+  ACTIVE
+  /// The money was returned, or an admin took it back.
+  REVOKED
+}
+
+/// A viewer's right to watch one title, rented or bought, whatever plan they
+/// have or have not.
+model Purchase {
+  id          String             @id @default(uuid(7)) @db.Uuid
+  viewerId    String             @db.Uuid
+  viewer      Viewer             @relation(fields: [viewerId], references: [id], onDelete: Cascade)
+  titleId     String             @db.Uuid
+  title       Title              @relation(fields: [titleId], references: [id], onDelete: Cascade)
+  kind        PurchaseKind
+  status      PurchaseStatus     @default(ACTIVE)
+  source      SubscriptionSource
+  createdAt   DateTime           @default(now())
+  /// When a rented title was first played. The time to finish it runs from then.
+  startedAt   DateTime?
+  /// Until when it may be watched. Empty for a bought title.
+  expiresAt   DateTime?
+  /// The payment in the books, when money was paid.
+  paymentId   String?            @unique @db.Uuid
+  payment     Payment?           @relation(fields: [paymentId], references: [id], onDelete: SetNull)
+  /// Id of the checkout at the payment provider.
+  externalId  String?            @unique
+  /// A remark of the admin who gave it, such as "prize of the raffle".
+  note        String?
+  grantedById String?            @db.Uuid
+  grantedBy   AdminUser?         @relation(fields: [grantedById], references: [id], onDelete: SetNull)
+  updatedAt   DateTime           @updatedAt
+
+  @@index([viewerId, titleId])
+  @@index([titleId])
+  @@map("purchases")
 }

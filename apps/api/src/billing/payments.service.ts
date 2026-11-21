@@ -88,7 +88,9 @@ export class PaymentsService {
         'Paid at (UTC)',
         'Email',
         'Name',
+        'For',
         'Plan',
+        'Title',
         'Source',
         'Status',
         'Currency',
@@ -107,7 +109,13 @@ export class PaymentsService {
           payment.paidAt.toISOString(),
           payment.viewerEmail,
           payment.viewer?.displayName ?? '',
+          payment.kind === 'SUBSCRIPTION'
+            ? 'Subscription'
+            : payment.kind === 'RENTAL'
+              ? 'Rental'
+              : 'Purchase',
           payment.planName ?? '',
+          payment.titleName ?? '',
           payment.source === 'STRIPE' ? 'Stripe' : 'By hand',
           payment.status === 'PAID'
             ? 'Paid'
@@ -278,16 +286,23 @@ export class PaymentsService {
            AND to_char("endsAt" AT TIME ZONE 'UTC' AT TIME ZONE ${timeZone}, 'YYYY-MM') >= ${first}
          GROUP BY 1`,
       this.prisma.$queryRaw<
-        { planId: string | null; planName: string | null; net: number; payments: number }[]
+        {
+          planId: string | null;
+          planName: string | null;
+          kind: 'SUBSCRIPTION' | 'RENTAL' | 'PURCHASE';
+          net: number;
+          payments: number;
+        }[]
       >`
         SELECT "planId"::text AS "planId",
                MAX("planName") AS "planName",
+               kind::text AS kind,
                COALESCE(SUM(amount - "refundedAmount"), 0)::int AS net,
                COUNT(*)::int AS payments
           FROM payments
          WHERE currency = ${currency}
            AND to_char("paidAt" AT TIME ZONE 'UTC' AT TIME ZONE ${timeZone}, 'YYYY-MM') >= ${first}
-         GROUP BY "planId"
+         GROUP BY "planId", kind
          ORDER BY net DESC`,
       this.prisma.subscription.findMany({
         where: {
@@ -372,7 +387,12 @@ export class PaymentsService {
       },
       byPlan: byPlan.map((row) => ({
         planId: row.planId,
-        planName: row.planName ?? 'No plan',
+        planName:
+          row.kind === 'RENTAL'
+            ? 'Rentals'
+            : row.kind === 'PURCHASE'
+              ? 'Purchases'
+              : (row.planName ?? 'No plan'),
         net: row.net,
         payments: row.payments,
       })),
@@ -395,6 +415,7 @@ export class PaymentsService {
       source: filters.source,
       status: filters.status,
       planId: filters.planId,
+      kind: filters.kind,
       ...(filters.from || filters.to ? { paidAt: { gte: filters.from, lt: filters.to } } : {}),
       ...(filters.q
         ? {
@@ -402,6 +423,7 @@ export class PaymentsService {
               { viewerEmail: { contains: filters.q, mode: 'insensitive' } },
               { invoiceNumber: { contains: filters.q, mode: 'insensitive' } },
               { note: { contains: filters.q, mode: 'insensitive' } },
+              { titleName: { contains: filters.q, mode: 'insensitive' } },
               { viewer: { displayName: { contains: filters.q, mode: 'insensitive' } } },
             ],
           }

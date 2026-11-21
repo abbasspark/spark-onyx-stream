@@ -42,6 +42,8 @@ export class AppConfig {
   readonly billingCurrency: string;
   /** Where viewers ask for a subscription. Empty when not set. */
   readonly billingContactUrl: string;
+  /** How long a rented title can be watched. */
+  readonly rental: { readonly startDays: number; readonly watchHours: number };
   /** Access to Stripe for selling subscriptions online. Null when there is no online payment. */
   readonly stripe: {
     readonly secretKey: string;
@@ -98,6 +100,7 @@ export class AppConfig {
     this.mediaBaseUrl = env.MEDIA_BASE_URL;
     this.billingCurrency = env.BILLING_CURRENCY;
     this.billingContactUrl = env.BILLING_CONTACT_URL;
+    this.rental = { startDays: env.RENTAL_START_DAYS, watchHours: env.RENTAL_WATCH_HOURS };
     this.stripe = env.STRIPE_SECRET_KEY
       ? {
           secretKey: env.STRIPE_SECRET_KEY,

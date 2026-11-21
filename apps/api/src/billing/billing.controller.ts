@@ -51,6 +51,7 @@ import type {
 import { RateLimit } from '../rate-limit/rate-limit.guard.js';
 import { CheckoutService } from './checkout.service.js';
 import type { ViewerAccess } from './entitlement.js';
+import { type OwnedTitle, PurchasesService } from '../purchases/purchases.service.js';
 import { PlansService } from './plans.service.js';
 import { StripeWebhookService } from './stripe-webhook.service.js';
 import { SubscriptionsService } from './subscriptions.service.js';
@@ -70,6 +71,8 @@ interface OwnSubscription {
   access: ViewerAccess;
   /** Whether the viewer paid online before, so a free trial is not offered again. */
   trialUsed: boolean;
+  /** Titles the viewer rented or bought and can watch now. */
+  purchases: OwnedTitle[];
 }
 
 /** What viewers and visitors see of billing. */
@@ -79,6 +82,7 @@ export class PublicBillingController {
     @Inject(PlansService) private readonly plans: PlansService,
     @Inject(SubscriptionsService) private readonly subscriptions: SubscriptionsService,
     @Inject(CheckoutService) private readonly checkout: CheckoutService,
+    @Inject(PurchasesService) private readonly purchases: PurchasesService,
   ) {}
 
   /** The plans on offer. Open to everyone, like the catalog. */
@@ -142,12 +146,13 @@ export class PublicBillingController {
   }
 
   private async ownOf(identity: ViewerIdentity): Promise<OwnSubscription> {
-    const [subscription, access, trialUsed] = await Promise.all([
+    const [subscription, access, trialUsed, purchases] = await Promise.all([
       this.subscriptions.ownOf(identity.viewer.id),
       this.subscriptions.accessOf(identity.viewer.id),
       this.subscriptions.paidBefore(identity.viewer.id),
+      this.purchases.ownedBy(identity.viewer.id),
     ]);
-    return { subscription, entitled: subscription !== null, access, trialUsed };
+    return { subscription, entitled: subscription !== null, access, trialUsed, purchases };
   }
 }
 

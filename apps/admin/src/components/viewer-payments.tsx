@@ -120,7 +120,11 @@ export function ViewerPayments({ viewerId, viewerName }: { viewerId: string; vie
                   </p>
                   <p className="mt-0.5 text-xs text-muted-foreground">
                     {formatDateTime(payment.paidAt)}
-                    {payment.planName ? `, ${payment.planName}` : ''}
+                    {payment.kind === 'SUBSCRIPTION'
+                      ? payment.planName
+                        ? `, ${payment.planName}`
+                        : ''
+                      : `, ${payment.kind === 'RENTAL' ? 'rented' : 'bought'} ${payment.titleName ?? 'a title'}`}
                     {payment.refundedAmount > 0
                       ? `, ${formatMoney(payment.refundedAmount, payment.currency)} returned`
                       : ''}

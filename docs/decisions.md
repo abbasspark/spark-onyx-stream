@@ -454,3 +454,20 @@ This replaces the "plain CSS without a component library" part of D-018.
 **Why:** operators think in bundles: a kids offer, a sports offer, everything. Levels, where a higher plan includes all lower ones, cannot say "sports without kids". Packages can say both, and are what live channels will be sorted into in the next phase, so one structure serves films, series and channels. Keeping "everything" as a state means a new title is in every full plan without anybody remembering to add it. Refusing by default for an unsorted title costs a click when it was meant to be open, and costs revenue when it was not: the first mistake is the cheaper one. Working access out when asked means a title moved between packages, or a plan changed, takes effect at once and cannot leave stale copies behind.
 
 **Consequence:** changing the packages of a plan changes what its current subscribers get, including those who paid for a year: the operator has to judge that. A viewer cannot move between plans in place yet. The ids of the packages of paid titles are public, which names no title that is not public anyway. Sites without packages behave exactly as before.
+
+## D-036 A single title can be rented or bought, beside the subscriptions
+
+**Date:** 2026-11-21
+
+- **Prices for renting and buying are part of a paid title.** A missing price means the title is not offered that way.
+- **A purchase is a right to one title,** separate from subscriptions. A paid title is open through a plan that opens it, or through a valid purchase.
+- **A title can be kept out of every plan** and is then rented or bought only.
+- **A rental has two clocks:** days to start, and hours to finish from the first play, never past the first deadline. Both are settings of the installation.
+- **The first play of a rental is the first playback request that the rental was needed for.** Watching through a plan starts nothing.
+- **A single payment through Stripe Checkout,** recorded from the checkout itself. An invoice that belongs to no subscription is not counted.
+- **A refund in full revokes the purchase.** An admin can give and take back titles by hand.
+- **A series is one thing to rent or buy.**
+
+**Why:** new releases and special titles earn more sold one by one than inside a flat price, and many operators run both models side by side. Keeping the purchase apart from the subscription keeps both rules small: one asks what the plan opens, the other whether this viewer holds this title, and either is enough. The two clocks are what viewers know from every large shop for films, so nothing has to be explained. Starting the clock only when the rental is needed spares a subscriber a rental they did not use. Recording from the checkout avoids depending on whether an account makes invoices for single payments, which is a setting at Stripe and would count a sale twice or not at all.
+
+**Consequence:** rental times are the same for every title. Seasons and episodes cannot be sold one by one. A title that is taken off the site is gone for those who bought it too, which the page says as "for as long as it is on this site". A partial refund leaves the title with the viewer. Prices of titles are in the one currency of the installation, as the plans are.

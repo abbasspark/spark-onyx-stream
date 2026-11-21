@@ -25,6 +25,16 @@ export interface StripeCheckoutSession {
   client_reference_id: string | null;
   customer: string | { id: string } | null;
   subscription: string | { id: string } | null;
+  /** "paid", "unpaid" or "no_payment_required". */
+  payment_status?: string | null;
+  /** The payment of a session that sells something once. */
+  payment_intent?: string | { id: string } | null;
+  /** What was paid, tax included, in the smallest unit of the currency. */
+  amount_total?: number | null;
+  currency?: string | null;
+  total_details?: { amount_tax?: number | null } | null;
+  metadata?: Record<string, string> | null;
+  created?: number;
 }
 
 export interface StripePortalSession {
