@@ -979,7 +979,18 @@ export interface RevenueReport {
 
 /** "WAITING" stands for an enabled channel that no live process reports on. */
 export type ChannelStatus =
-  'STOPPED' | 'WAITING' | 'STARTING' | 'RUNNING' | 'RECONNECTING' | 'FAILED';
+  'STOPPED' | 'WAITING' | 'IDLE' | 'STARTING' | 'RUNNING' | 'RECONNECTING' | 'FAILED';
+
+/** PULL: the server connects to an address. PUSH: an encoder connects with a stream key. */
+export type ChannelIngest = 'PULL' | 'PUSH';
+
+/** What to enter in an encoder for a pushed channel. Addresses are null when not configured. */
+export interface EncoderSettings {
+  streamKey: string;
+  rtmpServer: string | null;
+  rtmpUrl: string | null;
+  srtUrl: string | null;
+}
 
 /** COPY passes the picture on as it arrives. TRANSCODE encodes it into several qualities. */
 export type ChannelMode = 'COPY' | 'TRANSCODE';
@@ -1006,7 +1017,8 @@ export interface Channel {
   slug: string;
   number: number | null;
   description: string | null;
-  /** The source without anything secret. */
+  ingest: ChannelIngest;
+  /** The address of a pulled channel without anything secret. Empty for a pushed one. */
   source: string;
   mode: ChannelMode;
   /** The qualities chosen for transcoding, as picture heights. */
@@ -1041,7 +1053,8 @@ export interface ChannelInput {
   slug?: string;
   number: number | null;
   description: string | null;
-  source: string;
+  ingest?: ChannelIngest;
+  source?: string;
   mode?: ChannelMode;
   qualities?: number[];
   start?: boolean;

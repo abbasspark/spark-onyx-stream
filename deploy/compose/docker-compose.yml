@@ -24,6 +24,10 @@ x-app: &app
     JWT_SECRET: ${JWT_SECRET:?Run ./init-env.sh first}
     PLAYBACK_SIGNING_SECRET: ${PLAYBACK_SIGNING_SECRET:?Run ./init-env.sh first}
     MASTER_KEY: ${MASTER_KEY:?Run ./init-env.sh first}
+    INGEST_API_URL: http://ingest:9997
+    INGEST_RTSP_URL: rtsp://ingest:8554
+    INGEST_PUBLIC_RTMP_URL: ${INGEST_PUBLIC_RTMP_URL:-}
+    INGEST_PUBLIC_SRT_URL: ${INGEST_PUBLIC_SRT_URL:-}
     PLAYBACK_URL_TTL_SECONDS: ${PLAYBACK_URL_TTL_SECONDS:-21600}
     CATALOG_PLAYBACK: ${CATALOG_PLAYBACK:-open}
     VIEWER_REGISTRATION: ${VIEWER_REGISTRATION:-open}
@@ -144,6 +148,23 @@ services:
       migrate:
         condition: service_completed_successfully
       redis:
+        condition: service_healthy
+
+  # Receives the streams encoders push to live channels (MediaMTX). It asks the
+  # API before it lets a connection in. Only the two ports for encoders are
+  # published: reading streams and the control API stay in the internal network.
+  ingest:
+    image: bluenviron/mediamtx:1.21.4
+    restart: unless-stopped
+    environment:
+      MTX_AUTHHTTPADDRESS: http://api:3000/v1/live/ingest/auth
+    volumes:
+      - ../mediamtx/mediamtx.yml:/mediamtx.yml:ro
+    ports:
+      - '${INGEST_RTMP_PORT:-1935}:1935'
+      - '${INGEST_SRT_PORT:-8890}:8890/udp'
+    depends_on:
+      api:
         condition: service_healthy
 
   # The site viewers use. It reads the catalog from the API.

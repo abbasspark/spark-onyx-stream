@@ -9,7 +9,7 @@ import {
   type OnApplicationShutdown,
   type OnModuleInit,
 } from '@nestjs/common';
-import { type ChannelMode, PrismaClient } from '@onyx/database';
+import { type ChannelIngest, type ChannelMode, PrismaClient } from '@onyx/database';
 import type { Redis } from 'ioredis';
 import { AppConfig } from '../config/app-config.js';
 import { SecretBox } from '../crypto/secret-box.js';
@@ -17,6 +17,8 @@ import { EventPublisher } from '../events/event-publisher.js';
 import { REDIS_CLIENT } from '../redis/redis.module.js';
 import { ChannelRunner, type RunnerState } from './channel-runner.js';
 import { FfmpegLiveEngine } from './ffmpeg-live-engine.js';
+import { encoderSource } from './ingest.js';
+import { IngestClient } from './ingest-client.js';
 import { measureBitrate } from './live-playlist.js';
 import { parseSource } from './live-source.js';
 import {
@@ -29,10 +31,26 @@ import {
   RECONCILE_MS,
 } from './live-state.js';
 
+/** A channel that should run, as far as the supervisor needs it. */
+interface Wanted {
+  id: string;
+  name: string;
+  ingest: ChannelIngest;
+  sourceEncrypted: string | null;
+  streamKeyEncrypted: string | null;
+  restartToken: number;
+  mode: ChannelMode;
+  qualities: number[];
+}
+
+function signatureOf(channel: Wanted): string {
+  return `${channel.ingest}:${channel.sourceEncrypted ?? ''}:${channel.streamKeyEncrypted ?? ''}`;
+}
+
 interface Running {
   runner: ChannelRunner;
-  /** What the channel looked like when the runner started. A change means a restart. */
-  sourceEncrypted: string;
+  /** Where the channel got its video from when the runner started. A change means a restart. */
+  signature: string;
   restartToken: number;
 }
 
@@ -65,6 +83,7 @@ export class LiveSupervisorService implements OnModuleInit, OnApplicationShutdow
     @Inject(SecretBox) private readonly secrets: SecretBox,
     @Inject(EventPublisher) private readonly events: EventPublisher,
     @Inject(FfmpegLiveEngine) private readonly engine: FfmpegLiveEngine,
+    @Inject(IngestClient) private readonly ingest: IngestClient,
   ) {}
 
   onModuleInit(): void {
@@ -124,6 +143,8 @@ export class LiveSupervisorService implements OnModuleInit, OnApplicationShutdow
         restartToken: true,
         mode: true,
         qualities: true,
+        ingest: true,
+        streamKeyEncrypted: true,
       },
     });
     const byId = new Map(wanted.map((channel) => [channel.id, channel]));
@@ -134,7 +155,7 @@ export class LiveSupervisorService implements OnModuleInit, OnApplicationShutdow
         await this.halt(id);
         await this.markStopped(id);
       } else if (
-        channel.sourceEncrypted !== running.sourceEncrypted ||
+        signatureOf(channel) !== running.signature ||
         channel.restartToken !== running.restartToken
       ) {
         await this.halt(id);
@@ -156,18 +177,21 @@ export class LiveSupervisorService implements OnModuleInit, OnApplicationShutdow
     await Promise.all([...this.running].map(([id, running]) => this.report(id, running.runner)));
   }
 
-  private launch(channel: {
-    id: string;
-    name: string;
-    sourceEncrypted: string;
-    restartToken: number;
-    mode: ChannelMode;
-    qualities: number[];
-  }): void {
+  private launch(channel: Wanted): void {
     let runner: ChannelRunner;
     try {
+      const key =
+        channel.ingest === 'PUSH' && channel.streamKeyEncrypted
+          ? this.secrets.decrypt(channel.streamKeyEncrypted)
+          : null;
+      if (channel.ingest === 'PUSH' ? key === null : channel.sourceEncrypted === null) {
+        throw new Error('The channel has no source');
+      }
       runner = new ChannelRunner({
-        source: parseSource(this.secrets.decrypt(channel.sourceEncrypted)),
+        source: key
+          ? encoderSource(this.config.ingest.rtspUrl, key, this.config.playbackSigningSecret)
+          : parseSource(this.secrets.decrypt(channel.sourceEncrypted as string)),
+        encoder: key ? () => this.ingest.state(key) : undefined,
         directory: channelDirectory(this.config.live.path, channel.id),
         processing: { mode: channel.mode, qualities: channel.qualities },
         preset: this.config.live.transcodePreset,
@@ -184,7 +208,7 @@ export class LiveSupervisorService implements OnModuleInit, OnApplicationShutdow
 
     this.running.set(channel.id, {
       runner,
-      sourceEncrypted: channel.sourceEncrypted,
+      signature: signatureOf(channel),
       restartToken: channel.restartToken,
     });
     this.logger.log(`Starting channel "${channel.name}"`);

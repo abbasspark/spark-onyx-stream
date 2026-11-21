@@ -1,5 +1,11 @@
 // SPDX-License-Identifier: AGPL-3.0-only
-import type { Channel, ChannelStatus, ChannelStreams, SourceProbe } from '@/api/types';
+import type {
+  Channel,
+  ChannelStatus,
+  ChannelStreams,
+  EncoderSettings,
+  SourceProbe,
+} from '@/api/types';
 import type { BadgeTone } from '@/components/ui/display';
 
 export interface StatusLook {
@@ -13,6 +19,7 @@ const STATUS_LOOKS: Record<ChannelStatus, StatusLook> = {
   RUNNING: { label: 'On air', tone: 'success', live: true },
   STARTING: { label: 'Starting', tone: 'info', live: true },
   WAITING: { label: 'Waiting', tone: 'info', live: true },
+  IDLE: { label: 'Waiting for encoder', tone: 'info', live: true },
   RECONNECTING: { label: 'Reconnecting', tone: 'warning', live: true },
   FAILED: { label: 'Failed', tone: 'danger', live: false },
   STOPPED: { label: 'Stopped', tone: 'neutral', live: false },
@@ -34,7 +41,8 @@ export function needsAttention(channel: Channel): boolean {
   return (
     channel.status === 'FAILED' ||
     channel.status === 'RECONNECTING' ||
-    (channel.status === 'WAITING' && channel.statusMessage !== null)
+    // Waiting is fine, unless something says why it cannot end.
+    ((channel.status === 'WAITING' || channel.status === 'IDLE') && channel.statusMessage !== null)
   );
 }
 
@@ -54,7 +62,7 @@ export function matchesFilter(channel: Channel, filter: ChannelFilter): boolean 
 /** Finds channels by name, number or source. */
 export function matchesSearch(channel: Channel, search: string): boolean {
   const words = search.toLowerCase().split(/\s+/).filter(Boolean);
-  const text = `${channel.number ?? ''} ${channel.name} ${channel.source}`.toLowerCase();
+  const text = `${channel.number ?? ''} ${channel.name} ${sourceText(channel)}`.toLowerCase();
   return words.every((word) => text.includes(word));
 }
 
@@ -226,4 +234,36 @@ export function parseChannelNumber(text: string): number | null | undefined {
   }
   const value = Number(trimmed);
   return /^\d{1,4}$/.test(trimmed) && value >= 1 ? value : undefined;
+}
+
+/** Where a channel gets its video from, as a line of text. */
+export function sourceText(channel: Pick<Channel, 'ingest' | 'source'>): string {
+  return channel.ingest === 'PUSH' ? 'Pushed by an encoder' : channel.source;
+}
+
+/** The usual ports of the ingest server, used when no public address is configured. */
+const RTMP_PORT = 1935;
+const SRT_PORT = 8890;
+
+export interface EncoderAddresses {
+  /** "Server" in OBS. */
+  rtmpServer: string;
+  streamKey: string;
+  /** One address for encoders that take SRT. It contains the stream key. */
+  srtUrl: string;
+}
+
+/**
+ * What to enter in an encoder. Addresses the server does not know are made
+ * from the host name the panel itself is opened with, which is right for an
+ * installation on one server.
+ */
+export function encoderAddresses(settings: EncoderSettings, hostname: string): EncoderAddresses {
+  return {
+    rtmpServer: settings.rtmpServer ?? `rtmp://${hostname}:${RTMP_PORT}/live`,
+    streamKey: settings.streamKey,
+    srtUrl:
+      settings.srtUrl ??
+      `srt://${hostname}:${SRT_PORT}?streamid=publish:live/${settings.streamKey}`,
+  };
 }

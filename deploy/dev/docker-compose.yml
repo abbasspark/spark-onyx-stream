@@ -1,4 +1,4 @@
-# Development infrastructure only: PostgreSQL and Redis.
+# Development infrastructure only: PostgreSQL, Redis and the ingest server.
 # The applications run on the host with pnpm during development.
 #
 # Start: pnpm dev:infra
@@ -37,6 +37,24 @@ services:
       interval: 5s
       timeout: 3s
       retries: 10
+
+  # Receives streams pushed by encoders, for live channels of that kind. It asks
+  # the API on the host before it lets a connection in.
+  ingest:
+    image: bluenviron/mediamtx:1.21.4
+    restart: unless-stopped
+    environment:
+      MTX_AUTHHTTPADDRESS: http://host.docker.internal:${API_PORT:-3000}/v1/live/ingest/auth
+    extra_hosts:
+      - 'host.docker.internal:host-gateway'
+    volumes:
+      - ../mediamtx/mediamtx.yml:/mediamtx.yml:ro
+    ports:
+      - '1935:1935'
+      - '8890:8890/udp'
+      # For the live process on the host. Not published in production.
+      - '127.0.0.1:8554:8554'
+      - '127.0.0.1:9997:9997'
 
 volumes:
   postgres-data:

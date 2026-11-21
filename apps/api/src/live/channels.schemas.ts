@@ -64,25 +64,49 @@ const qualities = z
   .min(1, 'Choose at least one quality')
   .transform((values) => [...new Set(values)].sort((a, b) => b - a));
 
-export const createChannelSchema = z.object({
-  name,
-  /** Left out, the slug is made from the name. */
-  slug: slug.optional(),
-  number: number.default(null),
-  description: description.default(null),
-  source,
-  mode: mode.default('COPY'),
-  /** Left out, a transcoded channel gets the usual three. */
-  qualities: qualities.optional(),
-  /** Start pulling the source as soon as the channel exists. */
-  start: z.boolean().default(false),
-});
+const ingest = z.enum(['PULL', 'PUSH']);
+
+/** A pulled channel needs an address. A pushed one has none: its encoder connects with a stream key. */
+function checkSource(
+  value: { ingest?: 'PULL' | 'PUSH'; source?: string },
+  ctx: z.RefinementCtx,
+  required: boolean,
+): void {
+  if (value.ingest === 'PUSH' && value.source !== undefined) {
+    ctx.addIssue({
+      code: 'custom',
+      path: ['source'],
+      message: 'A channel that an encoder pushes has no source address',
+    });
+  }
+  if (required && value.ingest !== 'PUSH' && value.source === undefined) {
+    ctx.addIssue({ code: 'custom', path: ['source'], message: 'Enter the address of the source' });
+  }
+}
+
+export const createChannelSchema = z
+  .object({
+    name,
+    /** Left out, the slug is made from the name. */
+    slug: slug.optional(),
+    number: number.default(null),
+    description: description.default(null),
+    ingest: ingest.default('PULL'),
+    source: source.optional(),
+    mode: mode.default('COPY'),
+    /** Left out, a transcoded channel gets the usual three. */
+    qualities: qualities.optional(),
+    /** Start the channel as soon as it exists. */
+    start: z.boolean().default(false),
+  })
+  .superRefine((value, ctx) => checkSource(value, ctx, true));
 export type CreateChannelInput = z.infer<typeof createChannelSchema>;
 
 export const updateChannelSchema = z
-  .object({ name, slug, number, description, source, mode, qualities })
+  .object({ name, slug, number, description, ingest, source, mode, qualities })
   .partial()
-  .refine((value) => Object.keys(value).length > 0, { message: 'Nothing to change' });
+  .refine((value) => Object.keys(value).length > 0, { message: 'Nothing to change' })
+  .superRefine((value, ctx) => checkSource(value, ctx, false));
 export type UpdateChannelInput = z.infer<typeof updateChannelSchema>;
 
 export const probeSourceSchema = z.object({ source });

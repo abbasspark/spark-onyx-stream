@@ -9,6 +9,7 @@ import { mkdir, mkdtemp, readdir, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { AdminsModule } from '../src/admins/admins.module.js';
+import { ingestPassword } from '../src/live/ingest.js';
 import { LiveModule, LiveSupervisorModule } from '../src/live/live.module.js';
 import { LiveSupervisorService } from '../src/live/live-supervisor.service.js';
 import { createPlaybackToken } from '../src/playback/playback-token.js';
@@ -39,7 +40,11 @@ describe.skipIf(!TEST_DATABASE_URL)('Live channels (e2e)', () => {
 
   beforeAll(async () => {
     livePath = await mkdtemp(path.join(tmpdir(), 'onyx-live-e2e-'));
-    testApp = await createTestApp([AdminsModule, LiveModule], { LIVE_PATH: livePath });
+    testApp = await createTestApp([AdminsModule, LiveModule], {
+      LIVE_PATH: livePath,
+      // Nothing listens there: tests must not depend on an ingest server on this machine.
+      INGEST_API_URL: 'http://127.0.0.1:1',
+    });
   });
 
   afterAll(async () => {
@@ -267,6 +272,157 @@ describe.skipIf(!TEST_DATABASE_URL)('Live channels (e2e)', () => {
       await http().post('/v1/channels/probe').set(editor).send({ source: SOURCE }).expect(403);
       await http().delete(`/v1/channels/${created.body.id}`).set(editor).expect(403);
       await http().get('/v1/channels').expect(401);
+    });
+  });
+
+  describe('channels pushed by an encoder', () => {
+    const auth = (body: Record<string, unknown>) => http().post('/v1/live/ingest/auth').send(body);
+    const publish = (key: string) =>
+      auth({ action: 'publish', path: `live/${key}`, protocol: 'rtmp', user: '', password: '' });
+    const createPushed = (body: Record<string, unknown> = {}) =>
+      http()
+        .post('/v1/channels')
+        .set(admin())
+        .send({ name: 'Studio', ingest: 'PUSH', ...body });
+    const encoderOf = async (id: string) =>
+      (await http().get(`/v1/channels/${id}/encoder`).set(admin()).expect(200)).body as {
+        streamKey: string;
+      };
+
+    it('gets a stream key instead of an address', async () => {
+      const created = await createPushed().expect(201);
+      expect(created.body).toMatchObject({ ingest: 'PUSH', source: '', status: 'STOPPED' });
+      expect(JSON.stringify(created.body)).not.toContain('streamKey');
+
+      const encoder = await encoderOf(created.body.id);
+      expect(encoder).toEqual({
+        streamKey: expect.stringMatching(/^[A-Za-z0-9_-]{32}$/),
+        rtmpServer: null,
+        rtmpUrl: null,
+        srtUrl: null,
+      });
+
+      const stored = await testApp.prisma.channel.findUniqueOrThrow({
+        where: { id: created.body.id },
+      });
+      expect(stored.sourceEncrypted).toBeNull();
+      expect(stored.streamKeyEncrypted).not.toContain(encoder.streamKey);
+      expect(stored.streamKeyHash).not.toContain(encoder.streamKey);
+    });
+
+    it('needs an address for a pulled channel and takes none for a pushed one', async () => {
+      const missing = await http()
+        .post('/v1/channels')
+        .set(admin())
+        .send({ name: 'No source' })
+        .expect(400);
+      expect(missing.body.issues[0]).toEqual({
+        field: 'source',
+        message: 'Enter the address of the source',
+      });
+      await createPushed({ source: SOURCE }).expect(400);
+    });
+
+    it('lets an encoder publish with its key while the channel is switched on', async () => {
+      const created = await createPushed().expect(201);
+      const { streamKey } = await encoderOf(created.body.id);
+
+      // Switched off: the encoder is refused, which tells its operator at once.
+      await publish(streamKey).expect(401);
+
+      await http().post(`/v1/channels/${created.body.id}/start`).set(admin()).expect(200);
+      await publish(streamKey).expect(204);
+
+      await publish(`${streamKey}x`).expect(401);
+      await publish('short').expect(401);
+      await auth({ action: 'publish', path: `other/${streamKey}` }).expect(401);
+      await auth({}).expect(401);
+      await auth({ action: 'publish', path: 42 }).expect(401);
+    });
+
+    it('keeps reading streams and the control API to the platform itself', async () => {
+      const created = await createPushed({ start: true }).expect(201);
+      const { streamKey } = await encoderOf(created.body.id);
+      const password = ingestPassword('b'.repeat(64));
+
+      for (const action of ['read', 'playback', 'api', 'metrics', 'pprof']) {
+        const request = { action, path: `live/${streamKey}` };
+        await auth({ ...request, user: '', password: '' }).expect(401);
+        await auth({ ...request, user: 'onyx', password: 'guess' }).expect(401);
+        // The stream key opens publishing and nothing else.
+        await auth({ ...request, user: 'onyx', password: streamKey }).expect(401);
+        await auth({ ...request, user: 'onyx', password }).expect(204);
+      }
+      // The password of the platform is no stream key.
+      await auth({
+        action: 'publish',
+        path: 'live/unknownunknownunknown',
+        user: 'onyx',
+        password,
+      }).expect(401);
+    });
+
+    it('replaces a stream key, after which the old one is dead', async () => {
+      const created = await createPushed({ start: true }).expect(201);
+      const id = created.body.id as string;
+      const before = await encoderOf(id);
+
+      const replaced = await http().post(`/v1/channels/${id}/stream-key`).set(admin()).expect(200);
+      expect(replaced.body.streamKey).not.toBe(before.streamKey);
+      expect(await encoderOf(id)).toEqual(replaced.body);
+
+      await publish(before.streamKey).expect(401);
+      await publish(replaced.body.streamKey).expect(204);
+
+      const audit = await testApp.prisma.auditLog.findFirstOrThrow({
+        where: { action: 'channel.stream-key' },
+      });
+      expect(JSON.stringify(audit.metadata)).not.toContain(replaced.body.streamKey);
+      expect(audit.metadata).toMatchObject({ source: 'encoder' });
+    });
+
+    it('has no stream key for a pulled channel', async () => {
+      const pulled = await create().expect(201);
+      await http().get(`/v1/channels/${pulled.body.id}/encoder`).set(admin()).expect(400);
+      await http().post(`/v1/channels/${pulled.body.id}/stream-key`).set(admin()).expect(400);
+      await http().get(`/v1/channels/${UNKNOWN}/encoder`).set(admin()).expect(404);
+    });
+
+    it('can be turned into a pulled channel and back', async () => {
+      const created = await createPushed({ start: true }).expect(201);
+      const id = created.body.id as string;
+      const first = await encoderOf(id);
+      const patch = (body: Record<string, unknown>) =>
+        http().patch(`/v1/channels/${id}`).set(admin()).send(body);
+
+      // A pulled channel needs an address.
+      await patch({ ingest: 'PULL' }).expect(400);
+      const pulled = await patch({ ingest: 'PULL', source: SOURCE }).expect(200);
+      expect(pulled.body).toMatchObject({
+        ingest: 'PULL',
+        source: 'https://cdn.example.com/…/live.m3u8',
+      });
+      await publish(first.streamKey).expect(401);
+
+      const pushed = await patch({ ingest: 'PUSH' }).expect(200);
+      expect(pushed.body).toMatchObject({ ingest: 'PUSH', source: '' });
+      const second = await encoderOf(id);
+      expect(second.streamKey).not.toBe(first.streamKey);
+      await publish(second.streamKey).expect(204);
+
+      // Renaming a pushed channel keeps its key.
+      await patch({ name: 'Studio B' }).expect(200);
+      expect((await encoderOf(id)).streamKey).toBe(second.streamKey);
+    });
+
+    it('keeps stream keys from those who may only look', async () => {
+      const created = await createPushed().expect(201);
+      await http().post('/v1/admins').set(admin()).send(EDITOR).expect(201);
+      const editor = testApp.bearer(await testApp.login(EDITOR.email, EDITOR.password));
+
+      await http().get(`/v1/channels/${created.body.id}`).set(editor).expect(200);
+      await http().get(`/v1/channels/${created.body.id}/encoder`).set(editor).expect(403);
+      await http().post(`/v1/channels/${created.body.id}/stream-key`).set(editor).expect(403);
     });
   });
 

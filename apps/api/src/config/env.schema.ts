@@ -265,6 +265,32 @@ export const envSchema = z
     LIVE_TRANSCODE_PRESET: z
       .enum(['ultrafast', 'superfast', 'veryfast', 'faster', 'fast', 'medium'])
       .default('veryfast'),
+    /** Control API of the ingest server (MediaMTX), as the API and the live processes reach it. */
+    INGEST_API_URL: z.url().default('http://127.0.0.1:9997'),
+    /** RTSP address of the ingest server, as the live processes reach it. */
+    INGEST_RTSP_URL: z
+      .string()
+      .regex(/^rtsps?:\/\//)
+      .default('rtsp://127.0.0.1:8554'),
+    /**
+     * Addresses encoders reach the ingest server at, as shown to admins:
+     * "rtmp://stream.example.com:1935" and "srt://stream.example.com:8890".
+     * Empty, the panel shows its own host name with the usual ports.
+     */
+    INGEST_PUBLIC_RTMP_URL: z
+      .string()
+      .default('')
+      .transform((value) => value.trim().replace(/\/+$/, ''))
+      .refine((value) => value === '' || /^rtmps?:\/\/[^/?]+$/.test(value), {
+        message: 'INGEST_PUBLIC_RTMP_URL must look like rtmp://stream.example.com:1935',
+      }),
+    INGEST_PUBLIC_SRT_URL: z
+      .string()
+      .default('')
+      .transform((value) => value.trim().replace(/\/+$/, ''))
+      .refine((value) => value === '' || /^srt:\/\/[^/?]+$/.test(value), {
+        message: 'INGEST_PUBLIC_SRT_URL must look like srt://stream.example.com:8890',
+      }),
     /** Processing jobs one worker process runs at the same time. Transcoding uses all CPU cores already. */
     WORKER_CONCURRENCY: z.coerce.number().int().min(1).max(64).default(1),
 
