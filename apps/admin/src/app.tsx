@@ -25,6 +25,7 @@ import { LoginPage } from './pages/login-page';
 import { StoragePage } from './pages/storage-page';
 import { TitleEditorPage } from './pages/title-editor-page';
 import { TitlesPage } from './pages/titles-page';
+import { ViewersPage } from './pages/viewers-page';
 import { ThemeProvider, useTheme } from './theme/theme';
 import { UploadsProvider } from './uploads/uploads';
 
@@ -76,6 +77,7 @@ function Pages() {
             <Route path="titles" element={<TitlesPage />} />
             <Route path="titles/:id" element={<TitleEditorPage />} />
             <Route path="categories" element={<CategoriesPage />} />
+            <Route path="viewers" element={<ViewersPage />} />
             <Route path="jobs" element={<JobsPage />} />
             <Route path="encoding-profiles" element={<EncodingProfilesPage />} />
             <Route path="storage" element={<StoragePage />} />

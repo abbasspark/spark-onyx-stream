@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 import { Module } from '@nestjs/common';
 import { PlaybackModule } from '../playback/playback.module.js';
+import { ViewersModule } from '../viewers/viewers.module.js';
 import { CatalogController } from './catalog.controller.js';
 import { CategoriesService } from './categories.service.js';
 import { ImagesService } from './images.service.js';
@@ -15,7 +16,7 @@ import { TitlesService } from './titles.service.js';
  * media engine does not depend on it.
  */
 @Module({
-  imports: [PlaybackModule],
+  imports: [PlaybackModule, ViewersModule],
   controllers: [CatalogController, PublicCatalogController],
   providers: [TitlesService, CategoriesService, ImagesService, PublicCatalogService],
   exports: [TitlesService, CategoriesService, ImagesService],

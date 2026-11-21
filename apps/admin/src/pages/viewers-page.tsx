@@ -1,0 +1,899 @@
+// SPDX-License-Identifier: AGPL-3.0-only
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import {
+  ArrowDown,
+  ArrowUp,
+  Ban,
+  Check,
+  Copy,
+  KeyRound,
+  LogOut,
+  MonitorSmartphone,
+  MoreHorizontal,
+  Pencil,
+  Plus,
+  RefreshCw,
+  Search,
+  Trash2,
+  UserCheck,
+  UsersRound,
+  X,
+} from 'lucide-react';
+import { type FormEvent, type ReactNode, useEffect, useState } from 'react';
+import { toast } from 'sonner';
+import { viewersApi } from '@/api/endpoints';
+import {
+  VIEWER_SORT_FIELDS,
+  VIEWER_STATUSES,
+  type SortOrder,
+  type Viewer,
+  type ViewerAccessConfig,
+  type ViewerSortField,
+  type ViewerStatus,
+} from '@/api/types';
+import { useSession } from '@/auth/session';
+import { useConfirm } from '@/components/confirm';
+import { Button } from '@/components/ui/button';
+import {
+  Badge,
+  Card,
+  EmptyState,
+  ErrorNote,
+  Facts,
+  PageHeader,
+  Pagination,
+  Skeleton,
+  StatusBadge,
+  Table,
+  Td,
+  Th,
+  Tr,
+} from '@/components/ui/display';
+import { Field, Input, Select } from '@/components/ui/form';
+import {
+  Dialog,
+  DialogBody,
+  DialogContent,
+  DialogFooter,
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+  Tooltip,
+} from '@/components/ui/overlay';
+import { useAddressParams } from '@/lib/address-params';
+import { cn } from '@/lib/cn';
+import { formatDateTime, formatRelative, humanize } from '@/lib/format';
+import { describeDevice, generatePassword, initialsOf } from '@/lib/viewers';
+
+const PAGE_SIZE = 25;
+const SEARCH_DELAY_MS = 300;
+const MIN_PASSWORD_LENGTH = 8;
+
+const SORT_LABELS: Record<ViewerSortField, string> = {
+  createdAt: 'Date joined',
+  lastLoginAt: 'Last sign-in',
+  email: 'Email',
+  displayName: 'Name',
+};
+
+/** What a dialog is open for. */
+type Open =
+  | { kind: 'create' }
+  | { kind: 'edit'; viewer: Viewer }
+  | { kind: 'password'; viewer: Viewer }
+  | { kind: 'detail'; viewer: Viewer }
+  | null;
+
+function Avatar({ name, muted }: { name: string; muted?: boolean }) {
+  return (
+    <span
+      aria-hidden="true"
+      className={cn(
+        'flex size-9 shrink-0 items-center justify-center rounded-full text-xs font-semibold',
+        muted ? 'bg-muted text-muted-foreground' : 'bg-primary/12 text-primary',
+      )}
+    >
+      {initialsOf(name) || '?'}
+    </span>
+  );
+}
+
+/** Says in plain words what the installation lets the public do. */
+function AccessSummary({ access }: { access: ViewerAccessConfig }) {
+  const items: { label: string; value: string; note: string; tone: 'neutral' | 'warning' }[] = [
+    {
+      label: 'Sign-up',
+      value: access.registration === 'open' ? 'Open to everyone' : 'Closed',
+      note:
+        access.registration === 'open'
+          ? 'Anyone can create an account on the website.'
+          : 'Only admins create viewers, here.',
+      tone: 'neutral',
+    },
+    {
+      label: 'Playback',
+      value:
+        access.playback === 'open'
+          ? 'Open to everyone'
+          : access.playback === 'viewers'
+            ? 'Signed-in viewers only'
+            : 'Off',
+      note:
+        access.playback === 'open'
+          ? 'Published titles can be watched without an account.'
+          : access.playback === 'viewers'
+            ? 'A viewer must sign in to watch a published title.'
+            : 'Nobody can watch through the website. The catalog can still be browsed.',
+      tone: access.playback === 'open' ? 'warning' : 'neutral',
+    },
+  ];
+
+  return (
+    <Card className="mb-6 grid gap-x-10 gap-y-4 p-5 sm:grid-cols-2">
+      {items.map((item) => (
+        <div key={item.label}>
+          <p className="flex items-center gap-2 text-[13px] text-muted-foreground">
+            {item.label}
+            <Badge tone={item.tone}>{item.value}</Badge>
+          </p>
+          <p className="mt-1.5 text-sm">{item.note}</p>
+        </div>
+      ))}
+      <p className="text-xs text-muted-foreground sm:col-span-2">
+        Both are set where the installation is configured, with{' '}
+        <code className="font-mono">VIEWER_REGISTRATION</code> and{' '}
+        <code className="font-mono">CATALOG_PLAYBACK</code>, and apply after a restart.
+      </p>
+    </Card>
+  );
+}
+
+/** The people who have an account on the viewer website. */
+export function ViewersPage() {
+  const { can } = useSession();
+  const mayWrite = can('viewers:write');
+  const confirm = useConfirm();
+  const queryClient = useQueryClient();
+  const [params, change] = useAddressParams();
+  const [open, setOpen] = useState<Open>(null);
+
+  const page = Math.max(1, Number(params.get('page')) || 1);
+  const status = (
+    (VIEWER_STATUSES as readonly string[]).includes(params.get('status') ?? '')
+      ? params.get('status')
+      : ''
+  ) as ViewerStatus | '';
+  const q = params.get('q') ?? '';
+  const sort = (VIEWER_SORT_FIELDS as readonly string[]).includes(params.get('sort') ?? '')
+    ? (params.get('sort') as ViewerSortField)
+    : 'createdAt';
+  const order: SortOrder =
+    params.get('order') === 'asc' || params.get('order') === 'desc'
+      ? (params.get('order') as SortOrder)
+      : sort === 'email' || sort === 'displayName'
+        ? 'asc'
+        : 'desc';
+
+  // The search box is local while typing and reaches the address a moment later.
+  const [search, setSearch] = useState(q);
+  useEffect(() => {
+    if (search === q) {
+      return;
+    }
+    const timer = window.setTimeout(() => change({ q: search, page: null }), SEARCH_DELAY_MS);
+    return () => window.clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [search]);
+
+  const viewers = useQuery({
+    queryKey: ['viewers', 'list', { page, status, q, sort, order }],
+    queryFn: ({ signal }) =>
+      viewersApi.list(
+        {
+          page,
+          pageSize: PAGE_SIZE,
+          status: status || undefined,
+          q: q || undefined,
+          sort,
+          order,
+        },
+        signal,
+      ),
+    placeholderData: keepPreviousData,
+  });
+  const access = useQuery({
+    queryKey: ['viewers', 'access'],
+    queryFn: ({ signal }) => viewersApi.access(signal),
+    staleTime: 60_000,
+  });
+  const items = viewers.data?.items ?? [];
+  const filtered = Boolean(q || status);
+
+  const refresh = () => {
+    void queryClient.invalidateQueries({ queryKey: ['viewers'] });
+    void queryClient.invalidateQueries({ queryKey: ['stats'] });
+  };
+  const onError = (error: Error) => toast.error(error.message);
+
+  const setStatus = useMutation({
+    mutationFn: ({ viewer, next }: { viewer: Viewer; next: ViewerStatus }) =>
+      viewersApi.update(viewer.id, { status: next }),
+    onSuccess: (viewer) => {
+      toast.success(
+        viewer.status === 'DISABLED'
+          ? `${viewer.displayName} is disabled and signed out`
+          : `${viewer.displayName} can sign in again`,
+      );
+      refresh();
+    },
+    onError,
+  });
+  const signOut = useMutation({
+    mutationFn: (viewer: Viewer) => viewersApi.signOut(viewer.id),
+    onSuccess: (result, viewer) => {
+      toast.success(
+        result.sessionsEnded === 0
+          ? `${viewer.displayName} was not signed in anywhere`
+          : `${viewer.displayName} is signed out on ${result.sessionsEnded} ${result.sessionsEnded === 1 ? 'device' : 'devices'}`,
+      );
+      refresh();
+    },
+    onError,
+  });
+  const remove = useMutation({
+    mutationFn: (viewer: Viewer) => viewersApi.remove(viewer.id),
+    onSuccess: (_result, viewer) => {
+      toast.success(`${viewer.displayName} deleted`);
+      setOpen(null);
+      refresh();
+    },
+    onError,
+  });
+
+  const askDisable = async (viewer: Viewer) => {
+    const confirmed = await confirm({
+      title: `Disable ${viewer.displayName}?`,
+      description:
+        'They are signed out on every device at once and cannot sign in until you enable them again. Nothing is deleted.',
+      confirmLabel: 'Disable',
+      destructive: true,
+    });
+    if (confirmed) {
+      setStatus.mutate({ viewer, next: 'DISABLED' });
+    }
+  };
+  const askSignOut = async (viewer: Viewer) => {
+    const confirmed = await confirm({
+      title: `Sign ${viewer.displayName} out everywhere?`,
+      description: 'Every device has to sign in again. The password stays the same.',
+      confirmLabel: 'Sign out everywhere',
+    });
+    if (confirmed) {
+      signOut.mutate(viewer);
+    }
+  };
+  const askDelete = async (viewer: Viewer) => {
+    const confirmed = await confirm({
+      title: `Delete ${viewer.displayName}?`,
+      description: `The account ${viewer.email} is deleted with everything stored about it. This cannot be undone. To only keep someone out, disable them instead.`,
+      confirmLabel: 'Delete',
+      destructive: true,
+    });
+    if (confirmed) {
+      remove.mutate(viewer);
+    }
+  };
+
+  const sortBy = (field: ViewerSortField) =>
+    change({
+      sort: field === 'createdAt' ? null : field,
+      // A second click on the same column turns the order around.
+      order: sort === field ? (order === 'asc' ? 'desc' : 'asc') : null,
+      page: null,
+    });
+
+  const rowMenu = (viewer: Viewer): ReactNode => (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button variant="ghost" size="icon-sm" aria-label={`Actions for ${viewer.displayName}`}>
+          <MoreHorizontal />
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end">
+        <DropdownMenuItem onSelect={() => setOpen({ kind: 'detail', viewer })}>
+          <MonitorSmartphone />
+          Details and devices
+        </DropdownMenuItem>
+        {mayWrite ? (
+          <>
+            <DropdownMenuItem onSelect={() => setOpen({ kind: 'edit', viewer })}>
+              <Pencil />
+              Edit
+            </DropdownMenuItem>
+            <DropdownMenuItem onSelect={() => setOpen({ kind: 'password', viewer })}>
+              <KeyRound />
+              Set a new password
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              disabled={viewer.activeSessions === 0}
+              onSelect={() => void askSignOut(viewer)}
+            >
+              <LogOut />
+              Sign out everywhere
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            {viewer.status === 'ACTIVE' ? (
+              <DropdownMenuItem onSelect={() => void askDisable(viewer)}>
+                <Ban />
+                Disable
+              </DropdownMenuItem>
+            ) : (
+              <DropdownMenuItem onSelect={() => setStatus.mutate({ viewer, next: 'ACTIVE' })}>
+                <UserCheck />
+                Enable
+              </DropdownMenuItem>
+            )}
+            <DropdownMenuItem destructive onSelect={() => void askDelete(viewer)}>
+              <Trash2 />
+              Delete
+            </DropdownMenuItem>
+          </>
+        ) : null}
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+
+  const newButton = mayWrite ? (
+    <Button variant="primary" onClick={() => setOpen({ kind: 'create' })}>
+      <Plus />
+      New viewer
+    </Button>
+  ) : null;
+
+  const columns: readonly (readonly [field: ViewerSortField | null, label: string])[] = [
+    ['displayName', 'Viewer'],
+    [null, 'Status'],
+    [null, 'Devices'],
+    ['lastLoginAt', 'Last sign-in'],
+    ['createdAt', 'Joined'],
+  ];
+
+  return (
+    <>
+      <PageHeader
+        title="Viewers"
+        description="The people with an account on your site. A viewer can watch and manage their own account, and can never reach this panel."
+        actions={newButton}
+      />
+
+      {access.data ? <AccessSummary access={access.data} /> : null}
+
+      <div className="mb-4 flex flex-wrap items-center gap-2">
+        <div className="relative w-full sm:w-80">
+          <Search
+            className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground"
+            aria-hidden="true"
+          />
+          <Input
+            type="search"
+            placeholder="Search by name or email"
+            aria-label="Search by name or email"
+            className="pl-9"
+            value={search}
+            onChange={(event) => setSearch(event.target.value)}
+          />
+        </div>
+        <Select
+          aria-label="Filter by status"
+          className="w-40"
+          value={status || 'ALL'}
+          onValueChange={(value) => change({ status: value === 'ALL' ? null : value, page: null })}
+          options={[
+            { value: 'ALL', label: 'All statuses' },
+            ...VIEWER_STATUSES.map((value) => ({ value, label: humanize(value) })),
+          ]}
+        />
+        <Select
+          aria-label="Sort by"
+          className="w-40"
+          value={sort}
+          onValueChange={(value) =>
+            change({ sort: value === 'createdAt' ? null : value, order: null, page: null })
+          }
+          options={VIEWER_SORT_FIELDS.map((value) => ({ value, label: SORT_LABELS[value] }))}
+        />
+        {filtered ? (
+          <Button
+            variant="ghost"
+            onClick={() => {
+              setSearch('');
+              change({ q: null, status: null, page: null });
+            }}
+          >
+            <X />
+            Clear filters
+          </Button>
+        ) : null}
+        {viewers.data ? (
+          <span className="ml-auto text-xs text-muted-foreground tabular-nums">
+            {viewers.data.total} {viewers.data.total === 1 ? 'viewer' : 'viewers'}
+          </span>
+        ) : null}
+      </div>
+
+      <ErrorNote error={viewers.error} className="mb-4" />
+      {viewers.isPending ? <Skeleton className="h-80 rounded-xl" /> : null}
+
+      {viewers.data && items.length === 0 ? (
+        <EmptyState
+          icon={filtered ? Search : UsersRound}
+          title={filtered ? 'Nobody matches' : 'No viewers yet'}
+          action={!filtered ? newButton : null}
+        >
+          {filtered
+            ? 'Try another search or clear the filters.'
+            : access.data?.registration === 'closed'
+              ? 'Sign-up is closed, so viewers exist only when you create them here.'
+              : 'Viewers appear here when they create an account on your site. You can also create one yourself.'}
+        </EmptyState>
+      ) : null}
+
+      {items.length > 0 ? (
+        <Card className="overflow-hidden">
+          <Table>
+            <thead>
+              <tr>
+                {columns.map(([field, label]) => (
+                  <Th
+                    key={label}
+                    aria-sort={
+                      field && sort === field
+                        ? order === 'asc'
+                          ? 'ascending'
+                          : 'descending'
+                        : undefined
+                    }
+                  >
+                    {field ? (
+                      <button
+                        type="button"
+                        onClick={() => sortBy(field)}
+                        className="-mx-1 inline-flex items-center gap-1 rounded px-1 hover:text-foreground"
+                      >
+                        {label}
+                        {sort === field ? (
+                          order === 'asc' ? (
+                            <ArrowUp className="size-3" />
+                          ) : (
+                            <ArrowDown className="size-3" />
+                          )
+                        ) : null}
+                      </button>
+                    ) : (
+                      label
+                    )}
+                  </Th>
+                ))}
+                <Th className="w-10" aria-label="Actions" />
+              </tr>
+            </thead>
+            <tbody>
+              {items.map((viewer) => (
+                <Tr key={viewer.id}>
+                  <Td>
+                    <button
+                      type="button"
+                      className="group flex items-center gap-3 text-left"
+                      onClick={() => setOpen({ kind: 'detail', viewer })}
+                    >
+                      <Avatar name={viewer.displayName} muted={viewer.status === 'DISABLED'} />
+                      <span className="min-w-0">
+                        <span className="block max-w-xs truncate font-medium group-hover:underline">
+                          {viewer.displayName}
+                        </span>
+                        <span className="block max-w-xs truncate text-xs text-muted-foreground">
+                          {viewer.email}
+                        </span>
+                      </span>
+                    </button>
+                  </Td>
+                  <Td>
+                    <StatusBadge status={viewer.status} />
+                  </Td>
+                  <Td className="tabular-nums">
+                    {viewer.activeSessions > 0 ? (
+                      viewer.activeSessions
+                    ) : (
+                      <span className="text-muted-foreground">Signed out</span>
+                    )}
+                  </Td>
+                  <Td className="whitespace-nowrap text-muted-foreground">
+                    {viewer.lastLoginAt ? (
+                      <Tooltip content={formatDateTime(viewer.lastLoginAt)}>
+                        <span>{formatRelative(viewer.lastLoginAt)}</span>
+                      </Tooltip>
+                    ) : (
+                      'Never'
+                    )}
+                  </Td>
+                  <Td className="whitespace-nowrap text-muted-foreground">
+                    <Tooltip content={formatDateTime(viewer.createdAt)}>
+                      <span>{formatRelative(viewer.createdAt)}</span>
+                    </Tooltip>
+                  </Td>
+                  <Td>{rowMenu(viewer)}</Td>
+                </Tr>
+              ))}
+            </tbody>
+          </Table>
+        </Card>
+      ) : null}
+
+      {viewers.data ? (
+        <Pagination
+          page={page}
+          pageSize={PAGE_SIZE}
+          total={viewers.data.total}
+          onChange={(next) => change({ page: next === 1 ? null : String(next) })}
+        />
+      ) : null}
+
+      <ViewerFormDialog
+        target={open?.kind === 'create' ? 'new' : open?.kind === 'edit' ? open.viewer : null}
+        onClose={() => setOpen(null)}
+        onSaved={() => {
+          setOpen(null);
+          refresh();
+        }}
+      />
+      <PasswordDialog
+        viewer={open?.kind === 'password' ? open.viewer : null}
+        onClose={() => setOpen(null)}
+        onSaved={() => {
+          setOpen(null);
+          refresh();
+        }}
+      />
+      <DetailSheet
+        viewer={open?.kind === 'detail' ? open.viewer : null}
+        mayWrite={mayWrite}
+        onClose={() => setOpen(null)}
+        onEdit={(viewer) => setOpen({ kind: 'edit', viewer })}
+        onPassword={(viewer) => setOpen({ kind: 'password', viewer })}
+        onSignOut={(viewer) => void askSignOut(viewer)}
+      />
+    </>
+  );
+}
+
+interface PasswordFieldProps {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+}
+
+/**
+ * A password an admin sets for someone else. It is shown, not hidden, because
+ * the admin has to pass it on, and can be made up and copied with one click.
+ */
+function PasswordField({ label, value, onChange }: PasswordFieldProps) {
+  const [copied, setCopied] = useState(false);
+
+  const copy = async () => {
+    try {
+      await navigator.clipboard.writeText(value);
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 2000);
+    } catch {
+      // The clipboard can be blocked. The password stays visible to copy by hand.
+      toast.error('Copying is blocked by the browser. Select the password and copy it by hand.');
+    }
+  };
+
+  return (
+    <Field
+      label={label}
+      hint={`At least ${MIN_PASSWORD_LENGTH} characters. Pass it on to the viewer yourself. They can change it in their account.`}
+    >
+      {(id) => (
+        <div className="flex gap-2">
+          <Input
+            id={id}
+            required
+            minLength={MIN_PASSWORD_LENGTH}
+            maxLength={128}
+            autoComplete="off"
+            spellCheck={false}
+            className="font-mono"
+            value={value}
+            onChange={(event) => onChange(event.target.value)}
+          />
+          <Tooltip content="Make up a password">
+            <Button
+              size="icon"
+              aria-label="Make up a password"
+              onClick={() => onChange(generatePassword())}
+            >
+              <RefreshCw />
+            </Button>
+          </Tooltip>
+          <Tooltip content={copied ? 'Copied' : 'Copy'}>
+            <Button
+              size="icon"
+              aria-label="Copy the password"
+              disabled={!value}
+              onClick={() => void copy()}
+            >
+              {copied ? <Check /> : <Copy />}
+            </Button>
+          </Tooltip>
+        </div>
+      )}
+    </Field>
+  );
+}
+
+interface ViewerFormDialogProps {
+  target: Viewer | 'new' | null;
+  onClose: () => void;
+  onSaved: () => void;
+}
+
+/** Creates a viewer, or changes the name and email address of one. */
+function ViewerFormDialog({ target, onClose, onSaved }: ViewerFormDialogProps) {
+  const viewer = target === 'new' || target === null ? undefined : target;
+  const [displayName, setDisplayName] = useState('');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+
+  const save = useMutation({
+    mutationFn: () =>
+      viewer
+        ? viewersApi.update(viewer.id, { displayName: displayName.trim(), email: email.trim() })
+        : viewersApi.create({ displayName: displayName.trim(), email: email.trim(), password }),
+    onSuccess: (saved) => {
+      toast.success(viewer ? `${saved.displayName} saved` : `${saved.displayName} can now sign in`);
+      onSaved();
+    },
+  });
+
+  useEffect(() => {
+    if (target !== null) {
+      save.reset();
+      setDisplayName(viewer?.displayName ?? '');
+      setEmail(viewer?.email ?? '');
+      setPassword(viewer ? '' : generatePassword());
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [target]);
+
+  const submit = (event: FormEvent) => {
+    event.preventDefault();
+    save.mutate();
+  };
+
+  return (
+    <Dialog open={target !== null} onOpenChange={(isOpen) => !isOpen && onClose()}>
+      <DialogContent
+        title={viewer ? `Edit ${viewer.displayName}` : 'New viewer'}
+        description={
+          viewer
+            ? undefined
+            : 'Creates an account someone can sign in with on your site. No email is sent.'
+        }
+      >
+        <form onSubmit={submit} className="contents">
+          <DialogBody>
+            <Field label="Name">
+              {(id) => (
+                <Input
+                  id={id}
+                  required
+                  autoFocus
+                  maxLength={100}
+                  value={displayName}
+                  onChange={(event) => setDisplayName(event.target.value)}
+                />
+              )}
+            </Field>
+            <Field
+              label="Email"
+              hint={viewer ? 'The viewer signs in with this address from now on.' : undefined}
+            >
+              {(id) => (
+                <Input
+                  id={id}
+                  type="email"
+                  required
+                  maxLength={254}
+                  autoComplete="off"
+                  value={email}
+                  onChange={(event) => setEmail(event.target.value)}
+                />
+              )}
+            </Field>
+            {viewer ? null : (
+              <PasswordField label="Password" value={password} onChange={setPassword} />
+            )}
+            <ErrorNote error={save.error} />
+          </DialogBody>
+          <DialogFooter>
+            <Button onClick={onClose}>Cancel</Button>
+            <Button
+              type="submit"
+              variant="primary"
+              loading={save.isPending}
+              disabled={!displayName.trim() || !email.trim()}
+            >
+              {viewer ? 'Save' : 'Create viewer'}
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+interface PasswordDialogProps {
+  viewer: Viewer | null;
+  onClose: () => void;
+  onSaved: () => void;
+}
+
+function PasswordDialog({ viewer, onClose, onSaved }: PasswordDialogProps) {
+  const [password, setPassword] = useState('');
+  const save = useMutation({
+    mutationFn: () => viewersApi.resetPassword((viewer as Viewer).id, password),
+    onSuccess: () => {
+      toast.success(`New password set for ${viewer?.displayName}`);
+      onSaved();
+    },
+  });
+
+  useEffect(() => {
+    if (viewer) {
+      save.reset();
+      setPassword(generatePassword());
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [viewer]);
+
+  const submit = (event: FormEvent) => {
+    event.preventDefault();
+    save.mutate();
+  };
+
+  return (
+    <Dialog open={viewer !== null} onOpenChange={(isOpen) => !isOpen && onClose()}>
+      <DialogContent
+        title={`New password for ${viewer?.displayName ?? ''}`}
+        description="The viewer is signed out on every device and signs in again with this password. Copy it before you save: it is not shown again."
+      >
+        <form onSubmit={submit} className="contents">
+          <DialogBody>
+            <PasswordField label="New password" value={password} onChange={setPassword} />
+            <ErrorNote error={save.error} />
+          </DialogBody>
+          <DialogFooter>
+            <Button onClick={onClose}>Cancel</Button>
+            <Button
+              type="submit"
+              variant="primary"
+              loading={save.isPending}
+              disabled={password.length < MIN_PASSWORD_LENGTH}
+            >
+              Set password
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+interface DetailSheetProps {
+  viewer: Viewer | null;
+  mayWrite: boolean;
+  onClose: () => void;
+  onEdit: (viewer: Viewer) => void;
+  onPassword: (viewer: Viewer) => void;
+  onSignOut: (viewer: Viewer) => void;
+}
+
+/** One viewer with the devices they are signed in on. */
+function DetailSheet({
+  viewer,
+  mayWrite,
+  onClose,
+  onEdit,
+  onPassword,
+  onSignOut,
+}: DetailSheetProps) {
+  const detail = useQuery({
+    queryKey: ['viewers', 'detail', viewer?.id],
+    queryFn: ({ signal }) => viewersApi.get((viewer as Viewer).id, signal),
+    enabled: viewer !== null,
+  });
+  // The list row is shown at once and replaced by the fresh answer when it arrives.
+  const shown = detail.data ?? viewer;
+
+  return (
+    <Dialog open={viewer !== null} onOpenChange={(isOpen) => !isOpen && onClose()}>
+      <DialogContent variant="sheet" title={shown?.displayName ?? ''} description={shown?.email}>
+        {shown ? (
+          <DialogBody className="content-start">
+            <div className="flex items-center gap-3">
+              <Avatar name={shown.displayName} muted={shown.status === 'DISABLED'} />
+              <StatusBadge status={shown.status} />
+            </div>
+            <Facts
+              items={[
+                ['Joined', formatDateTime(shown.createdAt)],
+                ['Last sign-in', shown.lastLoginAt ? formatDateTime(shown.lastLoginAt) : 'Never'],
+                ['Changed', formatDateTime(shown.updatedAt)],
+              ]}
+            />
+
+            <div>
+              <h3 className="mb-2 text-[13px] font-medium">
+                Signed in on {shown.activeSessions}{' '}
+                {shown.activeSessions === 1 ? 'device' : 'devices'}
+              </h3>
+              <ErrorNote error={detail.error} />
+              {detail.isPending ? <Skeleton className="h-20 rounded-lg" /> : null}
+              {detail.data && detail.data.sessions.length === 0 ? (
+                <p className="rounded-lg border border-dashed p-3 text-sm text-muted-foreground">
+                  Not signed in anywhere.
+                </p>
+              ) : null}
+              {detail.data && detail.data.sessions.length > 0 ? (
+                <ul className="divide-y rounded-lg border">
+                  {detail.data.sessions.map((session) => (
+                    <li key={session.id} className="flex items-start gap-3 p-3">
+                      <MonitorSmartphone
+                        className="mt-0.5 size-4 shrink-0 text-muted-foreground"
+                        aria-hidden="true"
+                      />
+                      <div className="min-w-0 text-sm">
+                        <p className="font-medium" title={session.userAgent ?? undefined}>
+                          {describeDevice(session.userAgent)}
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          Used {formatRelative(session.lastUsedAt)}, signed in{' '}
+                          {formatRelative(session.createdAt)}
+                          {session.ipAddress ? ` from ${session.ipAddress}` : ''}
+                        </p>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              ) : null}
+            </div>
+          </DialogBody>
+        ) : null}
+        <DialogFooter>
+          {mayWrite && shown ? (
+            <>
+              <Button onClick={() => onEdit(shown)}>
+                <Pencil />
+                Edit
+              </Button>
+              <Button onClick={() => onPassword(shown)}>
+                <KeyRound />
+                New password
+              </Button>
+              <Button disabled={shown.activeSessions === 0} onClick={() => onSignOut(shown)}>
+                <LogOut />
+                Sign out everywhere
+              </Button>
+            </>
+          ) : (
+            <Button onClick={onClose}>Close</Button>
+          )}
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}

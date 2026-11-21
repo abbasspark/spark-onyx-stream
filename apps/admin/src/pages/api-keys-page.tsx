@@ -28,6 +28,7 @@ import { formatDateTime, formatRelative } from '@/lib/format';
 /** What a key can be allowed to do. Managing admins and keys can never be given to a key. */
 const SCOPE_GROUPS: { label: string; read: Permission; write?: Permission }[] = [
   { label: 'Catalog', read: 'catalog:read', write: 'catalog:write' },
+  { label: 'Viewers', read: 'viewers:read', write: 'viewers:write' },
   { label: 'Videos', read: 'assets:read', write: 'assets:write' },
   { label: 'Jobs', read: 'jobs:read', write: 'jobs:write' },
   { label: 'Encoding profiles', read: 'encoding-profiles:read', write: 'encoding-profiles:write' },

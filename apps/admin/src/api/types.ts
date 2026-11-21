@@ -20,6 +20,8 @@ export type Permission =
   | 'storage:write'
   | 'catalog:read'
   | 'catalog:write'
+  | 'viewers:read'
+  | 'viewers:write'
   | 'settings:read'
   | 'settings:write';
 
@@ -306,6 +308,11 @@ export interface OverviewStats {
     published: number;
     drafts: number;
   };
+  viewers: {
+    total: number;
+    newLast7Days: number;
+    activeLast30Days: number;
+  };
   jobs: {
     queued: number;
     running: number;
@@ -494,4 +501,57 @@ export interface EpisodeInput {
   assetId?: string | null;
   stillId?: string | null;
   status?: 'DRAFT' | 'PUBLISHED';
+}
+
+// --- Viewers ---------------------------------------------------------------
+
+export const VIEWER_STATUSES = ['ACTIVE', 'DISABLED'] as const;
+export type ViewerStatus = (typeof VIEWER_STATUSES)[number];
+
+/** A person with an account on the viewer website. */
+export interface Viewer {
+  id: string;
+  email: string;
+  displayName: string;
+  status: ViewerStatus;
+  lastLoginAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+  /** Devices signed in right now. */
+  activeSessions: number;
+}
+
+/** A device a viewer is signed in on. */
+export interface ViewerSession {
+  id: string;
+  userAgent: string | null;
+  ipAddress: string | null;
+  createdAt: string;
+  lastUsedAt: string;
+  expiresAt: string;
+}
+
+export interface ViewerDetail extends Viewer {
+  sessions: ViewerSession[];
+}
+
+export const VIEWER_SORT_FIELDS = ['createdAt', 'lastLoginAt', 'email', 'displayName'] as const;
+export type ViewerSortField = (typeof VIEWER_SORT_FIELDS)[number];
+
+export interface CreateViewerInput {
+  email: string;
+  displayName: string;
+  password: string;
+}
+
+export interface UpdateViewerInput {
+  email?: string;
+  displayName?: string;
+  status?: ViewerStatus;
+}
+
+/** What is open to the public on this installation. Set in its environment. */
+export interface ViewerAccessConfig {
+  registration: 'open' | 'closed';
+  playback: 'open' | 'viewers' | 'off';
 }

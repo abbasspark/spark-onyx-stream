@@ -10,12 +10,15 @@ import {
   ParseUUIDPipe,
   Post,
   Query,
+  Req,
 } from '@nestjs/common';
+import type { Request } from 'express';
 import { Public } from '../auth/auth.decorators.js';
 import type { Page } from '../common/pagination.js';
 import { ZodValidationPipe } from '../common/zod-validation.pipe.js';
 import type { PlaybackInfo } from '../playback/playback.service.js';
 import { RateLimit } from '../rate-limit/rate-limit.guard.js';
+import { ViewerSessionService } from '../viewers/viewer-session.service.js';
 import {
   type ListPublicTitlesInput,
   listPublicTitlesSchema,
@@ -50,7 +53,10 @@ const slugPipe = new ZodValidationPipe(slugParamSchema);
 @Public()
 @Controller(PUBLIC_CATALOG_ROUTE)
 export class PublicCatalogController {
-  constructor(@Inject(PublicCatalogService) private readonly catalog: PublicCatalogService) {}
+  constructor(
+    @Inject(PublicCatalogService) private readonly catalog: PublicCatalogService,
+    @Inject(ViewerSessionService) private readonly viewerSessions: ViewerSessionService,
+  ) {}
 
   @Get('home')
   @RateLimit(READS)
@@ -87,23 +93,40 @@ export class PublicCatalogController {
   @RateLimit(PLAYBACK)
   @HttpCode(HttpStatus.OK)
   @Header('Cache-Control', 'no-store')
-  playTitle(@Param('slug', slugPipe) slug: string): Promise<PlaybackInfo> {
-    return this.catalog.playTitle(slug);
+  async playTitle(
+    @Param('slug', slugPipe) slug: string,
+    @Req() request: Request,
+  ): Promise<PlaybackInfo> {
+    return this.catalog.playTitle(slug, await this.isSignedIn(request));
   }
 
   @Post('titles/:slug/trailer/playback')
   @RateLimit(PLAYBACK)
   @HttpCode(HttpStatus.OK)
   @Header('Cache-Control', 'no-store')
-  playTrailer(@Param('slug', slugPipe) slug: string): Promise<PlaybackInfo> {
-    return this.catalog.playTrailer(slug);
+  async playTrailer(
+    @Param('slug', slugPipe) slug: string,
+    @Req() request: Request,
+  ): Promise<PlaybackInfo> {
+    return this.catalog.playTrailer(slug, await this.isSignedIn(request));
   }
 
   @Post('episodes/:id/playback')
   @RateLimit(PLAYBACK)
   @HttpCode(HttpStatus.OK)
   @Header('Cache-Control', 'no-store')
-  playEpisode(@Param('id', ParseUUIDPipe) id: string): Promise<PlaybackInfo> {
-    return this.catalog.playEpisode(id);
+  async playEpisode(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Req() request: Request,
+  ): Promise<PlaybackInfo> {
+    return this.catalog.playEpisode(id, await this.isSignedIn(request));
+  }
+
+  /**
+   * Whether a viewer is signed in. Asking for playback changes nothing, so a
+   * cookie is enough here and the request needs no further check.
+   */
+  private async isSignedIn(request: Request): Promise<boolean> {
+    return (await this.viewerSessions.identify(request)) !== null;
   }
 }

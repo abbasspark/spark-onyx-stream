@@ -99,6 +99,8 @@ const STATUS_TONES: Record<string, { tone: BadgeTone; live?: boolean }> = {
   PUBLISHED: { tone: 'success' },
   DRAFT: { tone: 'neutral' },
   ARCHIVED: { tone: 'warning' },
+  ACTIVE: { tone: 'success' },
+  DISABLED: { tone: 'danger' },
 };
 
 /** A colored label for an asset or job status. */

@@ -16,6 +16,7 @@ import type {
   CreatedApiKey,
   CreatedAsset,
   CreateStoragePoolInput,
+  CreateViewerInput,
   EncodingProfile,
   EncodingProfileInput,
   Episode,
@@ -40,6 +41,12 @@ import type {
   UpdateAdminInput,
   UpdateStoragePoolInput,
   UpdateTitleInput,
+  UpdateViewerInput,
+  Viewer,
+  ViewerAccessConfig,
+  ViewerDetail,
+  ViewerSortField,
+  ViewerStatus,
 } from './types';
 
 export const authApi = {
@@ -119,6 +126,31 @@ export const adminsApi = {
   create: (body: CreateAdminInput) => request<Admin>('/v1/admins', { method: 'POST', body }),
   update: (id: string, body: UpdateAdminInput) =>
     request<Admin>(`/v1/admins/${id}`, { method: 'PATCH', body }),
+};
+
+export interface ViewerListQuery {
+  page: number;
+  pageSize: number;
+  status?: ViewerStatus;
+  q?: string;
+  sort?: ViewerSortField;
+  order?: SortOrder;
+}
+
+export const viewersApi = {
+  list: (query: ViewerListQuery, signal?: AbortSignal) =>
+    request<Page<Viewer>>('/v1/viewers', { query: { ...query }, signal }),
+  get: (id: string, signal?: AbortSignal) => request<ViewerDetail>(`/v1/viewers/${id}`, { signal }),
+  create: (body: CreateViewerInput) => request<Viewer>('/v1/viewers', { method: 'POST', body }),
+  update: (id: string, body: UpdateViewerInput) =>
+    request<Viewer>(`/v1/viewers/${id}`, { method: 'PATCH', body }),
+  resetPassword: (id: string, newPassword: string) =>
+    request<void>(`/v1/viewers/${id}/password`, { method: 'POST', body: { newPassword } }),
+  signOut: (id: string) =>
+    request<{ sessionsEnded: number }>(`/v1/viewers/${id}/sign-out`, { method: 'POST' }),
+  remove: (id: string) => request<void>(`/v1/viewers/${id}`, { method: 'DELETE' }),
+  /** What is open to the public. Needs no permission. */
+  access: (signal?: AbortSignal) => request<ViewerAccessConfig>('/v1/viewer/config', { signal }),
 };
 
 export const apiKeysApi = {

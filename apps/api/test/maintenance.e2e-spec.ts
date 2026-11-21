@@ -167,4 +167,36 @@ describe.skipIf(!TEST_DATABASE_URL || !hasFfmpeg)('Cleanup and repairs (e2e, rea
     // Nothing is left to repair.
     expect(await maintenance.sweep(0)).toEqual({ started: 0, cleanups: 0 });
   }, 120_000);
+
+  it('deletes viewer sessions that ended long ago and keeps the rest', async () => {
+    const maintenance = testApp.app.get(MaintenanceService);
+    const viewer = await testApp.prisma.viewer.create({
+      data: { email: 'anna@example.com', displayName: 'Anna', passwordHash: 'x' },
+    });
+    const day = 24 * 60 * 60 * 1000;
+    const session = (name: string, expiresInDays: number, revokedDaysAgo?: number) => ({
+      viewerId: viewer.id,
+      tokenHash: name,
+      userAgent: name,
+      expiresAt: new Date(Date.now() + expiresInDays * day),
+      revokedAt: revokedDaysAgo === undefined ? null : new Date(Date.now() - revokedDaysAgo * day),
+    });
+    await testApp.prisma.viewerSession.createMany({
+      data: [
+        session('active', 20),
+        session('expired yesterday', -1),
+        session('expired long ago', -10),
+        session('signed out yesterday', 20, 1),
+        session('signed out long ago', 20, 10),
+      ],
+    });
+
+    expect(await maintenance.purgeEndedViewerSessions()).toBe(2);
+    const left = await testApp.prisma.viewerSession.findMany({ orderBy: { userAgent: 'asc' } });
+    expect(left.map((item) => item.userAgent)).toEqual([
+      'active',
+      'expired yesterday',
+      'signed out yesterday',
+    ]);
+  });
 });

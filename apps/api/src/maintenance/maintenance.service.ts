@@ -38,6 +38,9 @@ export interface SweepResult {
  * - an upload that was stored but whose processing never started
  * - a deleted asset whose files are still in storage
  */
+/** How long an ended viewer session is kept before it is deleted. */
+const KEEP_ENDED_SESSIONS_MS = 7 * 24 * 60 * 60 * 1000;
+
 @Injectable()
 export class MaintenanceService implements OnApplicationBootstrap, OnApplicationShutdown {
   private readonly logger = new Logger(MaintenanceService.name);
@@ -68,6 +71,7 @@ export class MaintenanceService implements OnApplicationBootstrap, OnApplication
         return;
       }
 
+      await this.purgeEndedViewerSessions();
       const result = await this.sweep();
       if (result.started > 0 || result.cleanups > 0) {
         this.logger.log(
@@ -77,6 +81,20 @@ export class MaintenanceService implements OnApplicationBootstrap, OnApplication
     } catch (error) {
       this.logger.error(`Sweep failed: ${error instanceof Error ? error.message : String(error)}`);
     }
+  }
+
+  /**
+   * Deletes viewer sessions that ended or expired a while ago. Viewers sign in
+   * on many devices over time, and the table would otherwise only grow.
+   *
+   * @returns The number of sessions deleted.
+   */
+  async purgeEndedViewerSessions(now = new Date()): Promise<number> {
+    const before = new Date(now.getTime() - KEEP_ENDED_SESSIONS_MS);
+    const result = await this.prisma.viewerSession.deleteMany({
+      where: { OR: [{ expiresAt: { lt: before } }, { revokedAt: { lt: before } }] },
+    });
+    return result.count;
   }
 
   /**

@@ -67,6 +67,51 @@ model AdminSession {
   @@map("admin_sessions")
 }
 
+enum ViewerStatus {
+  ACTIVE
+  /// Cannot sign in. Existing sessions stop working at once.
+  DISABLED
+}
+
+/// A person who watches: an account on the viewer website and in the apps.
+/// Kept apart from admins on purpose. A viewer can never reach the panel.
+model Viewer {
+  id           String       @id @default(uuid(7)) @db.Uuid
+  /// Lower case. The sign-in name.
+  email        String       @unique
+  passwordHash String
+  displayName  String
+  status       ViewerStatus @default(ACTIVE)
+  lastLoginAt  DateTime?
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+
+  sessions ViewerSession[]
+
+  @@index([createdAt])
+  @@map("viewers")
+}
+
+/// A device a viewer is signed in on. As with admins, only a hash of the
+/// token is stored.
+model ViewerSession {
+  id         String    @id @default(uuid(7)) @db.Uuid
+  viewerId   String    @db.Uuid
+  viewer     Viewer    @relation(fields: [viewerId], references: [id], onDelete: Cascade)
+  /// SHA-256 hash of the session token.
+  tokenHash  String    @unique
+  userAgent  String?
+  ipAddress  String?
+  expiresAt  DateTime
+  lastUsedAt DateTime  @default(now())
+  revokedAt  DateTime?
+  createdAt  DateTime  @default(now())
+
+  @@index([viewerId])
+  @@index([expiresAt])
+  @@map("viewer_sessions")
+}
+
 model ApiKey {
   id          String    @id @default(uuid(7)) @db.Uuid
   name        String

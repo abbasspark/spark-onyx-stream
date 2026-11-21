@@ -4,6 +4,8 @@ import { createHash, randomBytes } from 'node:crypto';
 /** Prefixes make the two credential types recognizable in logs and secret scanners. */
 export const SESSION_TOKEN_PREFIX = 'onyx_sess_';
 export const API_KEY_PREFIX = 'onyx_key_';
+/** Sessions of viewers. A different prefix, so one can never be taken for an admin's. */
+export const VIEWER_TOKEN_PREFIX = 'onyx_view_';
 
 const SECRET_BYTES = 32;
 const API_KEY_ID_BYTES = 4;
@@ -22,6 +24,11 @@ export interface GeneratedSessionToken {
 
 export function generateSessionToken(): GeneratedSessionToken {
   const token = SESSION_TOKEN_PREFIX + randomBytes(SECRET_BYTES).toString('base64url');
+  return { token, tokenHash: hashToken(token) };
+}
+
+export function generateViewerToken(): GeneratedSessionToken {
+  const token = VIEWER_TOKEN_PREFIX + randomBytes(SECRET_BYTES).toString('base64url');
   return { token, tokenHash: hashToken(token) };
 }
 

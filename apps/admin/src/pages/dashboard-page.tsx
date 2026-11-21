@@ -2,15 +2,16 @@
 import { useQuery } from '@tanstack/react-query';
 import {
   Activity,
-  Clapperboard,
   AlertTriangle,
   ArrowRight,
   CheckCircle2,
+  Clapperboard,
   Clock,
   Database,
   Film,
-  type LucideIcon,
   Upload,
+  UsersRound,
+  type LucideIcon,
 } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { Link } from 'react-router';
@@ -224,8 +225,8 @@ export function DashboardPage() {
       <ErrorNote error={stats.error} className="mb-4" />
 
       {mayRead && stats.isPending ? (
-        <div className="flex flex-wrap gap-4 *:min-w-[12.5rem] *:flex-1">
-          {Array.from({ length: 5 }, (_, index) => (
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {Array.from({ length: 6 }, (_, index) => (
             <Skeleton key={index} className="h-[104px] rounded-xl" />
           ))}
         </div>
@@ -233,13 +234,20 @@ export function DashboardPage() {
 
       {data ? (
         <div className="grid gap-4">
-          <div className="flex flex-wrap gap-4 *:min-w-[12.5rem] *:flex-1">
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             <StatTile
               icon={Clapperboard}
               label="Titles in the catalog"
               value={data.catalog.titles}
               detail={`${data.catalog.published} published · ${data.catalog.drafts} ${data.catalog.drafts === 1 ? 'draft' : 'drafts'}`}
               to={can('catalog:read') ? '/titles' : undefined}
+            />
+            <StatTile
+              icon={UsersRound}
+              label="Viewers"
+              value={data.viewers.total}
+              detail={`${data.viewers.newLast7Days} new this week · ${data.viewers.activeLast30Days} active this month`}
+              to={can('viewers:read') ? '/viewers' : undefined}
             />
             <StatTile
               icon={Film}

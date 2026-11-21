@@ -318,3 +318,18 @@ This replaces the "plain CSS without a component library" part of D-018.
 **Why:** one origin needs no cross-origin setup, one certificate and one address to remember, and the root is the address viewers type. A nonce is the only way to keep inline scripts forbidden on pages that Next.js builds, since it writes small scripts into every page.
 
 **Consequence:** the admin panel changed its address, which breaks old bookmarks once. The panel and the website share cookies and storage of one origin; today neither uses cookies, and their stored keys are prefixed (`onyx.admin.`, `onyx.web.`). Operators who want the panel on a separate address can put it behind their own proxy rule. Every page of the website is built per request, because a nonce cannot be part of a page that is built once and reused.
+
+## D-027 Viewers are a separate kind of account
+
+**Date:** 2026-11-21
+
+- **Viewers have their own table, sessions, token prefix and routes.** Nothing is shared with admins except the password hashing and the sign-in throttle.
+- **The website holds the session in an `HttpOnly`, `SameSite=Lax` cookie.** Apps get the same token and send it in a header.
+- **Requests that change something and rely on the cookie must come from the site itself**, checked by the `Origin` header.
+- **Two settings decide what the public may do:** `VIEWER_REGISTRATION` and `CATALOG_PLAYBACK`, which gains the value `viewers`.
+- **Only owners and admins can manage viewers.** Editors work on content and do not see personal data.
+- **No email is sent yet.** There is no verification and no "forgot password". An admin sets a new password.
+
+**Why:** an admin account is a key to the installation and a viewer account is not. Keeping them apart means a mistake in viewer code cannot hand out admin rights, and the two can grow differently (subscriptions on one side, roles on the other). A cookie the page's scripts cannot read is the safest place for a browser session. The check of the origin closes the gap that such cookies otherwise open.
+
+**Consequence:** sign-up tells whether an email address is taken, which can only be avoided once email verification exists. A viewer who forgets their password needs an admin. Both settings are set in the environment and need a restart, and the panel shows their values so nobody has to guess.
