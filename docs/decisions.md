@@ -392,3 +392,18 @@ This replaces the "plain CSS without a component library" part of D-018.
 **Why:** a household on one account is the normal case, and a shared "Continue watching" is the first thing people complain about. Storing the choice on the session keeps every other endpoint unchanged: watch history simply works on "the profile in use", and an old client that knows nothing of profiles keeps working on the main one. A lazily created main profile needs no step in any of the places that create accounts.
 
 **Consequence:** a profile gives no privacy from the others on the account. Profiles for children need age ratings that mean the same in every country, which the catalog does not have yet. On a shared computer, what a visitor watched joins the profile in use after sign-in, as in D-028.
+
+## D-032 Billing starts with plans and access, before any payment provider
+
+**Date:** 2026-11-21
+
+- **Stripe is the first payment provider, and subscriptions are what is sold first.** Renting and buying single titles come later.
+- **Each title is free or paid.** A paid title needs a running subscription. Every plan opens all paid titles.
+- **The first step has no provider in it:** plans, subscriptions, the rule that decides who may watch, and access granted by an admin. Stripe is the next step and writes into the same subscriptions.
+- **Whether a viewer may watch is decided by state and end time together,** at the moment of asking.
+- **Prices are whole numbers of the smallest unit of one currency per installation.**
+- **`billing:read` and `billing:write` are permissions of their own.**
+
+**Why:** the rule for who may watch is the part every other part depends on, and it can be built and tested completely without a provider. Granting by hand is not a stopgap: operators who sell through resellers, take cash or give access away need it for good. A provider that only has to create and update subscriptions is small and can be replaced or joined by another. Whole numbers avoid the rounding faults of decimal prices. One currency keeps every sum on a page meaningful.
+
+**Consequence:** until the next step, a site can show its prices and cannot take money online. Plans cannot yet differ in what they open. An installation that changes its currency after creating plans shows the same numbers in the new currency, which is wrong, and has to correct the prices by hand. Money is the operator's business: taxes, invoices and the terms of the provider are theirs to handle.

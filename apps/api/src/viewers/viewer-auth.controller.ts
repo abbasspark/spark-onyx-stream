@@ -98,15 +98,21 @@ export class ViewerAuthController {
   @Header('Cache-Control', 'no-store')
   async session(
     @Req() request: Request,
-  ): Promise<{ viewer: ViewerView | null; profile: ProfileView | null }> {
+  ): Promise<{ viewer: ViewerView | null; profile: ProfileView | null; entitled: boolean }> {
     const identity = await this.viewerSessions.identify(request);
     if (!identity) {
-      return { viewer: null, profile: null };
+      return { viewer: null, profile: null, entitled: false };
     }
+    const [profile, entitled] = await Promise.all([
+      this.profiles.current(identity),
+      this.auth.isEntitled(identity.viewer.id),
+    ]);
     return {
       viewer: toViewerView(identity.viewer),
       // Who is watching on this device.
-      profile: toProfileView(await this.profiles.current(identity)),
+      profile: toProfileView(profile),
+      // Whether titles that need a subscription are open to this viewer.
+      entitled,
     };
   }
 

@@ -12,6 +12,7 @@ const title: TitleDetail = {
   status: 'DRAFT',
   publishedAt: null,
   isFeatured: false,
+  access: 'FREE',
   poster: null,
   categories: [
     { id: 'c2', name: 'Drama' },
@@ -93,5 +94,15 @@ describe('describeContent', () => {
     expect(describeContent({ ...series, seasonCount: 2, episodeCount: 14 })).toBe(
       '2 seasons · 14 episodes',
     );
+  });
+});
+
+describe('access', () => {
+  it('sends the access only when it changed', () => {
+    const saved = toForm(title);
+    expect(changedFields(saved, { ...saved, isPaid: true })).toEqual({ access: 'PAID' });
+    const paid = toForm({ ...title, access: 'PAID' });
+    expect(paid.isPaid).toBe(true);
+    expect(changedFields(paid, { ...paid, isPaid: false })).toEqual({ access: 'FREE' });
   });
 });

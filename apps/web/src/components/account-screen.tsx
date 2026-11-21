@@ -13,6 +13,7 @@ import {
   viewerApi,
   type ViewerDevice,
 } from '@/lib/viewer-api';
+import { describeEnd, type OwnSubscription, type Plans } from '@/lib/plans';
 import { type Profile, profilesApi } from '@/lib/profiles';
 import { clearHistory } from '@/lib/watch-sync';
 import { FormField } from './form-field';
@@ -104,6 +105,7 @@ export function AccountScreen() {
       />
       <NameSection name={viewer.displayName} onSaved={setViewer} />
       <PasswordSection />
+      <SubscriptionSection />
       <ProfilesSection />
       <DevicesSection />
       <HistorySection />
@@ -407,6 +409,83 @@ function DevicesSection() {
           ))}
         </ul>
       ) : null}
+    </Section>
+  );
+}
+
+/** The plan the account watches through, if any. */
+function SubscriptionSection() {
+  const { entitled } = useViewerSession();
+  const [own, setOwn] = useState<OwnSubscription | null | undefined>(undefined);
+  const [plansOffered, setPlansOffered] = useState(false);
+
+  useEffect(() => {
+    let current = true;
+    fetch('/v1/catalog/plans', { headers: { Accept: 'application/json' } })
+      .then((response) => (response.ok ? (response.json() as Promise<Plans>) : null))
+      .then((offer) => {
+        if (current) {
+          setPlansOffered((offer?.plans.length ?? 0) > 0);
+        }
+      })
+      .catch(() => {
+        // Without an answer no link to the plans is shown.
+      });
+    return () => {
+      current = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    let current = true;
+    viewerApi
+      .subscription()
+      .then((result) => {
+        if (current) {
+          setOwn(result.subscription);
+        }
+      })
+      .catch(() => {
+        // A site whose API is older than plans has no subscriptions: nothing is shown.
+        if (current) {
+          setOwn(undefined);
+        }
+      });
+    return () => {
+      current = false;
+    };
+  }, [entitled]);
+
+  // Nothing to say on a site that sells no plans, unless the viewer has one anyway.
+  if (own === undefined || (own === null && !plansOffered)) {
+    return null;
+  }
+
+  return (
+    <Section heading="Subscription">
+      {own ? (
+        <>
+          <p className="flex flex-wrap items-center gap-x-3 gap-y-1">
+            <span className="font-medium">{own.plan.name}</span>
+            <span className="inline-flex items-center gap-1 text-sm text-sard">
+              <Check className="size-4" aria-hidden="true" />
+              {own.status === 'PAST_DUE' ? 'Payment failed, access continues for now' : 'Running'}
+            </span>
+          </p>
+          <p className="mt-2 text-smoke">
+            You can watch every title that needs a subscription, {describeEnd(own)}.
+          </p>
+        </>
+      ) : (
+        <>
+          <p className="mb-5 text-smoke">
+            You have no subscription. Titles marked with a lock need one.
+          </p>
+          <Link href="/plans" className="button button-quiet">
+            See the plans
+          </Link>
+        </>
+      )}
     </Section>
   );
 }

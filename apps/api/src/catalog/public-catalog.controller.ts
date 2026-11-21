@@ -128,6 +128,8 @@ export class PublicCatalogController {
    */
   private async watcher(request: Request): Promise<Watcher> {
     const identity = await this.viewerSessions.identify(request);
-    return identity ? { emailVerified: identity.viewer.emailVerifiedAt !== null } : null;
+    return identity
+      ? { viewerId: identity.viewer.id, emailVerified: identity.viewer.emailVerifiedAt !== null }
+      : null;
   }
 }

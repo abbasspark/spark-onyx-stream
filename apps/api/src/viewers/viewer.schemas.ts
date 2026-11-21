@@ -92,6 +92,8 @@ export const VIEWER_SORT_FIELDS = ['createdAt', 'lastLoginAt', 'email', 'display
 
 export const listViewersSchema = paginationSchema.extend({
   status: z.enum(VIEWER_STATUSES).optional(),
+  /** "yes": only viewers with a running subscription. "no": only those without. */
+  subscribed: z.enum(['yes', 'no']).optional(),
   /** Matches the email address and the name, ignoring case. */
   q: z.string().trim().min(1).max(200).optional(),
   sort: z.enum(VIEWER_SORT_FIELDS).default('createdAt'),

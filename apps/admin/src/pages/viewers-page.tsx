@@ -69,6 +69,7 @@ import {
   DropdownMenuTrigger,
   Tooltip,
 } from '@/components/ui/overlay';
+import { ViewerSubscription } from '@/components/viewer-subscription';
 import { useAddressParams } from '@/lib/address-params';
 import { cn } from '@/lib/cn';
 import { formatDateTime, formatRelative, humanize } from '@/lib/format';
@@ -203,6 +204,9 @@ export function ViewersPage() {
       ? params.get('status')
       : ''
   ) as ViewerStatus | '';
+  const subscribed = (
+    ['yes', 'no'].includes(params.get('subscribed') ?? '') ? params.get('subscribed') : ''
+  ) as 'yes' | 'no' | '';
   const q = params.get('q') ?? '';
   const sort = (VIEWER_SORT_FIELDS as readonly string[]).includes(params.get('sort') ?? '')
     ? (params.get('sort') as ViewerSortField)
@@ -226,13 +230,14 @@ export function ViewersPage() {
   }, [search]);
 
   const viewers = useQuery({
-    queryKey: ['viewers', 'list', { page, status, q, sort, order }],
+    queryKey: ['viewers', 'list', { page, status, subscribed, q, sort, order }],
     queryFn: ({ signal }) =>
       viewersApi.list(
         {
           page,
           pageSize: PAGE_SIZE,
           status: status || undefined,
+          subscribed: subscribed || undefined,
           q: q || undefined,
           sort,
           order,
@@ -248,7 +253,7 @@ export function ViewersPage() {
   });
   const mailOn = access.data?.email ?? false;
   const items = viewers.data?.items ?? [];
-  const filtered = Boolean(q || status);
+  const filtered = Boolean(q || status || subscribed);
 
   const refresh = () => {
     void queryClient.invalidateQueries({ queryKey: ['viewers'] });
@@ -491,6 +496,19 @@ export function ViewersPage() {
           ]}
         />
         <Select
+          aria-label="Filter by subscription"
+          className="w-44"
+          value={subscribed || 'ALL'}
+          onValueChange={(value) =>
+            change({ subscribed: value === 'ALL' ? null : value, page: null })
+          }
+          options={[
+            { value: 'ALL', label: 'With or without plan' },
+            { value: 'yes', label: 'Subscribers' },
+            { value: 'no', label: 'No subscription' },
+          ]}
+        />
+        <Select
           aria-label="Sort by"
           className="w-40"
           value={sort}
@@ -601,6 +619,11 @@ export function ViewersPage() {
                               Not confirmed
                             </Badge>
                           )}
+                          {viewer.plan ? (
+                            <Badge tone="info" className="shrink-0">
+                              {viewer.plan.name}
+                            </Badge>
+                          ) : null}
                         </span>
                       </span>
                     </button>
@@ -973,6 +996,10 @@ function DetailSheet({
                 ['Changed', formatDateTime(shown.updatedAt)],
               ]}
             />
+
+            {shown ? (
+              <ViewerSubscription viewerId={shown.id} viewerName={shown.displayName} />
+            ) : null}
 
             {detail.data ? (
               <div>

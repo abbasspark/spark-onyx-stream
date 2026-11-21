@@ -3,7 +3,15 @@ import Link from 'next/link';
 import type { Category } from '@/lib/types';
 import { BandMark } from './brand';
 
-export function SiteFooter({ siteName, categories }: { siteName: string; categories: Category[] }) {
+export function SiteFooter({
+  siteName,
+  categories,
+  hasPlans = false,
+}: {
+  siteName: string;
+  categories: Category[];
+  hasPlans?: boolean;
+}) {
   return (
     <footer className="gutter mt-24 border-t border-line pt-10 pb-12 text-sm text-smoke">
       <div className="flex flex-wrap items-start justify-between gap-x-16 gap-y-8">
@@ -33,6 +41,13 @@ export function SiteFooter({ siteName, categories }: { siteName: string; categor
                 Search
               </Link>
             </li>
+            {hasPlans ? (
+              <li>
+                <Link href="/plans" className="hover:text-vein">
+                  Plans
+                </Link>
+              </li>
+            ) : null}
           </ul>
           {categories.length > 0 ? (
             <ul className="grid grid-flow-col grid-rows-4 content-start gap-x-12 gap-y-2">

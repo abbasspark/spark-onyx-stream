@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-only
-import type { Category, Image, TitleType } from '@onyx/database';
+import type { Category, Image, TitleAccess, TitleType } from '@onyx/database';
 import { toImageView } from './catalog.views.js';
 
 /**
@@ -35,6 +35,8 @@ export interface PublicTitleCard {
   releaseYear: number | null;
   ageRating: string | null;
   isFeatured: boolean;
+  /** FREE, or PAID when watching needs a subscription. */
+  access: TitleAccess;
   poster: PublicImage | null;
   backdrop: PublicImage | null;
   logo: PublicImage | null;
@@ -101,6 +103,7 @@ export interface CardRecord {
   releaseYear: number | null;
   ageRating: string | null;
   isFeatured: boolean;
+  access: TitleAccess;
   publishedAt: Date | null;
   poster: Image | null;
   backdrop: Image | null;
@@ -136,6 +139,7 @@ export function toPublicCard(title: CardRecord, mediaBaseUrl: string): PublicTit
     releaseYear: title.releaseYear,
     ageRating: title.ageRating,
     isFeatured: title.isFeatured,
+    access: title.access,
     poster: toPublicImage(title.poster, mediaBaseUrl),
     backdrop: toPublicImage(title.backdrop, mediaBaseUrl),
     logo: toPublicImage(title.logo, mediaBaseUrl),

@@ -146,7 +146,7 @@ All need `catalog:write`, except the first, which needs `catalog:read`.
 
 ## Not built yet
 
-- Playback that needs a purchase or a subscription
+- Renting or buying a single title. Subscriptions are in `phase-3-billing.md`
 - People and credits (cast, directors)
 - Collections and rows for the home page
 - Other sources than TMDB, and importing many titles at once

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 'use client';
 
-import { Loader2, Mail, Play, RotateCcw, SkipForward } from 'lucide-react';
+import { Loader2, Lock, Mail, Play, RotateCcw, SkipForward } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -41,7 +41,9 @@ type Loaded =
   /** Playback needs a signed-in viewer and there is none. */
   | { state: 'sign-in' }
   /** Playback needs a confirmed email address and the viewer has yet to confirm. */
-  | { state: 'confirm-email' };
+  | { state: 'confirm-email' }
+  /** The title needs a subscription and the viewer has none. */
+  | { state: 'subscribe' };
 
 /** Explains a refused playback request in the viewer's terms. */
 function refusal(status: number): { message: string; retry: boolean } {
@@ -116,6 +118,10 @@ export function WatchScreen({
         }
         if (response.status === 401) {
           setLoaded({ state: 'sign-in' });
+          return;
+        }
+        if (response.status === 402) {
+          setLoaded({ state: 'subscribe' });
           return;
         }
         if (response.status === 403) {
@@ -269,6 +275,38 @@ export function WatchScreen({
               Create an account
             </Link>
           )}
+        </div>
+        <Link
+          href={backHref}
+          className="text-sm text-smoke underline underline-offset-4 hover:text-vein"
+        >
+          Back to {heading}
+        </Link>
+      </div>
+    );
+  }
+
+  if (loaded.state === 'subscribe') {
+    const here = typeof window === 'undefined' ? backHref : window.location.pathname;
+    return (
+      <div className="flex h-dvh flex-col items-center justify-center gap-6 bg-onyx px-6 text-center">
+        <Lock className="size-8 text-sard" aria-hidden="true" />
+        <h1 className="display max-w-xl text-3xl sm:text-4xl">Subscribe to watch {heading}</h1>
+        <p className="max-w-md text-smoke">
+          This title is for subscribers. A plan opens it together with everything else that needs
+          one.
+        </p>
+        <div className="flex flex-wrap justify-center gap-3">
+          <Link href={`/plans?next=${encodeURIComponent(here)}`} className="button button-play">
+            See the plans
+          </Link>
+          <button
+            type="button"
+            className="button button-quiet"
+            onClick={() => setAttempt((value) => value + 1)}
+          >
+            <RotateCcw />I subscribed, play
+          </button>
         </div>
         <Link
           href={backHref}

@@ -9,6 +9,7 @@ import type {
   PublishStatus,
   Season,
   Title,
+  TitleAccess,
   TitleType,
 } from '@onyx/database';
 
@@ -113,6 +114,8 @@ export interface TitleSummary {
   status: PublishStatus;
   publishedAt: Date | null;
   isFeatured: boolean;
+  /** FREE, or PAID when watching needs a subscription. */
+  access: TitleAccess;
   poster: ImageView | null;
   categories: { id: string; name: string }[];
   /** Movies: the film's asset. Series: null. */
@@ -228,6 +231,7 @@ export function toTitleSummary(
     status: title.status,
     publishedAt: title.publishedAt,
     isFeatured: title.isFeatured,
+    access: title.access,
     poster: title.poster ? toImageView(title.poster, mediaBaseUrl) : null,
     categories: sortedCategories(title.categories),
     asset: title.type === 'MOVIE' ? toAssetRef(title.asset) : null,
@@ -326,6 +330,7 @@ export function toTitleDetail(title: TitleDetailRecord, mediaBaseUrl: string): T
     status: title.status,
     publishedAt: title.publishedAt,
     isFeatured: title.isFeatured,
+    access: title.access,
     poster: image(title.poster),
     backdrop: image(title.backdrop),
     logo: image(title.logo),

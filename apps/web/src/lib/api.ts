@@ -2,6 +2,7 @@
 import 'server-only';
 import { connection } from 'next/server';
 import { siteConfig } from './config';
+import { NO_PLANS, type Plans } from './plans';
 import { TtlCache } from './ttl-cache';
 import type { Category, Home, Page, TitleCard, TitleDetail, TitleSort, TitleType } from './types';
 
@@ -58,6 +59,21 @@ async function read<Result>(path: string): Promise<Result> {
 
 export function getHome(): Promise<Home> {
   return read<Home>('/home');
+}
+
+/**
+ * The plans on offer. A site without billing, or with an API older than
+ * plans, has none, which is not an error.
+ */
+export async function getPlans(): Promise<Plans> {
+  try {
+    return await read<Plans>('/plans');
+  } catch (error) {
+    if (error instanceof CatalogError && error.status === 404) {
+      return NO_PLANS;
+    }
+    throw error;
+  }
 }
 
 export function getCategories(): Promise<Category[]> {

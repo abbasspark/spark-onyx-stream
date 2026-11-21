@@ -55,9 +55,22 @@ export interface ViewerAdminView extends ViewerView {
   updatedAt: Date;
   /** Devices signed in right now. */
   activeSessions: number;
+  /** The plan the viewer watches through right now, if any. */
+  plan: ViewerPlanRef | null;
 }
 
-export function toViewerAdminView(viewer: Viewer, activeSessions: number): ViewerAdminView {
+export interface ViewerPlanRef {
+  id: string;
+  name: string;
+  /** Until when. Null means it has no end. */
+  endsAt: Date | null;
+}
+
+export function toViewerAdminView(
+  viewer: Viewer,
+  activeSessions: number,
+  plan: ViewerPlanRef | null,
+): ViewerAdminView {
   return {
     ...toViewerView(viewer),
     status: viewer.status,
@@ -65,6 +78,7 @@ export function toViewerAdminView(viewer: Viewer, activeSessions: number): Viewe
     lastLoginAt: viewer.lastLoginAt,
     updatedAt: viewer.updatedAt,
     activeSessions,
+    plan,
   };
 }
 

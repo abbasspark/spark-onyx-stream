@@ -73,6 +73,7 @@ export class MaintenanceService implements OnApplicationBootstrap, OnApplication
 
       await this.purgeEndedViewerSessions();
       await this.purgeExpiredViewerTokens();
+      await this.expireSubscriptions();
       const result = await this.sweep();
       if (result.started > 0 || result.cleanups > 0) {
         this.logger.log(
@@ -94,6 +95,21 @@ export class MaintenanceService implements OnApplicationBootstrap, OnApplication
     const before = new Date(now.getTime() - KEEP_ENDED_SESSIONS_MS);
     const result = await this.prisma.viewerSession.deleteMany({
       where: { OR: [{ expiresAt: { lt: before } }, { revokedAt: { lt: before } }] },
+    });
+    return result.count;
+  }
+
+  /**
+   * Marks access an admin granted as expired once its time has run out.
+   * Whether a viewer may watch is decided by the end time itself: this only
+   * keeps the stored state true for lists and counts.
+   *
+   * @returns The number of subscriptions marked.
+   */
+  async expireSubscriptions(now = new Date()): Promise<number> {
+    const result = await this.prisma.subscription.updateMany({
+      where: { source: 'MANUAL', status: { in: ['ACTIVE', 'TRIALING'] }, endsAt: { lte: now } },
+      data: { status: 'EXPIRED' },
     });
     return result.count;
   }

@@ -29,6 +29,8 @@ export interface TitleCard {
   releaseYear: number | null;
   ageRating: string | null;
   isFeatured: boolean;
+  /** PAID when watching needs a subscription. Left out by an API older than plans. */
+  access?: 'FREE' | 'PAID';
   poster: CatalogImage | null;
   backdrop: CatalogImage | null;
   logo: CatalogImage | null;

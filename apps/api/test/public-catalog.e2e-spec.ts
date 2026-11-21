@@ -177,6 +177,7 @@ describe.skipIf(!TEST_DATABASE_URL)('Public catalog (e2e)', () => {
         releaseYear: 2024,
         ageRating: '16',
         isFeatured: false,
+        access: 'FREE',
         poster: null,
         backdrop: null,
         logo: null,

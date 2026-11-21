@@ -24,6 +24,8 @@ interface ViewerSession {
   viewer: Viewer | null;
   /** Who of the account is watching on this device. Null for a visitor. */
   profile: Profile | null;
+  /** Whether the viewer has a running subscription, which opens paid titles. */
+  entitled: boolean;
   /** What is open on this site. Null while loading, or when it could not be asked. */
   access: AccessConfig | null;
   /**
@@ -51,6 +53,7 @@ export function ViewerSessionProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState<'loading' | 'ready'>('loading');
   const [viewer, setViewerState] = useState<Viewer | null>(null);
   const [profile, setProfileState] = useState<Profile | null>(null);
+  const [entitled, setEntitled] = useState(false);
   const [access, setAccess] = useState<AccessConfig | null>(null);
 
   /** The viewer and the profile whose watch history this browser holds. */
@@ -62,6 +65,7 @@ export function ViewerSessionProvider({ children }: { children: ReactNode }) {
     const known = me.status === 'fulfilled' ? me.value : { viewer: null, profile: null };
     setViewerState(known.viewer);
     setProfileState(known.profile);
+    setEntitled(known.entitled === true);
     if (me.status === 'fulfilled') {
       const before = signedInAs.current;
       signedInAs.current = known.viewer
@@ -104,6 +108,13 @@ export function ViewerSessionProvider({ children }: { children: ReactNode }) {
       signedInAs.current = next ? { viewer: next.id, profile: nextProfile?.id ?? null } : null;
       if (next) {
         startSync(true);
+        // Signing in does not say whether the viewer is subscribed.
+        viewerApi
+          .subscription()
+          .then((result) => setEntitled(result.entitled))
+          .catch(() => {
+            // Stays as for a viewer without one. The player asks the API anyway.
+          });
       } else {
         endSync();
       }
@@ -111,6 +122,7 @@ export function ViewerSessionProvider({ children }: { children: ReactNode }) {
     setViewerState(next);
     if (!next) {
       setProfileState(null);
+      setEntitled(false);
     } else if (nextProfile) {
       setProfileState(nextProfile);
     }
@@ -143,13 +155,24 @@ export function ViewerSessionProvider({ children }: { children: ReactNode }) {
       endSync();
       setViewerState(null);
       setProfileState(null);
+      setEntitled(false);
       announce();
     }
   }, []);
 
   const value = useMemo(
-    () => ({ state, viewer, profile, access, setViewer, setProfile, updateViewer, signOut }),
-    [state, viewer, profile, access, setViewer, setProfile, updateViewer, signOut],
+    () => ({
+      state,
+      viewer,
+      profile,
+      entitled,
+      access,
+      setViewer,
+      setProfile,
+      updateViewer,
+      signOut,
+    }),
+    [state, viewer, profile, entitled, access, setViewer, setProfile, updateViewer, signOut],
   );
   return <Context.Provider value={value}>{children}</Context.Provider>;
 }

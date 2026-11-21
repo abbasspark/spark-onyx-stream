@@ -22,6 +22,8 @@ export type Permission =
   | 'catalog:write'
   | 'viewers:read'
   | 'viewers:write'
+  | 'billing:read'
+  | 'billing:write'
   | 'settings:read'
   | 'settings:write';
 
@@ -423,6 +425,8 @@ export interface TitleSummary {
   status: PublishStatus;
   publishedAt: string | null;
   isFeatured: boolean;
+  /** FREE, or PAID when watching needs a subscription. */
+  access: TitleAccess;
   poster: CatalogImage | null;
   categories: { id: string; name: string }[];
   asset: AssetRef | null;
@@ -547,6 +551,7 @@ export interface UpdateTitleInput {
   ageRating?: string | null;
   originalLanguage?: string | null;
   isFeatured?: boolean;
+  access?: TitleAccess;
   categoryIds?: string[];
   assetId?: string | null;
   trailerAssetId?: string | null;
@@ -591,6 +596,8 @@ export interface Viewer {
   updatedAt: string;
   /** Devices signed in right now. */
   activeSessions: number;
+  /** The plan the viewer watches through right now, if any. */
+  plan: { id: string; name: string; endsAt: string | null } | null;
 }
 
 /** A device a viewer is signed in on. */
@@ -679,4 +686,89 @@ export interface MailStatus {
   verification: 'optional' | 'required';
   /** The last attempt to send, of the API process that answered. */
   lastDelivery: { at: string; error: string | null } | null;
+}
+
+// --- Billing -------------------------------------------------------------------
+
+export type TitleAccess = 'FREE' | 'PAID';
+
+export interface Plan {
+  id: string;
+  name: string;
+  description: string | null;
+  /** Short lines shown under the price. */
+  features: string[];
+  /** Prices in the smallest unit of the currency, such as cents. Null when not sold. */
+  monthlyAmount: number | null;
+  yearlyAmount: number | null;
+  trialDays: number;
+  isRecommended: boolean;
+  /** Whether viewers are offered the plan. */
+  isOffered: boolean;
+  position: number;
+  /** Viewers who can watch through this plan right now. */
+  subscribers: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export type PlanInput = Pick<
+  Plan,
+  | 'name'
+  | 'description'
+  | 'features'
+  | 'monthlyAmount'
+  | 'yearlyAmount'
+  | 'trialDays'
+  | 'isRecommended'
+  | 'isOffered'
+>;
+
+export type SubscriptionStatus = 'TRIALING' | 'ACTIVE' | 'PAST_DUE' | 'CANCELED' | 'EXPIRED';
+
+export interface Subscription {
+  id: string;
+  plan: { id: string; name: string };
+  status: SubscriptionStatus;
+  /** MANUAL: granted by an admin. STRIPE: paid online. */
+  source: 'MANUAL' | 'STRIPE';
+  interval: 'MONTH' | 'YEAR' | null;
+  /** Whether it lets the viewer watch right now. */
+  running: boolean;
+  startedAt: string;
+  /** Until when. Null means it has no end. */
+  endsAt: string | null;
+  cancelAtPeriodEnd: boolean;
+  canceledAt: string | null;
+  note: string | null;
+  grantedBy: { id: string; displayName: string } | null;
+  createdAt: string;
+}
+
+export interface ViewerSubscriptions {
+  current: Subscription | null;
+  /** All of them, newest first. */
+  history: Subscription[];
+}
+
+export interface GrantSubscriptionInput {
+  planId: string;
+  /** Null means until an admin ends it. */
+  endsAt: string | null;
+  note?: string | null;
+}
+
+export interface BillingOverview {
+  /** Currency of all prices, such as "EUR". */
+  currency: string;
+  /** Whether viewers can pay online. */
+  checkout: boolean;
+  contactUrl: string | null;
+  plans: number;
+  subscribers: number;
+  grantedByHand: number;
+  /** Running subscriptions that end within seven days and are not renewed. */
+  endingSoon: number;
+  paidTitles: number;
+  publishedTitles: number;
 }
