@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 'use client';
 
-import { Check, History, Loader2, LogOut, MonitorSmartphone } from 'lucide-react';
+import { Check, History, Loader2, LogOut, Mail, MonitorSmartphone } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { type FormEvent, type ReactNode, useCallback, useEffect, useState } from 'react';
 import {
@@ -63,7 +63,7 @@ function Saved({ when, label = 'Saved' }: { when: number; label?: string }) {
 /** The viewer's own account: name, password, devices, and leaving. */
 export function AccountScreen() {
   const router = useRouter();
-  const { state, viewer, setViewer, signOut } = useViewerSession();
+  const { state, viewer, access, setViewer, signOut } = useViewerSession();
   // Set when the viewer signs out or deletes the account here. They are then
   // on their way to the home page and must not be sent to sign in instead.
   const [leaving, setLeaving] = useState(false);
@@ -91,8 +91,14 @@ export function AccountScreen() {
   return (
     <div className="gutter pt-28">
       <h1 className="display text-4xl sm:text-5xl">Account</h1>
-      <p className="mt-4 mb-10 text-lg text-smoke">{viewer.email}</p>
+      <p className="mt-4 mb-10 text-lg text-smoke">{viewer.displayName}</p>
 
+      <EmailSection
+        email={viewer.email}
+        verified={viewer.emailVerified}
+        canSend={access?.email ?? false}
+        required={access?.verification === 'required'}
+      />
       <NameSection name={viewer.displayName} onSaved={setViewer} />
       <PasswordSection />
       <DevicesSection />
@@ -118,6 +124,85 @@ export function AccountScreen() {
         }}
       />
     </div>
+  );
+}
+
+/** The address of the account, and whether the viewer confirmed it. */
+function EmailSection({
+  email,
+  verified,
+  canSend,
+  required,
+}: {
+  email: string;
+  verified: boolean;
+  canSend: boolean;
+  required: boolean;
+}) {
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<ViewerApiError | null>(null);
+  const [sentAt, setSentAt] = useState(0);
+
+  const send = async () => {
+    setBusy(true);
+    setError(null);
+    try {
+      await viewerApi.sendVerification();
+      setSentAt(Date.now());
+    } catch (caught) {
+      setError(asError(caught));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <Section heading="Email">
+      <p className="flex flex-wrap items-center gap-x-3 gap-y-1">
+        <span className="break-all">{email}</span>
+        {verified ? (
+          <span className="inline-flex items-center gap-1 text-sm text-sard">
+            <Check className="size-4" aria-hidden="true" />
+            Confirmed
+          </span>
+        ) : (
+          <span className="rounded-[3px] border border-line px-2 py-0.5 text-xs text-smoke">
+            Not confirmed
+          </span>
+        )}
+      </p>
+      {verified ? null : (
+        <>
+          <p className="mt-3 mb-5 text-smoke">
+            {required
+              ? 'Confirm your address to watch. '
+              : 'Confirming shows that the address is yours, so a forgotten password can be replaced. '}
+            {canSend
+              ? 'We sent you an email with a link when you signed up.'
+              : 'This site does not send email at the moment.'}
+          </p>
+          {canSend ? (
+            <div className="flex flex-wrap items-center gap-4">
+              <button
+                type="button"
+                className="button button-quiet"
+                disabled={busy}
+                onClick={() => void send()}
+              >
+                {busy ? <Spinner /> : <Mail />}
+                Send the email again
+              </button>
+              <Saved when={sentAt} label="Sent. Check your inbox" />
+            </div>
+          ) : null}
+          {error ? (
+            <p role="alert" className="mt-3 text-sm text-alarm">
+              {error.message}
+            </p>
+          ) : null}
+        </>
+      )}
+    </Section>
   );
 }
 

@@ -16,6 +16,9 @@ import { DatabaseModule } from '../../src/database/database.module.js';
 import type { QueuedJobData } from '../../src/jobs/jobs.service.js';
 import { ProcessingCoreModule } from '../../src/processing/processing.module.js';
 import { PROCESSING_QUEUE } from '../../src/queue/queue.constants.js';
+import { MailModule } from '../../src/mail/mail.module.js';
+import { MailService } from '../../src/mail/mail.service.js';
+import { MAIL_TRANSPORT, MemoryTransport } from '../../src/mail/mail.transport.js';
 import { RateLimitModule } from '../../src/rate-limit/rate-limit.module.js';
 import { REDIS_CLIENT } from '../../src/redis/redis.module.js';
 import { StorageModule } from '../../src/storage/storage.module.js';
@@ -127,6 +130,9 @@ export interface TestApp {
   /** Creates the first owner through the setup endpoint and signs in. */
   setupOwner: () => Promise<string>;
   /** Removes all data the suites create, in dependency order. */
+  /** Emails the application sent. Nothing leaves the process. */
+  mail: MemoryTransport;
+  mailSettled: () => Promise<void>;
   resetDatabase: () => Promise<void>;
   close: () => Promise<void>;
 }
@@ -167,6 +173,7 @@ export async function createTestApp(
   })
   class FakeInfrastructureModule {}
 
+  const mail = new MemoryTransport();
   const moduleRef = await Test.createTestingModule({
     imports: [
       ConfigModule.forRoot(config),
@@ -179,15 +186,22 @@ export async function createTestApp(
       AuditModule,
       StorageModule,
       ProcessingCoreModule,
+      MailModule,
       ...featureModules,
     ],
-  }).compile();
+  })
+    .overrideProvider(MAIL_TRANSPORT)
+    .useValue(mail)
+    .compile();
 
   const app = moduleRef.createNestApplication<INestApplication<App>>();
   app.setGlobalPrefix('v1');
   await app.init();
 
   const prisma = app.get(PrismaClient);
+  const mailService = app.get(MailService);
+  // A mail server that is down is tried again at once in tests.
+  mailService.retryDelaysMs = [0];
   const http = () => request(app.getHttpServer());
   const bearer = (token: string) => ({ Authorization: `Bearer ${token}` });
 
@@ -208,8 +222,13 @@ export async function createTestApp(
       await http().post('/v1/auth/setup').send(OWNER).expect(201);
       return login(OWNER.email, OWNER.password);
     },
+    mail,
+    /** Waits until every email handed over so far is in the outbox, or given up. */
+    mailSettled: () => mailService.settled(),
     resetDatabase: async () => {
       redis.clear();
+      await mailService.settled();
+      mail.clear();
       queue.clear();
       await prisma.auditLog.deleteMany();
       // Catalog rows point to assets, pictures and pools, so they go first.

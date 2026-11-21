@@ -514,6 +514,8 @@ export interface Viewer {
   email: string;
   displayName: string;
   status: ViewerStatus;
+  /** When the address was confirmed, by the viewer or by an admin. */
+  emailVerifiedAt: string | null;
   lastLoginAt: string | null;
   createdAt: string;
   updatedAt: string;
@@ -562,16 +564,36 @@ export interface CreateViewerInput {
   email: string;
   displayName: string;
   password: string;
+  /** Whether the admin vouches for the address. Defaults to yes. */
+  emailVerified?: boolean;
 }
 
 export interface UpdateViewerInput {
   email?: string;
   displayName?: string;
   status?: ViewerStatus;
+  emailVerified?: boolean;
 }
 
 /** What is open to the public on this installation. Set in its environment. */
 export interface ViewerAccessConfig {
   registration: 'open' | 'closed';
   playback: 'open' | 'viewers' | 'off';
+  /** Whether the installation sends email. */
+  email: boolean;
+  /** Whether a viewer must confirm their address before they can watch. */
+  verification: 'optional' | 'required';
+}
+
+/** How email is set up. The password of the mail server is never returned. */
+export interface MailStatus {
+  enabled: boolean;
+  server: { host: string; port: number; secure: boolean; user: string | null } | null;
+  from: string | null;
+  /** Where the links in emails lead. */
+  siteUrl: string | null;
+  siteName: string;
+  verification: 'optional' | 'required';
+  /** The last attempt to send, of the API process that answered. */
+  lastDelivery: { at: string; error: string | null } | null;
 }

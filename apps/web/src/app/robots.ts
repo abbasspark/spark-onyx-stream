@@ -11,7 +11,17 @@ export default async function robots(): Promise<MetadataRoute.Robots> {
       userAgent: '*',
       allow: '/',
       // Players and search results are not pages worth finding. The API is not a page at all.
-      disallow: ['/watch/', '/search', '/account', '/sign-in', '/sign-up', '/v1/'],
+      disallow: [
+        '/watch/',
+        '/search',
+        '/account',
+        '/sign-in',
+        '/sign-up',
+        '/forgot-password',
+        '/reset-password',
+        '/verify-email',
+        '/v1/',
+      ],
     },
     sitemap: `${siteConfig.url}/sitemap.xml`,
   };

@@ -7,6 +7,7 @@ import {
   KeyRound,
   LayoutDashboard,
   type LucideIcon,
+  Mail,
   ScrollText,
   SlidersHorizontal,
   Tags,
@@ -102,6 +103,13 @@ export const NAVIGATION: NavGroup[] = [
         icon: Database,
         permission: 'storage:read',
         keywords: 'pools s3 disk bucket',
+      },
+      {
+        to: '/email',
+        label: 'Email',
+        icon: Mail,
+        permission: 'settings:read',
+        keywords: 'smtp mail server password reset verification',
       },
       {
         to: '/admins',

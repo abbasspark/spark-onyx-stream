@@ -24,7 +24,7 @@ import {
   listPublicTitlesSchema,
   slugParamSchema,
 } from './public-catalog.schemas.js';
-import { PublicCatalogService } from './public-catalog.service.js';
+import { PublicCatalogService, type Watcher } from './public-catalog.service.js';
 import type {
   PublicCategory,
   PublicHome,
@@ -97,7 +97,7 @@ export class PublicCatalogController {
     @Param('slug', slugPipe) slug: string,
     @Req() request: Request,
   ): Promise<PlaybackInfo> {
-    return this.catalog.playTitle(slug, await this.isSignedIn(request));
+    return this.catalog.playTitle(slug, await this.watcher(request));
   }
 
   @Post('titles/:slug/trailer/playback')
@@ -108,7 +108,7 @@ export class PublicCatalogController {
     @Param('slug', slugPipe) slug: string,
     @Req() request: Request,
   ): Promise<PlaybackInfo> {
-    return this.catalog.playTrailer(slug, await this.isSignedIn(request));
+    return this.catalog.playTrailer(slug, await this.watcher(request));
   }
 
   @Post('episodes/:id/playback')
@@ -119,14 +119,15 @@ export class PublicCatalogController {
     @Param('id', ParseUUIDPipe) id: string,
     @Req() request: Request,
   ): Promise<PlaybackInfo> {
-    return this.catalog.playEpisode(id, await this.isSignedIn(request));
+    return this.catalog.playEpisode(id, await this.watcher(request));
   }
 
   /**
-   * Whether a viewer is signed in. Asking for playback changes nothing, so a
-   * cookie is enough here and the request needs no further check.
+   * The viewer who asks, if one is signed in. Asking for playback changes
+   * nothing, so a cookie is enough here and the request needs no further check.
    */
-  private async isSignedIn(request: Request): Promise<boolean> {
-    return (await this.viewerSessions.identify(request)) !== null;
+  private async watcher(request: Request): Promise<Watcher> {
+    const identity = await this.viewerSessions.identify(request);
+    return identity ? { emailVerified: identity.viewer.emailVerifiedAt !== null } : null;
   }
 }

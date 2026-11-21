@@ -13,6 +13,7 @@ import { EmptyState, Spinner } from './components/ui/display';
 import { TooltipProvider } from './components/ui/overlay';
 import { LiveProvider } from './live/live';
 import { AccountPage } from './pages/account-page';
+import { EmailPage } from './pages/email-page';
 import { AdminsPage } from './pages/admins-page';
 import { ApiKeysPage } from './pages/api-keys-page';
 import { AssetsPage } from './pages/assets-page';
@@ -81,6 +82,7 @@ function Pages() {
             <Route path="jobs" element={<JobsPage />} />
             <Route path="encoding-profiles" element={<EncodingProfilesPage />} />
             <Route path="storage" element={<StoragePage />} />
+            <Route path="email" element={<EmailPage />} />
             <Route path="admins" element={<AdminsPage />} />
             <Route path="api-keys" element={<ApiKeysPage />} />
             <Route path="audit" element={<AuditPage />} />

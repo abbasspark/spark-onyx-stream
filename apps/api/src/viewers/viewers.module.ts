@@ -3,6 +3,7 @@ import { Module } from '@nestjs/common';
 import { ViewerAuthController } from './viewer-auth.controller.js';
 import { ViewerAuthGuard } from './viewer-auth.guard.js';
 import { ViewerAuthService } from './viewer-auth.service.js';
+import { ViewerEmailService } from './viewer-email.service.js';
 import { ViewerSessionService } from './viewer-session.service.js';
 import { ViewersAdminController } from './viewers-admin.controller.js';
 import { ViewersAdminService } from './viewers-admin.service.js';
@@ -14,7 +15,13 @@ import { ViewersAdminService } from './viewers-admin.service.js';
  */
 @Module({
   controllers: [ViewerAuthController, ViewersAdminController],
-  providers: [ViewerSessionService, ViewerAuthService, ViewerAuthGuard, ViewersAdminService],
+  providers: [
+    ViewerSessionService,
+    ViewerEmailService,
+    ViewerAuthService,
+    ViewerAuthGuard,
+    ViewersAdminService,
+  ],
   exports: [ViewerSessionService, ViewerAuthGuard],
 })
 export class ViewersModule {}

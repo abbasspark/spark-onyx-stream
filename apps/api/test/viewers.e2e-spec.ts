@@ -73,7 +73,12 @@ describe.skipIf(!TEST_DATABASE_URL)('Viewer accounts (e2e)', () => {
   describe('creating an account', () => {
     it('tells clients what is open on this installation', async () => {
       const config = await http().get('/v1/viewer/config').expect(200);
-      expect(config.body).toEqual({ registration: 'open', playback: 'open' });
+      expect(config.body).toEqual({
+        registration: 'open',
+        playback: 'open',
+        email: false,
+        verification: 'optional',
+      });
     });
 
     it('creates the viewer, signs them in and never returns the password', async () => {
@@ -83,6 +88,7 @@ describe.skipIf(!TEST_DATABASE_URL)('Viewer accounts (e2e)', () => {
         id: expect.any(String),
         email: 'anna@example.com',
         displayName: 'Anna',
+        emailVerified: false,
         createdAt: expect.any(String),
       });
       expect(response.body.token).toMatch(/^onyx_view_/);

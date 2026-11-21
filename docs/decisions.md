@@ -348,3 +348,18 @@ This replaces the "plain CSS without a component library" part of D-018.
 **Why:** resuming on another device is what viewers expect from an account. Reading from the browser keeps pages the same for everyone when they leave the server, shows the row without waiting, and keeps working without a connection. Rules on the server mean a phone app and the website cannot disagree about what is watched. Operators need to see a viewer's history to answer support questions, and later to report what is watched.
 
 **Consequence:** on a shared computer, what a visitor watched joins the account of whoever signs in next on it. Two devices playing the same video at once overwrite each other's position, the later one winning. There is one history per account until profiles exist. The player sends a small request about every 15 seconds for each signed-in viewer who is watching.
+
+## D-029 Email goes through the operator's own mail server, straight from the API
+
+**Date:** 2026-11-21
+
+- **One setting, `SMTP_URL`, turns email on.** Any mail provider that speaks SMTP works. There is no built-in provider and no provider-specific code.
+- **The API sends emails itself, in the background, with three tries.** They do not go through the job queue.
+- **Links carry single-use tokens in the fragment of the address.** Only hashes are stored.
+- **Confirming an address is optional by default.** `VIEWER_EMAIL_VERIFICATION=required` ties watching to it.
+- **The installation refuses to start** when email is half set up, or when confirmed addresses are required without a mail server.
+- **"No email is sent yet" of D-027 no longer holds.**
+
+**Why:** SMTP is the one thing every mail service offers, so an operator is never tied to one company. Putting emails on the queue would write addresses and usable tokens into Redis and its backups; a lost email costs a viewer one more click, which is the cheaper risk. A token in the fragment stays out of proxy and server logs. Requiring confirmation by default would lock out every installation that has no mail server, which is how most start.
+
+**Consequence:** an email that is still being retried is lost when the API restarts, and the viewer has to ask again. What the mail server said to the last email is known per API process, not across several. Emails are in English only. Whether an email reaches the inbox depends on the operator's sender address and DNS records, which the panel cannot check beyond a test email.

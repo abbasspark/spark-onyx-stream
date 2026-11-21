@@ -67,4 +67,53 @@ describe('validateEnv', () => {
       /MASTER_KEY must be 64 hexadecimal characters/,
     );
   });
+
+  describe('email', () => {
+    const mail = {
+      SMTP_URL: 'smtps://user:password@smtp.example.com:465',
+      MAIL_FROM: 'Onyx Stream <no-reply@example.com>',
+      SITE_URL: 'https://watch.example.com/',
+    };
+
+    it('is off by default', () => {
+      const env = validateEnv(validEnv);
+      expect(env.SMTP_URL).toBe('');
+      expect(env.VIEWER_EMAIL_VERIFICATION).toBe('optional');
+      expect(env.SITE_NAME).toBe('Onyx Stream');
+    });
+
+    it('accepts a mail server with a sender and the address of the site', () => {
+      const env = validateEnv({ ...validEnv, ...mail, MAIL_FROM: 'no-reply@example.com' });
+      expect(env.SITE_URL).toBe('https://watch.example.com');
+      expect(env.MAIL_FROM).toBe('no-reply@example.com');
+    });
+
+    it('needs the sender and the address of the site with a mail server', () => {
+      expect(() => validateEnv({ ...validEnv, SMTP_URL: mail.SMTP_URL })).toThrow(
+        /MAIL_FROM is required when SMTP_URL is set[\s\S]*SITE_URL is required when SMTP_URL is set/,
+      );
+    });
+
+    it('rejects values of the wrong form', () => {
+      expect(() => validateEnv({ ...validEnv, ...mail, SMTP_URL: 'smtp.example.com' })).toThrow(
+        /SMTP_URL must start with smtp:\/\/ or smtps:\/\//,
+      );
+      expect(() => validateEnv({ ...validEnv, ...mail, MAIL_FROM: 'Onyx Stream' })).toThrow(
+        /MAIL_FROM must be an address/,
+      );
+      expect(() =>
+        validateEnv({ ...validEnv, ...mail, SITE_URL: 'https://example.com/watch' }),
+      ).toThrow(/SITE_URL must be an origin/);
+    });
+
+    it('cannot require confirmed addresses without a mail server', () => {
+      expect(() => validateEnv({ ...validEnv, VIEWER_EMAIL_VERIFICATION: 'required' })).toThrow(
+        /VIEWER_EMAIL_VERIFICATION=required needs SMTP_URL/,
+      );
+      expect(
+        validateEnv({ ...validEnv, ...mail, VIEWER_EMAIL_VERIFICATION: 'required' })
+          .VIEWER_EMAIL_VERIFICATION,
+      ).toBe('required');
+    });
+  });
 });

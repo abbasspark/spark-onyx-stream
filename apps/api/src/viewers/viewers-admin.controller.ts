@@ -32,6 +32,7 @@ import {
   updateViewerSchema,
 } from './viewer.schemas.js';
 import type { ViewerAdminDetail, ViewerAdminView } from './viewer.view.js';
+import { ViewerEmailService } from './viewer-email.service.js';
 import { ViewersAdminService } from './viewers-admin.service.js';
 
 /**
@@ -43,6 +44,7 @@ export class ViewersAdminController {
   constructor(
     @Inject(ViewersAdminService) private readonly viewers: ViewersAdminService,
     @Inject(AuditService) private readonly audit: AuditService,
+    @Inject(ViewerEmailService) private readonly emails: ViewerEmailService,
   ) {}
 
   @Get()
@@ -107,6 +109,32 @@ export class ViewersAdminController {
   ): Promise<void> {
     const sessionsEnded = await this.viewers.resetPassword(id, body.newPassword);
     await this.record('viewer.password_reset', id, principal, request, { sessionsEnded });
+  }
+
+  /** Emails the viewer a link to set a new password themselves. */
+  @Post(':id/password-email')
+  @RequirePermissions('viewers:write')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  async sendPasswordEmail(
+    @Param('id', ParseUUIDPipe) id: string,
+    @CurrentPrincipal() principal: Principal,
+    @Req() request: Request,
+  ): Promise<void> {
+    await this.emails.sendPasswordReset(await this.viewers.find(id));
+    await this.record('viewer.password_email', id, principal, request);
+  }
+
+  /** Emails the viewer the link to confirm their address. */
+  @Post(':id/verification-email')
+  @RequirePermissions('viewers:write')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  async sendVerificationEmail(
+    @Param('id', ParseUUIDPipe) id: string,
+    @CurrentPrincipal() principal: Principal,
+    @Req() request: Request,
+  ): Promise<void> {
+    await this.emails.sendVerification(await this.viewers.find(id));
+    await this.record('viewer.verification_email', id, principal, request);
   }
 
   @Post(':id/sign-out')

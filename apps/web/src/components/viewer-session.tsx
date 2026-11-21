@@ -25,6 +25,8 @@ interface ViewerSession {
   access: AccessConfig | null;
   /** Takes over a viewer after sign-in, sign-up or a change of name. */
   setViewer: (viewer: Viewer | null) => void;
+  /** Changes what is known about the signed-in viewer. Does nothing for a visitor. */
+  updateViewer: (change: (viewer: Viewer) => Viewer) => void;
   signOut: () => Promise<void>;
 }
 
@@ -87,6 +89,10 @@ export function ViewerSessionProvider({ children }: { children: ReactNode }) {
     announce();
   }, []);
 
+  const updateViewer = useCallback((change: (viewer: Viewer) => Viewer) => {
+    setViewerState((current) => (current ? change(current) : current));
+  }, []);
+
   const signOut = useCallback(async () => {
     try {
       await viewerApi.logout();
@@ -100,8 +106,8 @@ export function ViewerSessionProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const value = useMemo(
-    () => ({ state, viewer, access, setViewer, signOut }),
-    [state, viewer, access, setViewer, signOut],
+    () => ({ state, viewer, access, setViewer, updateViewer, signOut }),
+    [state, viewer, access, setViewer, updateViewer, signOut],
   );
   return <Context.Provider value={value}>{children}</Context.Provider>;
 }

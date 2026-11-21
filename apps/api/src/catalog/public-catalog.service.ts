@@ -23,6 +23,9 @@ import {
   toPublicImage,
 } from './public-catalog.views.js';
 
+/** Who asks for playback: a signed-in viewer, or null for a visitor. */
+export type Watcher = { emailVerified: boolean } | null;
+
 /** Titles in one row of the home page. */
 export const ROW_SIZE = 20;
 /** Category rows on the home page. Further categories are reached through the category list. */
@@ -207,8 +210,8 @@ export class PublicCatalogService {
    * @param signedIn Whether the request comes from a signed-in viewer.
    * @throws ConflictException for a series, which is played per episode.
    */
-  async playTitle(slug: string, signedIn: boolean): Promise<PlaybackInfo> {
-    this.assertMayPlay(signedIn);
+  async playTitle(slug: string, watcher: Watcher): Promise<PlaybackInfo> {
+    this.assertMayPlay(watcher);
     const title = await this.prisma.title.findFirst({
       where: { slug, ...VISIBLE_TITLE },
       select: { type: true, assetId: true },
@@ -223,8 +226,8 @@ export class PublicCatalogService {
   }
 
   /** Signed addresses for playing the trailer of a title. */
-  async playTrailer(slug: string, signedIn: boolean): Promise<PlaybackInfo> {
-    this.assertMayPlay(signedIn);
+  async playTrailer(slug: string, watcher: Watcher): Promise<PlaybackInfo> {
+    this.assertMayPlay(watcher);
     const title = await this.prisma.title.findFirst({
       where: { slug, ...VISIBLE_TITLE },
       select: { trailerAsset: { select: { id: true, status: true, manifestPath: true } } },
@@ -236,8 +239,8 @@ export class PublicCatalogService {
   }
 
   /** Signed addresses for playing an episode of a visible series. */
-  async playEpisode(episodeId: string, signedIn: boolean): Promise<PlaybackInfo> {
-    this.assertMayPlay(signedIn);
+  async playEpisode(episodeId: string, watcher: Watcher): Promise<PlaybackInfo> {
+    this.assertMayPlay(watcher);
     const episode = await this.prisma.episode.findFirst({
       where: { id: episodeId, ...VISIBLE_EPISODE, season: { title: { status: 'PUBLISHED' } } },
       select: { assetId: true },
@@ -253,13 +256,26 @@ export class PublicCatalogService {
    *
    * @throws ForbiddenException when playback is off for everyone.
    * @throws UnauthorizedException when it needs a signed-in viewer and there is none.
+   * @throws ForbiddenException when the viewer has yet to confirm their email address.
    */
-  private assertMayPlay(signedIn: boolean): void {
+  private assertMayPlay(watcher: Watcher): void {
     if (this.config.catalogPlayback === 'off') {
       throw new ForbiddenException('Playback is not open on this installation');
     }
-    if (this.config.catalogPlayback === 'viewers' && !signedIn) {
+    if (this.config.catalogPlayback !== 'viewers') {
+      return;
+    }
+    if (!watcher) {
       throw new UnauthorizedException('Sign in to watch');
+    }
+    if (this.config.viewerVerificationRequired && !watcher.emailVerified) {
+      throw new ForbiddenException({
+        statusCode: 403,
+        error: 'Forbidden',
+        message: 'Confirm your email address to watch',
+        // Lets a player tell this apart from playback that is off for everyone.
+        code: 'email_unverified',
+      });
     }
   }
 }

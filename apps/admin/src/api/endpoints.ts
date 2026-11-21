@@ -44,6 +44,7 @@ import type {
   UpdateViewerInput,
   Viewer,
   ViewerAccessConfig,
+  MailStatus,
   ViewerDetail,
   ViewerWatching,
   ViewerSortField,
@@ -138,6 +139,11 @@ export interface ViewerListQuery {
   order?: SortOrder;
 }
 
+export const mailApi = {
+  status: (signal?: AbortSignal) => request<MailStatus>('/v1/mail', { signal }),
+  test: (to: string) => request<void>('/v1/mail/test', { method: 'POST', body: { to } }),
+};
+
 export const viewersApi = {
   list: (query: ViewerListQuery, signal?: AbortSignal) =>
     request<Page<Viewer>>('/v1/viewers', { query: { ...query }, signal }),
@@ -149,6 +155,10 @@ export const viewersApi = {
     request<Viewer>(`/v1/viewers/${id}`, { method: 'PATCH', body }),
   resetPassword: (id: string, newPassword: string) =>
     request<void>(`/v1/viewers/${id}/password`, { method: 'POST', body: { newPassword } }),
+  sendPasswordEmail: (id: string) =>
+    request<void>(`/v1/viewers/${id}/password-email`, { method: 'POST' }),
+  sendVerificationEmail: (id: string) =>
+    request<void>(`/v1/viewers/${id}/verification-email`, { method: 'POST' }),
   signOut: (id: string) =>
     request<{ sessionsEnded: number }>(`/v1/viewers/${id}/sign-out`, { method: 'POST' }),
   remove: (id: string) => request<void>(`/v1/viewers/${id}`, { method: 'DELETE' }),
