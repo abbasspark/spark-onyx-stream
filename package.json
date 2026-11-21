@@ -16,6 +16,7 @@
   "scripts": {
     "dev": "pnpm --filter @onyx/api start:dev",
     "dev:admin": "pnpm --filter @onyx/admin dev",
+    "dev:web": "pnpm --filter @onyx/web dev",
     "dev:player": "node tools/dev-player/serve.mjs",
     "dev:infra": "docker compose -f deploy/dev/docker-compose.yml up -d",
     "dev:infra:stop": "docker compose -f deploy/dev/docker-compose.yml down",

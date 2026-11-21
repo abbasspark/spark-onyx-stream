@@ -1,0 +1,262 @@
+/* SPDX-License-Identifier: AGPL-3.0-only */
+@import 'tailwindcss';
+@import '@fontsource-variable/archivo/standard.css';
+
+/*
+ * The look takes its cue from the stone the project is named after: onyx is
+ * true black with pale bands running through it. So the page is black, the
+ * text is the warm white of those bands, and thin stacked bands are the one
+ * recurring mark: in the logo, in progress and on the seek bar. Colour comes
+ * from the artwork of the catalog, not from the interface. The single accent
+ * is the amber of sardonyx, the banded variety, and marks what can be played.
+ */
+@theme {
+  --color-onyx: #000000;
+  --color-coal: #0d0d0e;
+  --color-ash: #1a1a1c;
+  --color-line: #2b2b2e;
+  --color-vein: #f4f1ea;
+  --color-smoke: #a9a6a0;
+  --color-dust: #77746f;
+  --color-sard: #e6a85c;
+  --color-sard-deep: #c98a3b;
+  --color-alarm: #ff8a7a;
+
+  --font-sans: 'Archivo Variable', ui-sans-serif, system-ui, sans-serif;
+
+  /* A scale on a perfect fourth (1.333), rounded. */
+  --text-xs: 0.75rem;
+  --text-sm: 0.875rem;
+  --text-base: 1rem;
+  --text-lg: 1.25rem;
+  --text-xl: 1.6875rem;
+  --text-2xl: 2.25rem;
+  --text-3xl: 3rem;
+  --text-4xl: 4rem;
+  --text-5xl: 5.25rem;
+
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+@layer base {
+  html {
+    background: var(--color-onyx);
+    color: var(--color-vein);
+    color-scheme: dark;
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+    scroll-padding-top: 5rem;
+  }
+
+  body {
+    min-height: 100dvh;
+    font-size: var(--text-base);
+    line-height: 1.55;
+  }
+
+  ::selection {
+    background: var(--color-sard);
+    color: var(--color-onyx);
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--color-sard);
+    outline-offset: 3px;
+    border-radius: 2px;
+  }
+
+  /* Subtitles drawn by the browser on top of the video. */
+  video::cue {
+    background: rgb(0 0 0 / 0.72);
+    color: #fff;
+    font-family: var(--font-sans);
+    font-size: clamp(1rem, 2.4vw, 1.75rem);
+    line-height: 1.35;
+  }
+}
+
+@layer components {
+  /*
+   * Titles are set narrow and heavy, like the lettering on a film poster.
+   * It is the same typeface as the body text at the other end of its width.
+   */
+  .display {
+    font-stretch: 68%;
+    font-weight: 800;
+    line-height: 0.95;
+    letter-spacing: -0.005em;
+    text-wrap: balance;
+  }
+
+  .heading {
+    font-stretch: 80%;
+    font-weight: 700;
+    line-height: 1.1;
+    letter-spacing: 0;
+  }
+
+  /* The page gutter, shared by everything that lines up with the header. */
+  .gutter {
+    padding-inline: clamp(1rem, 4vw, 3.5rem);
+  }
+
+  .button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    height: 3rem;
+    padding-inline: 1.5rem;
+    border-radius: 3px;
+    font-stretch: 88%;
+    font-weight: 650;
+    font-size: var(--text-base);
+    white-space: nowrap;
+    transition:
+      background-color 150ms,
+      color 150ms,
+      border-color 150ms;
+  }
+
+  .button svg {
+    width: 1.25rem;
+    height: 1.25rem;
+    flex-shrink: 0;
+  }
+
+  .button-play {
+    background: var(--color-sard);
+    color: var(--color-onyx);
+  }
+
+  .button-play:hover {
+    background: var(--color-vein);
+  }
+
+  .button-quiet {
+    background: rgb(244 241 234 / 0.12);
+    color: var(--color-vein);
+    backdrop-filter: blur(6px);
+  }
+
+  .button-quiet:hover {
+    background: rgb(244 241 234 / 0.22);
+  }
+
+  /* A horizontal strip that scrolls by touch, wheel or its arrow buttons. */
+  .strip {
+    display: flex;
+    gap: clamp(0.5rem, 1vw, 0.875rem);
+    overflow-x: auto;
+    scroll-snap-type: x proximity;
+    scrollbar-width: none;
+    scroll-padding-inline: clamp(1rem, 4vw, 3.5rem);
+    padding-inline: clamp(1rem, 4vw, 3.5rem);
+  }
+
+  .strip::-webkit-scrollbar {
+    display: none;
+  }
+
+  .strip > * {
+    scroll-snap-align: start;
+    flex-shrink: 0;
+  }
+
+  /* Progress drawn as a band: a pale track with an amber vein. */
+  .band {
+    height: 3px;
+    background: rgb(244 241 234 / 0.22);
+  }
+
+  .band > span {
+    display: block;
+    height: 100%;
+    background: var(--color-sard);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+@layer components {
+  /* A round control on top of the video. */
+  .player-button {
+    display: flex;
+    width: 2.75rem;
+    height: 2.75rem;
+    flex-shrink: 0;
+    align-items: center;
+    justify-content: center;
+    border-radius: 9999px;
+    color: var(--color-vein);
+    transition: background-color 120ms;
+  }
+
+  .player-button:hover {
+    background: rgb(244 241 234 / 0.16);
+  }
+
+  .player-button svg {
+    width: 1.5rem;
+    height: 1.5rem;
+  }
+
+  /* The volume slider, a band like the seek bar. */
+  .player-range {
+    appearance: none;
+    height: 1.5rem;
+    background: transparent;
+    cursor: pointer;
+  }
+
+  .player-range::-webkit-slider-runnable-track {
+    height: 4px;
+    background: linear-gradient(
+      to right,
+      var(--color-vein) var(--filled, 100%),
+      rgb(244 241 234 / 0.25) var(--filled, 100%)
+    );
+  }
+
+  .player-range::-moz-range-track {
+    height: 4px;
+    background: rgb(244 241 234 / 0.25);
+  }
+
+  .player-range::-moz-range-progress {
+    height: 4px;
+    background: var(--color-vein);
+  }
+
+  .player-range::-webkit-slider-thumb {
+    appearance: none;
+    width: 12px;
+    height: 12px;
+    margin-top: -4px;
+    border-radius: 9999px;
+    background: var(--color-vein);
+  }
+
+  .player-range::-moz-range-thumb {
+    width: 12px;
+    height: 12px;
+    border: 0;
+    border-radius: 9999px;
+    background: var(--color-vein);
+  }
+}
+
+@keyframes player-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
