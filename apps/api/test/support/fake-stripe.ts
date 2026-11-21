@@ -61,6 +61,12 @@ interface FakeSession {
   client_reference_id: string | null;
   customer: string | null;
   subscription: string | null;
+  payment_status: string;
+  payment_intent: string | null;
+  amount_total: number | null;
+  currency: string | null;
+  metadata: Record<string, string>;
+  created: number;
   form: Record<string, string>;
 }
 
@@ -86,6 +92,13 @@ export interface FakeStripe {
   pageSize: number;
   /** The viewer pays: the session completes and its subscription starts. */
   pay: (sessionId: string) => FakeSubscription;
+  /** The viewer pays for a single title: the session completes and is paid. */
+  payOnce: (sessionId: string) => FakeSession;
+  /** Returns money of a single payment. Answers with the charge, as the message about it carries it. */
+  refundOnce: (
+    sessionId: string,
+    amount: number,
+  ) => { id: string; amount: number; amount_refunded: number; payment_intent: string };
   /** Changes a subscription, as Stripe or its customer portal would. */
   change: (id: string, fields: Partial<FakeSubscription>) => FakeSubscription;
   /** Moves a subscription into its next period, as a renewal does, and bills it. */
@@ -192,6 +205,30 @@ export async function startFakeStripe(): Promise<FakeStripe> {
       // A trial starts with an invoice over nothing, which is no payment.
       fake.bill(subscription.id, trialDays > 0 ? { amount: 0 } : {});
       return subscription;
+    },
+    payOnce(sessionId) {
+      const session = fake.sessions.get(sessionId);
+      if (!session || session.mode !== 'payment') {
+        throw new Error(`No such payment session: ${sessionId}`);
+      }
+      session.status = 'complete';
+      session.payment_status = 'paid';
+      session.payment_intent = next('pi');
+      return session;
+    },
+    refundOnce(sessionId, amount) {
+      const session = fake.sessions.get(sessionId);
+      if (!session?.payment_intent) {
+        throw new Error(`Not paid: ${sessionId}`);
+      }
+      const total = (refunded.get(sessionId) ?? 0) + amount;
+      refunded.set(sessionId, total);
+      return {
+        id: `ch_${sessionId}`,
+        amount: session.amount_total ?? 0,
+        amount_refunded: total,
+        payment_intent: session.payment_intent,
+      };
     },
     change(id, fields) {
       const subscription = fake.subscriptions.get(id);
@@ -375,6 +412,19 @@ export async function startFakeStripe(): Promise<FakeStripe> {
           client_reference_id: form.client_reference_id ?? null,
           customer: form.customer,
           subscription: null,
+          payment_status: 'unpaid',
+          payment_intent: null,
+          amount_total:
+            form.mode === 'payment'
+              ? Number(form['line_items[0][price_data][unit_amount]'] ?? 0)
+              : null,
+          currency: form['line_items[0][price_data][currency]'] ?? null,
+          metadata: Object.fromEntries(
+            Object.entries(form)
+              .map(([key, value]) => [/^metadata\[(.+)\]$/.exec(key)?.[1], value] as const)
+              .filter((entry): entry is readonly [string, string] => entry[0] !== undefined),
+          ),
+          created: nowSeconds(),
           form,
         };
         fake.sessions.set(sessionId, session);

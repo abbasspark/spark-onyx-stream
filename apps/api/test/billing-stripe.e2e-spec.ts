@@ -303,6 +303,7 @@ describe.skipIf(!TEST_DATABASE_URL)('Billing with Stripe (e2e)', () => {
         entitled: false,
         access: null,
         trialUsed: false,
+        purchases: [],
       });
 
       const remote = stripe.pay(sessionId);
@@ -316,6 +317,7 @@ describe.skipIf(!TEST_DATABASE_URL)('Billing with Stripe (e2e)', () => {
         entitled: true,
         access: { all: true, packageIds: [] },
         trialUsed: true,
+        purchases: [],
         subscription: {
           plan: { id: plan.id, name: 'Standard' },
           status: 'ACTIVE',
@@ -504,6 +506,7 @@ describe.skipIf(!TEST_DATABASE_URL)('Billing with Stripe (e2e)', () => {
         entitled: false,
         access: null,
         trialUsed: true,
+        purchases: [],
       });
       const refused = await play(movie.slug, anna.cookie).expect(402);
       expect(refused.body.code).toBe('subscription_required');

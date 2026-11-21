@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 import { describe, expect, it } from 'vitest';
 import type { TitleDetail } from '@/api/types';
-import { changedFields, describeContent, toForm } from './catalog';
+import { changedFields, describeContent, priceProblem, toForm } from './catalog';
 
 const title: TitleDetail = {
   id: 't1',
@@ -19,6 +19,9 @@ const title: TitleDetail = {
     { id: 'c1', name: 'Thriller' },
   ],
   packages: [{ id: 'p1', name: 'Films' }],
+  rentAmount: 399,
+  buyAmount: null,
+  purchaseOnly: false,
   asset: null,
   seasonCount: 0,
   episodeCount: 0,
@@ -56,6 +59,28 @@ describe('changedFields', () => {
     });
     expect(changedFields(saved, { ...saved, packageIds: [] })).toEqual({ packageIds: [] });
     expect(changedFields(saved, { ...saved, packageIds: ['p1'] })).toEqual({});
+  });
+
+  it('sends a price that was set, changed or taken away, in the smallest unit', () => {
+    expect(saved.rentPrice).toBe('3.99');
+    expect(saved.buyPrice).toBe('');
+    expect(changedFields(saved, { ...saved, buyPrice: '9,99' })).toEqual({ buyAmount: 999 });
+    expect(changedFields(saved, { ...saved, rentPrice: '4' })).toEqual({ rentAmount: 400 });
+    expect(changedFields(saved, { ...saved, rentPrice: '' })).toEqual({ rentAmount: null });
+    // Written another way, it is the same price.
+    expect(changedFields(saved, { ...saved, rentPrice: ' 3,99 ' })).toEqual({});
+    expect(changedFields(saved, { ...saved, purchaseOnly: true })).toEqual({ purchaseOnly: true });
+  });
+
+  it('names what is wrong with the prices before anything is sent', () => {
+    expect(priceProblem(saved, 'EUR')).toBeNull();
+    expect(priceProblem({ ...saved, rentPrice: 'abc' }, 'EUR')).toMatch(/Write prices as numbers/);
+    expect(changedFields(saved, { ...saved, rentPrice: 'abc' })).toEqual({});
+    const onlyToBuy = { ...saved, isPaid: true, purchaseOnly: true, rentPrice: '' };
+    expect(priceProblem(onlyToBuy, 'EUR')).toMatch(/nobody could watch/);
+    expect(priceProblem({ ...onlyToBuy, buyPrice: '9.99' }, 'EUR')).toBeNull();
+    // A free title sells nothing, so nothing is missing.
+    expect(priceProblem({ ...onlyToBuy, isPaid: false }, 'EUR')).toBeNull();
   });
 
   it('sends only what changed', () => {

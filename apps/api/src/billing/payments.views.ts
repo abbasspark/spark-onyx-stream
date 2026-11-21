@@ -1,10 +1,14 @@
 // SPDX-License-Identifier: AGPL-3.0-only
-import type { Payment, PaymentStatus, SubscriptionSource } from '@onyx/database';
+import type { Payment, PaymentKind, PaymentStatus, SubscriptionSource } from '@onyx/database';
 
 /** A payment as the viewer who made it sees it. */
 export interface ViewerPaymentView {
   id: string;
+  /** What was paid for: a subscription, or renting or buying one title. */
+  kind: PaymentKind;
   planName: string | null;
+  /** The title that was rented or bought. Null for a subscription. */
+  titleName: string | null;
   status: PaymentStatus;
   amount: number;
   refundedAmount: number;
@@ -20,7 +24,9 @@ export interface ViewerPaymentView {
 export function toViewerPaymentView(payment: Payment): ViewerPaymentView {
   return {
     id: payment.id,
+    kind: payment.kind,
     planName: payment.planName,
+    titleName: payment.titleName,
     status: payment.status,
     amount: payment.amount,
     refundedAmount: payment.refundedAmount,
@@ -56,6 +62,20 @@ export type PaymentForAdmin = Payment & {
   recordedBy: { id: string; displayName: string } | null;
 };
 
+/** Where a payment is opened at Stripe: its invoice, or for a single title its payment. */
+function stripeUrl(payment: Payment, livemode: boolean): string | null {
+  if (payment.source !== 'STRIPE') {
+    return null;
+  }
+  const base = `https://dashboard.stripe.com/${livemode ? '' : 'test/'}`;
+  if (payment.kind === 'SUBSCRIPTION') {
+    return payment.externalId ? `${base}invoices/${encodeURIComponent(payment.externalId)}` : null;
+  }
+  return payment.externalPaymentId
+    ? `${base}payments/${encodeURIComponent(payment.externalPaymentId)}`
+    : null;
+}
+
 export function toPaymentAdminView(payment: PaymentForAdmin, livemode: boolean): PaymentAdminView {
   return {
     ...toViewerPaymentView(payment),
@@ -67,10 +87,7 @@ export function toPaymentAdminView(payment: PaymentForAdmin, livemode: boolean):
     netAmount: payment.amount - payment.refundedAmount,
     note: payment.note,
     recordedBy: payment.recordedBy,
-    externalUrl:
-      payment.source === 'STRIPE' && payment.externalId
-        ? `https://dashboard.stripe.com/${livemode ? '' : 'test/'}invoices/${encodeURIComponent(payment.externalId)}`
-        : null,
+    externalUrl: stripeUrl(payment, livemode),
     createdAt: payment.createdAt,
   };
 }
@@ -97,7 +114,9 @@ export interface RevenueMonth {
 }
 
 export interface RevenueByPlan {
+  /** Null for the two rows of single titles: rentals, and purchases. */
   planId: string | null;
+  /** The name of the plan, or "Rentals", "Purchases", or "No plan". */
   planName: string;
   net: number;
   payments: number;

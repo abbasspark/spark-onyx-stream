@@ -9,7 +9,10 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { PrismaClient, type Viewer } from '@onyx/database';
+import { VISIBLE_TITLE } from '../catalog/playable.js';
 import { AppConfig } from '../config/app-config.js';
+import { PurchasesService } from '../purchases/purchases.service.js';
+import type { StartPurchaseInput } from '../purchases/purchases.schemas.js';
 import { StripeClient, StripeError } from '../stripe/stripe.client.js';
 import { StripeSyncService } from '../stripe/stripe-sync.service.js';
 import { idOf } from '../stripe/stripe.types.js';
@@ -30,7 +33,66 @@ export class CheckoutService {
     @Inject(AppConfig) private readonly config: AppConfig,
     @Inject(StripeClient) private readonly stripe: StripeClient,
     @Inject(StripeSyncService) private readonly sync: StripeSyncService,
+    @Inject(PurchasesService) private readonly purchases: PurchasesService,
   ) {}
+
+  /**
+   * Opens the payment page for renting or buying one title.
+   *
+   * @returns The address to send the viewer to.
+   * @throws NotFoundException when the title is not on the site.
+   * @throws BadRequestException when the title is not rented or not sold.
+   * @throws ConflictException when the viewer has the title already.
+   * @throws BadGatewayException when Stripe refuses or cannot be reached.
+   */
+  async startPurchase(viewer: Viewer, input: StartPurchaseInput): Promise<{ url: string }> {
+    const title = await this.prisma.title.findFirst({
+      where: { id: input.titleId, ...VISIBLE_TITLE },
+      select: { id: true, slug: true, name: true, access: true, rentAmount: true, buyAmount: true },
+    });
+    if (!title) {
+      throw new NotFoundException('Title not found');
+    }
+    const amount = input.kind === 'RENT' ? title.rentAmount : title.buyAmount;
+    if (title.access !== 'PAID' || amount === null) {
+      throw new BadRequestException(
+        input.kind === 'RENT' ? 'This title is not for rent' : 'This title is not for sale',
+      );
+    }
+    await this.purchases.assertNotOwned(viewer.id, title.id, input.kind);
+
+    const page = `${this.config.siteUrl}/title/${title.slug}`;
+    const hours = this.config.rental.watchHours;
+    return this.withStripe('open the payment page', async () => {
+      const [customerId, productId] = await Promise.all([
+        this.customerOf(viewer),
+        // Named for what is sold, as the payment page and the receipt show it.
+        this.stripe.ensureProduct(
+          {
+            id: title.id,
+            name:
+              input.kind === 'RENT' ? `${title.name} (rental, ${hours} hours)` : `${title.name}`,
+          },
+          input.kind === 'RENT' ? 'r_' : 'b_',
+        ),
+      ]);
+      const session = await this.stripe.createPaymentCheckout({
+        customerId,
+        viewerId: viewer.id,
+        titleId: title.id,
+        kind: input.kind,
+        productId,
+        currency: this.config.billingCurrency,
+        amount,
+        successUrl: `${page}?paid={CHECKOUT_SESSION_ID}`,
+        cancelUrl: page,
+      });
+      if (!session.url) {
+        throw new StripeError('Stripe returned no address for the payment page', 502, null, null);
+      }
+      return { url: session.url };
+    });
+  }
 
   /**
    * Opens the payment page for a plan.
@@ -98,8 +160,8 @@ export class CheckoutService {
   }
 
   /**
-   * Records the subscription of a payment the viewer just returned from, in
-   * case Stripe's own message about it has not arrived yet.
+   * Records what a payment the viewer just returned from bought, a
+   * subscription or a title, in case Stripe's own message has not arrived yet.
    *
    * @throws NotFoundException when the payment is not this viewer's.
    */
@@ -115,6 +177,11 @@ export class CheckoutService {
         });
       if (!session || session.client_reference_id !== viewer.id) {
         throw new NotFoundException('This payment was not found');
+      }
+      if (session.mode === 'payment') {
+        // A title was rented or bought.
+        await this.sync.recordPurchase(session);
+        return;
       }
       const subscriptionId = idOf(session.subscription);
       if (session.status === 'complete' && subscriptionId) {

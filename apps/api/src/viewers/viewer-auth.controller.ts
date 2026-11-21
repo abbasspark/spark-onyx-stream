@@ -44,6 +44,7 @@ import { toViewerView, type ViewerSessionView, type ViewerView } from './viewer.
 import type { ViewerAccess } from '../billing/entitlement.js';
 import { CurrentViewer, ViewerOnly } from './viewer-auth.guard.js';
 import {
+  type OwnedTitleRef,
   type ViewerAccessConfig,
   ViewerAuthService,
   type ViewerSignIn,
@@ -102,14 +103,16 @@ export class ViewerAuthController {
     profile: ProfileView | null;
     entitled: boolean;
     access: ViewerAccess;
+    purchases: OwnedTitleRef[];
   }> {
     const identity = await this.viewerSessions.identify(request);
     if (!identity) {
-      return { viewer: null, profile: null, entitled: false, access: null };
+      return { viewer: null, profile: null, entitled: false, access: null, purchases: [] };
     }
-    const [profile, access] = await Promise.all([
+    const [profile, access, purchases] = await Promise.all([
       this.profiles.current(identity),
       this.auth.subscriptionAccess(identity.viewer.id),
+      this.auth.ownedTitles(identity.viewer.id),
     ]);
     const entitled = access !== null;
     return {
@@ -119,6 +122,8 @@ export class ViewerAuthController {
       // Whether the viewer has a running subscription, and which paid titles it opens.
       entitled,
       access,
+      // Titles rented or bought, which are open whatever the plan.
+      purchases,
     };
   }
 

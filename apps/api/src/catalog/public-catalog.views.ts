@@ -42,6 +42,14 @@ export interface PublicTitleCard {
    * opens everything or names one of them. Empty for a free title.
    */
   packageIds: string[];
+  /**
+   * What renting and buying a paid title cost, in the smallest unit of the
+   * site's currency. Null when not on offer.
+   */
+  rentAmount: number | null;
+  buyAmount: number | null;
+  /** True when no subscription opens the title: it is rented or bought only. */
+  purchaseOnly: boolean;
   poster: PublicImage | null;
   backdrop: PublicImage | null;
   logo: PublicImage | null;
@@ -110,6 +118,9 @@ export interface CardRecord {
   isFeatured: boolean;
   access: TitleAccess;
   packages: { packageId: string }[];
+  rentAmount: number | null;
+  buyAmount: number | null;
+  purchaseOnly: boolean;
   publishedAt: Date | null;
   poster: Image | null;
   backdrop: Image | null;
@@ -147,6 +158,9 @@ export function toPublicCard(title: CardRecord, mediaBaseUrl: string): PublicTit
     isFeatured: title.isFeatured,
     access: title.access,
     packageIds: title.access === 'PAID' ? title.packages.map((link) => link.packageId).sort() : [],
+    rentAmount: title.access === 'PAID' ? title.rentAmount : null,
+    buyAmount: title.access === 'PAID' ? title.buyAmount : null,
+    purchaseOnly: title.access === 'PAID' && title.purchaseOnly,
     poster: toPublicImage(title.poster, mediaBaseUrl),
     backdrop: toPublicImage(title.backdrop, mediaBaseUrl),
     logo: toPublicImage(title.logo, mediaBaseUrl),

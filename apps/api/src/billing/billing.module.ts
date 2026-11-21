@@ -11,6 +11,11 @@ import { PackagesController } from './packages.controller.js';
 import { PackagesService } from './packages.service.js';
 import { PaymentsService } from './payments.service.js';
 import { PlansService } from './plans.service.js';
+import {
+  PurchasesAdminController,
+  ViewerPurchasesController,
+} from '../purchases/purchases.controller.js';
+import { PurchasesService } from '../purchases/purchases.service.js';
 import { SubscriptionsService } from './subscriptions.service.js';
 
 /**
@@ -27,6 +32,8 @@ import { SubscriptionsService } from './subscriptions.service.js';
     ViewerPaymentsController,
     PaymentsAdminController,
     PackagesController,
+    ViewerPurchasesController,
+    PurchasesAdminController,
   ],
   providers: [
     PlansService,
@@ -35,7 +42,8 @@ import { SubscriptionsService } from './subscriptions.service.js';
     StripeWebhookService,
     PaymentsService,
     PackagesService,
+    PurchasesService,
   ],
-  exports: [SubscriptionsService],
+  exports: [SubscriptionsService, PurchasesService],
 })
 export class BillingModule {}

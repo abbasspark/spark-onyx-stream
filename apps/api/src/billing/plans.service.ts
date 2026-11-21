@@ -37,6 +37,7 @@ export class PlansService {
       currency: this.config.billingCurrency,
       checkout: this.config.stripe !== null,
       contactUrl: this.config.billingContactUrl || null,
+      rental: this.config.rental,
       plans: plans.map(toPublicPlan),
     };
   }

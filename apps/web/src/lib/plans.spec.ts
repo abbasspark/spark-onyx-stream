@@ -1,7 +1,13 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 import {
   bestYearlySaving,
+  canWatch,
   describeEnd,
+  describeOwned,
+  describeRentalTerms,
+  ownedTitle,
+  subscribable,
+  timeLeft,
   describeOpens,
   listNames,
   opensFrom,
@@ -147,6 +153,69 @@ describe('what a subscription opens', () => {
     ).toBe('Kids, Sports and Films');
     expect(listNames(['Kids', 'Sports'])).toBe('Kids and Sports');
     expect(listNames(['Kids'])).toBe('Kids');
+  });
+});
+
+describe('renting and buying', () => {
+  const NOW = new Date('2026-11-21T12:00:00Z');
+  const inHours = (hours: number) => new Date(NOW.getTime() + hours * 3_600_000).toISOString();
+  const film = { id: 't1', access: 'PAID' as const, rentAmount: 399, buyAmount: 999 };
+  const rented = (hours: number, started = false) => ({
+    titleId: 't1',
+    kind: 'RENT' as const,
+    expiresAt: inHours(hours),
+    started,
+  });
+  const bought = { titleId: 't1', kind: 'BUY' as const, expiresAt: null, started: false };
+
+  it('finds what the viewer has of a title, while it lasts', () => {
+    expect(ownedTitle([rented(5)], 't1', NOW)?.kind).toBe('RENT');
+    expect(ownedTitle([rented(-1)], 't1', NOW)).toBeNull();
+    expect(ownedTitle([bought], 't1', NOW)?.kind).toBe('BUY');
+    expect(ownedTitle([bought], 't2', NOW)).toBeNull();
+  });
+
+  it('opens a title that is rented or bought, with or without a plan', () => {
+    expect(canWatch(film, null, [], NOW)).toBe(false);
+    expect(canWatch(film, null, [rented(5)], NOW)).toBe(true);
+    expect(canWatch(film, null, [rented(-1)], NOW)).toBe(false);
+    expect(canWatch(film, { all: true, packageIds: [] }, [], NOW)).toBe(true);
+    expect(canWatch({ id: 't1', access: 'FREE' }, null, [], NOW)).toBe(true);
+  });
+
+  it('keeps a title for buyers closed to every plan', () => {
+    const premiere = { ...film, purchaseOnly: true };
+    const everything = { all: true, packageIds: [] };
+    expect(canWatch(premiere, everything, [], NOW)).toBe(false);
+    expect(canWatch(premiere, everything, [bought], NOW)).toBe(true);
+    expect(subscribable(premiere, [{ includesAll: true } as never])).toBe(false);
+    expect(subscribable(film, [{ includesAll: true } as never])).toBe(true);
+    expect(subscribable(film, [])).toBe(false);
+  });
+
+  it('says how much time is left', () => {
+    expect(timeLeft(inHours(24 * 29.99), NOW)).toBe('30 days');
+    expect(timeLeft(inHours(24 * 3.2), NOW)).toBe('4 days');
+    expect(timeLeft(inHours(48), NOW)).toBe('48 hours');
+    expect(timeLeft(inHours(47.9), NOW)).toBe('48 hours');
+    expect(timeLeft(inHours(1.5), NOW)).toBe('2 hours');
+    expect(timeLeft(inHours(1), NOW)).toBe('60 minutes');
+    expect(timeLeft(inHours(0.5), NOW)).toBe('30 minutes');
+    expect(timeLeft(inHours(0.001), NOW)).toBe('1 minute');
+  });
+
+  it('describes what the viewer has', () => {
+    expect(describeOwned(bought, NOW)).toBe('You bought this title.');
+    expect(describeOwned(rented(24 * 30), NOW)).toBe(
+      'Rented. Start within 30 days. Once you press play, the time to finish it runs.',
+    );
+    expect(describeOwned(rented(40, true), NOW)).toBe('Rented. 40 hours left to watch.');
+    expect(describeRentalTerms({ startDays: 30, watchHours: 48 })).toBe(
+      '30 days to start, then 48 hours to finish.',
+    );
+    expect(describeRentalTerms({ startDays: 1, watchHours: 1 })).toBe(
+      '1 day to start, then 1 hour to finish.',
+    );
   });
 });
 

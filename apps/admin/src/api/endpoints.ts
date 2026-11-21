@@ -22,6 +22,7 @@ import type {
   EncodingProfileInput,
   Episode,
   EpisodeInput,
+  GrantPurchaseInput,
   GrantSubscriptionInput,
   ImageKind,
   ImportResult,
@@ -43,6 +44,7 @@ import type {
   PlanInput,
   Playback,
   PublishStatus,
+  Purchase,
   RecordPaymentInput,
   ReprocessInput,
   RevenueReport,
@@ -197,6 +199,18 @@ export const packagesApi = {
   /** Puts titles into a package and takes titles out of it. */
   changeTitles: (id: string, body: { add?: string[]; remove?: string[] }) =>
     request<Package>(`/v1/packages/${id}/titles`, { method: 'PUT', body }),
+};
+
+export const purchasesApi = {
+  ofViewer: (viewerId: string, signal?: AbortSignal) =>
+    request<{ items: Purchase[] }>(`/v1/viewers/${viewerId}/purchases`, { signal }),
+  /** Gives a viewer a title by hand. */
+  grant: (viewerId: string, body: GrantPurchaseInput) =>
+    request<Purchase>(`/v1/viewers/${viewerId}/purchases`, { method: 'POST', body }),
+  revoke: (id: string) => request<Purchase>(`/v1/purchases/${id}/revoke`, { method: 'POST' }),
+  /** The currency of all prices, which is public. For those who set prices without billing rights. */
+  currency: async (signal?: AbortSignal) =>
+    (await request<{ currency: string }>('/v1/catalog/plans', { signal })).currency,
 };
 
 export const paymentsApi = {

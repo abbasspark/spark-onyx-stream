@@ -45,7 +45,9 @@ type Loaded =
   /** The title needs a subscription and the viewer has none. */
   | { state: 'subscribe' }
   /** Subscribed, to a plan that does not open this title. */
-  | { state: 'other-plan' };
+  | { state: 'other-plan' }
+  /** A title no plan opens: it is rented or bought. */
+  | { state: 'purchase' };
 
 /** Explains a refused playback request in the viewer's terms. */
 function refusal(status: number): { message: string; retry: boolean } {
@@ -124,7 +126,14 @@ export function WatchScreen({
         }
         if (response.status === 402) {
           const body = (await response.json().catch(() => null)) as { code?: string } | null;
-          setLoaded({ state: body?.code === 'plan_required' ? 'other-plan' : 'subscribe' });
+          setLoaded({
+            state:
+              body?.code === 'plan_required'
+                ? 'other-plan'
+                : body?.code === 'purchase_required'
+                  ? 'purchase'
+                  : 'subscribe',
+          });
           return;
         }
         if (response.status === 403) {
@@ -289,6 +298,30 @@ export function WatchScreen({
     );
   }
 
+  if (loaded.state === 'purchase') {
+    return (
+      <div className="flex h-dvh flex-col items-center justify-center gap-6 bg-onyx px-6 text-center">
+        <Lock className="size-8 text-sard" aria-hidden="true" />
+        <h1 className="display max-w-xl text-3xl sm:text-4xl">Rent or buy {heading}</h1>
+        <p className="max-w-md text-smoke">
+          This title is not part of a subscription. Its page shows what renting and buying cost.
+        </p>
+        <div className="flex flex-wrap justify-center gap-3">
+          <Link href={backHref} className="button button-play">
+            See the ways to watch
+          </Link>
+          <button
+            type="button"
+            className="button button-quiet"
+            onClick={() => setAttempt((value) => value + 1)}
+          >
+            <RotateCcw />I have it, play
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   if (loaded.state === 'other-plan') {
     return (
       <div className="flex h-dvh flex-col items-center justify-center gap-6 bg-onyx px-6 text-center">
@@ -296,7 +329,8 @@ export function WatchScreen({
         <h1 className="display max-w-xl text-3xl sm:text-4xl">{heading} is not in your plan</h1>
         <p className="max-w-md text-smoke">
           Your subscription opens other titles. The page of plans shows which plan includes this
-          one. To change, cancel your plan on your account page and choose the other.
+          one. To change, cancel your plan on your account page and choose the other. The page of
+          the title says whether it can be rented or bought instead.
         </p>
         <div className="flex flex-wrap justify-center gap-3">
           <Link href="/plans" className="button button-play">
@@ -310,7 +344,7 @@ export function WatchScreen({
           href={backHref}
           className="text-sm text-smoke underline underline-offset-4 hover:text-vein"
         >
-          Back to {heading}
+          All ways to watch {heading}
         </Link>
       </div>
     );
@@ -323,8 +357,8 @@ export function WatchScreen({
         <Lock className="size-8 text-sard" aria-hidden="true" />
         <h1 className="display max-w-xl text-3xl sm:text-4xl">Subscribe to watch {heading}</h1>
         <p className="max-w-md text-smoke">
-          This title is for subscribers. A plan opens it together with everything else that needs
-          one.
+          This title is for subscribers. The page of the title says whether it can also be rented or
+          bought on its own.
         </p>
         <div className="flex flex-wrap justify-center gap-3">
           <Link href={`/plans?next=${encodeURIComponent(here)}`} className="button button-play">
@@ -342,7 +376,7 @@ export function WatchScreen({
           href={backHref}
           className="text-sm text-smoke underline underline-offset-4 hover:text-vein"
         >
-          Back to {heading}
+          All ways to watch {heading}
         </Link>
       </div>
     );

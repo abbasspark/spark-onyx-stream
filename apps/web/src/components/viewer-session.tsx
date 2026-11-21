@@ -13,7 +13,7 @@ import {
 } from 'react';
 import type { Profile } from '@/lib/profiles';
 import { type AccessConfig, type Viewer, viewerApi } from '@/lib/viewer-api';
-import { type Opens, opensFrom } from '@/lib/plans';
+import { type Opens, opensFrom, type OwnedTitle } from '@/lib/plans';
 import { endSync, restartSync, startSync } from '@/lib/watch-sync';
 
 interface ViewerSession {
@@ -30,7 +30,13 @@ interface ViewerSession {
   /** Which paid titles the subscription opens: all, or those of some packages. Null without one. */
   opens: Opens;
   /** Takes over what the API said about the subscription, after paying for one. */
-  setSubscription: (result: { entitled: boolean; access?: Opens }) => void;
+  setSubscription: (result: {
+    entitled: boolean;
+    access?: Opens;
+    purchases?: OwnedTitle[];
+  }) => void;
+  /** Titles the viewer rented or bought and can watch now. */
+  purchases: OwnedTitle[];
   /** What is open on this site. Null while loading, or when it could not be asked. */
   access: AccessConfig | null;
   /**
@@ -60,8 +66,15 @@ export function ViewerSessionProvider({ children }: { children: ReactNode }) {
   const [profile, setProfileState] = useState<Profile | null>(null);
   const [opens, setOpens] = useState<Opens>(null);
   const entitled = opens !== null;
+  const [purchases, setPurchases] = useState<OwnedTitle[]>([]);
   const setSubscription = useCallback(
-    (result: { entitled: boolean; access?: Opens }) => setOpens(opensFrom(result)),
+    (result: { entitled: boolean; access?: Opens; purchases?: OwnedTitle[] }) => {
+      setOpens(opensFrom(result));
+      // An answer that does not name them leaves what is known.
+      if (result.purchases) {
+        setPurchases(result.purchases);
+      }
+    },
     [],
   );
   const [access, setAccess] = useState<AccessConfig | null>(null);
@@ -76,6 +89,7 @@ export function ViewerSessionProvider({ children }: { children: ReactNode }) {
     setViewerState(known.viewer);
     setProfileState(known.profile);
     setOpens(opensFrom({ entitled: known.entitled === true, access: known.access }));
+    setPurchases(known.purchases ?? []);
     if (me.status === 'fulfilled') {
       const before = signedInAs.current;
       signedInAs.current = known.viewer
@@ -134,6 +148,7 @@ export function ViewerSessionProvider({ children }: { children: ReactNode }) {
       if (!next) {
         setProfileState(null);
         setOpens(null);
+        setPurchases([]);
       } else if (nextProfile) {
         setProfileState(nextProfile);
       }
@@ -169,6 +184,7 @@ export function ViewerSessionProvider({ children }: { children: ReactNode }) {
       setViewerState(null);
       setProfileState(null);
       setOpens(null);
+      setPurchases([]);
       announce();
     }
   }, []);
@@ -180,6 +196,7 @@ export function ViewerSessionProvider({ children }: { children: ReactNode }) {
       profile,
       entitled,
       opens,
+      purchases,
       setSubscription,
       access,
       setViewer,
@@ -193,6 +210,7 @@ export function ViewerSessionProvider({ children }: { children: ReactNode }) {
       profile,
       entitled,
       opens,
+      purchases,
       setSubscription,
       access,
       setViewer,

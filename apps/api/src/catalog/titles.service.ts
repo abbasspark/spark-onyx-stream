@@ -158,6 +158,20 @@ export class TitlesService {
       }
     }
 
+    const after = { ...current, ...fields };
+    if (after.purchaseOnly && after.rentAmount === null && after.buyAmount === null) {
+      throw new BadRequestException({
+        statusCode: 400,
+        error: 'Bad Request',
+        message: 'Validation failed',
+        issues: [
+          {
+            field: 'purchaseOnly',
+            message: 'Set a price for renting or buying, or nobody could watch the title',
+          },
+        ],
+      });
+    }
     if (packageIds) {
       const found = await this.prisma.package.count({ where: { id: { in: packageIds } } });
       if (found !== new Set(packageIds).size) {

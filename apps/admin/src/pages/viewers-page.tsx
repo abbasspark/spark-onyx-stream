@@ -70,6 +70,7 @@ import {
   Tooltip,
 } from '@/components/ui/overlay';
 import { ViewerPayments } from '@/components/viewer-payments';
+import { ViewerPurchases } from '@/components/viewer-purchases';
 import { ViewerSubscription } from '@/components/viewer-subscription';
 import { useAddressParams } from '@/lib/address-params';
 import { cn } from '@/lib/cn';
@@ -1001,6 +1002,7 @@ function DetailSheet({
             {shown ? (
               <ViewerSubscription viewerId={shown.id} viewerName={shown.displayName} />
             ) : null}
+            {shown ? <ViewerPurchases viewerId={shown.id} viewerName={shown.displayName} /> : null}
             {shown ? <ViewerPayments viewerId={shown.id} viewerName={shown.displayName} /> : null}
 
             {detail.data ? (

@@ -7,7 +7,8 @@ import { Facts } from '@/components/facts';
 import { PosterCard } from '@/components/poster-card';
 import { TitleActions } from '@/components/title-actions';
 import { StripRow } from '@/components/title-row';
-import { getTitle, getTitles } from '@/lib/api';
+import { getPlans, getTitle, getTitles } from '@/lib/api';
+import { DEFAULT_RENTAL, NO_PLANS, subscribable } from '@/lib/plans';
 import { absoluteUrl, siteConfig } from '@/lib/config';
 import { isoDuration, truncate } from '@/lib/format';
 import type { TitleCard, TitleDetail } from '@/lib/types';
@@ -92,7 +93,18 @@ export default async function TitlePage({ params }: TitlePageProps) {
   if (!title) {
     notFound();
   }
-  const related = await loadRelated(title);
+  // A free title needs no offer, and the page must not fail because the plans could not be read.
+  const [related, plans] = await Promise.all([
+    loadRelated(title),
+    title.access === 'PAID' ? getPlans().catch(() => NO_PLANS) : NO_PLANS,
+  ]);
+  const offer = {
+    currency: plans.currency,
+    checkout: plans.checkout,
+    contactUrl: plans.contactUrl,
+    rental: plans.rental ?? DEFAULT_RENTAL,
+    subscribable: subscribable(title, plans.plans),
+  };
   const firstCategory = title.categories[0];
 
   return (
@@ -138,7 +150,7 @@ export default async function TitlePage({ params }: TitlePageProps) {
             )}
             <Facts title={title} className="mt-5 text-vein/85" />
             <div className="mt-7">
-              <TitleActions title={title} />
+              <TitleActions title={title} offer={offer} />
             </div>
           </div>
         </div>

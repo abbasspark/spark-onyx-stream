@@ -23,7 +23,7 @@ import { type FormEvent, useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router';
 import { toast } from 'sonner';
 import { ApiError, apiUrl } from '@/api/client';
-import { categoriesApi, packagesApi, titlesApi } from '@/api/endpoints';
+import { categoriesApi, packagesApi, purchasesApi, titlesApi } from '@/api/endpoints';
 import type { PublishStatus, TitleDetail, UpdateTitleInput } from '@/api/types';
 import { useSession } from '@/auth/session';
 import { useConfirm } from '@/components/confirm';
@@ -55,7 +55,14 @@ import {
   DropdownMenuTrigger,
   Tooltip,
 } from '@/components/ui/overlay';
-import { changedFields, describeContent, type DetailsForm, toForm } from '@/lib/catalog';
+import {
+  changedFields,
+  describeContent,
+  type DetailsForm,
+  priceProblem,
+  toForm,
+} from '@/lib/catalog';
+import { parsePrice } from '@/lib/billing';
 import { cn } from '@/lib/cn';
 import { formatDateTime, formatRelative } from '@/lib/format';
 import { announceImport } from '@/lib/metadata-toast';
@@ -494,7 +501,14 @@ interface DetailsTabProps {
 
 /** The texts and categories of a title, saved together with one button. */
 function DetailsTab({ title, disabled, save }: DetailsTabProps) {
-  const saved = useMemo(() => toForm(title), [title]);
+  // The currency of all prices. It is public, so editors without billing rights learn it too.
+  const currencyQuery = useQuery({
+    queryKey: ['billing', 'currency'],
+    queryFn: ({ signal }) => purchasesApi.currency(signal),
+    staleTime: 300_000,
+  });
+  const currency = currencyQuery.data ?? 'EUR';
+  const saved = useMemo(() => toForm(title, currency), [title, currency]);
   const [form, setForm] = useState(saved);
   const set = <Key extends keyof DetailsForm>(key: Key, value: DetailsForm[Key]) =>
     setForm((current) => ({ ...current, [key]: value }));
@@ -509,8 +523,9 @@ function DetailsTab({ title, disabled, save }: DetailsTabProps) {
     queryFn: ({ signal }) => categoriesApi.list(signal),
   });
 
-  const changes = changedFields(saved, form);
+  const changes = changedFields(saved, form, currency);
   const dirty = Object.keys(changes).length > 0;
+  const pricesWrong = priceProblem(form, currency);
 
   // What was saved elsewhere (another admin, another tab) shows up unless there are unsaved edits.
   useEffect(() => {
@@ -537,6 +552,10 @@ function DetailsTab({ title, disabled, save }: DetailsTabProps) {
 
   const onSubmit = (event: FormEvent) => {
     event.preventDefault();
+    if (pricesWrong) {
+      toast.error(pricesWrong);
+      return;
+    }
     submit.mutate();
   };
 
@@ -712,13 +731,64 @@ function DetailsTab({ title, disabled, save }: DetailsTabProps) {
             onCheckedChange={(checked) => set('isFeatured', checked)}
           />
           <ToggleRow
-            label="Needs a subscription"
-            description="On, only viewers with a running subscription can watch. The trailer stays open to everyone. Off, the title is as open as the installation is."
+            label="Paid title"
+            description="On, watching needs a subscription that includes the title, or renting or buying it. The trailer stays open to everyone. Off, the title is as open as the installation is."
             checked={form.isPaid}
             disabled={disabled}
             onCheckedChange={(checked) => set('isPaid', checked)}
           />
-          {form.isPaid && packages.data && packages.data.length > 0 ? (
+          {form.isPaid ? (
+            <div className="rounded-lg border p-4">
+              <p className="text-sm font-medium">Rent or buy</p>
+              <p className="mt-0.5 mb-3 text-xs text-muted-foreground">
+                Lets a viewer pay for this title alone, with or without a subscription. Leave a
+                price empty to not offer it that way.
+              </p>
+              <div className="grid max-w-md gap-4 sm:grid-cols-2">
+                <Field label={`Rent (${currency})`}>
+                  {(id) => (
+                    <Input
+                      id={id}
+                      inputMode="decimal"
+                      placeholder="Not for rent"
+                      disabled={disabled}
+                      aria-invalid={parsePrice(form.rentPrice, currency) === 'invalid'}
+                      value={form.rentPrice}
+                      onChange={(event) => set('rentPrice', event.target.value)}
+                    />
+                  )}
+                </Field>
+                <Field label={`Buy (${currency})`}>
+                  {(id) => (
+                    <Input
+                      id={id}
+                      inputMode="decimal"
+                      placeholder="Not for sale"
+                      disabled={disabled}
+                      aria-invalid={parsePrice(form.buyPrice, currency) === 'invalid'}
+                      value={form.buyPrice}
+                      onChange={(event) => set('buyPrice', event.target.value)}
+                    />
+                  )}
+                </Field>
+              </div>
+              <div className="mt-4">
+                <ToggleRow
+                  label="Not part of any subscription"
+                  description="On, no plan opens this title: it is watched by renting or buying only. For a premiere, for example."
+                  checked={form.purchaseOnly}
+                  disabled={disabled}
+                  onCheckedChange={(checked) => set('purchaseOnly', checked)}
+                />
+              </div>
+              {pricesWrong ? (
+                <p role="alert" className="mt-3 text-sm text-destructive">
+                  {pricesWrong}
+                </p>
+              ) : null}
+            </div>
+          ) : null}
+          {form.isPaid && !form.purchaseOnly && packages.data && packages.data.length > 0 ? (
             <div className="rounded-lg border p-4">
               <div className="flex flex-wrap items-baseline justify-between gap-2">
                 <p className="text-sm font-medium">Packages</p>

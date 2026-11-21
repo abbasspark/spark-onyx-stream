@@ -1,12 +1,15 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 import { Inject, Injectable, Logger } from '@nestjs/common';
-import { type Payment, PrismaClient, type Subscription } from '@onyx/database';
+import { type Payment, PrismaClient, type Purchase, type Subscription } from '@onyx/database';
 import { isUniqueViolation } from '../common/prisma-errors.js';
+import { AppConfig } from '../config/app-config.js';
+import { rentalDeadline } from '../purchases/purchase-rules.js';
 import { StripeClient, StripeError } from './stripe.client.js';
 import { mapInvoice, mapSubscription, refundState } from './stripe.mapper.js';
 import {
   idOf,
   type StripeCharge,
+  type StripeCheckoutSession,
   type StripeInvoice,
   type StripeSubscription,
 } from './stripe.types.js';
@@ -35,6 +38,7 @@ export class StripeSyncService {
   constructor(
     @Inject(PrismaClient) private readonly prisma: PrismaClient,
     @Inject(StripeClient) private readonly stripe: StripeClient,
+    @Inject(AppConfig) private readonly config: AppConfig,
   ) {}
 
   /**
@@ -124,7 +128,9 @@ export class StripeSyncService {
   /** Writes the payment of an invoice into the books, once. */
   async recordInvoice(invoice: StripeInvoice): Promise<Payment | null> {
     const paid = mapInvoice(invoice);
-    if (!paid) {
+    // An invoice for no subscription is none of this site's: a title that is
+    // rented or bought is recorded from its checkout, and would be counted twice.
+    if (!paid || !paid.subscriptionExternalId) {
       return null;
     }
     let subscription = paid.subscriptionExternalId
@@ -212,13 +218,108 @@ export class StripeSyncService {
         return null;
       }
     }
-    return this.prisma.payment.update({
+    const updated = await this.prisma.payment.update({
       where: { id: payment.id },
       data: {
         ...refundState(payment.amount, charge.amount_refunded),
         externalPaymentId: paymentId,
       },
     });
+    if (updated.status === 'REFUNDED' && updated.kind !== 'SUBSCRIPTION') {
+      // All the money for a title went back, so the title goes back too.
+      await this.prisma.purchase.updateMany({
+        where: { paymentId: updated.id, status: 'ACTIVE' },
+        data: { status: 'REVOKED' },
+      });
+    }
+    return updated;
+  }
+
+  /**
+   * Reads a checkout from Stripe and records what it bought: a title, rented or bought.
+   *
+   * @returns The purchase, or null when the checkout is not paid or is not for a title.
+   * @throws StripeError
+   */
+  async recordPurchaseById(sessionId: string): Promise<Purchase | null> {
+    return this.recordPurchase(await this.stripe.retrieveCheckoutSession(sessionId));
+  }
+
+  /** Records the title a paid checkout rented or bought, once, with its payment. */
+  async recordPurchase(session: StripeCheckoutSession): Promise<Purchase | null> {
+    const kind = session.metadata?.kind;
+    const titleId = session.metadata?.titleId;
+    const viewerId = session.metadata?.viewerId ?? session.client_reference_id;
+    if (
+      session.mode !== 'payment' ||
+      session.payment_status !== 'paid' ||
+      (kind !== 'RENT' && kind !== 'BUY') ||
+      !titleId ||
+      !viewerId ||
+      !UUID.test(titleId) ||
+      !UUID.test(viewerId)
+    ) {
+      return null;
+    }
+    const known = await this.prisma.purchase.findUnique({ where: { externalId: session.id } });
+    if (known) {
+      return known;
+    }
+    const [viewer, title] = await Promise.all([
+      this.prisma.viewer.findUnique({ where: { id: viewerId } }),
+      this.prisma.title.findUnique({ where: { id: titleId }, select: { id: true, name: true } }),
+    ]);
+    if (!viewer || !title) {
+      this.logger.warn(`Stripe checkout ${session.id} is for a viewer or a title that is gone`);
+      return null;
+    }
+
+    const paidAt = session.created ? new Date(session.created * 1000) : new Date();
+    const amount = session.amount_total ?? 0;
+    const tax = session.total_details?.amount_tax ?? 0;
+    try {
+      return await this.prisma.$transaction(async (tx) => {
+        const payment =
+          amount > 0
+            ? await tx.payment.create({
+                data: {
+                  viewerId: viewer.id,
+                  viewerEmail: viewer.email,
+                  kind: kind === 'RENT' ? 'RENTAL' : 'PURCHASE',
+                  titleId: title.id,
+                  titleName: title.name,
+                  source: 'STRIPE',
+                  amount,
+                  taxAmount: Math.max(0, Math.min(tax, amount)),
+                  currency: (session.currency ?? this.config.billingCurrency).toUpperCase(),
+                  paidAt,
+                  // A checkout that sells something once has no invoice. Its own id stands in.
+                  externalId: session.id,
+                  externalPaymentId: idOf(session.payment_intent),
+                },
+              })
+            : null;
+        return tx.purchase.create({
+          data: {
+            viewerId: viewer.id,
+            titleId: title.id,
+            kind,
+            source: 'STRIPE',
+            createdAt: paidAt,
+            expiresAt:
+              kind === 'RENT' ? rentalDeadline(paidAt, this.config.rental.startDays) : null,
+            paymentId: payment?.id ?? null,
+            externalId: session.id,
+          },
+        });
+      });
+    } catch (error) {
+      // The message from Stripe and the viewer's return can record it at the same moment.
+      if (isUniqueViolation(error)) {
+        return this.prisma.purchase.findUnique({ where: { externalId: session.id } });
+      }
+      throw error;
+    }
   }
 
   /**

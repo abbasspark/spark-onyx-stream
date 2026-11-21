@@ -55,6 +55,18 @@ export interface CheckoutParams {
   cancelUrl: string;
 }
 
+export interface PaymentCheckoutParams {
+  customerId: string;
+  viewerId: string;
+  titleId: string;
+  kind: 'RENT' | 'BUY';
+  productId: string;
+  currency: string;
+  amount: number;
+  successUrl: string;
+  cancelUrl: string;
+}
+
 /** Talks to Stripe. Knows its addresses and its errors, nothing of viewers or plans. */
 @Injectable()
 export class StripeClient {
@@ -99,9 +111,16 @@ export class StripeClient {
    * returns the product's id. The id is derived from the plan, so nothing has
    * to be stored and a product is never made twice.
    */
-  async ensureProduct(plan: { id: string; name: string }): Promise<string> {
-    const id = `onyx_${plan.id.replace(/-/g, '')}`;
-    const fields = { name: plan.name, metadata: { planId: plan.id } };
+  async ensureProduct(
+    plan: { id: string; name: string },
+    /** Tells products of other kinds apart: "r_" for renting a title, "b_" for buying it. */
+    prefix = '',
+  ): Promise<string> {
+    const id = `onyx_${prefix}${plan.id.replace(/-/g, '')}`;
+    const fields = {
+      name: plan.name,
+      metadata: prefix ? { titleId: plan.id } : { planId: plan.id },
+    };
     try {
       await this.request('POST', `/v1/products/${id}`, fields);
     } catch (error) {
@@ -148,6 +167,35 @@ export class StripeClient {
         ...(params.trialDays > 0 ? { trial_period_days: params.trialDays } : {}),
       },
       metadata: { viewerId: params.viewerId, planId: params.planId },
+      ...(tax ? { automatic_tax: { enabled: true }, customer_update: { address: 'auto' } } : {}),
+    });
+  }
+
+  /** Opens Stripe's payment page for renting or buying one title: a single payment. */
+  createPaymentCheckout(params: PaymentCheckoutParams): Promise<StripeCheckoutSession> {
+    const tax = this.setup().automaticTax;
+    const metadata = { viewerId: params.viewerId, titleId: params.titleId, kind: params.kind };
+    return this.request<StripeCheckoutSession>('POST', '/v1/checkout/sessions', {
+      mode: 'payment',
+      customer: params.customerId,
+      client_reference_id: params.viewerId,
+      success_url: params.successUrl,
+      cancel_url: params.cancelUrl,
+      allow_promotion_codes: true,
+      line_items: [
+        {
+          quantity: 1,
+          price_data: {
+            currency: params.currency.toLowerCase(),
+            product: params.productId,
+            unit_amount: params.amount,
+            ...(tax ? { tax_behavior: 'inclusive' } : {}),
+          },
+        },
+      ],
+      metadata,
+      // On the payment too, so it can be told in Stripe what a charge was for.
+      payment_intent_data: { metadata },
       ...(tax ? { automatic_tax: { enabled: true }, customer_update: { address: 'auto' } } : {}),
     });
   }

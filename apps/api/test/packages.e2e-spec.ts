@@ -501,9 +501,15 @@ describe.skipIf(!TEST_DATABASE_URL)('Packages (e2e)', () => {
       const world = await seed();
       const anna = await register();
       const before = await http().get('/v1/viewer/session').set('Cookie', anna.cookie).expect(200);
-      expect(before.body).toMatchObject({ entitled: false, access: null });
+      expect(before.body).toMatchObject({ entitled: false, access: null, purchases: [] });
       const visitor = await http().get('/v1/viewer/session').expect(200);
-      expect(visitor.body).toEqual({ viewer: null, profile: null, entitled: false, access: null });
+      expect(visitor.body).toEqual({
+        viewer: null,
+        profile: null,
+        entitled: false,
+        access: null,
+        purchases: [],
+      });
 
       await grant(anna.id, world.kidsPlan.id);
       const session = await http().get('/v1/viewer/session').set('Cookie', anna.cookie).expect(200);

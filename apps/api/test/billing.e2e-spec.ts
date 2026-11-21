@@ -164,6 +164,7 @@ describe.skipIf(!TEST_DATABASE_URL)('Billing (e2e)', () => {
         currency: 'EUR',
         checkout: false,
         contactUrl: 'mailto:billing@example.com',
+        rental: { startDays: 30, watchHours: 48 },
         plans: [
           {
             id: created.body.id,
@@ -327,6 +328,7 @@ describe.skipIf(!TEST_DATABASE_URL)('Billing (e2e)', () => {
         entitled: false,
         access: null,
         trialUsed: false,
+        purchases: [],
       });
       expect(before.headers['cache-control']).toBe('no-store');
 
@@ -359,6 +361,7 @@ describe.skipIf(!TEST_DATABASE_URL)('Billing (e2e)', () => {
         entitled: true,
         access: { all: true, packageIds: [] },
         trialUsed: false,
+        purchases: [],
         subscription: {
           plan: { id: plan.id, name: 'Standard' },
           status: 'ACTIVE',
@@ -435,6 +438,7 @@ describe.skipIf(!TEST_DATABASE_URL)('Billing (e2e)', () => {
         entitled: false,
         access: null,
         trialUsed: false,
+        purchases: [],
       });
 
       // What is over cannot be changed or ended again. A new grant can follow.

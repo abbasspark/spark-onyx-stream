@@ -181,6 +181,10 @@ export class StripeWebhookService {
       subscription?: string | { id: string } | null;
     };
     if (event.type === 'checkout.session.completed') {
+      if (object.mode === 'payment' && typeof object.id === 'string') {
+        // A title was rented or bought.
+        return (await this.sync.recordPurchaseById(object.id)) !== null;
+      }
       const subscriptionId = idOf(object.subscription);
       if (object.mode !== 'subscription' || !subscriptionId) {
         return false;
