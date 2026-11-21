@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 import type { Metadata, Viewport } from 'next';
 import type { ReactNode } from 'react';
+import { ViewerSessionProvider } from '@/components/viewer-session';
 import { siteConfig } from '@/lib/config';
 import './globals.css';
 
@@ -23,7 +24,9 @@ export const viewport: Viewport = {
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
     <html lang="en">
-      <body>{children}</body>
+      <body>
+        <ViewerSessionProvider>{children}</ViewerSessionProvider>
+      </body>
     </html>
   );
 }

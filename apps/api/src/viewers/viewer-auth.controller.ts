@@ -41,7 +41,7 @@ import {
   ViewerAuthService,
   type ViewerSignIn,
 } from './viewer-auth.service.js';
-import type { ViewerIdentity } from './viewer-session.service.js';
+import { type ViewerIdentity, ViewerSessionService } from './viewer-session.service.js';
 
 /** Route of the viewer accounts, relative to the API prefix. */
 export const VIEWER_ROUTE = 'viewer';
@@ -57,7 +57,10 @@ const SIGN_INS = { name: 'viewer-login', limit: 30, windowSeconds: 300 };
  */
 @Controller(VIEWER_ROUTE)
 export class ViewerAuthController {
-  constructor(@Inject(ViewerAuthService) private readonly auth: ViewerAuthService) {}
+  constructor(
+    @Inject(ViewerAuthService) private readonly auth: ViewerAuthService,
+    @Inject(ViewerSessionService) private readonly viewerSessions: ViewerSessionService,
+  ) {}
 
   /** What the website needs to know to show the right buttons. */
   @Public()
@@ -65,6 +68,19 @@ export class ViewerAuthController {
   @Header('Cache-Control', 'public, max-age=30')
   config(): ViewerAccessConfig {
     return this.auth.accessConfig();
+  }
+
+  /**
+   * Who is signed in, or nobody. Unlike "me" this is not an error for a
+   * visitor, so the website can ask on every page without filling the
+   * browser's console with failed requests.
+   */
+  @Public()
+  @Get('session')
+  @Header('Cache-Control', 'no-store')
+  async session(@Req() request: Request): Promise<{ viewer: ViewerView | null }> {
+    const identity = await this.viewerSessions.identify(request);
+    return { viewer: identity ? toViewerView(identity.viewer) : null };
   }
 
   @Public()

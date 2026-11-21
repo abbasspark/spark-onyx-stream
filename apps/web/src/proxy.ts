@@ -18,7 +18,17 @@ export function proxy(request: NextRequest): NextResponse {
   const { pathname, search } = request.nextUrl;
 
   if (pathname.startsWith('/v1/')) {
-    return NextResponse.rewrite(new URL(`${pathname}${search}`, siteConfig.apiUrl));
+    // The API checks that a request that changes a viewer's account comes from
+    // this site. It compares the browser's Origin with the address the browser
+    // used, which it only knows if it is passed on here.
+    const headers = new Headers(request.headers);
+    const host = request.headers.get('host');
+    if (host) {
+      headers.set('x-forwarded-host', host);
+    }
+    return NextResponse.rewrite(new URL(`${pathname}${search}`, siteConfig.apiUrl), {
+      request: { headers },
+    });
   }
 
   const nonce = Buffer.from(crypto.randomUUID()).toString('base64');

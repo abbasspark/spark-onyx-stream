@@ -12,6 +12,8 @@ The site people watch on: a home page with rows of titles, pages for each movie 
 | `/watch/{slug}`               | The player for a movie. With `?trailer=1`, the trailer                    |
 | `/watch/{slug}/{episode id}`  | The player for an episode, which goes on to the next one                  |
 | `/search`                     | Search by name while typing                                               |
+| `/sign-in`, `/sign-up`        | Sign in, and create an account                                            |
+| `/account`                    | The viewer's name, password, devices, and deleting the account            |
 | `/sitemap.xml`, `/robots.txt` | For search engines                                                        |
 
 ## Run it
@@ -52,7 +54,8 @@ They are read when the server starts: from the `.env` file at the repository roo
 - **A title that is not published answers 404**, the same as one that never existed.
 - **Scripts run only with a nonce** that is new for every page (content security policy). Injected markup cannot run script.
 - **Search and playback requests go from the browser straight to the API.** Each viewer then uses their own request allowance, and signed playback addresses are never cached.
-- **"Continue watching" lives in the browser.** There are no viewer accounts yet, so positions are stored on the device and nowhere else.
+- **Who is signed in is asked by the browser**, not built into the page, so pages stay the same for everyone and can be shared. The session is a cookie that the page's scripts cannot read.
+- **"Continue watching" lives in the browser.** Positions are stored on the device and do not follow an account yet.
 
 ## The player
 
@@ -79,7 +82,7 @@ src/
 
 ## Not built yet
 
-- Viewer accounts, and with them watch history that follows the viewer between devices
+- Watch history that follows a viewer between devices
 - Smaller versions of artwork for small screens. Pictures are sent as uploaded
 - Translations of the interface
 - A page for the site's own branding in the admin panel. Name and description come from settings

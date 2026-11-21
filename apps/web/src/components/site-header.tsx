@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { usePathname, useSearchParams } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
 import type { Category } from '@/lib/types';
+import { AccountMenu } from './account-menu';
 import { BandMark } from './brand';
 
 interface SiteHeaderProps {
@@ -159,6 +160,9 @@ export function SiteHeader({ siteName, categories }: SiteHeaderProps) {
             />
           </label>
         </form>
+        <div className="hidden md:block">
+          <AccountMenu />
+        </div>
 
         <div className="ml-auto flex items-center gap-1 md:hidden">
           <Link
@@ -168,6 +172,9 @@ export function SiteHeader({ siteName, categories }: SiteHeaderProps) {
           >
             <Search className="size-5" />
           </Link>
+          <div className="mx-1">
+            <AccountMenu />
+          </div>
           <button
             type="button"
             aria-label={menuOpen ? 'Close the menu' : 'Open the menu'}
