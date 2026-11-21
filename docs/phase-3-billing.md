@@ -11,7 +11,7 @@ It is built in steps. This document describes what is built so far: plans, subsc
 - **Access of a title**: `FREE` or `PAID`, set per title. An episode is as open as its series.
 - **Payment**: money a viewer paid for a subscription. Collected by Stripe, or received by the operator and written down by an admin. It stays in the books when the account is deleted, with the email address it was paid under.
 
-- **Package**: a group of paid titles that plans open together, such as Kids or Sports. A title can be in several. Live channels will be sorted into the same packages.
+- **Package**: a group of paid titles that plans open together, such as Kids or Sports. A title can be in several. Live channels are sorted into the same packages (see `phase-4-live.md`).
 - **Purchase**: a viewer's right to watch one title, rented for a time or bought for good, whatever plan they have or have not.
 
 A plan opens every paid title, or the packages chosen for it.

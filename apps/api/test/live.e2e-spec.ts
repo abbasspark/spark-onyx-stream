@@ -748,6 +748,48 @@ describe.skipIf(!TEST_DATABASE_URL || !hasFfmpeg)('Live channels (e2e, real FFmp
     expect(testApp.app.get(LiveSupervisorService).runningIds()).toEqual([]);
   }, 120_000);
 
+  it('passes AAC audio from a transport stream through', async () => {
+    const port = PORT + 1;
+    const withAac = spawn(
+      process.env.FFMPEG_PATH ?? 'ffmpeg',
+      // prettier-ignore
+      [
+        '-v', 'error', '-re',
+        '-f', 'lavfi', '-i', 'testsrc2=size=320x180:rate=25',
+        '-f', 'lavfi', '-i', 'sine=frequency=440',
+        '-c:v', 'libx264', '-preset', 'ultrafast', '-tune', 'zerolatency', '-g', '25',
+        '-pix_fmt', 'yuv420p', '-c:a', 'aac', '-f', 'mpegts',
+        `udp://127.0.0.1:${port}?pkt_size=1316`,
+      ],
+      { stdio: 'ignore' },
+    );
+    try {
+      const created = await http()
+        .post('/v1/channels')
+        .set(admin())
+        .send({ name: 'With AAC', source: `udp://127.0.0.1:${port}`, start: true })
+        .expect(201);
+      const id = created.body.id as string;
+
+      const running = await waitFor(id, 'RUNNING');
+      expect(running.streams).toMatchObject({ audioCodec: 'aac' });
+      // It has to stay on air: the fault this guards against ended the stream after its first segment.
+      await new Promise((resolve) => setTimeout(resolve, 6000));
+      await reconcile();
+      const later = (await http().get(`/v1/channels/${id}`).set(admin()).expect(200)).body;
+      expect(later).toMatchObject({ status: 'RUNNING', restartCount: 0 });
+
+      const playback = await http().post(`/v1/channels/${id}/playback`).set(admin()).expect(200);
+      const playlist = await http().get(playback.body.url).expect(200);
+      expect(playlist.text.match(/\.m4s/g)?.length).toBeGreaterThan(2);
+
+      await http().delete(`/v1/channels/${id}`).set(admin()).expect(204);
+      await reconcile();
+    } finally {
+      withAac.kill('SIGKILL');
+    }
+  }, 120_000);
+
   it('reports a source that sends nothing, and keeps trying', async () => {
     const created = await http()
       .post('/v1/channels')

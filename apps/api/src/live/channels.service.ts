@@ -12,6 +12,7 @@ import {
   type ChannelMode,
   type ChannelStatus,
   PrismaClient,
+  type TitleAccess,
 } from '@onyx/database';
 import type { Redis } from 'ioredis';
 import { slugify, uniqueSlug } from '../catalog/slug.js';
@@ -62,6 +63,12 @@ export interface ChannelView {
    * known: chosen heights above the source are left out. Null otherwise.
    */
   outputs: { name: string; height: number; videoKbps: number }[] | null;
+  /** Whether viewers find the channel on the website and in the apps. */
+  published: boolean;
+  /** FREE is as open as the installation. PAID needs a plan that opens the channel. */
+  access: TitleAccess;
+  /** The packages the channel is in, in their order. */
+  packages: { id: string; name: string }[];
   enabled: boolean;
   status: ChannelState;
   statusMessage: string | null;
@@ -83,6 +90,15 @@ export interface ChannelDetails extends ChannelView {
   /** The latest lines of the live process, oldest first. */
   log: string[];
 }
+
+/** What is read with a channel to show it. */
+const WITH_PACKAGES = {
+  packages: { select: { package: { select: { id: true, name: true, position: true } } } },
+} as const;
+
+type ChannelRecord = Channel & {
+  packages: { package: { id: string; name: string; position: number } }[];
+};
 
 /** What testing a source found. */
 export type ProbeResult =
@@ -109,6 +125,7 @@ export class ChannelsService {
 
   async list(): Promise<ChannelView[]> {
     const channels = await this.prisma.channel.findMany({
+      include: WITH_PACKAGES,
       orderBy: [{ number: { sort: 'asc', nulls: 'last' } }, { name: 'asc' }],
     });
     const health = await Promise.all(channels.map((channel) => this.healthOf(channel.id)));
@@ -128,6 +145,7 @@ export class ChannelsService {
   }
 
   async create(input: CreateChannelInput): Promise<ChannelView> {
+    await this.assertPackages(input.packageIds);
     const source = input.source === undefined ? null : parseSource(input.source);
     const slug =
       input.slug ??
@@ -137,11 +155,15 @@ export class ChannelsService {
 
     try {
       const channel = await this.prisma.channel.create({
+        include: WITH_PACKAGES,
         data: {
           name: input.name,
           slug,
           number: input.number,
           description: input.description,
+          published: input.published,
+          access: input.access,
+          packages: { create: input.packageIds.map((packageId) => ({ packageId })) },
           ingest: input.ingest,
           sourceEncrypted: source ? this.secrets.encrypt(source.url) : null,
           sourceLabel: source?.label ?? '',
@@ -162,6 +184,9 @@ export class ChannelsService {
   async update(id: string, input: UpdateChannelInput): Promise<ChannelView> {
     const current = await this.find(id);
     const source = input.source === undefined ? null : parseSource(input.source);
+    if (input.packageIds) {
+      await this.assertPackages(input.packageIds);
+    }
     const ingest = input.ingest ?? current.ingest;
     if (ingest === 'PULL' && !source && !(current.ingest === 'PULL' && current.sourceEncrypted)) {
       throw new BadRequestException('Enter the address of the source');
@@ -172,12 +197,23 @@ export class ChannelsService {
 
     try {
       const channel = await this.prisma.channel.update({
+        include: WITH_PACKAGES,
         where: { id },
         data: {
           name: input.name,
           slug: input.slug,
           number: input.number,
           description: input.description,
+          published: input.published,
+          access: input.access,
+          ...(input.packageIds
+            ? {
+                packages: {
+                  deleteMany: {},
+                  create: input.packageIds.map((packageId) => ({ packageId })),
+                },
+              }
+            : {}),
           mode,
           qualities,
           // Other qualities need another process: the live process starts the channel over.
@@ -221,6 +257,7 @@ export class ChannelsService {
       return toView(channel, await this.healthOf(id));
     }
     const started = await this.prisma.channel.update({
+      include: WITH_PACKAGES,
       where: { id },
       data: {
         enabled: true,
@@ -237,6 +274,7 @@ export class ChannelsService {
   async stop(id: string): Promise<ChannelView> {
     const channel = await this.find(id);
     const stopped = await this.prisma.channel.update({
+      include: WITH_PACKAGES,
       where: { id },
       data: { enabled: false, status: 'STOPPED', statusMessage: null, startedAt: null },
     });
@@ -253,6 +291,7 @@ export class ChannelsService {
       return this.start(id);
     }
     const restarted = await this.prisma.channel.update({
+      include: WITH_PACKAGES,
       where: { id },
       data: {
         restartToken: { increment: 1 },
@@ -318,6 +357,17 @@ export class ChannelsService {
     }
   }
 
+  /** @throws BadRequestException when a package does not exist. */
+  private async assertPackages(packageIds: readonly string[]): Promise<void> {
+    if (packageIds.length === 0) {
+      return;
+    }
+    const found = await this.prisma.package.count({ where: { id: { in: [...packageIds] } } });
+    if (found !== packageIds.length) {
+      throw new BadRequestException('One of the packages does not exist');
+    }
+  }
+
   private async disconnectEncoder(channel: Channel): Promise<void> {
     if (channel.ingest === 'PUSH' && channel.streamKeyEncrypted) {
       await this.ingest.disconnect(channel.streamKeyEncrypted);
@@ -342,8 +392,11 @@ export class ChannelsService {
     );
   }
 
-  private async find(id: string): Promise<Channel> {
-    const channel = await this.prisma.channel.findUnique({ where: { id } });
+  private async find(id: string): Promise<ChannelRecord> {
+    const channel = await this.prisma.channel.findUnique({
+      where: { id },
+      include: WITH_PACKAGES,
+    });
     if (!channel) {
       throw new NotFoundException('Channel not found');
     }
@@ -374,7 +427,7 @@ function qualitiesOf(mode: ChannelMode, qualities: readonly number[] | undefined
   return qualities && qualities.length > 0 ? [...qualities] : [...DEFAULT_LIVE_QUALITIES];
 }
 
-function toView(channel: Channel, health: ChannelHealth | null): ChannelView {
+function toView(channel: ChannelRecord, health: ChannelHealth | null): ChannelView {
   const attended = channel.enabled && health !== null;
   const unattendedFor = Date.now() - channel.updatedAt.getTime();
 
@@ -409,6 +462,12 @@ function toView(channel: Channel, health: ChannelHealth | null): ChannelView {
             videoKbps: rendition.videoKbps,
           }))
         : null,
+    published: channel.published,
+    access: channel.access,
+    packages: channel.packages
+      .map((link) => link.package)
+      .sort((a, b) => a.position - b.position || a.name.localeCompare(b.name))
+      .map(({ id, name }) => ({ id, name })),
     enabled: channel.enabled,
     status,
     statusMessage,

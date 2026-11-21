@@ -2,7 +2,7 @@
 
 Live adds channels: streams that run around the clock, or for the length of an event, and that viewers join while they run.
 
-It is built in steps. This document describes what is built so far: channels the server pulls from an address or that an encoder pushes to it, kept running by a live process, passed through untouched or transcoded into several qualities, with signed delivery and a page in the admin panel.
+It is built in steps. This document describes what is built so far: channels the server pulls from an address or that an encoder pushes to it, kept running by a live process, passed through untouched or transcoded into several qualities, with signed delivery, a page in the admin panel, and the channels on the viewer website for those who may watch them.
 
 ## Model
 
@@ -115,6 +115,30 @@ Transcoding costs CPU for every quality, all the time the channel runs. How much
 
 The files are written to `LIVE_PATH`, one folder per channel. They are temporary: a few megabytes per quality, removed when the channel stops.
 
+## Channels for viewers
+
+A channel is for admins only until it is **published**. A published channel is in the public catalog, on the website under **Live**, and later in the apps.
+
+| Setting   | Meaning                                                                                |
+| --------- | -------------------------------------------------------------------------------------- |
+| Published | Viewers find the channel. Off for a new channel                                        |
+| Access    | `FREE`: as open as the installation (`CATALOG_PLAYBACK`). `PAID`: needs a plan         |
+| Packages  | A paid channel is opened by plans that include one of its packages, as a paid title is |
+
+The rules are those of titles, on purpose: a plan with the package "Sports" opens the films and the channels in it. A paid channel in no package is opened only by plans that open everything. A channel cannot be rented or bought on its own.
+
+| Method and path                            | Purpose                                          |
+| ------------------------------------------ | ------------------------------------------------ |
+| `GET /v1/catalog/channels`                 | Published channels in the order of their numbers |
+| `GET /v1/catalog/channels/:slug`           | One of them                                      |
+| `POST /v1/catalog/channels/:slug/playback` | A signed address for watching                    |
+
+Viewers are told the name, number, description, whether a channel is paid and in which packages, and whether it is on air. Nothing about where its video comes from leaves the API. The list may be cached for ten seconds, a shorter time than the rest of the catalog, because being on air changes at any moment.
+
+Asking to watch answers 401 without a viewer where one is needed, 402 with `subscription_required` or `plan_required`, 403 with `email_unverified`, and 409 with `off_air` for a channel that is not sending. Who may watch is checked before whether the channel is on air, so the state of a paid channel is not told to those it is closed to.
+
+On the website, **Live** lists the channels as a lineup, with what is on air and a mark on those that need another plan. The page of a channel plays it over the whole window, with the lineup one key away and the arrow keys for the channel before and after. A channel that is off air is waited for: the picture starts by itself. When a signed address runs out during a long session, the player asks for a new one and goes on.
+
 ## The live process
 
 Processes with the `live` role keep the channels running. In development one process has every role. The Compose file starts a `live` container of its own.
@@ -188,6 +212,6 @@ With several servers, the live processes and the gateway need the same `LIVE_PAT
 - Pushing from a browser (WebRTC), and RTMPS
 - Going back in time (DVR) and recording
 - A programme guide (EPG)
-- Channels in the catalog, in packages and on the viewer website
+- Channels on the home page and in search, and how many people are watching
 - Audio-only channels, several audio languages and subtitles
 - Pictures of channels (logos, live thumbnails)

@@ -267,3 +267,24 @@ export function encoderAddresses(settings: EncoderSettings, hostname: string): E
       `srt://${hostname}:${SRT_PORT}?streamid=publish:live/${settings.streamKey}`,
   };
 }
+
+/** How viewers get to a channel, in a few words: "Not on the website", "Free", "Paid, in Kids and Sports". */
+export function describeAudience(
+  channel: Pick<Channel, 'published' | 'access' | 'packages'>,
+): string {
+  if (!channel.published) {
+    return 'Not on the website';
+  }
+  if (channel.access === 'FREE') {
+    return 'On the website, free';
+  }
+  const names = channel.packages.map((item) => item.name);
+  if (names.length === 0) {
+    return 'On the website, for plans that open everything';
+  }
+  const list =
+    names.length === 1
+      ? names[0]
+      : `${names.slice(0, -1).join(', ')} and ${names.at(-1) as string}`;
+  return `On the website, for plans with ${list}`;
+}

@@ -2,6 +2,7 @@
 import { describe, expect, it } from 'vitest';
 import type { Channel } from '@/api/types';
 import {
+  describeAudience,
   describeProbePlan,
   describeQualities,
   exceedsSource,
@@ -33,6 +34,9 @@ const channel = (change: Partial<Channel> = {}): Channel => ({
   mode: 'COPY',
   qualities: [],
   outputs: null,
+  published: false,
+  access: 'FREE',
+  packages: [],
   enabled: true,
   status: 'RUNNING',
   statusMessage: null,
@@ -251,5 +255,28 @@ describe('channels pushed by an encoder', () => {
         'tv.example.com',
       ).rtmpServer,
     ).toBe('rtmp://in.example.com:1935/live');
+  });
+});
+
+describe('describeAudience', () => {
+  it('says who gets to a channel', () => {
+    expect(describeAudience(channel())).toBe('Not on the website');
+    expect(describeAudience(channel({ published: true }))).toBe('On the website, free');
+    expect(describeAudience(channel({ published: true, access: 'PAID' }))).toBe(
+      'On the website, for plans that open everything',
+    );
+    const kids = { id: 'k', name: 'Kids' };
+    expect(describeAudience(channel({ published: true, access: 'PAID', packages: [kids] }))).toBe(
+      'On the website, for plans with Kids',
+    );
+    expect(
+      describeAudience(
+        channel({
+          published: true,
+          access: 'PAID',
+          packages: [kids, { id: 's', name: 'Sports' }, { id: 'n', name: 'News' }],
+        }),
+      ),
+    ).toBe('On the website, for plans with Kids, Sports and News');
   });
 });

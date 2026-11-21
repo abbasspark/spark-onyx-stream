@@ -66,6 +66,14 @@ const qualities = z
 
 const ingest = z.enum(['PULL', 'PUSH']);
 
+const access = z.enum(['FREE', 'PAID']);
+
+/** Packages the channel is in, without repeats. */
+const packageIds = z
+  .array(z.uuid())
+  .max(100)
+  .transform((ids) => [...new Set(ids)]);
+
 /** A pulled channel needs an address. A pushed one has none: its encoder connects with a stream key. */
 function checkSource(
   value: { ingest?: 'PULL' | 'PUSH'; source?: string },
@@ -96,6 +104,10 @@ export const createChannelSchema = z
     mode: mode.default('COPY'),
     /** Left out, a transcoded channel gets the usual three. */
     qualities: qualities.optional(),
+    /** Whether viewers find the channel on the website and in the apps. */
+    published: z.boolean().default(false),
+    access: access.default('FREE'),
+    packageIds: packageIds.default([]),
     /** Start the channel as soon as it exists. */
     start: z.boolean().default(false),
   })
@@ -103,7 +115,19 @@ export const createChannelSchema = z
 export type CreateChannelInput = z.infer<typeof createChannelSchema>;
 
 export const updateChannelSchema = z
-  .object({ name, slug, number, description, ingest, source, mode, qualities })
+  .object({
+    name,
+    slug,
+    number,
+    description,
+    ingest,
+    source,
+    mode,
+    qualities,
+    published: z.boolean(),
+    access,
+    packageIds,
+  })
   .partial()
   .refine((value) => Object.keys(value).length > 0, { message: 'Nothing to change' })
   .superRefine((value, ctx) => checkSource(value, ctx, false));

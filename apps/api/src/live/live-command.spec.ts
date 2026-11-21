@@ -143,6 +143,8 @@ describe('buildLiveArgs', () => {
       settings,
     );
     expect(pair(copy, '-c:a')).toBe('copy');
+    // Without it, AAC from a transport stream is refused by the MP4 writer.
+    expect(pair(copy, '-bsf:a')).toBe('aac_adtstoasc');
 
     const encode = buildLiveArgs(
       source,

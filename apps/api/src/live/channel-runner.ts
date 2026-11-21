@@ -256,6 +256,8 @@ export class ChannelRunner {
       let lastOutTimeMs = 0;
       let lastAdvanceAt = startedAt;
       let stalled = false;
+      // What FFmpeg itself said last, which is the best account of why it ended.
+      let lastSaid: string | null = null;
       this.speed = null;
 
       const watchdog = setInterval(() => {
@@ -288,11 +290,14 @@ export class ChannelRunner {
               this.update({ status: 'RUNNING', message: null, startedAt: new Date() });
             }
           },
-          onLog: (line) => this.note(line),
+          onLog: (line) => {
+            if (this.note(line)) {
+              lastSaid = this.log.at(-1) ?? null;
+            }
+          },
           onExit: (code) => {
             clearInterval(watchdog);
             this.process = null;
-            const last = this.log.at(-1);
             resolve(
               stalled
                 ? this.state.startedAt
@@ -300,7 +305,7 @@ export class ChannelRunner {
                   : 'The source sent nothing'
                 : code === 0
                   ? 'The source ended the stream'
-                  : `The stream stopped${last ? `: ${last}` : ''}`,
+                  : `The stream stopped${lastSaid ? `: ${lastSaid}` : ''}`,
             );
           },
         },
@@ -333,18 +338,21 @@ export class ChannelRunner {
   /**
    * Adds a line to the log. FFmpeg repeats itself a lot while it joins a
    * running stream, so a line that was just written is not written again.
+   *
+   * @returns Whether the line was added.
    */
-  private note(line: string): void {
+  private note(line: string): boolean {
     const text = this.clean(line)
       .replace(/ @ 0x[0-9a-f]+\]/, ']')
       .trim();
     if (!text || JOIN_NOISE.test(text) || this.log.slice(-6).includes(text)) {
-      return;
+      return false;
     }
     this.log.push(text.length > 300 ? `${text.slice(0, 300)}…` : text);
     if (this.log.length > LOG_LINES) {
       this.log.shift();
     }
+    return true;
   }
 
   /** The address of a source may carry a password. It never appears in a log or message. */
