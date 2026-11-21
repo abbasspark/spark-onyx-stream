@@ -2,11 +2,12 @@
 
 Live adds channels: streams that run around the clock, or for the length of an event, and that viewers join while they run.
 
-It is built in steps. This document describes what is built so far: channels the server pulls from an address, kept running by a live process and repackaged as HLS without re-encoding, with signed delivery and a page in the admin panel.
+It is built in steps. This document describes what is built so far: channels the server pulls from an address, kept running by a live process, passed through untouched or transcoded into several qualities, with signed delivery and a page in the admin panel.
 
 ## Model
 
 - **Channel**: a name, an optional number as on a remote control, a name for addresses, and a source.
+- **Processing**: a channel is passed through or transcoded. A transcoded channel has a list of qualities.
 - **Source**: the address the server pulls the channel from. It is stored encrypted with the master key, because it often carries a password, a token or a stream key. Lists, logs, messages and the audit log only ever show a form without those parts.
 - **Wanted state**: a channel is switched on or off by an admin. A channel that is on is kept running. Nothing else decides whether a channel runs.
 - **Reported state**: what the live process last said about a channel that is on.
@@ -35,18 +36,50 @@ The server connects to whatever address an admin enters, including addresses ins
 
 **Test source** in the form connects to an address for up to 15 seconds and reports what it carries, before anything is created.
 
-## Repackaging
+## Processing
 
-In this step the picture is never re-encoded. One FFmpeg process per channel reads the source and writes HLS with fMP4 segments (decision D-010):
+One FFmpeg process per channel reads the source and writes HLS with fMP4 segments (decision D-010). There are two ways to run a channel, chosen per channel.
 
-- **Video** must be H.264 or HEVC and is passed on untouched. A source with other video, such as MPEG-2, is reported as failed with that reason. Transcoding is a later step.
+### Pass through
+
+The picture is never re-encoded.
+
+- **Video** must be H.264 or HEVC and is passed on untouched. A source with other video, such as MPEG-2, is reported as failed with the advice to switch to transcoding.
 - **Audio** in AAC is passed on untouched. Anything else, such as MP2 or AC-3 from broadcast feeds, is encoded to AAC, because browsers play neither. This costs very little.
-- **Segments** are cut at key frames of the source, as close to `LIVE_SEGMENT_SECONDS` (4) as the source allows. The playlist lists `LIVE_PLAYLIST_SEGMENTS` (6) of them, and older ones are deleted.
+
+This costs almost no CPU: one server carries many channels. The price is that viewers get the one quality the source sends.
+
+### Transcode
+
+The picture is encoded again as H.264, in each of the qualities chosen for the channel. Players switch between them as the connection allows.
+
+| Quality | Video bitrate |
+| ------- | ------------- |
+| 1080p   | 5 Mbit/s      |
+| 720p    | 2.8 Mbit/s    |
+| 480p    | 1.4 Mbit/s    |
+| 360p    | 800 kbit/s    |
+| 240p    | 400 kbit/s    |
+
+- **Any video the server can read is accepted,** MPEG-2 included.
+- **A picture is never made larger than the source.** Chosen qualities above it are left out. When that cuts the top off, the height of the source takes its place: a 576-line broadcast with 1080p, 720p and 480p chosen comes out as 576p and 480p. The panel shows what a channel is really encoded into.
+- **Sources at 50 or 60 pictures a second** get 40 percent more from 720p up.
+- **Interlaced pictures are made whole** before scaling. Pixels that are not square are made square.
+- **Key frames sit at the same moments in every quality,** every two seconds, so players can switch at any segment.
+- **Audio** is encoded to AAC, stereo at most, once per quality.
+- **The encoder** is x264 with the speed setting `LIVE_TRANSCODE_PRESET` (`veryfast`).
+
+Transcoding costs CPU for every quality, all the time the channel runs. How much depends on the server, the source and the qualities, and has not been measured for this project yet: try a channel on your own server before planning with it. When a server cannot keep up, the channel falls behind the source and viewers see pauses. The panel shows the pace of each channel and warns when it stays below real time.
+
+`index.m3u8` is the address players open either way: the playlist itself for a channel that is passed through, the list of qualities for a transcoded one. Changing the processing of a running channel restarts it.
+
+### Both
+
+- **Segments** are as close to `LIVE_SEGMENT_SECONDS` (4) as possible. A channel that is passed through can only cut where the source has key frames. The playlist lists `LIVE_PLAYLIST_SEGMENTS` (6) of them, and older ones are deleted.
 - **Segment numbers follow the clock**, so they keep rising across restarts and a player that is watching goes on instead of starting over.
+- **Delay** behind the source is a few segments, 15 to 25 seconds with the defaults.
 
-Passing video on untouched costs almost no CPU: one server carries many channels. The price is that viewers get the one quality the source sends, and that the delay behind the source is a few segments, 15 to 25 seconds with the defaults.
-
-The files are written to `LIVE_PATH`, one folder per channel. They are temporary: a few megabytes per running channel, removed when it stops.
+The files are written to `LIVE_PATH`, one folder per channel. They are temporary: a few megabytes per quality, removed when the channel stops.
 
 ## The live process
 
@@ -96,21 +129,22 @@ Changes are written to the audit log, with the source in its form without secret
 
 ## Settings
 
-| Setting                  | Default      | Meaning                             |
-| ------------------------ | ------------ | ----------------------------------- |
-| `LIVE_PATH`              | `./tmp/live` | Folder of playlists and segments    |
-| `LIVE_SEGMENT_SECONDS`   | `4`          | Wanted length of a segment, 1 to 10 |
-| `LIVE_PLAYLIST_SEGMENTS` | `6`          | Segments in the playlist, 3 to 60   |
+| Setting                  | Default      | Meaning                                                               |
+| ------------------------ | ------------ | --------------------------------------------------------------------- |
+| `LIVE_PATH`              | `./tmp/live` | Folder of playlists and segments                                      |
+| `LIVE_SEGMENT_SECONDS`   | `4`          | Wanted length of a segment, 1 to 10                                   |
+| `LIVE_PLAYLIST_SEGMENTS` | `6`          | Segments in the playlist, 3 to 60                                     |
+| `LIVE_TRANSCODE_PRESET`  | `veryfast`   | Speed of the encoder for transcoded channels, `ultrafast` to `medium` |
 
 With several servers, the live processes and the gateway need the same `LIVE_PATH`. Delivery through edges is phase 5.
 
 ## Admin panel
 
-**Live → Channels** shows every channel with its number, source, state, picture and sound, bitrate and time on air, and what is wrong when something is. The list can be narrowed to channels on air, channels that need attention and stopped ones, and searched. The details of a channel show the live picture, its figures and the log of the live process. The form tests a source before it is saved.
+**Live → Channels** shows every channel with its number, source, state, picture and sound, bitrate and time on air, and what is wrong when something is. The list can be narrowed to channels on air, channels that need attention and stopped ones, and searched. The details of a channel show the live picture, its figures and the log of the live process. The form tests a source before it is saved, and offers the two ways to run a channel with the qualities to choose from.
 
 ## Not built yet
 
-- Transcoding to several qualities, for sources that need it and for adaptive playback
+- Encoding on graphics cards, and qualities with bitrates of your own
 - Channels pushed by an encoder (RTMP or SRT ingest with a stream key)
 - Going back in time (DVR) and recording
 - A programme guide (EPG)

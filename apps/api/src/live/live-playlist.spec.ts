@@ -2,7 +2,7 @@
 import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
-import { measureBitrate, parseSegments } from './live-playlist.js';
+import { measureBitrate, parseSegments, parseVariants } from './live-playlist.js';
 
 const PLAYLIST = `#EXTM3U
 #EXT-X-VERSION:7
@@ -25,6 +25,22 @@ describe('parseSegments', () => {
   });
 });
 
+const MASTER = `#EXTM3U
+#EXT-X-VERSION:7
+#EXT-X-STREAM-INF:BANDWIDTH=2890800,RESOLUTION=1280x720,CODECS="avc1.64001f,mp4a.40.2"
+q-720p.m3u8
+
+#EXT-X-STREAM-INF:BANDWIDTH=910800,RESOLUTION=640x360,CODECS="avc1.4d401e,mp4a.40.2"
+q-360p.m3u8
+`;
+
+describe('parseVariants', () => {
+  it('lists the playlists of the qualities, and nothing for a plain playlist', () => {
+    expect(parseVariants(MASTER)).toEqual(['q-720p.m3u8', 'q-360p.m3u8']);
+    expect(parseVariants(PLAYLIST)).toEqual([]);
+  });
+});
+
 describe('measureBitrate', () => {
   let directory: string;
 
@@ -44,6 +60,14 @@ describe('measureBitrate', () => {
     await writeFile(path.join(directory, 'index.m3u8'), PLAYLIST);
     await writeFile(path.join(directory, 'seg-101.m4s'), Buffer.alloc(250_000));
     expect(await measureBitrate(directory)).toBe(1_000_000);
+  });
+
+  it('measures the best quality of a channel that has several', async () => {
+    await writeFile(path.join(directory, 'index.m3u8'), MASTER);
+    await writeFile(path.join(directory, 'q-720p.m3u8'), PLAYLIST);
+    await writeFile(path.join(directory, 'seg-100.m4s'), Buffer.alloc(1_000_000));
+    await writeFile(path.join(directory, 'seg-101.m4s'), Buffer.alloc(500_000));
+    expect(await measureBitrate(directory)).toBe(2_000_000);
   });
 
   it('has no figure before there is a playlist', async () => {

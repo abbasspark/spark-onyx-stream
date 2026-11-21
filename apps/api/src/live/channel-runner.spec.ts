@@ -77,6 +77,8 @@ function setup(url = 'https://user:secret@example.com/a/live.m3u8') {
   const runner = new ChannelRunner({
     source: parseSource(url),
     directory: '/tmp/onyx-live-test',
+    processing: { mode: 'COPY', qualities: [] },
+    preset: 'veryfast',
     segmentSeconds: 4,
     playlistSegments: 6,
     engine,

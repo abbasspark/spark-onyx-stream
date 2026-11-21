@@ -487,3 +487,17 @@ This replaces the "plain CSS without a component library" part of D-018.
 **Why:** most channels an operator starts with already arrive in a form players take, so repackaging puts many channels on one small server, and transcoding can be added as a second way to run a channel without changing the first. Comparing a wanted state with what runs is the one design that survives every kind of failure the same way: a crashed process, a restarted server and a second live process all end in the same check. Retrying for ever is what an operator would do by hand anyway. Segment numbers taken from the clock let a restart pass for viewers as a short pause. The source is a secret because it very often is one: a stream key or an account in the address. Limiting who may enter addresses matters because the server connects to whatever it is given.
 
 **Consequence:** viewers get the one quality the source sends, with a delay of a few segments. A source with other video cannot be used until transcoding exists. With several servers, live processes and gateway need a shared folder until edges exist. A live process that dies takes its channels down for the seconds it takes to start them again. Redis is needed for more than one live process, and for figures in the panel.
+
+## D-038 Transcoding is a second way to run a channel, with fixed qualities
+
+**Date:** 2026-11-22
+
+- **Each channel is passed through or transcoded.** Passing through stays the default.
+- **A transcoded channel is encoded into qualities chosen from a fixed list** of picture heights, each with a bitrate that belongs to it. Nothing is ever made larger than the source.
+- **One FFmpeg process makes all qualities of a channel,** decoding the source once, with key frames at the same moments in each.
+- **Software encoding with x264.** One setting for its speed applies to the installation.
+- **Players open the same address either way.**
+
+**Why:** transcoding is what makes a channel watchable on a weak connection, and the only way to use a source in a format players do not take. It is also the most expensive thing the platform does, so it has to be a choice per channel and never a surprise. A fixed list keeps a channel from being set up with numbers that cannot work, and keeps what the panel says and what the encoder does in one small table. One process per channel keeps the supervisor as it was: a channel is still one process to watch, restart and clean up after. x264 runs on every server, which matters more for a self-hosted product than the last bit of efficiency.
+
+**Consequence:** the cost of a transcoded channel is CPU the operator has to have. A server that is too small shows it as a channel falling behind, which the panel reports but cannot fix. Bitrates cannot be tuned per channel. Graphics cards are not used. All qualities of a channel stop together when its one process does.

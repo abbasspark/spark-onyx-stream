@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 import { z } from 'zod';
 import { MAX_SLUG_LENGTH, SLUG_PATTERN } from '../catalog/slug.js';
+import { LIVE_QUALITIES, type LiveQuality } from './live-ladder.js';
 import { InvalidSourceError, parseSource } from './live-source.js';
 
 const name = z
@@ -46,6 +47,23 @@ const source = z
     }
   });
 
+const mode = z.enum(['COPY', 'TRANSCODE']);
+
+/** Picture heights to encode, without repeats, best first. */
+const qualities = z
+  .array(
+    z
+      .number()
+      .refine(
+        (value): value is LiveQuality => (LIVE_QUALITIES as readonly number[]).includes(value),
+        {
+          message: `Qualities are ${LIVE_QUALITIES.join(', ')}`,
+        },
+      ),
+  )
+  .min(1, 'Choose at least one quality')
+  .transform((values) => [...new Set(values)].sort((a, b) => b - a));
+
 export const createChannelSchema = z.object({
   name,
   /** Left out, the slug is made from the name. */
@@ -53,13 +71,16 @@ export const createChannelSchema = z.object({
   number: number.default(null),
   description: description.default(null),
   source,
+  mode: mode.default('COPY'),
+  /** Left out, a transcoded channel gets the usual three. */
+  qualities: qualities.optional(),
   /** Start pulling the source as soon as the channel exists. */
   start: z.boolean().default(false),
 });
 export type CreateChannelInput = z.infer<typeof createChannelSchema>;
 
 export const updateChannelSchema = z
-  .object({ name, slug, number, description, source })
+  .object({ name, slug, number, description, source, mode, qualities })
   .partial()
   .refine((value) => Object.keys(value).length > 0, { message: 'Nothing to change' });
 export type UpdateChannelInput = z.infer<typeof updateChannelSchema>;

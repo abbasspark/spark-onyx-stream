@@ -137,6 +137,7 @@ services:
       APP_ROLE: live
       LIVE_SEGMENT_SECONDS: ${LIVE_SEGMENT_SECONDS:-4}
       LIVE_PLAYLIST_SEGMENTS: ${LIVE_PLAYLIST_SEGMENTS:-6}
+      LIVE_TRANSCODE_PRESET: ${LIVE_TRANSCODE_PRESET:-veryfast}
     volumes:
       - live:/var/lib/onyx/live
     depends_on:

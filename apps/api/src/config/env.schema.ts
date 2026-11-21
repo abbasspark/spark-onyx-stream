@@ -258,6 +258,13 @@ export const envSchema = z
     LIVE_SEGMENT_SECONDS: z.coerce.number().int().min(1).max(10).default(4),
     /** Segments a live playlist lists. Players can go back this far. */
     LIVE_PLAYLIST_SEGMENTS: z.coerce.number().int().min(3).max(60).default(6),
+    /**
+     * Speed setting of the H.264 encoder for transcoded channels. Faster settings
+     * use less CPU and give a slightly worse picture at the same bitrate.
+     */
+    LIVE_TRANSCODE_PRESET: z
+      .enum(['ultrafast', 'superfast', 'veryfast', 'faster', 'fast', 'medium'])
+      .default('veryfast'),
     /** Processing jobs one worker process runs at the same time. Transcoding uses all CPU cores already. */
     WORKER_CONCURRENCY: z.coerce.number().int().min(1).max(64).default(1),
 
