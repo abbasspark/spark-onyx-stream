@@ -471,3 +471,19 @@ This replaces the "plain CSS without a component library" part of D-018.
 **Why:** new releases and special titles earn more sold one by one than inside a flat price, and many operators run both models side by side. Keeping the purchase apart from the subscription keeps both rules small: one asks what the plan opens, the other whether this viewer holds this title, and either is enough. The two clocks are what viewers know from every large shop for films, so nothing has to be explained. Starting the clock only when the rental is needed spares a subscriber a rental they did not use. Recording from the checkout avoids depending on whether an account makes invoices for single payments, which is a setting at Stripe and would count a sale twice or not at all.
 
 **Consequence:** rental times are the same for every title. Seasons and episodes cannot be sold one by one. A title that is taken off the site is gone for those who bought it too, which the page says as "for as long as it is on this site". A partial refund leaves the title with the viewer. Prices of titles are in the one currency of the installation, as the plans are.
+
+## D-037 Live channels are pulled, passed on untouched and never given up
+
+**Date:** 2026-11-21
+
+- **A channel has a wanted state, set by an admin, and a reported state, set by the live process.** The database holds both. Live processes compare the wanted state with their FFmpeg processes every two seconds and when told, and hold nothing else in memory that matters.
+- **One FFmpeg process per channel** reads the source and writes HLS with fMP4 segments. Video is passed on untouched and must be H.264 or HEVC. Audio that is not AAC is encoded to AAC.
+- **A channel that is switched on is retried for ever,** with waits that grow to 30 seconds. "Failed" is something an admin is shown, not an end.
+- **A lock in Redis per channel** decides which live process runs it. Figures of a running channel live in Redis for seconds at a time.
+- **Sources are network addresses only, stored encrypted,** and shown everywhere without their secret parts.
+- **Live files are delivered like video on demand:** the same token in the path, checked by the API or by the gateway, from a folder the live processes write to.
+- **Changing channels is for owners and admins.**
+
+**Why:** most channels an operator starts with already arrive in a form players take, so repackaging puts many channels on one small server, and transcoding can be added as a second way to run a channel without changing the first. Comparing a wanted state with what runs is the one design that survives every kind of failure the same way: a crashed process, a restarted server and a second live process all end in the same check. Retrying for ever is what an operator would do by hand anyway. Segment numbers taken from the clock let a restart pass for viewers as a short pause. The source is a secret because it very often is one: a stream key or an account in the address. Limiting who may enter addresses matters because the server connects to whatever it is given.
+
+**Consequence:** viewers get the one quality the source sends, with a delay of a few segments. A source with other video cannot be used until transcoding exists. With several servers, live processes and gateway need a shared folder until edges exist. A live process that dies takes its channels down for the seconds it takes to start them again. Redis is needed for more than one live process, and for figures in the panel.

@@ -1,6 +1,11 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 import { download, request, uploadFile } from './client';
 import type {
+  Channel,
+  ChannelDetails,
+  ChannelInput,
+  LivePlayback,
+  SourceProbe,
   Admin,
   ApiKey,
   Asset,
@@ -368,4 +373,25 @@ export const imagesApi = {
   upload: (kind: ImageKind, file: Blob) =>
     uploadFile<CatalogImage>(`/v1/images?kind=${kind}`, file),
   remove: (id: string) => request<void>(`/v1/images/${id}`, { method: 'DELETE' }),
+};
+
+export const channelsApi = {
+  list: (signal?: AbortSignal) => request<Channel[]>('/v1/channels', { signal }),
+  get: (id: string, signal?: AbortSignal) =>
+    request<ChannelDetails>(`/v1/channels/${id}`, { signal }),
+  /** The full address of the source, which may carry a password. */
+  source: (id: string, signal?: AbortSignal) =>
+    request<{ source: string }>(`/v1/channels/${id}/source`, { signal }),
+  create: (body: ChannelInput) => request<Channel>('/v1/channels', { method: 'POST', body }),
+  update: (id: string, body: Partial<ChannelInput>) =>
+    request<Channel>(`/v1/channels/${id}`, { method: 'PATCH', body }),
+  remove: (id: string) => request<void>(`/v1/channels/${id}`, { method: 'DELETE' }),
+  start: (id: string) => request<Channel>(`/v1/channels/${id}/start`, { method: 'POST' }),
+  stop: (id: string) => request<Channel>(`/v1/channels/${id}/stop`, { method: 'POST' }),
+  restart: (id: string) => request<Channel>(`/v1/channels/${id}/restart`, { method: 'POST' }),
+  /** Connects to a source and says what it carries. Takes up to 15 seconds. */
+  probe: (source: string, signal?: AbortSignal) =>
+    request<SourceProbe>('/v1/channels/probe', { method: 'POST', body: { source }, signal }),
+  playback: (id: string, signal?: AbortSignal) =>
+    request<LivePlayback>(`/v1/channels/${id}/playback`, { method: 'POST', signal }),
 };

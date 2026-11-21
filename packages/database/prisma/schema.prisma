@@ -1053,3 +1053,55 @@ model Purchase {
   @@index([titleId])
   @@map("purchases")
 }
+
+// ── Live ─────────────────────────────────────────────────────────────
+
+/// What a live process last reported about a channel.
+enum ChannelStatus {
+  STOPPED
+  STARTING
+  RUNNING
+  RECONNECTING
+  FAILED
+}
+
+/// A live channel. The platform pulls its source and repackages it for players.
+model Channel {
+  id          String  @id @default(uuid(7)) @db.Uuid
+  name        String
+  /// Name for addresses, such as "news-24".
+  slug        String  @unique
+  /// Channel number on a remote control. Optional.
+  number      Int?    @unique
+  description String?
+
+  /// Address of the source, encrypted with the master key: it may carry a password.
+  sourceEncrypted String
+  /// The source without credentials or query, for display.
+  sourceLabel     String
+
+  /// The wanted state: a live process keeps an enabled channel running.
+  enabled       Boolean       @default(false)
+  status        ChannelStatus @default(STOPPED)
+  statusMessage String?
+  /// When the running stream started. Null while not running.
+  startedAt     DateTime?
+  /// Restarts since the channel was last started by an admin.
+  restartCount  Int           @default(0)
+  /// Raised to ask the live process for a restart.
+  restartToken  Int           @default(0)
+
+  /// What the source carries, as last probed.
+  videoCodec    String?
+  width         Int?
+  height        Int?
+  frameRate     Float?
+  audioCodec    String?
+  audioChannels Int?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([enabled])
+  @@map("channels")
+}

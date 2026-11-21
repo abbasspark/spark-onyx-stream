@@ -11,6 +11,7 @@ import { validateEnv } from './config/env.schema.js';
 import { loadEnvFile } from './config/load-env-file.js';
 import { ARTWORK_ROUTE } from './catalog/catalog.views.js';
 import { PUBLIC_CATALOG_ROUTE } from './catalog/public-catalog.controller.js';
+import { LIVE_ROUTE } from './live/live-playback.service.js';
 import { MEDIA_ROUTE } from './playback/playback.service.js';
 
 /** Version prefix of every HTTP route. */
@@ -68,6 +69,7 @@ async function bootstrap(): Promise<void> {
       const path = request.url ?? '';
       if (
         path.startsWith(`/${API_PREFIX}/${MEDIA_ROUTE}/`) ||
+        path.startsWith(`/${API_PREFIX}/${LIVE_ROUTE}/`) ||
         path.startsWith(`/${API_PREFIX}/${ARTWORK_ROUTE}/`)
       ) {
         callback(null, {

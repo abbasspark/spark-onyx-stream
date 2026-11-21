@@ -2,6 +2,12 @@
 
 /** What each action code of the audit log means, in words. */
 const ACTION_LABELS: Record<string, string> = {
+  'channel.create': 'Created a channel',
+  'channel.update': 'Changed a channel',
+  'channel.delete': 'Deleted a channel',
+  'channel.start': 'Started a channel',
+  'channel.stop': 'Stopped a channel',
+  'channel.restart': 'Restarted a channel',
   'auth.setup': 'Created the first admin',
   'auth.login': 'Signed in',
   'auth.login_failed': 'Failed sign-in',

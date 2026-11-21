@@ -11,6 +11,7 @@ import {
   Receipt,
   type LucideIcon,
   Mail,
+  Radio,
   ScrollText,
   SlidersHorizontal,
   Tags,
@@ -94,6 +95,18 @@ export const NAVIGATION: NavGroup[] = [
         icon: Receipt,
         permission: 'billing:read',
         keywords: 'payments money income invoices refunds mrr export csv books accounting',
+      },
+    ],
+  },
+  {
+    label: 'Live',
+    items: [
+      {
+        to: '/channels',
+        label: 'Channels',
+        icon: Radio,
+        permission: 'live:read',
+        keywords: 'live tv streams broadcast iptv linear sources rtmp srt hls udp on air',
       },
     ],
   },

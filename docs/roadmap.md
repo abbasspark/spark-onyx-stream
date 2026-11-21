@@ -2,16 +2,16 @@
 
 The project is built in phases. Each phase ends with something that works end to end.
 
-| Phase                         | Delivers                                                                            | Status            |
-| ----------------------------- | ----------------------------------------------------------------------------------- | ----------------- |
-| 1. Media engine core          | Upload, probe, copy or transcode, HLS packaging, signed playback, basic admin panel | Done              |
-| 2. Catalog and viewer website | Titles, series, metadata import, viewer accounts and profiles, player with resume   | Done              |
-| 3. Billing                    | Plans, payments, entitlements, coupons. First complete VOD service                  | In progress       |
-| 4. Live                       | Ingest, copy and transcode channels, DVR, EPG, channels in the catalog              | Planned           |
-| 5. Edges and P2P              | Edge agent, tracker, P2P in the player, offload statistics                          | Planned           |
-| 6. Operations                 | Installer, updates with rollback, backup and restore, diagnostics                   | Starts in phase 1 |
-| 7. Apps                       | Android mobile and Android TV                                                       | Planned           |
-| 8. Advanced                   | DRM, ads, analytics dashboards, further apps                                        | Planned           |
+| Phase                         | Delivers                                                                            | Status              |
+| ----------------------------- | ----------------------------------------------------------------------------------- | ------------------- |
+| 1. Media engine core          | Upload, probe, copy or transcode, HLS packaging, signed playback, basic admin panel | Done                |
+| 2. Catalog and viewer website | Titles, series, metadata import, viewer accounts and profiles, player with resume   | Done                |
+| 3. Billing                    | Plans, payments, entitlements, coupons. First complete VOD service                  | Done, coupons later |
+| 4. Live                       | Ingest, copy and transcode channels, DVR, EPG, channels in the catalog              | In progress         |
+| 5. Edges and P2P              | Edge agent, tracker, P2P in the player, offload statistics                          | Planned             |
+| 6. Operations                 | Installer, updates with rollback, backup and restore, diagnostics                   | Starts in phase 1   |
+| 7. Apps                       | Android mobile and Android TV                                                       | Planned             |
+| 8. Advanced                   | DRM, ads, analytics dashboards, further apps                                        | Planned             |
 
 ## Phase 1 in steps
 
@@ -27,3 +27,14 @@ The project is built in phases. Each phase ends with something that works end to
 10. Admin panel design system: Tailwind and Radix components, light and dark themes, command palette, dashboard, library with posters, sorting, bulk actions and drag-and-drop upload. **Done.** Step 10b added live updates pushed from the server and the video workspace with qualities, subtitles, pictures and activity. **Done.**
 
 See [phase-1-media-engine.md](phase-1-media-engine.md) for the design.
+
+## Phase 4 in steps
+
+1. Channels pulled from an address: sources over HTTP, RTMP, SRT, UDP and RTP, a live process that keeps them running, repackaging to HLS without re-encoding, signed delivery, and the Channels page with a live preview. **Done.**
+2. Transcoding to several qualities.
+3. Channels pushed by an encoder.
+4. Going back in time and recording.
+5. A programme guide.
+6. Channels in the catalog, in packages and on the viewer website.
+
+See [phase-4-live.md](phase-4-live.md) for the design.

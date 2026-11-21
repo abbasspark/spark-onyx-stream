@@ -66,14 +66,15 @@ ENV NODE_ENV=production \
     API_PORT=3000 \
     STORAGE_LOCAL_PATH=/var/lib/onyx/storage \
     UPLOAD_TEMP_PATH=/var/lib/onyx/uploads \
-    PROCESSING_TEMP_PATH=/var/lib/onyx/processing
+    PROCESSING_TEMP_PATH=/var/lib/onyx/processing \
+    LIVE_PATH=/var/lib/onyx/live
 
 # FFmpeg does the media work. tini passes stop signals on, so jobs end cleanly.
 RUN apt-get update \
  && apt-get install --yes --no-install-recommends ffmpeg tini \
  && rm -rf /var/lib/apt/lists/* \
  && npm install --global pnpm@${PNPM_VERSION} && npm cache clean --force \
- && mkdir -p /var/lib/onyx/storage /var/lib/onyx/uploads /var/lib/onyx/processing \
+ && mkdir -p /var/lib/onyx/storage /var/lib/onyx/uploads /var/lib/onyx/processing /var/lib/onyx/live \
  && chown -R node:node /var/lib/onyx
 
 WORKDIR /app

@@ -25,6 +25,8 @@ export const PERMISSIONS = [
   'viewers:write',
   'billing:read',
   'billing:write',
+  'live:read',
+  'live:write',
   'settings:read',
   'settings:write',
 ] as const;
@@ -43,6 +45,7 @@ const CONTENT_READ: readonly Permission[] = [
   'jobs:read',
   'encoding-profiles:read',
   'storage:read',
+  'live:read',
 ];
 
 const CONTENT_WRITE: readonly Permission[] = [

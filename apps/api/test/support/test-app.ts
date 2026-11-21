@@ -38,8 +38,10 @@ if (TEST_DATABASE_URL && TEST_DATABASE_URL === process.env.DATABASE_URL) {
 export class FakeRedis {
   private readonly counters = new Map<string, number>();
 
+  private readonly strings = new Map<string, string>();
+
   async get(key: string): Promise<string | null> {
-    const value = this.counters.get(key);
+    const value = this.counters.get(key) ?? this.strings.get(key);
     return value === undefined ? null : String(value);
   }
 
@@ -57,8 +59,30 @@ export class FakeRedis {
     return this.counters.has(key) ? 900 : -2;
   }
 
-  async del(key: string): Promise<number> {
-    return this.counters.delete(key) ? 1 : 0;
+  async del(...keys: string[]): Promise<number> {
+    let removed = 0;
+    for (const key of keys) {
+      removed += Number(this.counters.delete(key)) + Number(this.strings.delete(key));
+    }
+    return removed;
+  }
+
+  /** "SET key value [PX ms] [NX]". Values set here do not run out. */
+  async set(key: string, value: string, ...options: (string | number)[]): Promise<'OK' | null> {
+    if (options.includes('NX') && this.strings.has(key)) {
+      return null;
+    }
+    this.strings.set(key, value);
+    return 'OK';
+  }
+
+  async pexpire(): Promise<number> {
+    return 1;
+  }
+
+  /** A second connection, as subscribers need one. It never receives anything. */
+  duplicate() {
+    return { on: () => undefined, subscribe: async () => 1, disconnect: () => undefined };
   }
 
   async publish(channel: string, message: string): Promise<number> {
@@ -71,6 +95,7 @@ export class FakeRedis {
 
   clear(): void {
     this.counters.clear();
+    this.strings.clear();
     this.published.length = 0;
   }
 }
@@ -232,6 +257,7 @@ export async function createTestApp(
       queue.clear();
       await prisma.auditLog.deleteMany();
       await prisma.payment.deleteMany();
+      await prisma.channel.deleteMany();
       // Catalog rows point to assets, pictures and pools, so they go first.
       await prisma.title.deleteMany();
       await prisma.category.deleteMany();
