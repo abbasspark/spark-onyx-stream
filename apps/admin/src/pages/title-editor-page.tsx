@@ -55,6 +55,7 @@ import {
 import { changedFields, describeContent, type DetailsForm, toForm } from '@/lib/catalog';
 import { cn } from '@/lib/cn';
 import { formatDateTime } from '@/lib/format';
+import { SITE_URL } from '@/lib/site';
 import { usePollInterval } from '@/live/live';
 
 const isBusy = (status: string | undefined) =>
@@ -241,55 +242,65 @@ export function TitleEditorPage() {
           </p>
         </div>
 
-        {mayWrite ? (
-          <div className="flex shrink-0 flex-wrap items-center gap-2">
-            {title.status === 'PUBLISHED' ? (
-              <Button loading={setStatus.isPending} onClick={() => void askUnpublish()}>
-                <EyeOff />
-                Unpublish
-              </Button>
-            ) : null}
-            {title.status === 'ARCHIVED' ? (
-              <Button loading={setStatus.isPending} onClick={() => setStatus.mutate('DRAFT')}>
-                <ArchiveRestore />
-                Restore as draft
-              </Button>
-            ) : null}
-            {title.status === 'DRAFT' ? (
-              canPublish ? (
-                publishButton
-              ) : (
-                <Tooltip content={`Still open: ${open.map((item) => item.label).join(', ')}`}>
-                  <span className="inline-flex">{publishButton}</span>
-                </Tooltip>
-              )
-            ) : null}
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button size="icon" aria-label="More actions">
-                  <MoreHorizontal />
+        <div className="flex shrink-0 flex-wrap items-center gap-2">
+          {title.isVisible && SITE_URL !== null ? (
+            <Button asChild variant="ghost">
+              <a href={`${SITE_URL}/title/${title.slug}`} target="_blank" rel="noreferrer">
+                View on site
+                <ExternalLink />
+              </a>
+            </Button>
+          ) : null}
+          {mayWrite ? (
+            <>
+              {title.status === 'PUBLISHED' ? (
+                <Button loading={setStatus.isPending} onClick={() => void askUnpublish()}>
+                  <EyeOff />
+                  Unpublish
                 </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                {title.status !== 'ARCHIVED' ? (
-                  <DropdownMenuItem onSelect={() => void askArchive()}>
-                    <Archive />
-                    Archive
+              ) : null}
+              {title.status === 'ARCHIVED' ? (
+                <Button loading={setStatus.isPending} onClick={() => setStatus.mutate('DRAFT')}>
+                  <ArchiveRestore />
+                  Restore as draft
+                </Button>
+              ) : null}
+              {title.status === 'DRAFT' ? (
+                canPublish ? (
+                  publishButton
+                ) : (
+                  <Tooltip content={`Still open: ${open.map((item) => item.label).join(', ')}`}>
+                    <span className="inline-flex">{publishButton}</span>
+                  </Tooltip>
+                )
+              ) : null}
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button size="icon" aria-label="More actions">
+                    <MoreHorizontal />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  {title.status !== 'ARCHIVED' ? (
+                    <DropdownMenuItem onSelect={() => void askArchive()}>
+                      <Archive />
+                      Archive
+                    </DropdownMenuItem>
+                  ) : null}
+                  {title.status !== 'ARCHIVED' ? <DropdownMenuSeparator /> : null}
+                  <DropdownMenuItem
+                    destructive
+                    disabled={title.status === 'PUBLISHED'}
+                    onSelect={() => void askDelete()}
+                  >
+                    <Trash2 />
+                    {title.status === 'PUBLISHED' ? 'Delete (unpublish first)' : 'Delete'}
                   </DropdownMenuItem>
-                ) : null}
-                {title.status !== 'ARCHIVED' ? <DropdownMenuSeparator /> : null}
-                <DropdownMenuItem
-                  destructive
-                  disabled={title.status === 'PUBLISHED'}
-                  onSelect={() => void askDelete()}
-                >
-                  <Trash2 />
-                  {title.status === 'PUBLISHED' ? 'Delete (unpublish first)' : 'Delete'}
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </div>
-        ) : null}
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </>
+          ) : null}
+        </div>
       </header>
 
       {hidden ? (

@@ -1,10 +1,11 @@
 # Single-server installation with Docker Compose
 
-Runs the whole platform on one server: PostgreSQL, Redis, the API, a worker and an Nginx gateway with the admin panel.
+Runs the whole platform on one server: PostgreSQL, Redis, the API, a worker, the viewer website and an Nginx gateway with the admin panel.
 
 ```
             ┌──────────── gateway (Nginx, port 8080) ────────────┐
-browser ───▶│  /            admin panel                           │
+browser ───▶│  /            viewer website                        │──▶ web ──▶ api
+            │  /admin/      admin panel                           │
 player  ───▶│  /v1/media/…  media files, token checked by Nginx   │──▶ storage volume (read-only)
             │  /v1/…        passed on to the API                  │──▶ api ──▶ postgres, redis
             └─────────────────────────────────────────────────────┘                ▲
@@ -22,25 +23,32 @@ player  ───▶│  /v1/media/…  media files, token checked by Nginx   �
 ```bash
 cd deploy/compose
 ./init-env.sh                 # once: writes .env with fresh secrets
-docker compose up -d --build  # builds the two images and starts everything
+docker compose up -d --build  # builds the three images and starts everything
 ```
 
-Open `http://<server>:8080` and create the first admin.
+Open `http://<server>:8080/admin` and create the first admin. The site for viewers is at `http://<server>:8080`. It stays empty until you publish a title.
+
+Before you publish anything, set `SITE_NAME` and `SITE_URL` in `.env`. Read the note on `CATALOG_PLAYBACK` there too: with the default, everyone who can reach the server can watch what you publish.
 
 **Keep a copy of `.env` in a safe place.** Without `MASTER_KEY`, encrypted videos cannot be played and stored S3 credentials cannot be read.
 
 ## What runs
 
-| Service    | Image                 | Job                                                         |
-| ---------- | --------------------- | ----------------------------------------------------------- |
-| `gateway`  | `onyx-stream/gateway` | Nginx: admin panel, media files, passes `/v1` on to the API |
-| `api`      | `onyx-stream/api`     | REST API and uploads (`APP_ROLE=api,scheduler`)             |
-| `worker`   | `onyx-stream/api`     | Processing with FFmpeg (`APP_ROLE=worker`)                  |
-| `migrate`  | `onyx-stream/api`     | Brings the database to the current version, then ends       |
-| `postgres` | `postgres:17-alpine`  | Database                                                    |
-| `redis`    | `redis:7-alpine`      | Job queue                                                   |
+| Service    | Image                 | Job                                                   |
+| ---------- | --------------------- | ----------------------------------------------------- |
+| `gateway`  | `onyx-stream/gateway` | Nginx: admin panel, media files, passes the rest on   |
+| `web`      | `onyx-stream/web`     | Viewer website (Next.js)                              |
+| `api`      | `onyx-stream/api`     | REST API and uploads (`APP_ROLE=api,scheduler`)       |
+| `worker`   | `onyx-stream/api`     | Processing with FFmpeg (`APP_ROLE=worker`)            |
+| `migrate`  | `onyx-stream/api`     | Brings the database to the current version, then ends |
+| `postgres` | `postgres:17-alpine`  | Database                                              |
+| `redis`    | `redis:7-alpine`      | Job queue                                             |
 
-Only the gateway is reachable from outside. The API, the database and Redis have no published ports.
+Only the gateway is reachable from outside. The API, the website, the database and Redis have no published ports.
+
+### Coming from an earlier version
+
+The admin panel moved from `/` to `/admin`, because the root now belongs to the viewer website. Bookmarks of the panel need `/admin` in front. Signed-in admins stay signed in.
 
 ## How media is served
 

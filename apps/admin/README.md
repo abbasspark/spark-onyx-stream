@@ -18,6 +18,12 @@ The admin panel: a single-page app built with Vite and React.
 
 Buttons that change something are shown only to roles that may use them.
 
+## Where it is served
+
+In development the panel is at the root of its own port. The Docker gateway serves it under `/admin/`, and the build is told so with `ADMIN_BASE_PATH=/admin/`.
+
+When the panel knows where the viewer website is, it shows a "View site" link and, on a published title, "View on site". Behind the gateway that is the root of the same address. Elsewhere set `VITE_SITE_URL`, for example `VITE_SITE_URL=http://localhost:3001 pnpm dev:admin`.
+
 ## Built with
 
 Vite, React, React Router, TanStack Query, Tailwind CSS 4 and Radix primitives. The components in `src/components/ui` follow the shadcn/ui approach: their code lives in this repository. See decision D-021.

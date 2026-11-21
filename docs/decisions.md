@@ -303,4 +303,18 @@ This replaces the "plain CSS without a component library" part of D-018.
 
 **Why:** title pages must be readable by search engines and show a proper preview when a link is shared, which a page built only in the browser does not give. The admin panel has neither need, so it stays the simpler Vite application it is. Keeping the website on the public API alone means it can run on another machine, and that everything a viewer can see is, by construction, what the API decided to publish.
 
-**Consequence:** the project now has two frontend stacks to maintain. The website's server counts as one client for the API's request limit, which is why it shares cached answers and leaves search to the browser. The website is not yet part of the Docker images and the gateway. Until it is, it runs with `pnpm dev:web` or its own `start` command.
+**Consequence:** the project now has two frontend stacks to maintain. The website's server counts as one client for the API's request limit, which is why it shares cached answers and leaves search to the browser. In the Docker installation the gateway serves the website at `/` and the admin panel at `/admin` (D-026).
+
+## D-026 One origin: the website at the root, the admin panel under /admin
+
+**Date:** 2026-11-21
+
+- **The gateway serves everything from one origin:** the viewer website at `/`, the admin panel at `/admin/`, the API at `/v1/`.
+- **The admin panel is built for the path it is served under** (`ADMIN_BASE_PATH`). In development it stays at the root of its own port.
+- **The website is its own image, `web`,** a self-contained Next.js server. It is built without any setting of the installation and reads them when it starts.
+- **The website sets its own content security policy,** with a nonce that is new for every page. The stricter, fixed policy of the gateway stays on the admin panel only.
+- **Requests to `/v1` that reach the website are passed on to the API at run time.** Behind the gateway that never happens. It keeps development and gateway-less setups on one origin.
+
+**Why:** one origin needs no cross-origin setup, one certificate and one address to remember, and the root is the address viewers type. A nonce is the only way to keep inline scripts forbidden on pages that Next.js builds, since it writes small scripts into every page.
+
+**Consequence:** the admin panel changed its address, which breaks old bookmarks once. The panel and the website share cookies and storage of one origin; today neither uses cookies, and their stored keys are prefixed (`onyx.admin.`, `onyx.web.`). Operators who want the panel on a separate address can put it behind their own proxy rule. Every page of the website is built per request, because a nonce cannot be part of a page that is built once and reused.

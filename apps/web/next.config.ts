@@ -9,17 +9,17 @@ if (existsSync(rootEnvFile)) {
   process.loadEnvFile(rootEnvFile);
 }
 
-const apiUrl = (process.env.WEB_API_URL ?? 'http://localhost:3000').replace(/\/+$/, '');
-
 const config: NextConfig = {
+  // The Docker image runs a self-contained server from .next/standalone. That
+  // output does not work with "next start", so it is made only when asked for.
+  ...(process.env.NEXT_OUTPUT === 'standalone'
+    ? {
+        output: 'standalone' as const,
+        outputFileTracingRoot: path.resolve(import.meta.dirname, '../..'),
+      }
+    : {}),
   poweredByHeader: false,
   reactStrictMode: true,
-  // In production the gateway sends /v1 to the API itself. Without a gateway,
-  // as in development, the website passes these requests on, so the browser
-  // talks to one origin either way.
-  async rewrites() {
-    return [{ source: '/v1/:path*', destination: `${apiUrl}/v1/:path*` }];
-  },
   async headers() {
     return [
       {
