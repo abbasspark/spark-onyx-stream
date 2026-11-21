@@ -6,7 +6,8 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { formatClock } from '@/lib/format';
-import { findEntry, isResumable, removeEntry, saveEntry } from '@/lib/progress';
+import { findEntry, isResumable } from '@/lib/progress';
+import { recordFinished, recordPosition, syncSettled } from '@/lib/watch-sync';
 import type { Playback } from '@/lib/types';
 import { authHref } from '@/lib/viewer-api';
 import { Player } from './player/player';
@@ -28,7 +29,7 @@ export interface WatchScreenProps {
    * Under which the position is remembered, with what the "Continue watching"
    * row shows. Null for a trailer, which is not worth resuming.
    */
-  progress: { key: string; href: string; image: string | null } | null;
+  progress: { id: string; key: string; href: string; image: string | null } | null;
   /** What plays after this, for an episode that has a following one. */
   next: { href: string; label: string } | null;
 }
@@ -89,17 +90,28 @@ export function WatchScreen({
     setLoaded({ state: 'loading' });
     setEnded(false);
 
-    // After a failure the video goes on where it broke, otherwise where the viewer left it.
-    const stored = progress ? findEntry(progress.key) : undefined;
-    const startAt =
-      attempt > 0
-        ? position.current.time
-        : stored && isResumable(stored.position, stored.duration)
-          ? stored.position
-          : 0;
+    // After a failure the video goes on where it broke, otherwise where the
+    // viewer left it, on this device or on another one.
+    const whereToStart = async (): Promise<number> => {
+      if (attempt > 0) {
+        return position.current.time;
+      }
+      if (!progress) {
+        return 0;
+      }
+      await syncSettled();
+      const stored = findEntry(progress.key);
+      return stored && isResumable(stored.position, stored.duration) ? stored.position : 0;
+    };
 
-    fetch(playbackPath, { method: 'POST', signal: controller.signal })
-      .then(async (response) => {
+    Promise.all([
+      fetch(playbackPath, { method: 'POST', signal: controller.signal }),
+      whereToStart(),
+    ])
+      .then(async ([response, startAt]) => {
+        if (controller.signal.aborted) {
+          return;
+        }
         if (response.status === 401) {
           setLoaded({ state: 'sign-in' });
           return;
@@ -138,23 +150,30 @@ export function WatchScreen({
 
   // --- Remembering the position --------------------------------------------
 
-  const save = useCallback(() => {
-    const { time, duration } = position.current;
-    if (!progress || !(duration > 0)) {
-      return;
-    }
-    position.current.savedAt = Date.now();
-    saveEntry({
-      key: progress.key,
-      href: progress.href,
-      name: heading,
-      detail,
-      image: progress.image,
-      position: time,
-      duration,
-      updatedAt: Date.now(),
-    });
-  }, [progress, heading, detail]);
+  const save = useCallback(
+    (leaving = false) => {
+      const { time, duration } = position.current;
+      if (!progress || !(duration > 0)) {
+        return;
+      }
+      position.current.savedAt = Date.now();
+      recordPosition(
+        {
+          id: progress.id,
+          key: progress.key,
+          href: progress.href,
+          name: heading,
+          detail,
+          image: progress.image,
+          position: time,
+          duration,
+          updatedAt: Date.now(),
+        },
+        leaving,
+      );
+    },
+    [progress, heading, detail],
+  );
 
   const onTime = useCallback(
     (time: number, duration: number) => {
@@ -169,17 +188,20 @@ export function WatchScreen({
 
   // Leaving the page, or putting the phone away, saves the exact position.
   useEffect(() => {
+    // The page may be gone before the answer comes, so the request is one
+    // the browser finishes by itself.
+    const onLeave = () => save(true);
     const onHide = () => {
       if (document.visibilityState === 'hidden') {
-        save();
+        save(true);
       }
     };
-    window.addEventListener('pagehide', save);
+    window.addEventListener('pagehide', onLeave);
     document.addEventListener('visibilitychange', onHide);
     return () => {
-      window.removeEventListener('pagehide', save);
+      window.removeEventListener('pagehide', onLeave);
       document.removeEventListener('visibilitychange', onHide);
-      save();
+      save(true);
     };
   }, [save]);
 
@@ -187,7 +209,7 @@ export function WatchScreen({
 
   const onEnded = useCallback(() => {
     if (progress) {
-      removeEntry(progress.key);
+      recordFinished(progress, position.current.duration);
     }
     // Nothing is saved any more: the position is the end, which is not worth resuming.
     position.current.duration = 0;

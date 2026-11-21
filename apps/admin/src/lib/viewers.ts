@@ -1,4 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-only
+import type { ViewerWatchingItem } from '@/api/types';
+import { formatDuration } from './format';
 
 const BROWSERS: readonly (readonly [pattern: RegExp, name: string])[] = [
   // Order matters: most browsers also name the ones they are built on.
@@ -80,4 +82,31 @@ export function initialsOf(name: string): string {
     .map((word) => [...(word ?? '')][0] ?? '')
     .join('')
     .toUpperCase();
+}
+
+export interface WatchingSummary {
+  /** For an episode "S1 E3 The Trench", for a movie null. */
+  episode: string | null;
+  /** "Watched", "12:30 of 45:00", or for a finished video watched again "12:30 of 45:00, watched before". */
+  state: string;
+  /** How much of the video is behind the viewer, 0 to 100. */
+  percent: number;
+}
+
+/** One video of a viewer's history in words. */
+export function summarizeWatching(item: ViewerWatchingItem): WatchingSummary {
+  const episode = item.episode
+    ? `S${item.episode.seasonNumber} E${item.episode.number} ${item.episode.name}`
+    : null;
+  const finished = item.completedAt !== null;
+  if (item.position <= 0) {
+    return { episode, state: finished ? 'Watched' : 'Not started', percent: finished ? 100 : 0 };
+  }
+  const where = `${formatDuration(item.position * 1000)} of ${formatDuration(item.duration * 1000)}`;
+  return {
+    episode,
+    state: finished ? `${where}, watched before` : where,
+    percent:
+      item.duration > 0 ? Math.min(100, Math.round((item.position / item.duration) * 100)) : 0,
+  };
 }

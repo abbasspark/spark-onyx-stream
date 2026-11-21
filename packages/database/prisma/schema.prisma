@@ -87,6 +87,7 @@ model Viewer {
   updatedAt    DateTime     @updatedAt
 
   sessions ViewerSession[]
+  watching WatchProgress[]
 
   @@index([createdAt])
   @@map("viewers")
@@ -575,6 +576,7 @@ model Title {
 
   categories TitleCategory[]
   seasons    Season[]
+  watching   WatchProgress[]
 
   @@index([type, status])
   @@index([status, publishedAt])
@@ -647,7 +649,41 @@ model Episode {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  watching WatchProgress[]
+
   @@unique([seasonId, number])
   @@index([assetId])
   @@map("episodes")
+}
+
+/// How far a viewer is in one video: a movie, or an episode of a series.
+/// One row per viewer and video.
+model WatchProgress {
+  id        String   @id @default(uuid(7)) @db.Uuid
+  viewerId  String   @db.Uuid
+  viewer    Viewer   @relation(fields: [viewerId], references: [id], onDelete: Cascade)
+  titleId   String   @db.Uuid
+  title     Title    @relation(fields: [titleId], references: [id], onDelete: Cascade)
+  /// Set for an episode of a series, empty for a movie.
+  episodeId String?  @db.Uuid
+  episode   Episode? @relation(fields: [episodeId], references: [id], onDelete: Cascade)
+  /// The video itself: the id of the episode, or of the title for a movie.
+  itemId    String   @db.Uuid
+
+  /// Where to go on. 0 when there is nothing to resume, for example after the end.
+  positionSeconds Int
+  durationSeconds Int
+  /// When the viewer last watched the video to its end.
+  completedAt     DateTime?
+  /// When the viewer last watched. Comes from the device, never later than now.
+  watchedAt       DateTime
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([viewerId, itemId])
+  @@index([viewerId, watchedAt])
+  @@index([titleId])
+  @@index([episodeId])
+  @@map("watch_progress")
 }

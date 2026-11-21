@@ -61,6 +61,7 @@ export default async function WatchPage({ params, searchParams }: WatchPageProps
       detail={null}
       backHref={backHref}
       progress={{
+        id: title.id,
         key: movieKey(title.slug),
         href: watchHref(title.slug),
         image: (title.backdrop ?? title.poster)?.url ?? null,

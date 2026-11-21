@@ -67,12 +67,23 @@ export function toViewerApiError(status: number, body: ErrorBody | null): Viewer
   return new ViewerApiError(status, message || 'Something went wrong. Try again in a moment.');
 }
 
-async function call<Result>(method: string, path: string, body?: unknown): Promise<Result> {
+/**
+ * Calls the API of the viewer's own account.
+ *
+ * @param keepalive Lets the request finish after the page is left.
+ */
+export async function call<Result>(
+  method: string,
+  path: string,
+  body?: unknown,
+  keepalive = false,
+): Promise<Result> {
   let response: Response;
   try {
     response = await fetch(`/v1/viewer${path}`, {
       method,
       credentials: 'same-origin',
+      keepalive,
       headers: body === undefined ? undefined : { 'Content-Type': 'application/json' },
       body: body === undefined ? undefined : JSON.stringify(body),
     });

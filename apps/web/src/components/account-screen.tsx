@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 'use client';
 
-import { Check, Loader2, LogOut, MonitorSmartphone } from 'lucide-react';
+import { Check, History, Loader2, LogOut, MonitorSmartphone } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { type FormEvent, type ReactNode, useCallback, useEffect, useState } from 'react';
 import {
@@ -12,6 +12,7 @@ import {
   viewerApi,
   type ViewerDevice,
 } from '@/lib/viewer-api';
+import { clearHistory } from '@/lib/watch-sync';
 import { FormField } from './form-field';
 import { useViewerSession } from './viewer-session';
 
@@ -37,7 +38,7 @@ function Spinner() {
 }
 
 /** Confirms a change next to its button for a few seconds. */
-function Saved({ when }: { when: number }) {
+function Saved({ when, label = 'Saved' }: { when: number; label?: string }) {
   const [shown, setShown] = useState(false);
   useEffect(() => {
     if (when === 0) {
@@ -52,7 +53,7 @@ function Saved({ when }: { when: number }) {
       {shown ? (
         <>
           <Check className="size-4" aria-hidden="true" />
-          Saved
+          {label}
         </>
       ) : null}
     </span>
@@ -95,6 +96,7 @@ export function AccountScreen() {
       <NameSection name={viewer.displayName} onSaved={setViewer} />
       <PasswordSection />
       <DevicesSection />
+      <HistorySection />
       <Section heading="Sign out">
         <p className="mb-5 text-smoke">Signs you out on this device only.</p>
         <button
@@ -316,6 +318,72 @@ function DevicesSection() {
           ))}
         </ul>
       ) : null}
+    </Section>
+  );
+}
+
+/** What the account remembers of what was watched, and forgetting it. */
+function HistorySection() {
+  const [open, setOpen] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<ViewerApiError | null>(null);
+  const [clearedAt, setClearedAt] = useState(0);
+
+  const clear = async () => {
+    setBusy(true);
+    setError(null);
+    try {
+      await clearHistory();
+      setOpen(false);
+      setClearedAt(Date.now());
+    } catch (caught) {
+      setError(asError(caught));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <Section heading="Watch history">
+      <p className="mb-5 text-smoke">
+        Your account remembers where you stopped and what you finished, so you can go on with a
+        video on any device you sign in on.
+      </p>
+      {open ? (
+        <div className="grid gap-4">
+          <p>
+            Clearing empties "Continue watching" and removes the "Watched" marks, on all your
+            devices. This cannot be undone.
+          </p>
+          {error ? (
+            <p role="alert" className="text-sm text-alarm">
+              {error.message}
+            </p>
+          ) : null}
+          <div className="flex flex-wrap gap-3">
+            <button
+              type="button"
+              className="button button-danger"
+              disabled={busy}
+              onClick={() => void clear()}
+            >
+              {busy ? <Spinner /> : null}
+              Clear my watch history
+            </button>
+            <button type="button" className="button button-quiet" onClick={() => setOpen(false)}>
+              Keep it
+            </button>
+          </div>
+        </div>
+      ) : (
+        <div className="flex flex-wrap items-center gap-4">
+          <button type="button" className="button button-quiet" onClick={() => setOpen(true)}>
+            <History />
+            Clear watch history
+          </button>
+          <Saved when={clearedAt} label="Cleared" />
+        </div>
+      )}
     </Section>
   );
 }

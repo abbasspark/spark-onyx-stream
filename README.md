@@ -91,7 +91,7 @@ docker compose up -d --build
 
 Then open http://localhost:8080. See the [Compose README](deploy/compose/README.md) for updates, backups and TLS.
 
-The viewer website is not scaffolded yet. See the [roadmap](docs/roadmap.md).
+The viewer website is at the root and the admin panel at `/admin/`. See the [roadmap](docs/roadmap.md) for what comes next.
 
 ## Documentation
 

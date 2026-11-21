@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 //
-// Where a viewer stopped watching, kept in the browser. There are no viewer
-// accounts yet, so this never leaves the device.
+// Where a viewer stopped watching, kept in the browser. For a visitor this
+// never leaves the device. For a signed-in viewer it is a copy of what the
+// account holds, so the page has it at once and it survives a lost connection.
 
 export interface WatchEntry {
   /** What is watched: "movie:{slug}" or "episode:{episodeId}". */
@@ -19,6 +20,19 @@ export interface WatchEntry {
   duration: number;
   /** Milliseconds since 1970, to order the list. */
   updatedAt: number;
+  /** Id of the video in the catalog: of the episode, or of the movie. */
+  id?: string;
+  /** Set when the viewer's account holds this entry as it is here. */
+  synced?: boolean;
+}
+
+/** A position as the account takes it. */
+export interface WatchReport {
+  title: string;
+  episodeId?: string;
+  position: number;
+  duration: number;
+  watchedAt?: string;
 }
 
 export const STORAGE_KEY = 'onyx.web.watching.v1';
@@ -103,4 +117,66 @@ export function removeEntry(key: string): void {
 
 export function findEntry(key: string): WatchEntry | undefined {
   return readEntries().find((entry) => entry.key === key);
+}
+
+export function replaceEntries(entries: readonly WatchEntry[]): void {
+  writeEntries(entries.slice(0, MAX_ENTRIES));
+}
+
+/** Notes that the account holds an entry, unless the entry moved on since. */
+export function markSynced(key: string, updatedAt: number): void {
+  const entries = readEntries();
+  const entry = entries.find((item) => item.key === key);
+  if (entry && entry.updatedAt === updatedAt && !entry.synced) {
+    entry.synced = true;
+    writeEntries(entries);
+  }
+}
+
+/**
+ * Which video an entry is about, in the words of the catalog. The address of
+ * the watch page says it: "/watch/{slug}" or "/watch/{slug}/{episodeId}".
+ */
+export function targetOf(
+  entry: Pick<WatchEntry, 'href'>,
+): Pick<WatchReport, 'title' | 'episodeId'> | null {
+  const match = /^\/watch\/([^/?#]+)(?:\/([^/?#]+))?$/.exec(entry.href);
+  if (!match?.[1]) {
+    return null;
+  }
+  const title = decodeURIComponent(match[1]);
+  return match[2] ? { title, episodeId: match[2] } : { title };
+}
+
+/** An entry made on this device, as a report for the account, with its time. */
+export function toReport(entry: WatchEntry): WatchReport | null {
+  const target = targetOf(entry);
+  if (!target) {
+    return null;
+  }
+  const watchedAt = Number.isFinite(entry.updatedAt)
+    ? new Date(entry.updatedAt).toISOString()
+    : undefined;
+  return { ...target, position: entry.position, duration: entry.duration, watchedAt };
+}
+
+/**
+ * The list of the account, with what this device knows better: entries the
+ * account has not taken yet, when they are newer than the account's own.
+ */
+export function mergeUnsynced(
+  account: readonly WatchEntry[],
+  local: readonly WatchEntry[],
+): WatchEntry[] {
+  const merged = new Map(account.map((entry) => [entry.key, entry]));
+  for (const entry of local) {
+    if (entry.synced) {
+      continue;
+    }
+    const held = merged.get(entry.key);
+    if (!held || held.updatedAt < entry.updatedAt) {
+      merged.set(entry.key, entry);
+    }
+  }
+  return [...merged.values()].sort((a, b) => b.updatedAt - a.updatedAt).slice(0, MAX_ENTRIES);
 }

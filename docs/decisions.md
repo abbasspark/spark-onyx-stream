@@ -333,3 +333,18 @@ This replaces the "plain CSS without a component library" part of D-018.
 **Why:** an admin account is a key to the installation and a viewer account is not. Keeping them apart means a mistake in viewer code cannot hand out admin rights, and the two can grow differently (subscriptions on one side, roles on the other). A cookie the page's scripts cannot read is the safest place for a browser session. The check of the origin closes the gap that such cookies otherwise open.
 
 **Consequence:** sign-up tells whether an email address is taken, which can only be avoided once email verification exists. A viewer who forgets their password needs an admin. Both settings are set in the environment and need a restart, and the panel shows their values so nobody has to guess.
+
+## D-028 Watch history lives in the account, with a copy in the browser
+
+**Date:** 2026-11-21
+
+- **One row per viewer and video** holds the position, the length, when it was finished and when it was last watched.
+- **The API decides what "begun" and "finished" mean.** Players report raw positions.
+- **Of two reports for one video the later one counts,** by the time the device noted it, never later than the server's now.
+- **The website keeps reading its list from the browser.** For a signed-in viewer that list is a copy: changes go to the account as they happen, and the account's list replaces the copy when a page opens.
+- **Signing in hands over what the device kept as a visitor. Signing out empties the copy.**
+- **Admins with `viewers:read` can see what a viewer watched.**
+
+**Why:** resuming on another device is what viewers expect from an account. Reading from the browser keeps pages the same for everyone when they leave the server, shows the row without waiting, and keeps working without a connection. Rules on the server mean a phone app and the website cannot disagree about what is watched. Operators need to see a viewer's history to answer support questions, and later to report what is watched.
+
+**Consequence:** on a shared computer, what a visitor watched joins the account of whoever signs in next on it. Two devices playing the same video at once overwrite each other's position, the later one winning. There is one history per account until profiles exist. The player sends a small request about every 15 seconds for each signed-in viewer who is watching.

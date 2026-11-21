@@ -41,7 +41,9 @@ export function buildCsp({ nonce, development, mediaOrigin }: CspOptions): strin
     `script-src 'self' 'nonce-${nonce}' 'strict-dynamic'${development ? " 'unsafe-eval'" : ''}`,
     "style-src 'self' 'unsafe-inline'",
     `img-src ${withMedia("'self' data: blob:")}`,
-    `media-src ${withMedia("'self' blob:")}`,
+    // "data:" is for the empty subtitle file the player gives each text
+    // track, which works around a fault in Chrome's captions menu.
+    `media-src ${withMedia("'self' blob: data:")}`,
     // Development also talks to the dev server over a websocket.
     `connect-src ${withMedia("'self'")}${development ? ' ws: wss:' : ''}`,
     "font-src 'self'",
