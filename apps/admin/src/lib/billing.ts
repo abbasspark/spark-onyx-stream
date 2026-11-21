@@ -102,8 +102,22 @@ export function endOfDay(date: string): string | null {
   return Number.isNaN(parsed.getTime()) ? null : parsed.toISOString();
 }
 
+/** The address Stripe reports to: the address of the API as the browser knows it, and the path. */
+export function webhookUrl(apiOrigin: string, pageOrigin: string, path: string): string {
+  return `${apiOrigin || pageOrigin}${path}`;
+}
+
+/** "Customer subscription updated" for "customer.subscription.updated". */
+export function describeEventType(type: string): string {
+  const words = type.replace(/[._]/g, ' ').trim();
+  return words ? words.charAt(0).toUpperCase() + words.slice(1) : type;
+}
+
 /** How a subscription stands, in words and a tone for its badge. */
-export function describeSubscription(subscription: Pick<Subscription, 'status' | 'running'>): {
+export function describeSubscription(
+  subscription: Pick<Subscription, 'status' | 'running'> &
+    Partial<Pick<Subscription, 'online' | 'cancelAtPeriodEnd'>>,
+): {
   label: string;
   tone: 'success' | 'warning' | 'neutral' | 'danger';
 } {
@@ -118,6 +132,9 @@ export function describeSubscription(subscription: Pick<Subscription, 'status' |
     case 'PAST_DUE':
       return { label: 'Payment failed', tone: 'danger' };
     default:
+      if (subscription.online && subscription.cancelAtPeriodEnd) {
+        return { label: 'Cancelled, still running', tone: 'warning' };
+      }
       return { label: 'Running', tone: 'success' };
   }
 }

@@ -26,6 +26,10 @@ import type { ViewerIdentity } from '../viewers/viewer-session.service.js';
 import {
   type ChangeSubscriptionInput,
   changeSubscriptionSchema,
+  type ConfirmCheckoutInput,
+  confirmCheckoutSchema,
+  type StartCheckoutInput,
+  startCheckoutSchema,
   type CreatePlanInput,
   createPlanSchema,
   type GrantSubscriptionInput,
@@ -39,14 +43,31 @@ import type {
   BillingOverview,
   PlanAdminView,
   PublicPlans,
+  StripeAccountView,
+  StripeEventView,
   SubscriptionAdminView,
   ViewerSubscriptionView,
 } from './billing.views.js';
+import { RateLimit } from '../rate-limit/rate-limit.guard.js';
+import { CheckoutService } from './checkout.service.js';
 import { PlansService } from './plans.service.js';
+import { StripeWebhookService } from './stripe-webhook.service.js';
 import { SubscriptionsService } from './subscriptions.service.js';
 
 /** Plans change rarely, and a page of plans is opened by many. */
 const PLANS_CACHE = 'public, max-age=30';
+
+/** Paying is done by hand, a few times. This stops a script that opens payment pages in a loop. */
+const CHECKOUT_LIMIT = { name: 'viewer-checkout', limit: 20, windowSeconds: 600 } as const;
+
+/** What a viewer learns about their own subscription. */
+interface OwnSubscription {
+  subscription: ViewerSubscriptionView | null;
+  /** Whether titles that need a subscription are open to the viewer. */
+  entitled: boolean;
+  /** Whether the viewer paid online before, so a free trial is not offered again. */
+  trialUsed: boolean;
+}
 
 /** What viewers and visitors see of billing. */
 @Controller()
@@ -54,6 +75,7 @@ export class PublicBillingController {
   constructor(
     @Inject(PlansService) private readonly plans: PlansService,
     @Inject(SubscriptionsService) private readonly subscriptions: SubscriptionsService,
+    @Inject(CheckoutService) private readonly checkout: CheckoutService,
   ) {}
 
   /** The plans on offer. Open to everyone, like the catalog. */
@@ -68,11 +90,60 @@ export class PublicBillingController {
   @ViewerOnly()
   @Get('viewer/subscription')
   @Header('Cache-Control', 'no-store')
-  async own(
+  async own(@CurrentViewer() identity: ViewerIdentity): Promise<OwnSubscription> {
+    return this.ownOf(identity);
+  }
+
+  /** Opens Stripe's payment page for a plan. The viewer is sent to the address returned. */
+  @ViewerOnly()
+  @RateLimit(CHECKOUT_LIMIT)
+  @Post('viewer/checkout')
+  @HttpCode(HttpStatus.OK)
+  @Header('Cache-Control', 'no-store')
+  async start(
     @CurrentViewer() identity: ViewerIdentity,
-  ): Promise<{ subscription: ViewerSubscriptionView | null; entitled: boolean }> {
-    const subscription = await this.subscriptions.ownOf(identity.viewer.id);
-    return { subscription, entitled: subscription !== null };
+    @Body(new ZodValidationPipe(startCheckoutSchema)) body: StartCheckoutInput,
+  ): Promise<{ url: string }> {
+    return this.checkout.start(
+      identity.viewer,
+      body,
+      await this.subscriptions.paidBefore(identity.viewer.id),
+    );
+  }
+
+  /**
+   * Called when the viewer returns from paying. Records the subscription at
+   * once, without waiting for Stripe's own message about it.
+   */
+  @ViewerOnly()
+  @RateLimit(CHECKOUT_LIMIT)
+  @Post('viewer/checkout/confirm')
+  @HttpCode(HttpStatus.OK)
+  @Header('Cache-Control', 'no-store')
+  async confirm(
+    @CurrentViewer() identity: ViewerIdentity,
+    @Body(new ZodValidationPipe(confirmCheckoutSchema)) body: ConfirmCheckoutInput,
+  ): Promise<OwnSubscription> {
+    await this.checkout.confirm(identity.viewer, body.sessionId);
+    return this.ownOf(identity);
+  }
+
+  /** Opens Stripe's page for changing the card, reading invoices and cancelling. */
+  @ViewerOnly()
+  @RateLimit(CHECKOUT_LIMIT)
+  @Post('viewer/billing-portal')
+  @HttpCode(HttpStatus.OK)
+  @Header('Cache-Control', 'no-store')
+  portal(@CurrentViewer() identity: ViewerIdentity): Promise<{ url: string }> {
+    return this.checkout.portal(identity.viewer);
+  }
+
+  private async ownOf(identity: ViewerIdentity): Promise<OwnSubscription> {
+    const [subscription, trialUsed] = await Promise.all([
+      this.subscriptions.ownOf(identity.viewer.id),
+      this.subscriptions.paidBefore(identity.viewer.id),
+    ]);
+    return { subscription, entitled: subscription !== null, trialUsed };
   }
 }
 
@@ -83,12 +154,29 @@ export class BillingAdminController {
     @Inject(PlansService) private readonly plans: PlansService,
     @Inject(SubscriptionsService) private readonly subscriptions: SubscriptionsService,
     @Inject(AuditService) private readonly audit: AuditService,
+    @Inject(CheckoutService) private readonly checkout: CheckoutService,
+    @Inject(StripeWebhookService) private readonly webhooks: StripeWebhookService,
   ) {}
 
   @Get('billing')
   @RequirePermissions('billing:read')
   overview(): Promise<BillingOverview> {
     return this.subscriptions.overview();
+  }
+
+  /** Asks Stripe which account the key belongs to: the proof that the key works. */
+  @Post('billing/stripe/check')
+  @RequirePermissions('billing:read')
+  @HttpCode(HttpStatus.OK)
+  checkStripe(): Promise<StripeAccountView> {
+    return this.checkout.account();
+  }
+
+  /** The last messages Stripe sent, newest first. */
+  @Get('billing/stripe/events')
+  @RequirePermissions('billing:read')
+  stripeEvents(): Promise<StripeEventView[]> {
+    return this.webhooks.recent(25);
   }
 
   @Get('plans')
@@ -208,6 +296,14 @@ export class BillingAdminController {
       plan: subscription.plan.name,
     });
     return subscription;
+  }
+
+  /** Reads a subscription paid online from Stripe again. */
+  @Post('subscriptions/:id/refresh')
+  @RequirePermissions('billing:write')
+  @HttpCode(HttpStatus.OK)
+  refresh(@Param('id', ParseUUIDPipe) id: string): Promise<SubscriptionAdminView> {
+    return this.subscriptions.refresh(id);
   }
 
   private record(

@@ -76,6 +76,10 @@ export interface ViewerSubscriptionView {
   endsAt: Date | null;
   /** Set when it ends at endsAt and is not renewed. */
   cancelAtPeriodEnd: boolean;
+  /** When the next payment is due. Null when it is not renewed. */
+  renewsAt: Date | null;
+  /** Whether it is paid online, so the viewer manages it at the payment provider. */
+  online: boolean;
 }
 
 type WithPlan = Subscription & { plan: Pick<Plan, 'id' | 'name'> };
@@ -88,6 +92,8 @@ export function toViewerSubscriptionView(subscription: WithPlan): ViewerSubscrip
     startedAt: subscription.startedAt,
     endsAt: subscription.endsAt,
     cancelAtPeriodEnd: subscription.cancelAtPeriodEnd,
+    renewsAt: subscription.renewsAt,
+    online: subscription.source === 'STRIPE',
   };
 }
 
@@ -100,14 +106,23 @@ export interface SubscriptionAdminView extends ViewerSubscriptionView {
   canceledAt: Date | null;
   note: string | null;
   grantedBy: { id: string; displayName: string } | null;
+  /** Id of the subscription at the payment provider, and where to open it there. */
+  externalId: string | null;
+  externalUrl: string | null;
   createdAt: Date;
 }
 
 type ForAdmin = WithPlan & { grantedBy: { id: string; displayName: string } | null };
 
+/** Address of a subscription in Stripe's dashboard. */
+export function stripeDashboardUrl(externalId: string, livemode: boolean): string {
+  return `https://dashboard.stripe.com/${livemode ? '' : 'test/'}subscriptions/${encodeURIComponent(externalId)}`;
+}
+
 export function toSubscriptionAdminView(
   subscription: ForAdmin,
   now: Date = new Date(),
+  livemode = false,
 ): SubscriptionAdminView {
   return {
     ...toViewerSubscriptionView(subscription),
@@ -117,6 +132,11 @@ export function toSubscriptionAdminView(
     canceledAt: subscription.canceledAt,
     note: subscription.note,
     grantedBy: subscription.grantedBy,
+    externalId: subscription.externalId,
+    externalUrl:
+      subscription.source === 'STRIPE' && subscription.externalId
+        ? stripeDashboardUrl(subscription.externalId, livemode)
+        : null,
     createdAt: subscription.createdAt,
   };
 }
@@ -131,9 +151,54 @@ export interface BillingOverview {
   subscribers: number;
   /** Of those, the ones an admin granted access to. */
   grantedByHand: number;
+  /** Of those, the ones who pay online. */
+  paidOnline: number;
+  /** Paying subscribers whose last payment failed and is being tried again. */
+  pastDue: number;
+  /** How online payment is set up. Null when it is off. */
+  stripe: StripeStatus | null;
   /** Running subscriptions that end within the next seven days and are not renewed. */
   endingSoon: number;
   /** Published titles that need a subscription, and all published titles. */
   paidTitles: number;
   publishedTitles: number;
+}
+
+/** A message from Stripe, as the panel lists it. */
+export interface StripeEventView {
+  id: string;
+  type: string;
+  receivedAt: Date;
+  /** "handled", "failed" with the reason in error, or "pending" while it is worked on. */
+  state: 'handled' | 'failed' | 'pending';
+  error: string | null;
+}
+
+/** How online payment is set up, for the panel. */
+export interface StripeStatus {
+  /** False while the key is one for testing, where no money moves. */
+  livemode: boolean;
+  /** Path of the endpoint Stripe reports to, after the address of the API. */
+  webhookPath: string;
+  /** The events the endpoint must be subscribed to at Stripe. */
+  webhookEvents: readonly string[];
+  /** Where viewers return after paying. */
+  siteUrl: string;
+  automaticTax: boolean;
+  /** The last message Stripe sent. Null when none arrived yet. */
+  lastEvent: StripeEventView | null;
+  /** Messages of the last day that could not be handled. */
+  failedEvents: number;
+}
+
+/** The Stripe account behind the key, as proof that the key works. */
+export interface StripeAccountView {
+  id: string;
+  name: string | null;
+  country: string | null;
+  defaultCurrency: string | null;
+  chargesEnabled: boolean;
+  livemode: boolean;
+  /** Set when the account's currency is not the one prices are in here. */
+  currencyMismatch: boolean;
 }

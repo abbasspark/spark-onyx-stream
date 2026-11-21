@@ -1,6 +1,14 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { CalendarClock, CreditCard, Gift, Pencil, XCircle } from 'lucide-react';
+import {
+  CalendarClock,
+  CreditCard,
+  ExternalLink,
+  Gift,
+  Pencil,
+  RefreshCw,
+  XCircle,
+} from 'lucide-react';
 import { type FormEvent, useEffect, useState } from 'react';
 import { Link } from 'react-router';
 import { toast } from 'sonner';
@@ -21,8 +29,16 @@ import {
 } from '@/lib/billing';
 import { formatDateTime, formatRelative } from '@/lib/format';
 
-/** "until 21 Dec 2026, 12:00" or "no end". */
-function describeEnd(subscription: Pick<Subscription, 'endsAt' | 'running'>): string {
+/** "until 21 Dec 2026, 12:00", "no end", or when a subscription paid online is charged next. */
+function describeEnd(
+  subscription: Pick<Subscription, 'endsAt' | 'running' | 'renewsAt' | 'status'>,
+): string {
+  if (subscription.running && subscription.status === 'PAST_DUE') {
+    return 'Payment overdue, Stripe is trying again';
+  }
+  if (subscription.running && subscription.renewsAt) {
+    return `${subscription.status === 'TRIALING' ? 'First payment' : 'Next payment'} ${formatDateTime(subscription.renewsAt)}`;
+  }
   if (!subscription.endsAt) {
     return 'No end';
   }
@@ -67,6 +83,15 @@ export function ViewerSubscription({
     onError: (error) => toast.error(error.message),
   });
 
+  const refreshFromStripe = useMutation({
+    mutationFn: (subscription: Subscription) => billingApi.refresh(subscription.id),
+    onSuccess: () => {
+      toast.success('Read from Stripe again');
+      refresh();
+    },
+    onError: (error) => toast.error(error.message),
+  });
+
   if (!mayRead) {
     return null;
   }
@@ -75,13 +100,23 @@ export function ViewerSubscription({
   const earlier = (subscriptions.data?.history ?? []).filter((item) => item.id !== current?.id);
 
   const askEnd = async (subscription: Subscription) => {
-    const confirmed = await confirm({
-      title: `End the access of ${viewerName}?`,
-      description:
-        'They can no longer watch titles that need a subscription, starting now. Free titles stay open. You can grant access again at any time.',
-      confirmLabel: 'End access now',
-      destructive: true,
-    });
+    const confirmed = await confirm(
+      subscription.online
+        ? {
+            title: `Cancel the subscription of ${viewerName}?`,
+            description:
+              'It is cancelled at Stripe now: nothing more is charged, and titles that need a subscription lock at once. Money already paid is not returned by this. To give some back, refund the payment in Stripe.',
+            confirmLabel: 'Cancel subscription now',
+            destructive: true,
+          }
+        : {
+            title: `End the access of ${viewerName}?`,
+            description:
+              'They can no longer watch titles that need a subscription, starting now. Free titles stay open. You can grant access again at any time.',
+            confirmLabel: 'End access now',
+            destructive: true,
+          },
+    );
     if (confirmed) {
       end.mutate(subscription);
     }
@@ -128,14 +163,63 @@ export function ViewerSubscription({
               <p className="mt-1.5 flex items-center gap-1.5 text-sm text-muted-foreground">
                 <CalendarClock className="size-3.5" aria-hidden="true" />
                 {describeEnd(current)}
-                {current.endsAt ? ` (${formatRelative(current.endsAt)})` : ''}
+                {current.status === 'PAST_DUE' && current.online
+                  ? ''
+                  : current.renewsAt
+                    ? ` (${formatRelative(current.renewsAt)})`
+                    : current.endsAt
+                      ? ` (${formatRelative(current.endsAt)})`
+                      : ''}
               </p>
+              {current.online ? (
+                <p className="mt-1 text-xs text-muted-foreground">
+                  {current.status === 'PAST_DUE'
+                    ? 'The last payment failed. Stripe tries again, and the viewer keeps watching until it gives up.'
+                    : current.cancelAtPeriodEnd
+                      ? 'The viewer cancelled. Nothing more is charged.'
+                      : `Paid ${current.interval === 'YEAR' ? 'yearly' : 'monthly'} through Stripe, which renews it by itself.`}
+                </p>
+              ) : null}
               <p className="mt-1 text-xs text-muted-foreground">
                 Since {formatDateTime(current.startedAt)}
                 {current.grantedBy ? `, by ${current.grantedBy.displayName}` : ''}
               </p>
               {current.note ? <p className="mt-2 border-l-2 pl-2 text-sm">{current.note}</p> : null}
             </div>
+            {current.online ? (
+              <div className="flex shrink-0 flex-wrap gap-1.5">
+                {current.externalUrl ? (
+                  <Button size="sm" asChild>
+                    <a href={current.externalUrl} target="_blank" rel="noreferrer">
+                      Open in Stripe
+                      <ExternalLink />
+                    </a>
+                  </Button>
+                ) : null}
+                {mayWrite ? (
+                  <>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      loading={refreshFromStripe.isPending}
+                      onClick={() => refreshFromStripe.mutate(current)}
+                    >
+                      <RefreshCw />
+                      Refresh
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      loading={end.isPending}
+                      onClick={() => void askEnd(current)}
+                    >
+                      <XCircle />
+                      Cancel now
+                    </Button>
+                  </>
+                ) : null}
+              </div>
+            ) : null}
             {mayWrite && current.source === 'MANUAL' ? (
               <div className="flex shrink-0 gap-1.5">
                 <Button size="sm" onClick={() => setDialog('change')}>
@@ -168,6 +252,12 @@ export function ViewerSubscription({
             {earlier.map((item) => (
               <li key={item.id} className="flex flex-wrap items-baseline justify-between gap-2 p-3">
                 <span className="flex items-center gap-2">
+                  {item.online ? (
+                    <CreditCard
+                      className="size-3.5 text-muted-foreground"
+                      aria-label="Paid online"
+                    />
+                  ) : null}
                   {item.plan.name}
                   <Badge tone={describeSubscription(item).tone}>
                     {describeSubscription(item).label}

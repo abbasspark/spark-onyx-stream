@@ -742,6 +742,13 @@ export interface Subscription {
   canceledAt: string | null;
   note: string | null;
   grantedBy: { id: string; displayName: string } | null;
+  /** When the next payment is due. Null when it is not renewed. */
+  renewsAt: string | null;
+  /** Whether it is paid online and follows the payment provider. */
+  online: boolean;
+  /** Id of the subscription at Stripe, and where to open it there. */
+  externalId: string | null;
+  externalUrl: string | null;
   createdAt: string;
 }
 
@@ -767,8 +774,50 @@ export interface BillingOverview {
   plans: number;
   subscribers: number;
   grantedByHand: number;
+  /** Subscribers who pay online. */
+  paidOnline: number;
+  /** Paying subscribers whose last payment failed and is being tried again. */
+  pastDue: number;
+  /** How online payment is set up. Null when it is off. */
+  stripe: StripeStatus | null;
   /** Running subscriptions that end within seven days and are not renewed. */
   endingSoon: number;
   paidTitles: number;
   publishedTitles: number;
+}
+
+/** A message Stripe sent to this installation. */
+export interface StripeEvent {
+  id: string;
+  type: string;
+  receivedAt: string;
+  state: 'handled' | 'failed' | 'pending';
+  error: string | null;
+}
+
+export interface StripeStatus {
+  /** False while the key is one for testing, where no money moves. */
+  livemode: boolean;
+  /** Path of the endpoint Stripe reports to, after the address of the API. */
+  webhookPath: string;
+  /** The events the endpoint must be subscribed to at Stripe. */
+  webhookEvents: string[];
+  /** Where viewers return after paying. */
+  siteUrl: string;
+  automaticTax: boolean;
+  lastEvent: StripeEvent | null;
+  /** Messages of the last day that could not be handled. */
+  failedEvents: number;
+}
+
+/** The Stripe account behind the key. */
+export interface StripeAccount {
+  id: string;
+  name: string | null;
+  country: string | null;
+  defaultCurrency: string | null;
+  chargesEnabled: boolean;
+  livemode: boolean;
+  /** Set when the account's currency is not the one prices are in here. */
+  currencyMismatch: boolean;
 }

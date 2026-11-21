@@ -23,6 +23,7 @@ import { billingApi } from '@/api/endpoints';
 import type { BillingOverview, Plan, PlanInput } from '@/api/types';
 import { useSession } from '@/auth/session';
 import { useConfirm } from '@/components/confirm';
+import { StripePanel } from '@/components/stripe-panel';
 import { Button } from '@/components/ui/button';
 import {
   Badge,
@@ -192,11 +193,19 @@ function Overview({ overview }: { overview: BillingOverview }) {
     {
       label: 'Subscribers',
       value: String(overview.subscribers),
-      note:
-        overview.subscribers === overview.grantedByHand
+      note: overview.stripe
+        ? `${overview.paidOnline} paying online, ${overview.grantedByHand} granted by hand`
+        : overview.subscribers === overview.grantedByHand
           ? 'All granted by hand'
           : `${overview.grantedByHand} granted by hand`,
     },
+    overview.stripe
+      ? {
+          label: 'Payment failed',
+          value: String(overview.pastDue),
+          note: 'Still watching while Stripe tries again',
+        }
+      : { label: 'Currency', value: overview.currency, note: 'Of all prices' },
     {
       label: 'Ending within 7 days',
       value: String(overview.endingSoon),
@@ -207,7 +216,6 @@ function Overview({ overview }: { overview: BillingOverview }) {
       value: `${overview.paidTitles} of ${overview.publishedTitles}`,
       note: 'Of the published titles',
     },
-    { label: 'Currency', value: overview.currency, note: 'Of all prices' },
   ];
   return (
     <div className="mb-6 grid gap-4">
@@ -222,25 +230,7 @@ function Overview({ overview }: { overview: BillingOverview }) {
           ))}
         </CardContent>
       </Card>
-      {overview.checkout ? null : (
-        <div className="flex flex-wrap items-start gap-3 rounded-lg border border-warning/30 bg-warning/5 p-4 text-sm">
-          <CreditCard className="mt-0.5 size-4 shrink-0 text-warning" aria-hidden="true" />
-          <div className="min-w-0 flex-1">
-            <p className="font-medium">Online payment is not connected</p>
-            <p className="mt-1 text-muted-foreground">
-              Viewers see the plans and their prices, and cannot pay on the site yet. You give
-              access by hand: open a viewer on the{' '}
-              <Link to="/viewers" className="underline underline-offset-4">
-                Viewers
-              </Link>{' '}
-              page and choose "Grant access".{' '}
-              {overview.contactUrl
-                ? 'The page of plans sends viewers to the contact address you set.'
-                : 'Set BILLING_CONTACT_URL to tell viewers where to ask for a subscription.'}
-            </p>
-          </div>
-        </div>
-      )}
+      <StripePanel overview={overview} />
     </div>
   );
 }

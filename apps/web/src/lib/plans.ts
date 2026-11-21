@@ -36,6 +36,10 @@ export interface OwnSubscription {
   /** Until when it lets the viewer watch. Null means it has no end. */
   endsAt: string | null;
   cancelAtPeriodEnd: boolean;
+  /** When the next payment is due. Null when it is not renewed. */
+  renewsAt?: string | null;
+  /** Whether it is paid online, so the viewer manages it at the payment provider. */
+  online?: boolean;
 }
 
 export type Interval = 'month' | 'year';
@@ -108,11 +112,61 @@ export function bestYearlySaving(plans: readonly Plan[]): number | null {
   return savings.length > 0 ? Math.max(...savings) : null;
 }
 
-/** "until 24 December 2026", or how a subscription without an end is described. */
-export function describeEnd(subscription: Pick<OwnSubscription, 'endsAt'>): string {
+/** "24 December 2026". Written the same way for everyone, like the prices. */
+export function formatDate(value: string): string {
+  return new Date(value).toLocaleDateString('en-GB', {
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
+  });
+}
+
+/**
+ * How long a subscription lasts, in words that follow "You can watch ...,":
+ * "until 24 December 2026", "with no end date", or when it is paid next.
+ */
+export function describeEnd(
+  subscription: Pick<OwnSubscription, 'endsAt' | 'renewsAt' | 'status'>,
+): string {
+  if (subscription.renewsAt) {
+    const day = formatDate(subscription.renewsAt);
+    return subscription.status === 'TRIALING'
+      ? `free until ${day}, then paid`
+      : `renewed on ${day}`;
+  }
   if (!subscription.endsAt) {
     return 'with no end date';
   }
-  const date = new Date(subscription.endsAt);
-  return `until ${date.toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })}`;
+  return `until ${formatDate(subscription.endsAt)}`;
+}
+
+/** The words on the button that starts a payment. */
+export function subscribeLabel(plan: Pick<Plan, 'trialDays'>, trialOffered: boolean): string {
+  return trialOffered && plan.trialDays > 0
+    ? `Start ${plan.trialDays} ${plan.trialDays === 1 ? 'day' : 'days'} free`
+    : 'Subscribe';
+}
+
+/**
+ * Where a viewer wanted to go when they were sent to the plans, kept while
+ * they are away paying. Session storage: it is gone with the tab.
+ */
+const AFTER_CHECKOUT = 'onyx.web.afterCheckout';
+
+export function rememberAfterCheckout(path: string): void {
+  try {
+    window.sessionStorage.setItem(AFTER_CHECKOUT, path);
+  } catch {
+    // Without it the viewer lands on the start page.
+  }
+}
+
+export function takeAfterCheckout(): string | null {
+  try {
+    const path = window.sessionStorage.getItem(AFTER_CHECKOUT);
+    window.sessionStorage.removeItem(AFTER_CHECKOUT);
+    return path;
+  } catch {
+    return null;
+  }
 }

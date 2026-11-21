@@ -13,7 +13,7 @@ import {
   viewerApi,
   type ViewerDevice,
 } from '@/lib/viewer-api';
-import { describeEnd, type OwnSubscription, type Plans } from '@/lib/plans';
+import { describeEnd, formatDate, type OwnSubscription, type Plans } from '@/lib/plans';
 import { type Profile, profilesApi } from '@/lib/profiles';
 import { clearHistory } from '@/lib/watch-sync';
 import { FormField } from './form-field';
@@ -418,6 +418,9 @@ function SubscriptionSection() {
   const { entitled } = useViewerSession();
   const [own, setOwn] = useState<OwnSubscription | null | undefined>(undefined);
   const [plansOffered, setPlansOffered] = useState(false);
+  // Set while Stripe's page for the subscription is being opened.
+  const [opening, setOpening] = useState(false);
+  const [problem, setProblem] = useState<string | null>(null);
 
   useEffect(() => {
     let current = true;
@@ -461,20 +464,72 @@ function SubscriptionSection() {
     return null;
   }
 
+  async function manage() {
+    setOpening(true);
+    setProblem(null);
+    try {
+      const { url } = await viewerApi.billingPortal();
+      // The page is Stripe's. The button stays busy until the browser has left.
+      window.location.assign(url);
+    } catch (caught) {
+      setOpening(false);
+      setProblem(asError(caught).message);
+    }
+  }
+  const failed = own?.status === 'PAST_DUE';
+
   return (
     <Section heading="Subscription">
       {own ? (
         <>
           <p className="flex flex-wrap items-center gap-x-3 gap-y-1">
             <span className="font-medium">{own.plan.name}</span>
-            <span className="inline-flex items-center gap-1 text-sm text-sard">
-              <Check className="size-4" aria-hidden="true" />
-              {own.status === 'PAST_DUE' ? 'Payment failed, access continues for now' : 'Running'}
-            </span>
+            {failed ? (
+              <span className="text-sm text-alarm">Payment failed</span>
+            ) : (
+              <span className="inline-flex items-center gap-1 text-sm text-sard">
+                <Check className="size-4" aria-hidden="true" />
+                {own.cancelAtPeriodEnd && own.online
+                  ? 'Cancelled'
+                  : own.status === 'TRIALING'
+                    ? 'Free trial'
+                    : 'Running'}
+              </span>
+            )}
           </p>
           <p className="mt-2 text-smoke">
-            You can watch every title that needs a subscription, {describeEnd(own)}.
+            {failed
+              ? 'The last payment did not go through. You can still watch while it is tried again. Check your card so your subscription does not end.'
+              : own.cancelAtPeriodEnd && own.online && own.endsAt
+                ? `You cancelled. You can watch every title that needs a subscription until ${formatDate(own.endsAt)}, and nothing more is charged.`
+                : `You can watch every title that needs a subscription, ${describeEnd(own)}.`}
           </p>
+          {own.online ? (
+            <>
+              <button
+                type="button"
+                className={`button mt-5 ${failed ? 'button-play' : 'button-quiet'}`}
+                disabled={opening}
+                aria-busy={opening}
+                onClick={() => void manage()}
+              >
+                {opening ? <Spinner /> : null}
+                {failed
+                  ? 'Update your card'
+                  : own.cancelAtPeriodEnd
+                    ? 'Manage or resume'
+                    : 'Manage subscription'}
+              </button>
+              <p className="mt-3 text-sm text-dust">
+                Opens a page of Stripe: change the card, read your invoices, or cancel.
+              </p>
+              {problem ? (
+                <p role="alert" className="mt-3 text-sm text-alarm">
+                  {problem}
+                </p>
+              ) : null}
+            </>
+          ) : null}
         </>
       ) : (
         <>

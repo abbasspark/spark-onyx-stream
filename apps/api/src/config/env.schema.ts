@@ -151,6 +151,45 @@ export const envSchema = z
       ),
 
     /**
+     * Secret key of a Stripe account, to sell subscriptions online. It starts
+     * with "sk_test_" while testing and "sk_live_" for real payments; a
+     * restricted key ("rk_") works too. Empty means no online payment: access
+     * is then granted by an admin.
+     */
+    STRIPE_SECRET_KEY: z
+      .string()
+      .default('')
+      .transform((value) => value.trim())
+      .refine((value) => value === '' || /^(sk|rk)_(test|live)_[A-Za-z0-9]+$/.test(value), {
+        message: 'STRIPE_SECRET_KEY must start with sk_test_, sk_live_, rk_test_ or rk_live_',
+      }),
+    /**
+     * Signing secret of the webhook endpoint at Stripe, which starts with
+     * "whsec_". Stripe reports renewals, cancellations and failed payments to
+     * that endpoint, and this proves a report is from Stripe.
+     */
+    STRIPE_WEBHOOK_SECRET: z
+      .string()
+      .default('')
+      .transform((value) => value.trim())
+      .refine((value) => value === '' || /^whsec_[A-Za-z0-9+/=_-]+$/.test(value), {
+        message: 'STRIPE_WEBHOOK_SECRET must start with whsec_',
+      }),
+    /**
+     * Lets Stripe Tax work out the tax of each payment. Needs Stripe Tax set
+     * up in the Stripe account. Prices of plans then include the tax.
+     */
+    STRIPE_AUTOMATIC_TAX: z.enum(['true', 'false']).default('false'),
+    /** Where Stripe is reached. Only changed for tests. */
+    STRIPE_API_URL: z
+      .string()
+      .default('https://api.stripe.com')
+      .transform((value) => value.trim().replace(/\/$/, ''))
+      .refine((value) => /^https?:\/\/[^/]+/.test(value), {
+        message: 'STRIPE_API_URL must start with https:// or http://',
+      }),
+
+    /**
      * Access to The Movie Database (TMDB), to import details and artwork of
      * titles. Either the "API Read Access Token" or the shorter "API Key" of a
      * TMDB account. Empty turns the import off.
@@ -257,6 +296,30 @@ export const envSchema = z
           message: 'SITE_URL is required when SMTP_URL is set, for the links in emails',
         });
       }
+    }
+    if (env.STRIPE_SECRET_KEY !== '') {
+      if (env.STRIPE_WEBHOOK_SECRET === '') {
+        ctx.addIssue({
+          code: 'custom',
+          path: ['STRIPE_WEBHOOK_SECRET'],
+          message:
+            'STRIPE_WEBHOOK_SECRET is required when STRIPE_SECRET_KEY is set, or renewals and cancellations would go unnoticed',
+        });
+      }
+      if (env.SITE_URL === '') {
+        ctx.addIssue({
+          code: 'custom',
+          path: ['SITE_URL'],
+          message:
+            'SITE_URL is required when STRIPE_SECRET_KEY is set: viewers return there after paying',
+        });
+      }
+    } else if (env.STRIPE_WEBHOOK_SECRET !== '') {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['STRIPE_SECRET_KEY'],
+        message: 'STRIPE_SECRET_KEY is required when STRIPE_WEBHOOK_SECRET is set',
+      });
     }
     if (env.VIEWER_EMAIL_VERIFICATION === 'required' && env.SMTP_URL === '') {
       ctx.addIssue({

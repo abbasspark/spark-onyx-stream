@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 import { describe, expect, it } from 'vitest';
 import {
+  describeEventType,
   describePrices,
   describeSubscription,
   endOfDay,
@@ -8,6 +9,7 @@ import {
   parsePrice,
   presetEnd,
   toPriceText,
+  webhookUrl,
   yearlySaving,
 } from './billing';
 
@@ -99,5 +101,38 @@ describe('describeSubscription', () => {
     expect(describeSubscription({ status: 'EXPIRED', running: false }).label).toBe('Expired');
     // Out of time, though nothing has marked it yet.
     expect(describeSubscription({ status: 'ACTIVE', running: false }).label).toBe('Expired');
+  });
+});
+
+describe('paying online', () => {
+  it('builds the address Stripe reports to', () => {
+    expect(webhookUrl('https://api.example.com', 'https://admin.example.com', '/v1/x')).toBe(
+      'https://api.example.com/v1/x',
+    );
+    // The panel and the API share an address behind the gateway.
+    expect(webhookUrl('', 'https://admin.example.com', '/v1/x')).toBe(
+      'https://admin.example.com/v1/x',
+    );
+  });
+
+  it('puts the names of events into words', () => {
+    expect(describeEventType('customer.subscription.updated')).toBe(
+      'Customer subscription updated',
+    );
+    expect(describeEventType('checkout.session.completed')).toBe('Checkout session completed');
+  });
+
+  it('says when a paying viewer has cancelled and still watches', () => {
+    expect(
+      describeSubscription({
+        status: 'ACTIVE',
+        running: true,
+        online: true,
+        cancelAtPeriodEnd: true,
+      }),
+    ).toEqual({ label: 'Cancelled, still running', tone: 'warning' });
+    expect(describeSubscription({ status: 'ACTIVE', running: true, online: true }).label).toBe(
+      'Running',
+    );
   });
 });

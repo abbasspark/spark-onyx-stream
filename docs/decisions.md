@@ -407,3 +407,19 @@ This replaces the "plain CSS without a component library" part of D-018.
 **Why:** the rule for who may watch is the part every other part depends on, and it can be built and tested completely without a provider. Granting by hand is not a stopgap: operators who sell through resellers, take cash or give access away need it for good. A provider that only has to create and update subscriptions is small and can be replaced or joined by another. Whole numbers avoid the rounding faults of decimal prices. One currency keeps every sum on a page meaningful.
 
 **Consequence:** until the next step, a site can show its prices and cannot take money online. Plans cannot yet differ in what they open. An installation that changes its currency after creating plans shows the same numbers in the new currency, which is wrong, and has to correct the prices by hand. Money is the operator's business: taxes, invoices and the terms of the provider are theirs to handle.
+
+## D-033 Stripe is the authority for subscriptions paid online
+
+**Date:** 2026-11-21
+
+- **Payments run on Stripe's own pages:** Checkout for paying, the customer portal for the card, invoices and cancelling. No card detail reaches this application.
+- **Stripe is spoken to directly over HTTP,** with a small client of the six calls needed, and one API version asked for in every request. No SDK.
+- **A message from Stripe is a hint, not the truth.** On every message the subscription is read from Stripe again and recorded as it is. The return from the payment page does the same, and the scheduler asks about subscriptions whose renewal is overdue.
+- **Messages are checked by their signature and handled once.** They are kept for 30 days.
+- **A renewing subscription runs three days past its next payment date here.**
+- **A plan is a product at Stripe with an id derived from the plan. Prices are sent with each payment** and not kept at Stripe.
+- **An admin can cancel a subscription paid online, and nothing else about it.**
+
+**Why:** Stripe's pages carry the burden of card data, of strong customer authentication and of the many ways to pay, and they stay current without work here. Reading the state again on each message removes a whole class of faults: duplicates, messages out of order, and a webhook that was down for a day all end in the same correct record. Three ways to learn of a change (the return, the message, the hourly check) mean that none of them has to be reliable alone. The days of grace exist because locking out somebody who paid is worse than a few free days for somebody who did not. A derived product id and prices sent along need no bookkeeping that could drift from Stripe. The API version is fixed because Stripe moved the billing period of a subscription to its items in 2025, and an account upgraded later must not change what this code reads.
+
+**Consequence:** Stripe has to be reachable when a message arrives, or the message is refused and Stripe sends it again. A viewer cannot change plans while subscribed: they cancel and subscribe again. A change of price reaches new subscribers only. Each price a viewer pays is its own price object at Stripe, which Stripe's reports group by product. Changing from a test key to a live key ends the subscriptions made in test mode. Refunds, disputes, invoices and taxes are handled in Stripe. Another provider would be a second source beside `STRIPE`, with the same rule for who may watch.

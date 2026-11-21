@@ -33,7 +33,7 @@ export class PlansService {
     });
     return {
       currency: this.config.billingCurrency,
-      checkout: false,
+      checkout: this.config.stripe !== null,
       contactUrl: this.config.billingContactUrl || null,
       plans: plans.map(toPublicPlan),
     };

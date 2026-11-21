@@ -77,17 +77,19 @@ enum ViewerStatus {
 /// A person who watches: an account on the viewer website and in the apps.
 /// Kept apart from admins on purpose. A viewer can never reach the panel.
 model Viewer {
-  id              String       @id @default(uuid(7)) @db.Uuid
+  id               String       @id @default(uuid(7)) @db.Uuid
   /// Lower case. The sign-in name.
-  email           String       @unique
-  passwordHash    String
-  displayName     String
-  status          ViewerStatus @default(ACTIVE)
+  email            String       @unique
+  passwordHash     String
+  displayName      String
+  status           ViewerStatus @default(ACTIVE)
   /// When the viewer showed that the email address is theirs, or an admin vouched for it.
-  emailVerifiedAt DateTime?
-  lastLoginAt     DateTime?
-  createdAt       DateTime     @default(now())
-  updatedAt       DateTime     @updatedAt
+  emailVerifiedAt  DateTime?
+  lastLoginAt      DateTime?
+  /// The viewer as a customer at Stripe, once they started a checkout.
+  stripeCustomerId String?      @unique
+  createdAt        DateTime     @default(now())
+  updatedAt        DateTime     @updatedAt
 
   sessions      ViewerSession[]
   profiles      ViewerProfile[]
@@ -832,7 +834,11 @@ model Subscription {
 
   startedAt         DateTime  @default(now())
   /// Until when the viewer may watch. Empty means until an admin ends it.
+  /// For a subscription paid online that renews, a few days after renewsAt,
+  /// so a late message from the payment provider locks nobody out.
   endsAt            DateTime?
+  /// When the next payment is due. Empty when it is not renewed.
+  renewsAt          DateTime?
   /// Set when it will not be renewed at endsAt.
   cancelAtPeriodEnd Boolean   @default(false)
   /// When it was ended before its time, by the viewer or an admin.
@@ -852,4 +858,21 @@ model Subscription {
   @@index([planId])
   @@index([status, endsAt])
   @@map("subscriptions")
+}
+
+/// A message Stripe sent about a payment or a subscription. Kept for a while
+/// so the same message is not handled twice and the panel can show the last one.
+model StripeEvent {
+  /// Stripe's id of the event, such as "evt_1Q...".
+  id          String    @id
+  type        String
+  livemode    Boolean
+  receivedAt  DateTime  @default(now())
+  /// Empty while it is handled, or when handling it failed.
+  processedAt DateTime?
+  /// Why handling it failed, when it did.
+  error       String?
+
+  @@index([receivedAt])
+  @@map("stripe_events")
 }
