@@ -66,10 +66,15 @@ export const envSchema = z.object({
     .default(6 * 60 * 60),
   /**
    * Who may play published titles through the public catalog.
-   * "open": anyone who can reach the site. "off": nobody, the catalog can
-   * still be browsed. Viewer accounts will add further choices.
+   * "open": anyone who can reach the site. "viewers": only signed-in viewers.
+   * "off": nobody. The catalog can be browsed in every case.
    */
-  CATALOG_PLAYBACK: z.enum(['open', 'off']).default('open'),
+  CATALOG_PLAYBACK: z.enum(['open', 'viewers', 'off']).default('open'),
+  /**
+   * Whether people can create a viewer account themselves.
+   * "closed": only admins create viewers, in the panel.
+   */
+  VIEWER_REGISTRATION: z.enum(['open', 'closed']).default('open'),
   /**
    * Origin that serves media files, for example "https://media.example.com".
    * Empty means the API itself, and playback URLs are then relative paths.

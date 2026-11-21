@@ -93,14 +93,15 @@ The viewer website and the apps read the catalog through `/v1/catalog`. No sign-
 
 ### Who may play
 
-Viewer accounts are not built yet. Until they are, `CATALOG_PLAYBACK` decides:
+`CATALOG_PLAYBACK` decides:
 
-| Value  | Meaning                                                               |
-| ------ | --------------------------------------------------------------------- |
-| `open` | Anyone who can reach the site can play every published title. Default |
-| `off`  | Nobody can play through the catalog. Browsing still works             |
+| Value     | Meaning                                                                       |
+| --------- | ----------------------------------------------------------------------------- |
+| `open`    | Anyone who can reach the site can play every published title. Default         |
+| `viewers` | Only signed-in viewers can play. See [phase-2-viewers.md](phase-2-viewers.md) |
+| `off`     | Nobody can play through the catalog                                           |
 
-With `open`, publishing a title makes it watchable by everyone on the internet who can reach your gateway. Use `off` on a server that is reachable from outside while the content must not be public yet. Admins can always play videos in the panel.
+Browsing the catalog works in every case. With `open`, publishing a title makes it watchable by everyone on the internet who can reach your gateway. Admins can always play videos in the panel.
 
 ## Admin panel
 
@@ -112,7 +113,7 @@ With `open`, publishing a title makes it watchable by everyone on the internet w
 
 ## Not built yet
 
-- Viewer accounts, and with them playback that needs a sign-in or a purchase
+- Playback that needs a purchase or a subscription
 - People and credits (cast, directors)
 - Collections and rows for the home page
 - Importing metadata from outside sources

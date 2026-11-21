@@ -27,6 +27,13 @@ export interface OverviewStats {
     published: number;
     drafts: number;
   };
+  viewers: {
+    total: number;
+    /** Accounts created in the last seven days. */
+    newLast7Days: number;
+    /** Viewers who signed in during the last thirty days. */
+    activeLast30Days: number;
+  };
   jobs: {
     queued: number;
     running: number;
@@ -94,6 +101,15 @@ export class StatsService {
         }),
         this.prisma.title.groupBy({ by: ['status'], _count: { _all: true } }),
       ]);
+    const [viewers, newViewers, activeViewers] = await Promise.all([
+      this.prisma.viewer.count(),
+      this.prisma.viewer.count({
+        where: { createdAt: { gte: new Date(now.getTime() - 7 * DAY_MS) } },
+      }),
+      this.prisma.viewer.count({
+        where: { lastLoginAt: { gte: new Date(now.getTime() - 30 * DAY_MS) } },
+      }),
+    ]);
     const titleCount = (status: PublishStatus): number =>
       titleGroups.find((group) => group.status === status)?._count._all ?? 0;
 
@@ -126,6 +142,7 @@ export class StatsService {
         published: titleCount('PUBLISHED'),
         drafts: titleCount('DRAFT'),
       },
+      viewers: { total: viewers, newLast7Days: newViewers, activeLast30Days: activeViewers },
       jobs: {
         queued: jobCount('QUEUED'),
         running: jobCount('RUNNING'),

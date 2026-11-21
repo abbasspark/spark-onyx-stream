@@ -24,6 +24,6 @@ import { SessionService } from './session.service.js';
     ApiKeyAuthService,
     { provide: APP_GUARD, useClass: AuthGuard },
   ],
-  exports: [SessionService],
+  exports: [SessionService, LoginThrottleService],
 })
 export class AuthModule {}

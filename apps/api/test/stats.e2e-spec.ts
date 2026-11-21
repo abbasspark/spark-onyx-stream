@@ -32,6 +32,7 @@ describe.skipIf(!TEST_DATABASE_URL)('Stats (e2e)', () => {
 
     expect(stats.body.assets).toEqual({ total: 0, byStatus: {}, readyDurationMs: 0 });
     expect(stats.body.catalog).toEqual({ titles: 0, published: 0, drafts: 0 });
+    expect(stats.body.viewers).toEqual({ total: 0, newLast7Days: 0, activeLast30Days: 0 });
     expect(stats.body.jobs).toEqual({
       queued: 0,
       running: 0,

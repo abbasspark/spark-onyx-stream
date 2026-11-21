@@ -221,6 +221,7 @@ export async function createTestApp(
       await prisma.encodingProfile.deleteMany();
       await prisma.storagePool.deleteMany();
       await prisma.adminUser.deleteMany();
+      await prisma.viewer.deleteMany();
     },
     close: () => app.close(),
   };

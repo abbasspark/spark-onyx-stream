@@ -5,6 +5,7 @@ import {
   Inject,
   Injectable,
   NotFoundException,
+  UnauthorizedException,
 } from '@nestjs/common';
 import { type Prisma, PrismaClient } from '@onyx/database';
 import { type Page, toPage, toSkipTake } from '../common/pagination.js';
@@ -203,10 +204,11 @@ export class PublicCatalogService {
   /**
    * Signed addresses for playing a movie.
    *
+   * @param signedIn Whether the request comes from a signed-in viewer.
    * @throws ConflictException for a series, which is played per episode.
    */
-  async playTitle(slug: string): Promise<PlaybackInfo> {
-    this.assertPlaybackOpen();
+  async playTitle(slug: string, signedIn: boolean): Promise<PlaybackInfo> {
+    this.assertMayPlay(signedIn);
     const title = await this.prisma.title.findFirst({
       where: { slug, ...VISIBLE_TITLE },
       select: { type: true, assetId: true },
@@ -221,8 +223,8 @@ export class PublicCatalogService {
   }
 
   /** Signed addresses for playing the trailer of a title. */
-  async playTrailer(slug: string): Promise<PlaybackInfo> {
-    this.assertPlaybackOpen();
+  async playTrailer(slug: string, signedIn: boolean): Promise<PlaybackInfo> {
+    this.assertMayPlay(signedIn);
     const title = await this.prisma.title.findFirst({
       where: { slug, ...VISIBLE_TITLE },
       select: { trailerAsset: { select: { id: true, status: true, manifestPath: true } } },
@@ -234,8 +236,8 @@ export class PublicCatalogService {
   }
 
   /** Signed addresses for playing an episode of a visible series. */
-  async playEpisode(episodeId: string): Promise<PlaybackInfo> {
-    this.assertPlaybackOpen();
+  async playEpisode(episodeId: string, signedIn: boolean): Promise<PlaybackInfo> {
+    this.assertMayPlay(signedIn);
     const episode = await this.prisma.episode.findFirst({
       where: { id: episodeId, ...VISIBLE_EPISODE, season: { title: { status: 'PUBLISHED' } } },
       select: { assetId: true },
@@ -246,9 +248,18 @@ export class PublicCatalogService {
     return this.playback.createPlayback(episode.assetId);
   }
 
-  private assertPlaybackOpen(): void {
-    if (!this.config.catalogPlaybackOpen) {
+  /**
+   * Applies CATALOG_PLAYBACK.
+   *
+   * @throws ForbiddenException when playback is off for everyone.
+   * @throws UnauthorizedException when it needs a signed-in viewer and there is none.
+   */
+  private assertMayPlay(signedIn: boolean): void {
+    if (this.config.catalogPlayback === 'off') {
       throw new ForbiddenException('Playback is not open on this installation');
+    }
+    if (this.config.catalogPlayback === 'viewers' && !signedIn) {
+      throw new UnauthorizedException('Sign in to watch');
     }
   }
 }

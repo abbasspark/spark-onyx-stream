@@ -11,6 +11,7 @@ import {
   SlidersHorizontal,
   Tags,
   Users,
+  UsersRound,
 } from 'lucide-react';
 import type { Permission } from '@/api/types';
 
@@ -51,6 +52,18 @@ export const NAVIGATION: NavGroup[] = [
         icon: Tags,
         permission: 'catalog:read',
         keywords: 'genres groups tags',
+      },
+    ],
+  },
+  {
+    label: 'Audience',
+    items: [
+      {
+        to: '/viewers',
+        label: 'Viewers',
+        icon: UsersRound,
+        permission: 'viewers:read',
+        keywords: 'accounts users customers members subscribers sign-up devices',
       },
     ],
   },
