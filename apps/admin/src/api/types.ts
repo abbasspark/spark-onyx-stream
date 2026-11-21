@@ -463,8 +463,78 @@ export interface TitleDetail extends TitleSummary {
   backdrop: CatalogImage | null;
   logo: CatalogImage | null;
   trailerAsset: AssetRef | null;
+  /** Where the details were imported from. Null for a title typed by hand. */
+  metadata: { source: string; id: string; language: string | null; syncedAt: string | null } | null;
   seasons: Season[];
   checklist: ChecklistItem[];
+}
+
+/** Whether the import of details is set up, and what it defaults to. */
+export interface MetadataStatus {
+  enabled: boolean;
+  source: 'tmdb';
+  language: string;
+  region: string;
+}
+
+/** A title at the source, offered to pick from. */
+export interface MetadataSearchResult {
+  /** The id at the source with its kind: "movie:603" or "tv:1399". */
+  id: string;
+  type: TitleType;
+  name: string;
+  originalName: string | null;
+  releaseYear: number | null;
+  overview: string | null;
+  posterUrl: string | null;
+  /** Set when the catalog already has a title imported from this entry. */
+  existingTitleId: string | null;
+}
+
+/** What an import would bring. */
+export interface MetadataPreview {
+  id: string;
+  type: TitleType;
+  language: string;
+  name: string;
+  originalName: string | null;
+  tagline: string | null;
+  synopsis: string | null;
+  releaseYear: number | null;
+  ageRating: string | null;
+  originalLanguage: string | null;
+  genres: { name: string; categoryId: string | null }[];
+  artwork: { poster: string | null; backdrop: string | null; logo: string | null };
+  seasons: { number: number; name: string | null; episodeCount: number }[];
+  existingTitleId: string | null;
+}
+
+/** Which parts an import brings. Left out, a part is brought. */
+export interface MetadataParts {
+  id: string;
+  language?: string;
+  text?: boolean;
+  categories?: boolean;
+  createCategories?: boolean;
+  artwork?: boolean;
+  episodes?: boolean;
+  stills?: boolean;
+  specials?: boolean;
+}
+
+export interface ImportReport {
+  fields: string[];
+  categoriesCreated: string[];
+  seasonsCreated: number;
+  episodesCreated: number;
+  episodesUpdated: number;
+  picturesAdded: number;
+  warnings: string[];
+}
+
+export interface ImportResult {
+  title: TitleDetail;
+  report: ImportReport;
 }
 
 export interface UpdateTitleInput {

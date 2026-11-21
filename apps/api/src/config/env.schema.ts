@@ -125,6 +125,45 @@ export const envSchema = z
       .transform((value) => value.trim() || 'Onyx Stream'),
 
     /**
+     * Access to The Movie Database (TMDB), to import details and artwork of
+     * titles. Either the "API Read Access Token" or the shorter "API Key" of a
+     * TMDB account. Empty turns the import off.
+     */
+    TMDB_API_TOKEN: z
+      .string()
+      .default('')
+      .transform((value) => value.trim()),
+    /** Language details are imported in when the admin does not choose one. */
+    METADATA_LANGUAGE: z
+      .string()
+      .default('en-US')
+      .refine((value) => /^[a-z]{2}(-[A-Z]{2})?$/.test(value), {
+        message: 'METADATA_LANGUAGE must be of the form en or en-US',
+      }),
+    /** Country whose age ratings are imported, as two capital letters. */
+    METADATA_REGION: z
+      .string()
+      .default('US')
+      .refine((value) => /^[A-Z]{2}$/.test(value), {
+        message: 'METADATA_REGION must be a country code of two capital letters, such as US',
+      }),
+    /** Where TMDB is reached. Only changed for tests or a mirror. */
+    TMDB_API_URL: z
+      .string()
+      .default('https://api.themoviedb.org/3')
+      .transform((value) => value.trim().replace(/\/$/, ''))
+      .refine((value) => /^https?:\/\/[^/]+/.test(value), {
+        message: 'TMDB_API_URL must start with https:// or http://',
+      }),
+    TMDB_IMAGE_URL: z
+      .string()
+      .default('https://image.tmdb.org/t/p')
+      .transform((value) => value.trim().replace(/\/$/, ''))
+      .refine((value) => /^https?:\/\/[^/]+/.test(value), {
+        message: 'TMDB_IMAGE_URL must start with https:// or http://',
+      }),
+
+    /**
      * Origin that serves media files, for example "https://media.example.com".
      * Empty means the API itself, and playback URLs are then relative paths.
      */

@@ -139,6 +139,7 @@ export class PublicCatalogService {
       synopsis: title.synopsis,
       originalLanguage: title.originalLanguage,
       hasTrailer: isPlayable(title.trailerAsset),
+      metadataSource: title.metadataSource,
       seasons: seasons.map((season) => ({
         number: season.number,
         name: season.name,

@@ -44,7 +44,12 @@ import type {
   UpdateViewerInput,
   Viewer,
   ViewerAccessConfig,
+  ImportResult,
   MailStatus,
+  MetadataParts,
+  MetadataPreview,
+  MetadataSearchResult,
+  MetadataStatus,
   ViewerDetail,
   ViewerWatching,
   ViewerSortField,
@@ -201,6 +206,29 @@ export interface TitleListQuery {
   sort?: TitleSortField;
   order?: SortOrder;
 }
+
+export const metadataApi = {
+  status: (signal?: AbortSignal) => request<MetadataStatus>('/v1/metadata', { signal }),
+  search: (
+    query: { type: TitleType; q: string; year?: number; language?: string },
+    signal?: AbortSignal,
+  ) => request<MetadataSearchResult[]>('/v1/metadata/search', { query: { ...query }, signal }),
+  preview: (query: { id: string; language?: string; specials?: boolean }, signal?: AbortSignal) =>
+    request<MetadataPreview>('/v1/metadata/preview', {
+      query: {
+        id: query.id,
+        language: query.language,
+        specials: query.specials ? 'true' : undefined,
+      },
+      signal,
+    }),
+  /** Creates a draft title from an entry at the source. */
+  importNew: (body: MetadataParts & { allowDuplicate?: boolean }) =>
+    request<ImportResult>('/v1/metadata/import', { method: 'POST', body }),
+  /** Brings details of an entry into an existing title. */
+  apply: (titleId: string, body: MetadataParts & { overwrite?: boolean }) =>
+    request<ImportResult>(`/v1/titles/${titleId}/metadata`, { method: 'POST', body }),
+};
 
 export const titlesApi = {
   list: (query: TitleListQuery, signal?: AbortSignal) =>

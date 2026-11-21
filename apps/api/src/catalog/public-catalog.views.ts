@@ -69,6 +69,11 @@ export interface PublicTitleDetail extends PublicTitleCard {
   synopsis: string | null;
   originalLanguage: string | null;
   hasTrailer: boolean;
+  /**
+   * Where details and artwork were imported from, for example "tmdb". Sources
+   * ask to be named where their material is shown. Null for a title typed by hand.
+   */
+  metadataSource: string | null;
   /** Series: seasons that have something to watch, in order. Movies: empty. */
   seasons: PublicSeason[];
 }

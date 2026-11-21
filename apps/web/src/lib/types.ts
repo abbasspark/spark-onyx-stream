@@ -61,6 +61,8 @@ export interface TitleDetail extends TitleCard {
   synopsis: string | null;
   originalLanguage: string | null;
   hasTrailer: boolean;
+  /** Where details and artwork were imported from, for example "tmdb". */
+  metadataSource?: string | null;
   seasons: Season[];
 }
 

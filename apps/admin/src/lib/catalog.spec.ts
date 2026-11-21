@@ -31,6 +31,7 @@ const title: TitleDetail = {
   backdrop: null,
   logo: null,
   trailerAsset: null,
+  metadata: null,
   seasons: [],
   checklist: [],
 };

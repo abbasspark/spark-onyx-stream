@@ -573,6 +573,14 @@ model Title {
   logoId     String? @db.Uuid
   logo       Image?  @relation("TitleLogo", fields: [logoId], references: [id], onDelete: SetNull)
 
+  /// Where the details were imported from, for example "tmdb". Empty for a title typed by hand.
+  metadataSource   String?
+  /// The id there, with its kind: "movie:603" or "tv:1399".
+  metadataId       String?
+  /// Language the details were imported in, for example "en-US".
+  metadataLanguage String?
+  metadataSyncedAt DateTime?
+
   createdById String?  @db.Uuid
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
@@ -582,6 +590,7 @@ model Title {
   watching   WatchProgress[]
 
   @@index([type, status])
+  @@index([metadataSource, metadataId])
   @@index([status, publishedAt])
   @@index([createdAt])
   @@map("titles")
