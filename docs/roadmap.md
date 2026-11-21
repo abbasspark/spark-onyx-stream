@@ -4,7 +4,7 @@ The project is built in phases. Each phase ends with something that works end to
 
 | Phase                         | Delivers                                                                            | Status            |
 | ----------------------------- | ----------------------------------------------------------------------------------- | ----------------- |
-| 1. Media engine core          | Upload, probe, copy or transcode, HLS packaging, signed playback, basic admin panel | In design         |
+| 1. Media engine core          | Upload, probe, copy or transcode, HLS packaging, signed playback, basic admin panel | Done              |
 | 2. Catalog and viewer website | Titles, series, metadata import, viewer accounts and profiles, player with resume   | In progress       |
 | 3. Billing                    | Plans, payments, entitlements, coupons. First complete VOD service                  | Planned           |
 | 4. Live                       | Ingest, copy and transcode channels, DVR, EPG, channels in the catalog              | Planned           |

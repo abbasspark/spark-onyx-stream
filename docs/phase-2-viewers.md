@@ -1,6 +1,6 @@
 # Phase 2: viewers
 
-Viewers are the people who watch, and this part of phase 2 gives them accounts. This document describes what is built: accounts in the API and their management in the admin panel. Sign-in on the viewer website follows.
+Viewers are the people who watch, and this part of phase 2 gives them accounts. This document describes accounts in the API, their management in the admin panel, and sign-in on the viewer website.
 
 ## Viewers are not admins
 
@@ -50,15 +50,16 @@ A private service for invited people is `VIEWER_REGISTRATION=closed` with `CATAL
 
 All under `/v1/viewer`. Answers about a person are never cached.
 
-| Method and path                          | Purpose                                                    |
-| ---------------------------------------- | ---------------------------------------------------------- |
-| `GET /config`                            | What is open: registration and playback. No sign-in needed |
-| `POST /register`                         | Create an account and sign in                              |
-| `POST /login`, `POST /logout`            | Sign in and out                                            |
-| `GET /me`, `PATCH /me`                   | The viewer's own account, and changing the name            |
-| `POST /password`                         | Change the password                                        |
-| `GET /sessions`, `DELETE /sessions/{id}` | The devices signed in, and signing one out                 |
-| `POST /delete`                           | Delete the own account. Asks for the password again        |
+| Method and path                          | Purpose                                                                   |
+| ---------------------------------------- | ------------------------------------------------------------------------- |
+| `GET /config`                            | What is open: registration and playback. No sign-in needed                |
+| `POST /register`                         | Create an account and sign in                                             |
+| `POST /login`, `POST /logout`            | Sign in and out                                                           |
+| `GET /session`                           | Who is signed in, or nobody. Never an error, so a page can ask every time |
+| `GET /me`, `PATCH /me`                   | The viewer's own account, and changing the name                           |
+| `POST /password`                         | Change the password                                                       |
+| `GET /sessions`, `DELETE /sessions/{id}` | The devices signed in, and signing one out                                |
+| `POST /delete`                           | Delete the own account. Asks for the password again                       |
 
 Playback (`POST /v1/catalog/…/playback`) answers 401 with "Sign in to watch" when `CATALOG_PLAYBACK=viewers` and no viewer is signed in.
 
@@ -80,9 +81,17 @@ All under `/v1/viewers`, with the permissions `viewers:read` and `viewers:write`
 
 The **Viewers** page shows what the installation lets the public do (sign-up and playback), then the viewers with search, a status filter and sorting. For each viewer: details and devices, edit, a new password that can be made up and copied, sign out everywhere, disable or enable, delete. The dashboard shows the number of viewers.
 
+## Viewer website
+
+- **Sign in** and **Create an account** pages. After either, the viewer lands where they came from, for example on the video they wanted to watch. Only addresses on the site itself are accepted as the way back.
+- **Account** page: name, password, the devices signed in with a way to sign each out, sign out, and deleting the account.
+- The header shows "Sign in" to a visitor and the account to a viewer.
+- **When playback needs a viewer**, the player page asks to sign in instead of showing an error.
+- Pages stay the same for everyone when they leave the server. Who is signed in is asked by the browser, so pages can still be shared and cached.
+- With sign-up closed, the sign-up page says so and the buttons that lead to it are not shown.
+
 ## Not built yet
 
-- Sign-in, sign-up and the account page on the viewer website
 - Email: verifying an address, and "forgot password". Until then an admin sets a new password
 - Watch history and "continue watching" that follow a viewer between devices
 - Subscriptions and payments

@@ -8,7 +8,9 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { formatClock } from '@/lib/format';
 import { findEntry, isResumable, removeEntry, saveEntry } from '@/lib/progress';
 import type { Playback } from '@/lib/types';
+import { authHref } from '@/lib/viewer-api';
 import { Player } from './player/player';
+import { useViewerSession } from './viewer-session';
 
 const SAVE_EVERY_MS = 5000;
 const NEXT_AFTER_SECONDS = 8;
@@ -34,7 +36,9 @@ export interface WatchScreenProps {
 type Loaded =
   | { state: 'loading' }
   | { state: 'ready'; playback: Playback; startAt: number }
-  | { state: 'failed'; message: string; retry: boolean };
+  | { state: 'failed'; message: string; retry: boolean }
+  /** Playback needs a signed-in viewer and there is none. */
+  | { state: 'sign-in' };
 
 /** Explains a refused playback request in the viewer's terms. */
 function refusal(status: number): { message: string; retry: boolean } {
@@ -64,6 +68,7 @@ export function WatchScreen({
   next,
 }: WatchScreenProps) {
   const router = useRouter();
+  const { state: sessionState, viewer, access } = useViewerSession();
   const [loaded, setLoaded] = useState<Loaded>({ state: 'loading' });
   const [attempt, setAttempt] = useState(0);
   const [ended, setEnded] = useState(false);
@@ -75,6 +80,11 @@ export function WatchScreen({
   // --- Asking for the addresses --------------------------------------------
 
   useEffect(() => {
+    // Asking before it is known who is signed in would mean asking twice,
+    // and starting the video twice.
+    if (sessionState !== 'ready') {
+      return;
+    }
     const controller = new AbortController();
     setLoaded({ state: 'loading' });
     setEnded(false);
@@ -90,6 +100,10 @@ export function WatchScreen({
 
     fetch(playbackPath, { method: 'POST', signal: controller.signal })
       .then(async (response) => {
+        if (response.status === 401) {
+          setLoaded({ state: 'sign-in' });
+          return;
+        }
         if (!response.ok) {
           setLoaded({ state: 'failed', ...refusal(response.status) });
           return;
@@ -111,7 +125,8 @@ export function WatchScreen({
     return () => controller.abort();
     // The progress key belongs to the page and does not change while it is open.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [playbackPath, attempt]);
+    // Signing in, or out, in this or another tab asks again.
+  }, [playbackPath, attempt, sessionState, viewer?.id]);
 
   useEffect(() => {
     if (resumedAt === null) {
@@ -203,6 +218,36 @@ export function WatchScreen({
   };
 
   // --- Screens --------------------------------------------------------------
+
+  if (loaded.state === 'sign-in') {
+    const here = `${window.location.pathname}${window.location.search}`;
+    return (
+      <div className="flex h-dvh flex-col items-center justify-center gap-6 bg-onyx px-6 text-center">
+        <h1 className="display max-w-xl text-3xl sm:text-4xl">Sign in to watch {heading}</h1>
+        <p className="max-w-md text-smoke">
+          {access?.registration === 'closed'
+            ? 'Watching needs an account on this site.'
+            : 'Watching needs an account. Creating one takes a minute.'}
+        </p>
+        <div className="flex flex-wrap justify-center gap-3">
+          <Link href={authHref('sign-in', here)} className="button button-play">
+            Sign in
+          </Link>
+          {access?.registration === 'closed' ? null : (
+            <Link href={authHref('sign-up', here)} className="button button-quiet">
+              Create an account
+            </Link>
+          )}
+        </div>
+        <Link
+          href={backHref}
+          className="text-sm text-smoke underline underline-offset-4 hover:text-vein"
+        >
+          Back to {heading}
+        </Link>
+      </div>
+    );
+  }
 
   if (loaded.state !== 'ready') {
     return (
