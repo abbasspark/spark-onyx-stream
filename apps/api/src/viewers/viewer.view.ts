@@ -6,6 +6,8 @@ export interface ViewerView {
   id: string;
   email: string;
   displayName: string;
+  /** Whether the viewer showed that the address is theirs. */
+  emailVerified: boolean;
   createdAt: Date;
 }
 
@@ -14,6 +16,7 @@ export function toViewerView(viewer: Viewer): ViewerView {
     id: viewer.id,
     email: viewer.email,
     displayName: viewer.displayName,
+    emailVerified: viewer.emailVerifiedAt !== null,
     createdAt: viewer.createdAt,
   };
 }
@@ -47,6 +50,7 @@ export function toViewerSessionView(
 /** A viewer as admins see them in the panel. */
 export interface ViewerAdminView extends ViewerView {
   status: ViewerStatus;
+  emailVerifiedAt: Date | null;
   lastLoginAt: Date | null;
   updatedAt: Date;
   /** Devices signed in right now. */
@@ -57,6 +61,7 @@ export function toViewerAdminView(viewer: Viewer, activeSessions: number): Viewe
   return {
     ...toViewerView(viewer),
     status: viewer.status,
+    emailVerifiedAt: viewer.emailVerifiedAt,
     lastLoginAt: viewer.lastLoginAt,
     updatedAt: viewer.updatedAt,
     activeSessions,

@@ -19,6 +19,7 @@ import { RateLimitModule } from './rate-limit/rate-limit.module.js';
 import { RedisModule } from './redis/redis.module.js';
 import { StatsModule } from './stats/stats.module.js';
 import { StorageModule, StoragePoolsModule } from './storage/storage.module.js';
+import { MailModule } from './mail/mail.module.js';
 import { ViewersModule } from './viewers/viewers.module.js';
 import { WatchingModule } from './watching/watching.module.js';
 import type { AppRole } from './roles/app-role.js';
@@ -36,6 +37,7 @@ const ROLE_MODULES: Record<AppRole, Type[]> = {
     ProcessingApiModule,
     StatsModule,
     CatalogModule,
+    MailModule,
     ViewersModule,
     WatchingModule,
     EventStreamModule,

@@ -36,6 +36,21 @@ export const changeViewerPasswordSchema = z.object({
 });
 export type ChangeViewerPasswordInput = z.infer<typeof changeViewerPasswordSchema>;
 
+export const forgotViewerPasswordSchema = z.object({ email: emailSchema });
+export type ForgotViewerPasswordInput = z.infer<typeof forgotViewerPasswordSchema>;
+
+/** The token of a link from an email. */
+const mailTokenSchema = z.string().min(20, 'This link is incomplete').max(200);
+
+export const resetViewerPasswordByMailSchema = z.object({
+  token: mailTokenSchema,
+  newPassword: viewerPasswordSchema,
+});
+export type ResetViewerPasswordByMailInput = z.infer<typeof resetViewerPasswordByMailSchema>;
+
+export const verifyViewerEmailSchema = z.object({ token: mailTokenSchema });
+export type VerifyViewerEmailInput = z.infer<typeof verifyViewerEmailSchema>;
+
 export const deleteOwnViewerSchema = z.object({
   password: z.string().min(1, 'Enter your password').max(MAX_PASSWORD_LENGTH),
 });
@@ -55,7 +70,10 @@ export const listViewersSchema = paginationSchema.extend({
 });
 export type ListViewersInput = z.infer<typeof listViewersSchema>;
 
-export const createViewerSchema = registerViewerSchema;
+export const createViewerSchema = registerViewerSchema.extend({
+  /** Whether the admin vouches for the address. Otherwise the viewer confirms it by email. */
+  emailVerified: z.boolean().default(true),
+});
 export type CreateViewerInput = z.infer<typeof createViewerSchema>;
 
 export const updateViewerSchema = z
@@ -63,6 +81,8 @@ export const updateViewerSchema = z
     email: emailSchema,
     displayName: displayNameSchema,
     status: z.enum(VIEWER_STATUSES),
+    /** Marks the address as confirmed, or as not confirmed. */
+    emailVerified: z.boolean(),
   })
   .partial()
   .refine((value) => Object.keys(value).length > 0, 'Nothing to change');

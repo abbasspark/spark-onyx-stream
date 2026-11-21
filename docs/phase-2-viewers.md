@@ -39,10 +39,15 @@ Nothing else. The audit log names a viewer by id and never stores an email addre
 
 ## Settings
 
-| Name                  | Values                             | Meaning                                                                                    |
-| --------------------- | ---------------------------------- | ------------------------------------------------------------------------------------------ |
-| `VIEWER_REGISTRATION` | `open` (default), `closed`         | Whether people can create an account themselves. With `closed`, only admins create viewers |
-| `CATALOG_PLAYBACK`    | `open` (default), `viewers`, `off` | Who may play published titles. `viewers` needs a signed-in viewer                          |
+| Name                        | Values                                   | Meaning                                                                                       |
+| --------------------------- | ---------------------------------------- | --------------------------------------------------------------------------------------------- |
+| `VIEWER_REGISTRATION`       | `open` (default), `closed`               | Whether people can create an account themselves. With `closed`, only admins create viewers    |
+| `CATALOG_PLAYBACK`          | `open` (default), `viewers`, `off`       | Who may play published titles. `viewers` needs a signed-in viewer                             |
+| `VIEWER_EMAIL_VERIFICATION` | `optional` (default), `required`         | Whether a viewer must confirm their email address before they can watch. Needs email to be on |
+| `SMTP_URL`                  | empty (default), `smtp://…`, `smtps://…` | The mail server. Empty turns email off                                                        |
+| `MAIL_FROM`                 | `Name <address>`                         | Sender of the emails. Needed with `SMTP_URL`                                                  |
+| `SITE_URL`                  | `https://host`                           | Address of the viewer website, for the links in emails. Needed with `SMTP_URL`                |
+| `SITE_NAME`                 | `Onyx Stream` (default)                  | Name of the site, as emails call it                                                           |
 
 A private service for invited people is `VIEWER_REGISTRATION=closed` with `CATALOG_PLAYBACK=viewers`.
 
@@ -60,6 +65,10 @@ All under `/v1/viewer`. Answers about a person are never cached.
 | `POST /password`                            | Change the password                                                                              |
 | `GET /sessions`, `DELETE /sessions/{id}`    | The devices signed in, and signing one out                                                       |
 | `POST /delete`                              | Delete the own account. Asks for the password again                                              |
+| `POST /password/forgot`                     | Ask for a link to set a new password. The same answer for every address                          |
+| `POST /password/reset`                      | Set a new password with the token of the link                                                    |
+| `POST /email/verify`                        | Confirm the address with the token of the link. No sign-in needed                                |
+| `POST /email/send`                          | Send the link to confirm again                                                                   |
 | `GET /watching`                             | "Continue watching": videos begun and not finished, the latest first                             |
 | `GET /watching/titles/{slug}`               | Progress in the videos of one title, finished ones included                                      |
 | `PUT /watching`                             | Report positions: `{ items: [{ title, episodeId?, position, duration, watchedAt? }] }`, up to 50 |
@@ -71,20 +80,46 @@ Playback (`POST /v1/catalog/…/playback`) answers 401 with "Sign in to watch" w
 
 All under `/v1/viewers`, with the permissions `viewers:read` and `viewers:write`. Owners and admins have them. Editors do not, because this is personal data.
 
-| Method and path               | Purpose                                                          |
-| ----------------------------- | ---------------------------------------------------------------- |
-| `GET /viewers`                | Page of viewers. Filters: status, search by name or email. Sorts |
-| `GET /viewers/{id}`           | One viewer with the devices they are signed in on                |
-| `POST /viewers`               | Create a viewer                                                  |
-| `PATCH /viewers/{id}`         | Change name, email or status. Disabling signs the viewer out     |
-| `POST /viewers/{id}/password` | Set a new password and sign the viewer out everywhere            |
-| `POST /viewers/{id}/sign-out` | Sign the viewer out everywhere                                   |
-| `DELETE /viewers/{id}`        | Delete the viewer                                                |
-| `GET /viewers/{id}/watching`  | What the viewer watched: totals and the latest 25 videos         |
+| Method and path                         | Purpose                                                                                |
+| --------------------------------------- | -------------------------------------------------------------------------------------- |
+| `GET /viewers`                          | Page of viewers. Filters: status, search by name or email. Sorts                       |
+| `GET /viewers/{id}`                     | One viewer with the devices they are signed in on                                      |
+| `POST /viewers`                         | Create a viewer                                                                        |
+| `PATCH /viewers/{id}`                   | Change name, email or status. Disabling signs the viewer out                           |
+| `POST /viewers/{id}/password`           | Set a new password and sign the viewer out everywhere                                  |
+| `POST /viewers/{id}/sign-out`           | Sign the viewer out everywhere                                                         |
+| `DELETE /viewers/{id}`                  | Delete the viewer                                                                      |
+| `POST /viewers/{id}/password-email`     | Email the viewer a link to set a new password                                          |
+| `POST /viewers/{id}/verification-email` | Email the viewer the link to confirm their address                                     |
+| `GET /mail`, `POST /mail/test`          | How email is set up, and sending a test. Permissions `settings:read`, `settings:write` |
+| `GET /viewers/{id}/watching`            | What the viewer watched: totals and the latest 25 videos                               |
 
 ## Admin panel
 
 The **Viewers** page shows what the installation lets the public do (sign-up and playback), then the viewers with search, a status filter and sorting. For each viewer: details, devices and what they watched with progress, edit, a new password that can be made up and copied, sign out everywhere, disable or enable, delete. The dashboard shows the number of viewers.
+
+## Email
+
+Email is off until a mail server is set (`SMTP_URL`). With it on, viewers get three emails:
+
+| Email                      | Sent                                                                                | Link works for |
+| -------------------------- | ----------------------------------------------------------------------------------- | -------------- |
+| Confirm your email address | After sign-up on the website, and when the viewer or an admin asks for it again     | 3 days         |
+| Set a new password         | When "Forgot your password?" is used with the address of an account, or by an admin | 1 hour         |
+| Your password was changed  | After a new password was set with a link                                            | no link        |
+
+- **A link carries a random token of which only a hash is stored.** It works once, and a newer link of the same kind replaces the older ones.
+- **The token rides in the fragment of the address** (`#token=…`), which browsers send to no server and which ends in no access log. The page takes it out of the address bar when it opens.
+- **A link stops working when the address of the account changes** or the account is disabled.
+- **"Forgot your password?" answers the same for every address,** so it does not tell whether an account exists. Nothing is sent to a disabled account.
+- **One viewer gets at most one email of a kind every two minutes,** and one network address can ask for eight emails in fifteen minutes. Nobody can fill a stranger's inbox.
+- **Setting a new password signs the viewer out everywhere** and confirms the address, since whoever used the link reads its mail.
+- **Emails are sent in the background and tried three times.** Sign-up never waits for the mail server and never fails because of it.
+- **A viewer an admin creates counts as confirmed,** unless the admin says otherwise. An address an admin changes counts as not confirmed.
+- **With `VIEWER_EMAIL_VERIFICATION=required`,** playback that needs a viewer answers 403 with the code `email_unverified` until the address is confirmed. Browsing, signing in and the account page work as before.
+- Emails are plain: text and simple HTML, no pictures, no tracking. Logs never contain an address or the content of an email.
+
+The panel has an **Email** page: how email is set up (never the password of the mail server), what the mail server said to the last email, and a test email that waits for the server's answer. On the **Viewers** page an admin sees which addresses are confirmed, can mark one as confirmed or not, and can send both links.
 
 ## Watch history
 
@@ -107,13 +142,15 @@ On the website the list is also kept in the browser. For a visitor that is the o
 - **Account** page: name, password, the devices signed in with a way to sign each out, clearing the watch history, sign out, and deleting the account.
 - **"Continue watching" and resuming follow the account.** A series page marks the episodes that were watched, and its main button starts the episode after them.
 - The header shows "Sign in" to a visitor and the account to a viewer.
-- **When playback needs a viewer**, the player page asks to sign in instead of showing an error.
+- **When playback needs a viewer**, the player page asks to sign in instead of showing an error. When it needs a confirmed address, it says so and offers to send the email again.
+- **Forgot your password?** on the sign-in page, and the pages the emailed links open: set a new password, and confirm the address. The account page shows whether the address is confirmed.
 - Pages stay the same for everyone when they leave the server. Who is signed in is asked by the browser, so pages can still be shared and cached.
 - With sign-up closed, the sign-up page says so and the buttons that lead to it are not shown.
 
 ## Not built yet
 
-- Email: verifying an address, and "forgot password". Until then an admin sets a new password
+- Changing the email address by the viewer. An admin can change it
+- Emails in other languages, and editing their text in the panel
 - Profiles: several people with their own history under one account
 - A "watch next" row that offers the following episode of a series
 - Subscriptions and payments

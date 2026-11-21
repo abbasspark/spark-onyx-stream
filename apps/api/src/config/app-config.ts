@@ -38,6 +38,13 @@ export class AppConfig {
   readonly viewerRegistrationOpen: boolean;
   /** Origin that serves media files. Empty when the API serves them itself. */
   readonly mediaBaseUrl: string;
+  /** The mail server and the sender. Null when email is off. */
+  readonly mail: { readonly smtpUrl: string; readonly from: string } | null;
+  /** Address of the viewer website, for links in emails. Empty when not set. */
+  readonly siteUrl: string;
+  readonly siteName: string;
+  /** Whether a viewer must confirm their email address before they can watch. */
+  readonly viewerVerificationRequired: boolean;
 
   /**
    * @param env Validated environment variables.
@@ -67,6 +74,10 @@ export class AppConfig {
     this.catalogPlayback = env.CATALOG_PLAYBACK;
     this.viewerRegistrationOpen = env.VIEWER_REGISTRATION === 'open';
     this.mediaBaseUrl = env.MEDIA_BASE_URL;
+    this.mail = env.SMTP_URL ? { smtpUrl: env.SMTP_URL, from: env.MAIL_FROM } : null;
+    this.siteUrl = env.SITE_URL;
+    this.siteName = env.SITE_NAME;
+    this.viewerVerificationRequired = env.VIEWER_EMAIL_VERIFICATION === 'required';
   }
 
   get isProduction(): boolean {

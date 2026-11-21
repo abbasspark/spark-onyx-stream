@@ -4,17 +4,18 @@ The site people watch on: a home page with rows of titles, pages for each movie 
 
 ## Pages
 
-| Address                       | What it shows                                                             |
-| ----------------------------- | ------------------------------------------------------------------------- |
-| `/`                           | One featured title, what the viewer began watching, then rows of titles   |
-| `/browse`                     | All titles, filtered by kind and category, in a chosen order              |
-| `/title/{slug}`               | One title: artwork, facts, synopsis, episodes of a series, similar titles |
-| `/watch/{slug}`               | The player for a movie. With `?trailer=1`, the trailer                    |
-| `/watch/{slug}/{episode id}`  | The player for an episode, which goes on to the next one                  |
-| `/search`                     | Search by name while typing                                               |
-| `/sign-in`, `/sign-up`        | Sign in, and create an account                                            |
-| `/account`                    | The viewer's name, password, devices, and deleting the account            |
-| `/sitemap.xml`, `/robots.txt` | For search engines                                                        |
+| Address                                                | What it shows                                                             |
+| ------------------------------------------------------ | ------------------------------------------------------------------------- |
+| `/`                                                    | One featured title, what the viewer began watching, then rows of titles   |
+| `/browse`                                              | All titles, filtered by kind and category, in a chosen order              |
+| `/title/{slug}`                                        | One title: artwork, facts, synopsis, episodes of a series, similar titles |
+| `/watch/{slug}`                                        | The player for a movie. With `?trailer=1`, the trailer                    |
+| `/watch/{slug}/{episode id}`                           | The player for an episode, which goes on to the next one                  |
+| `/search`                                              | Search by name while typing                                               |
+| `/sign-in`, `/sign-up`                                 | Sign in, and create an account                                            |
+| `/forgot-password`, `/reset-password`, `/verify-email` | Asking for a new password, and the pages the emailed links open           |
+| `/account`                                             | The viewer's name, password, devices, and deleting the account            |
+| `/sitemap.xml`, `/robots.txt`                          | For search engines                                                        |
 
 ## Run it
 

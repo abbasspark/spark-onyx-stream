@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 'use client';
 
-import { Loader2, Play, RotateCcw, SkipForward } from 'lucide-react';
+import { Loader2, Mail, Play, RotateCcw, SkipForward } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -9,7 +9,7 @@ import { formatClock } from '@/lib/format';
 import { findEntry, isResumable } from '@/lib/progress';
 import { recordFinished, recordPosition, syncSettled } from '@/lib/watch-sync';
 import type { Playback } from '@/lib/types';
-import { authHref } from '@/lib/viewer-api';
+import { authHref, ViewerApiError, viewerApi } from '@/lib/viewer-api';
 import { Player } from './player/player';
 import { useViewerSession } from './viewer-session';
 
@@ -39,7 +39,9 @@ type Loaded =
   | { state: 'ready'; playback: Playback; startAt: number }
   | { state: 'failed'; message: string; retry: boolean }
   /** Playback needs a signed-in viewer and there is none. */
-  | { state: 'sign-in' };
+  | { state: 'sign-in' }
+  /** Playback needs a confirmed email address and the viewer has yet to confirm. */
+  | { state: 'confirm-email' };
 
 /** Explains a refused playback request in the viewer's terms. */
 function refusal(status: number): { message: string; retry: boolean } {
@@ -115,6 +117,13 @@ export function WatchScreen({
         if (response.status === 401) {
           setLoaded({ state: 'sign-in' });
           return;
+        }
+        if (response.status === 403) {
+          const body = (await response.json().catch(() => null)) as { code?: string } | null;
+          if (body?.code === 'email_unverified') {
+            setLoaded({ state: 'confirm-email' });
+            return;
+          }
         }
         if (!response.ok) {
           setLoaded({ state: 'failed', ...refusal(response.status) });
@@ -271,6 +280,17 @@ export function WatchScreen({
     );
   }
 
+  if (loaded.state === 'confirm-email') {
+    return (
+      <ConfirmEmailGate
+        heading={heading}
+        backHref={backHref}
+        email={viewer?.email ?? null}
+        onRetry={() => setAttempt((value) => value + 1)}
+      />
+    );
+  }
+
   if (loaded.state !== 'ready') {
     return (
       <div className="flex h-dvh flex-col items-center justify-center gap-6 bg-onyx px-6 text-center">
@@ -382,5 +402,87 @@ export function WatchScreen({
       onFatal={onFatal}
       overlay={endScreen}
     />
+  );
+}
+
+/** Shown in place of the player while the viewer has yet to confirm their address. */
+function ConfirmEmailGate({
+  heading,
+  backHref,
+  email,
+  onRetry,
+}: {
+  heading: string;
+  backHref: string;
+  email: string | null;
+  onRetry: () => void;
+}) {
+  const [busy, setBusy] = useState(false);
+  const [note, setNote] = useState<{ tone: 'good' | 'bad'; text: string } | null>(null);
+
+  const send = async () => {
+    setBusy(true);
+    setNote(null);
+    try {
+      await viewerApi.sendVerification();
+      setNote({ tone: 'good', text: 'Sent. Check your inbox.' });
+    } catch (caught) {
+      // Confirmed in the meantime, for example on another device.
+      if (caught instanceof ViewerApiError && caught.status === 409) {
+        onRetry();
+        return;
+      }
+      setNote({
+        tone: 'bad',
+        text:
+          caught instanceof ViewerApiError
+            ? caught.message
+            : 'Something went wrong. Try again in a moment.',
+      });
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="flex h-dvh flex-col items-center justify-center gap-6 bg-onyx px-6 text-center">
+      <h1 className="display max-w-xl text-3xl sm:text-4xl">
+        Confirm your email address to watch {heading}
+      </h1>
+      <p className="max-w-md text-smoke">
+        We sent a link to {email ? <span className="text-vein">{email}</span> : 'your address'} when
+        you signed up. Open it, then come back here.
+      </p>
+      <div className="flex flex-wrap justify-center gap-3">
+        <button type="button" className="button button-play" onClick={onRetry}>
+          <Play className="fill-current" />I confirmed, play
+        </button>
+        <button
+          type="button"
+          className="button button-quiet"
+          disabled={busy}
+          onClick={() => void send()}
+        >
+          {busy ? (
+            <Loader2 className="animate-[player-spin_0.9s_linear_infinite]" aria-hidden="true" />
+          ) : (
+            <Mail />
+          )}
+          Send the email again
+        </button>
+      </div>
+      <p
+        role="status"
+        className={`min-h-5 text-sm ${note?.tone === 'bad' ? 'text-alarm' : 'text-sard'}`}
+      >
+        {note?.text}
+      </p>
+      <Link
+        href={backHref}
+        className="text-sm text-smoke underline underline-offset-4 hover:text-vein"
+      >
+        Back to {heading}
+      </Link>
+    </div>
   );
 }

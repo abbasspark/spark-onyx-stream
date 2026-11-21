@@ -27,6 +27,12 @@ import {
   changeViewerPasswordSchema,
   type DeleteOwnViewerInput,
   deleteOwnViewerSchema,
+  type ForgotViewerPasswordInput,
+  forgotViewerPasswordSchema,
+  type ResetViewerPasswordByMailInput,
+  resetViewerPasswordByMailSchema,
+  type VerifyViewerEmailInput,
+  verifyViewerEmailSchema,
   type LoginViewerInput,
   loginViewerSchema,
   type RegisterViewerInput,
@@ -41,6 +47,7 @@ import {
   ViewerAuthService,
   type ViewerSignIn,
 } from './viewer-auth.service.js';
+import { ViewerEmailService } from './viewer-email.service.js';
 import { type ViewerIdentity, ViewerSessionService } from './viewer-session.service.js';
 
 /** Route of the viewer accounts, relative to the API prefix. */
@@ -50,6 +57,10 @@ export const VIEWER_ROUTE = 'viewer';
 const REGISTRATIONS = { name: 'viewer-register', limit: 10, windowSeconds: 3600 };
 /** Sign-in attempts from one address, on top of the limit per email address. */
 const SIGN_INS = { name: 'viewer-login', limit: 30, windowSeconds: 300 };
+/** Requests for an email from one address. Each one may send mail to a stranger. */
+const MAIL_REQUESTS = { name: 'viewer-mail', limit: 8, windowSeconds: 900 };
+/** Tries of a link's token from one address. Tokens cannot be guessed; this stops trying anyway. */
+const LINK_USES = { name: 'viewer-link', limit: 20, windowSeconds: 900 };
 
 /**
  * Accounts of viewers: sign-up, sign-in and the viewer's own settings.
@@ -60,6 +71,7 @@ export class ViewerAuthController {
   constructor(
     @Inject(ViewerAuthService) private readonly auth: ViewerAuthService,
     @Inject(ViewerSessionService) private readonly viewerSessions: ViewerSessionService,
+    @Inject(ViewerEmailService) private readonly emails: ViewerEmailService,
   ) {}
 
   /** What the website needs to know to show the right buttons. */
@@ -144,6 +156,56 @@ export class ViewerAuthController {
     @Body(new ZodValidationPipe(changeViewerPasswordSchema)) body: ChangeViewerPasswordInput,
   ): Promise<void> {
     await this.auth.changePassword(identity, body);
+  }
+
+  /**
+   * Asks for a link to set a new password. The answer is the same whether or
+   * not the address belongs to an account.
+   */
+  @Public()
+  @RateLimit(MAIL_REQUESTS)
+  @Post('password/forgot')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  async forgotPassword(
+    @Body(new ZodValidationPipe(forgotViewerPasswordSchema)) body: ForgotViewerPasswordInput,
+  ): Promise<void> {
+    await this.emails.requestPasswordReset(body.email);
+  }
+
+  /** Sets a new password with the token of the link. Signs the viewer out everywhere. */
+  @Public()
+  @RateLimit(LINK_USES)
+  @Post('password/reset')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  async resetPassword(
+    @Body(new ZodValidationPipe(resetViewerPasswordByMailSchema))
+    body: ResetViewerPasswordByMailInput,
+  ): Promise<void> {
+    await this.emails.resetPassword(body.token, body.newPassword);
+  }
+
+  /**
+   * Confirms the address with the token of the link. Needs no sign-in: the
+   * link is often opened on another device than the one that signed up.
+   */
+  @Public()
+  @RateLimit(LINK_USES)
+  @Post('email/verify')
+  @HttpCode(HttpStatus.OK)
+  @Header('Cache-Control', 'no-store')
+  verifyEmail(
+    @Body(new ZodValidationPipe(verifyViewerEmailSchema)) body: VerifyViewerEmailInput,
+  ): Promise<{ email: string }> {
+    return this.emails.verifyEmail(body.token);
+  }
+
+  /** Sends the link to confirm the address again. */
+  @ViewerOnly()
+  @RateLimit(MAIL_REQUESTS)
+  @Post('email/send')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  async sendVerification(@CurrentViewer() identity: ViewerIdentity): Promise<void> {
+    await this.emails.sendVerification(identity.viewer);
   }
 
   /** The devices the viewer is signed in on. */

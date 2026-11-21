@@ -1,5 +1,12 @@
 // SPDX-License-Identifier: AGPL-3.0-only
-import { authHref, describeDevice, formatDay, safeNextPath, toViewerApiError } from './viewer-api';
+import {
+  authHref,
+  describeDevice,
+  formatDay,
+  readLinkToken,
+  safeNextPath,
+  toViewerApiError,
+} from './viewer-api';
 
 describe('safeNextPath', () => {
   it('accepts a path on this site', () => {
@@ -87,5 +94,27 @@ describe('formatDay', () => {
     expect(formatDay(new Date(2026, 10, 20, 23, 55).toISOString(), now)).toBe('yesterday');
     expect(formatDay(new Date(2026, 10, 16, 12, 0).toISOString(), now)).toBe('5 days ago');
     expect(formatDay(new Date(2026, 9, 1, 12, 0).toISOString(), now)).toBe('October 1, 2026');
+  });
+});
+
+describe('an email that was sent a moment ago', () => {
+  it('is not called too many attempts', () => {
+    const error = toViewerApiError(429, { code: 'mail_recently_sent', retryAfterSeconds: 90 });
+    expect(error.message).toContain('An email was sent a moment ago');
+  });
+});
+
+describe('readLinkToken', () => {
+  it('reads the token from the fragment of the address', () => {
+    expect(readLinkToken('#token=onyx_mail_AbC-123_xyz0123456789')).toBe(
+      'onyx_mail_AbC-123_xyz0123456789',
+    );
+  });
+
+  it('has none when the fragment is empty, cut short or not a token', () => {
+    expect(readLinkToken('')).toBeNull();
+    expect(readLinkToken('#episodes')).toBeNull();
+    expect(readLinkToken('#token=short')).toBeNull();
+    expect(readLinkToken('#token=has spaces and <tags> in it, which no token has')).toBeNull();
   });
 });

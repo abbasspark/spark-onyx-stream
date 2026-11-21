@@ -162,6 +162,14 @@ export function AuthScreen({ mode }: { mode: 'sign-in' | 'sign-up' }) {
                 ) : null}
                 {isSignUp ? 'Create account' : 'Sign in'}
               </button>
+              {!isSignUp && access?.email ? (
+                <Link
+                  href="/forgot-password"
+                  className="justify-self-start text-sm text-smoke underline underline-offset-4 hover:text-vein"
+                >
+                  Forgot your password?
+                </Link>
+              ) : null}
             </form>
             {other}
           </>

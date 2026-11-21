@@ -27,6 +27,7 @@
     "@tus/server": "^2.4.7",
     "bullmq": "^6.7.8",
     "ioredis": "^5.8.0",
+    "nodemailer": "^7.0.13",
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.1",
     "zod": "^4.6.7"
@@ -37,6 +38,7 @@
     "@nestjs/testing": "^12.0.1",
     "@types/express": "^5.0.0",
     "@types/node": "^24.0.0",
+    "@types/nodemailer": "^8.0.2",
     "@types/supertest": "^7.0.0",
     "oxlint": "^1.58.0",
     "supertest": "^7.0.0",

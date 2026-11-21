@@ -72,6 +72,7 @@ export class MaintenanceService implements OnApplicationBootstrap, OnApplication
       }
 
       await this.purgeEndedViewerSessions();
+      await this.purgeExpiredViewerTokens();
       const result = await this.sweep();
       if (result.started > 0 || result.cleanups > 0) {
         this.logger.log(
@@ -94,6 +95,16 @@ export class MaintenanceService implements OnApplicationBootstrap, OnApplication
     const result = await this.prisma.viewerSession.deleteMany({
       where: { OR: [{ expiresAt: { lt: before } }, { revokedAt: { lt: before } }] },
     });
+    return result.count;
+  }
+
+  /**
+   * Deletes links from emails that can no longer be used.
+   *
+   * @returns The number of links deleted.
+   */
+  async purgeExpiredViewerTokens(now = new Date()): Promise<number> {
+    const result = await this.prisma.viewerToken.deleteMany({ where: { expiresAt: { lt: now } } });
     return result.count;
   }
 

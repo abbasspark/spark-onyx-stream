@@ -9,6 +9,10 @@ import {
   Film,
   KeyRound,
   LogOut,
+  Mail,
+  MailCheck,
+  MailPlus,
+  MailQuestion,
   MonitorSmartphone,
   MoreHorizontal,
   Pencil,
@@ -52,7 +56,7 @@ import {
   Th,
   Tr,
 } from '@/components/ui/display';
-import { Field, Input, Select } from '@/components/ui/form';
+import { Field, Input, Select, ToggleRow } from '@/components/ui/form';
 import {
   Dialog,
   DialogBody,
@@ -131,6 +135,25 @@ function AccessSummary({ access }: { access: ViewerAccessConfig }) {
             : 'Nobody can watch through the website. The catalog can still be browsed.',
       tone: access.playback === 'open' ? 'warning' : 'neutral',
     },
+    {
+      label: 'Email',
+      value: access.email ? 'On' : 'Off',
+      note: access.email
+        ? 'Viewers get a link to confirm their address, and can set a new password by email.'
+        : 'No email is sent. A viewer who forgets their password needs a new one from you.',
+      tone: access.email ? 'neutral' : 'warning',
+    },
+    {
+      label: 'Confirmed address',
+      value: access.verification === 'required' ? 'Needed to watch' : 'Not needed',
+      note:
+        access.verification === 'required'
+          ? access.playback === 'viewers'
+            ? 'A viewer watches only after they confirmed their email address.'
+            : 'Has no effect while playback does not need a viewer.'
+          : 'A viewer can watch without confirming their email address.',
+      tone: 'neutral',
+    },
   ];
 
   return (
@@ -145,9 +168,15 @@ function AccessSummary({ access }: { access: ViewerAccessConfig }) {
         </div>
       ))}
       <p className="text-xs text-muted-foreground sm:col-span-2">
-        Both are set where the installation is configured, with{' '}
-        <code className="font-mono">VIEWER_REGISTRATION</code> and{' '}
-        <code className="font-mono">CATALOG_PLAYBACK</code>, and apply after a restart.
+        These are set where the installation is configured, with{' '}
+        <code className="font-mono">VIEWER_REGISTRATION</code>,{' '}
+        <code className="font-mono">CATALOG_PLAYBACK</code> and{' '}
+        <code className="font-mono">VIEWER_EMAIL_VERIFICATION</code>, and apply after a restart.
+        Email has{' '}
+        <Link to="/email" className="underline underline-offset-4">
+          its own page
+        </Link>
+        .
       </p>
     </Card>
   );
@@ -211,6 +240,7 @@ export function ViewersPage() {
     queryFn: ({ signal }) => viewersApi.access(signal),
     staleTime: 60_000,
   });
+  const mailOn = access.data?.email ?? false;
   const items = viewers.data?.items ?? [];
   const filtered = Boolean(q || status);
 
@@ -243,6 +273,31 @@ export function ViewersPage() {
       );
       refresh();
     },
+    onError,
+  });
+  const setVerified = useMutation({
+    mutationFn: ({ viewer, verified }: { viewer: Viewer; verified: boolean }) =>
+      viewersApi.update(viewer.id, { emailVerified: verified }),
+    onSuccess: (viewer) => {
+      toast.success(
+        viewer.emailVerifiedAt
+          ? `The address of ${viewer.displayName} counts as confirmed`
+          : `${viewer.displayName} has to confirm their address again`,
+      );
+      refresh();
+    },
+    onError,
+  });
+  const sendPasswordEmail = useMutation({
+    mutationFn: (viewer: Viewer) => viewersApi.sendPasswordEmail(viewer.id),
+    onSuccess: (_result, viewer) =>
+      toast.success(`A link to set a new password is on its way to ${viewer.email}`),
+    onError,
+  });
+  const sendVerificationEmail = useMutation({
+    mutationFn: (viewer: Viewer) => viewersApi.sendVerificationEmail(viewer.id),
+    onSuccess: (_result, viewer) =>
+      toast.success(`A link to confirm the address is on its way to ${viewer.email}`),
     onError,
   });
   const remove = useMutation({
@@ -319,6 +374,37 @@ export function ViewersPage() {
               <KeyRound />
               Set a new password
             </DropdownMenuItem>
+            {mailOn ? (
+              <DropdownMenuItem
+                disabled={viewer.status !== 'ACTIVE'}
+                onSelect={() => sendPasswordEmail.mutate(viewer)}
+              >
+                <Mail />
+                Email a link for a new password
+              </DropdownMenuItem>
+            ) : null}
+            {viewer.emailVerifiedAt ? (
+              <DropdownMenuItem onSelect={() => setVerified.mutate({ viewer, verified: false })}>
+                <MailQuestion />
+                Mark address as not confirmed
+              </DropdownMenuItem>
+            ) : (
+              <>
+                {mailOn ? (
+                  <DropdownMenuItem
+                    disabled={viewer.status !== 'ACTIVE'}
+                    onSelect={() => sendVerificationEmail.mutate(viewer)}
+                  >
+                    <MailPlus />
+                    Email the link to confirm
+                  </DropdownMenuItem>
+                ) : null}
+                <DropdownMenuItem onSelect={() => setVerified.mutate({ viewer, verified: true })}>
+                  <MailCheck />
+                  Mark address as confirmed
+                </DropdownMenuItem>
+              </>
+            )}
             <DropdownMenuItem
               disabled={viewer.activeSessions === 0}
               onSelect={() => void askSignOut(viewer)}
@@ -496,8 +582,19 @@ export function ViewersPage() {
                         <span className="block max-w-xs truncate font-medium group-hover:underline">
                           {viewer.displayName}
                         </span>
-                        <span className="block max-w-xs truncate text-xs text-muted-foreground">
-                          {viewer.email}
+                        <span className="flex max-w-xs items-center gap-1.5 text-xs text-muted-foreground">
+                          <span className="truncate">{viewer.email}</span>
+                          {viewer.emailVerifiedAt ? (
+                            <MailCheck
+                              className="size-3.5 shrink-0 text-success"
+                              role="img"
+                              aria-label="Address confirmed"
+                            />
+                          ) : (
+                            <Badge tone="warning" className="shrink-0">
+                              Not confirmed
+                            </Badge>
+                          )}
                         </span>
                       </span>
                     </button>
@@ -650,12 +747,18 @@ function ViewerFormDialog({ target, onClose, onSaved }: ViewerFormDialogProps) {
   const [displayName, setDisplayName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [vouched, setVouched] = useState(true);
 
   const save = useMutation({
     mutationFn: () =>
       viewer
         ? viewersApi.update(viewer.id, { displayName: displayName.trim(), email: email.trim() })
-        : viewersApi.create({ displayName: displayName.trim(), email: email.trim(), password }),
+        : viewersApi.create({
+            displayName: displayName.trim(),
+            email: email.trim(),
+            password,
+            emailVerified: vouched,
+          }),
     onSuccess: (saved) => {
       toast.success(viewer ? `${saved.displayName} saved` : `${saved.displayName} can now sign in`);
       onSaved();
@@ -668,6 +771,7 @@ function ViewerFormDialog({ target, onClose, onSaved }: ViewerFormDialogProps) {
       setDisplayName(viewer?.displayName ?? '');
       setEmail(viewer?.email ?? '');
       setPassword(viewer ? '' : generatePassword());
+      setVouched(true);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [target]);
@@ -703,7 +807,11 @@ function ViewerFormDialog({ target, onClose, onSaved }: ViewerFormDialogProps) {
             </Field>
             <Field
               label="Email"
-              hint={viewer ? 'The viewer signs in with this address from now on.' : undefined}
+              hint={
+                viewer
+                  ? 'The viewer signs in with this address from now on. A new address counts as not confirmed.'
+                  : undefined
+              }
             >
               {(id) => (
                 <Input
@@ -718,7 +826,15 @@ function ViewerFormDialog({ target, onClose, onSaved }: ViewerFormDialogProps) {
               )}
             </Field>
             {viewer ? null : (
-              <PasswordField label="Password" value={password} onChange={setPassword} />
+              <>
+                <PasswordField label="Password" value={password} onChange={setPassword} />
+                <ToggleRow
+                  label="The address is confirmed"
+                  description="You know that this address belongs to the viewer. Turn off to let them confirm it by email first."
+                  checked={vouched}
+                  onCheckedChange={setVouched}
+                />
+              </>
             )}
             <ErrorNote error={save.error} />
           </DialogBody>
@@ -838,6 +954,12 @@ function DetailSheet({
             </div>
             <Facts
               items={[
+                [
+                  'Email address',
+                  shown.emailVerifiedAt
+                    ? `Confirmed ${formatDateTime(shown.emailVerifiedAt)}`
+                    : 'Not confirmed',
+                ],
                 ['Joined', formatDateTime(shown.createdAt)],
                 ['Last sign-in', shown.lastLoginAt ? formatDateTime(shown.lastLoginAt) : 'Never'],
                 ['Changed', formatDateTime(shown.updatedAt)],

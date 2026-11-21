@@ -27,6 +27,14 @@ export function generateSessionToken(): GeneratedSessionToken {
   return { token, tokenHash: hashToken(token) };
 }
 
+/** Links sent by email. Not a session: it only does the one thing it was sent for. */
+export const MAIL_TOKEN_PREFIX = 'onyx_mail_';
+
+export function generateMailToken(): GeneratedSessionToken {
+  const token = MAIL_TOKEN_PREFIX + randomBytes(SECRET_BYTES).toString('base64url');
+  return { token, tokenHash: hashToken(token) };
+}
+
 export function generateViewerToken(): GeneratedSessionToken {
   const token = VIEWER_TOKEN_PREFIX + randomBytes(SECRET_BYTES).toString('base64url');
   return { token, tokenHash: hashToken(token) };

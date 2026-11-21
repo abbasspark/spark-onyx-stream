@@ -7,6 +7,8 @@ export interface Viewer {
   id: string;
   email: string;
   displayName: string;
+  /** Whether the viewer showed that the address is theirs. */
+  emailVerified: boolean;
   createdAt: string;
 }
 
@@ -24,6 +26,10 @@ export interface ViewerDevice {
 export interface AccessConfig {
   registration: 'open' | 'closed';
   playback: 'open' | 'viewers' | 'off';
+  /** Whether the site sends email, so "forgot password" and confirming an address work. */
+  email: boolean;
+  /** Whether watching needs a confirmed address. */
+  verification: 'optional' | 'required';
 }
 
 /** A request the API refused, with a message that can be shown to the viewer. */
@@ -43,10 +49,17 @@ interface ErrorBody {
   message?: string | string[];
   issues?: { field: string; message: string }[];
   retryAfterSeconds?: number;
+  code?: string;
 }
 
 /** Turns a refused response into words for the person in front of the screen. */
 export function toViewerApiError(status: number, body: ErrorBody | null): ViewerApiError {
+  if (status === 429 && body?.code === 'mail_recently_sent') {
+    return new ViewerApiError(
+      status,
+      'An email was sent a moment ago. Check your inbox, and the spam folder. You can ask again in two minutes.',
+    );
+  }
   if (status === 429) {
     const minutes = body?.retryAfterSeconds ? Math.ceil(body.retryAfterSeconds / 60) : null;
     return new ViewerApiError(
@@ -111,7 +124,23 @@ export const viewerApi = {
   devices: () => call<ViewerDevice[]>('GET', '/sessions'),
   signOutDevice: (id: string) => call<void>('DELETE', `/sessions/${id}`),
   deleteAccount: (password: string) => call<void>('POST', '/delete', { password }),
+  /** Asks for a link to set a new password. Succeeds whether or not the address is known. */
+  forgotPassword: (email: string) => call<void>('POST', '/password/forgot', { email }),
+  resetPassword: (token: string, newPassword: string) =>
+    call<void>('POST', '/password/reset', { token, newPassword }),
+  verifyEmail: (token: string) => call<{ email: string }>('POST', '/email/verify', { token }),
+  /** Sends the link to confirm the address again. */
+  sendVerification: () => call<void>('POST', '/email/send'),
 };
+
+/**
+ * The token of a link from an email. It rides in the fragment of the address
+ * ("#token=…"), which the browser sends to no server.
+ */
+export function readLinkToken(hash: string): string | null {
+  const token = new URLSearchParams(hash.replace(/^#/, '')).get('token');
+  return token && /^[A-Za-z0-9_-]{20,200}$/.test(token) ? token : null;
+}
 
 /**
  * Where to go after signing in. Only a path on this site is accepted, so a

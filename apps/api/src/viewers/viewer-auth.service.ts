@@ -26,6 +26,7 @@ import {
   type ViewerSessionView,
   type ViewerView,
 } from './viewer.view.js';
+import { ViewerEmailService } from './viewer-email.service.js';
 import { type ViewerIdentity, ViewerSessionService } from './viewer-session.service.js';
 
 /**
@@ -50,6 +51,10 @@ export interface ViewerAccessConfig {
   registration: 'open' | 'closed';
   /** Who may play: anyone, signed-in viewers only, or nobody. */
   playback: 'open' | 'viewers' | 'off';
+  /** Whether the site sends email: "forgot password" and confirming an address work. */
+  email: boolean;
+  /** Whether a viewer must confirm their address before they can watch. */
+  verification: 'optional' | 'required';
 }
 
 /** Everything a viewer does with their own account. */
@@ -60,12 +65,15 @@ export class ViewerAuthService {
     @Inject(ViewerSessionService) private readonly sessions: ViewerSessionService,
     @Inject(LoginThrottleService) private readonly throttle: LoginThrottleService,
     @Inject(AppConfig) private readonly config: AppConfig,
+    @Inject(ViewerEmailService) private readonly emails: ViewerEmailService,
   ) {}
 
   accessConfig(): ViewerAccessConfig {
     return {
       registration: this.config.viewerRegistrationOpen ? 'open' : 'closed',
       playback: this.config.catalogPlayback,
+      email: this.emails.enabled,
+      verification: this.config.viewerVerificationRequired ? 'required' : 'optional',
     };
   }
 
@@ -98,6 +106,7 @@ export class ViewerAuthService {
       throw error;
     }
 
+    await this.emails.sendWelcomeVerification(viewer);
     const { token, session } = await this.sessions.create(viewer.id, info);
     return { viewer: toViewerView(viewer), token, expiresAt: session.expiresAt };
   }

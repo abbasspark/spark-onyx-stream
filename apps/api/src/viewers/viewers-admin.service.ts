@@ -91,6 +91,7 @@ export class ViewersAdminService {
           email: input.email,
           displayName: input.displayName,
           passwordHash: await hashPassword(input.password),
+          emailVerifiedAt: input.emailVerified ? new Date() : null,
         },
       });
       return toViewerAdminView(viewer, 0);
@@ -105,14 +106,30 @@ export class ViewersAdminService {
   /** Changes a viewer. Disabling one signs them out everywhere. */
   async update(id: string, input: UpdateViewerInput): Promise<ViewerChange> {
     const before = await this.find(id);
-    const changed = (Object.keys(input) as (keyof UpdateViewerInput)[]).filter(
-      (key) => input[key] !== undefined && input[key] !== before[key],
+    const { emailVerified, ...fields } = input;
+    const changed: string[] = (Object.keys(fields) as (keyof typeof fields)[]).filter(
+      (key) => fields[key] !== undefined && fields[key] !== before[key],
     );
+
+    // A new address is not confirmed, unless the admin vouches for it in the same step.
+    const wasVerified = before.emailVerifiedAt !== null;
+    const isVerified = emailVerified ?? (changed.includes('email') ? false : wasVerified);
+    if (isVerified !== wasVerified) {
+      changed.push('emailVerified');
+    }
 
     let viewer = before;
     if (changed.length > 0) {
       try {
-        viewer = await this.prisma.viewer.update({ where: { id }, data: input });
+        viewer = await this.prisma.viewer.update({
+          where: { id },
+          data: {
+            ...fields,
+            ...(isVerified !== wasVerified
+              ? { emailVerifiedAt: isVerified ? new Date() : null }
+              : {}),
+          },
+        });
       } catch (error) {
         if (isUniqueViolation(error)) {
           throw new ConflictException(EMAIL_TAKEN);
@@ -154,7 +171,8 @@ export class ViewersAdminService {
     return viewer;
   }
 
-  private async find(id: string): Promise<Viewer> {
+  /** @throws NotFoundException */
+  async find(id: string): Promise<Viewer> {
     const viewer = await this.prisma.viewer.findUnique({ where: { id } });
     if (!viewer) {
       throw new NotFoundException('Viewer not found');
