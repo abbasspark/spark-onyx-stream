@@ -127,8 +127,62 @@ export function describeAudio(streams: ChannelStreams): string {
   return `${codecName(streams.audioCodec)}${layout}`;
 }
 
-/** What happens to the audio of a tested source, in words. */
-export function describeAudioPlan(probe: Extract<SourceProbe, { ok: true }>): string {
+/** Qualities a transcoded channel can be given, with their video bitrate in kbit/s. */
+export const QUALITY_OPTIONS: readonly { height: number; videoKbps: number }[] = [
+  { height: 1080, videoKbps: 5000 },
+  { height: 720, videoKbps: 2800 },
+  { height: 480, videoKbps: 1400 },
+  { height: 360, videoKbps: 800 },
+  { height: 240, videoKbps: 400 },
+];
+export const DEFAULT_QUALITIES: readonly number[] = [1080, 720, 480];
+
+/** A chosen quality is left out when the source has fewer lines. */
+export function exceedsSource(height: number, streams: ChannelStreams | null): boolean {
+  return streams !== null && height > streams.height * 1.05;
+}
+
+/** Adds or removes a quality, keeping the best first. */
+export function toggleQuality(qualities: readonly number[], height: number): number[] {
+  const next = qualities.includes(height)
+    ? qualities.filter((quality) => quality !== height)
+    : [...qualities, height];
+  return next.sort((a, b) => b - a);
+}
+
+/** "720p, 480p" for a transcoded channel: what it sends, or what was chosen while that is unknown. */
+export function describeQualities(channel: Pick<Channel, 'qualities' | 'outputs'>): string {
+  const names = channel.outputs
+    ? channel.outputs.map((output) => output.name)
+    : channel.qualities.map((height) => `${height}p`);
+  return names.join(', ');
+}
+
+/** Encoding slower than the source arrives means viewers will see pauses. */
+export function isFallingBehind(channel: Channel): boolean {
+  const speed = channel.health?.speed;
+  return (
+    channel.mode === 'TRANSCODE' &&
+    channel.status === 'RUNNING' &&
+    speed !== null &&
+    speed !== undefined &&
+    speed < 0.95
+  );
+}
+
+/** What happens to a tested source with the chosen processing, in words. */
+export function describeProbePlan(
+  probe: Extract<SourceProbe, { ok: true }>,
+  mode: 'COPY' | 'TRANSCODE',
+): string {
+  if (mode === 'TRANSCODE') {
+    return probe.streams.audioCodec
+      ? 'Video and audio are encoded again, into the qualities you choose.'
+      : 'The video is encoded again, into the qualities you choose. The source has no audio.';
+  }
+  if (probe.copyObstacle) {
+    return `${probe.copyObstacle}.`;
+  }
   if (probe.audio === 'none') {
     return 'The source has no audio. The channel will be silent.';
   }

@@ -36,6 +36,7 @@ export class AppConfig {
     readonly path: string;
     readonly segmentSeconds: number;
     readonly playlistSegments: number;
+    readonly transcodePreset: string;
   };
   readonly playbackUrlTtlSeconds: number;
   /** Who may play published titles through the public catalog. */
@@ -104,6 +105,7 @@ export class AppConfig {
       path: path.resolve(baseDirectory, env.LIVE_PATH),
       segmentSeconds: env.LIVE_SEGMENT_SECONDS,
       playlistSegments: env.LIVE_PLAYLIST_SEGMENTS,
+      transcodePreset: env.LIVE_TRANSCODE_PRESET,
     };
     this.playbackUrlTtlSeconds = env.PLAYBACK_URL_TTL_SECONDS;
     this.catalogPlayback = env.CATALOG_PLAYBACK;

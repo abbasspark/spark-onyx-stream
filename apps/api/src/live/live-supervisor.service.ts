@@ -9,7 +9,7 @@ import {
   type OnApplicationShutdown,
   type OnModuleInit,
 } from '@nestjs/common';
-import { PrismaClient } from '@onyx/database';
+import { type ChannelMode, PrismaClient } from '@onyx/database';
 import type { Redis } from 'ioredis';
 import { AppConfig } from '../config/app-config.js';
 import { SecretBox } from '../crypto/secret-box.js';
@@ -117,7 +117,14 @@ export class LiveSupervisorService implements OnModuleInit, OnApplicationShutdow
   private async pass(): Promise<void> {
     const wanted = await this.prisma.channel.findMany({
       where: { enabled: true },
-      select: { id: true, name: true, sourceEncrypted: true, restartToken: true },
+      select: {
+        id: true,
+        name: true,
+        sourceEncrypted: true,
+        restartToken: true,
+        mode: true,
+        qualities: true,
+      },
     });
     const byId = new Map(wanted.map((channel) => [channel.id, channel]));
 
@@ -154,12 +161,16 @@ export class LiveSupervisorService implements OnModuleInit, OnApplicationShutdow
     name: string;
     sourceEncrypted: string;
     restartToken: number;
+    mode: ChannelMode;
+    qualities: number[];
   }): void {
     let runner: ChannelRunner;
     try {
       runner = new ChannelRunner({
         source: parseSource(this.secrets.decrypt(channel.sourceEncrypted)),
         directory: channelDirectory(this.config.live.path, channel.id),
+        processing: { mode: channel.mode, qualities: channel.qualities },
+        preset: this.config.live.transcodePreset,
         segmentSeconds: this.config.live.segmentSeconds,
         playlistSegments: this.config.live.playlistSegments,
         engine: this.engine,

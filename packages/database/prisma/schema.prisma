@@ -1065,6 +1065,14 @@ enum ChannelStatus {
   FAILED
 }
 
+/// How a channel is made from its source.
+enum ChannelMode {
+  /// The picture is passed on as it arrives. One quality, almost no CPU.
+  COPY
+  /// The picture is encoded again, into several qualities.
+  TRANSCODE
+}
+
 /// A live channel. The platform pulls its source and repackages it for players.
 model Channel {
   id          String  @id @default(uuid(7)) @db.Uuid
@@ -1079,6 +1087,10 @@ model Channel {
   sourceEncrypted String
   /// The source without credentials or query, for display.
   sourceLabel     String
+
+  mode      ChannelMode @default(COPY)
+  /// Picture heights to encode with TRANSCODE, such as 1080, 720, 480. Heights above the source are left out.
+  qualities Int[]       @default([])
 
   /// The wanted state: a live process keeps an enabled channel running.
   enabled       Boolean       @default(false)

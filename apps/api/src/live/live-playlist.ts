@@ -28,15 +28,30 @@ export function parseSegments(playlist: string): PlaylistSegment[] {
   return segments;
 }
 
+/** The playlists a master playlist lists, best first as FFmpeg writes them. */
+export function parseVariants(playlist: string): string[] {
+  const lines = playlist.split('\n').map((line) => line.trim());
+  return lines.filter(
+    (line, index) => line.endsWith('.m3u8') && lines[index - 1]?.startsWith('#EXT-X-STREAM-INF'),
+  );
+}
+
 /**
- * Bits per second of what a channel currently sends out, measured over the
- * segments in its playlist. Null when there is nothing to measure yet.
+ * Bits per second of what a channel currently sends to one viewer, measured
+ * over the segments in its playlist. For a channel with several qualities
+ * this is the best one. Null when there is nothing to measure yet.
  */
 export async function measureBitrate(directory: string): Promise<number | null> {
   try {
-    const segments = parseSegments(
-      await readFile(path.join(directory, LIVE_PLAYLIST_NAME), 'utf8'),
-    );
+    let playlist = await readFile(path.join(directory, LIVE_PLAYLIST_NAME), 'utf8');
+    const best = parseVariants(playlist)[0];
+    if (best !== undefined) {
+      if (path.basename(best) !== best) {
+        return null;
+      }
+      playlist = await readFile(path.join(directory, best), 'utf8');
+    }
+    const segments = parseSegments(playlist);
     const sizes = await Promise.all(
       segments.map((segment) =>
         // Names come from a file FFmpeg wrote. Only plain file names are looked at all the same.

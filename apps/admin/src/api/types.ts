@@ -981,6 +981,15 @@ export interface RevenueReport {
 export type ChannelStatus =
   'STOPPED' | 'WAITING' | 'STARTING' | 'RUNNING' | 'RECONNECTING' | 'FAILED';
 
+/** COPY passes the picture on as it arrives. TRANSCODE encodes it into several qualities. */
+export type ChannelMode = 'COPY' | 'TRANSCODE';
+
+export interface ChannelOutput {
+  name: string;
+  height: number;
+  videoKbps: number;
+}
+
 /** What a source carries. */
 export interface ChannelStreams {
   videoCodec: string;
@@ -999,6 +1008,11 @@ export interface Channel {
   description: string | null;
   /** The source without anything secret. */
   source: string;
+  mode: ChannelMode;
+  /** The qualities chosen for transcoding, as picture heights. */
+  qualities: number[];
+  /** The qualities the channel is encoded into, once the source is known. */
+  outputs: ChannelOutput[] | null;
   /** Whether the channel is meant to run. */
   enabled: boolean;
   status: ChannelStatus;
@@ -1028,13 +1042,22 @@ export interface ChannelInput {
   number: number | null;
   description: string | null;
   source: string;
+  mode?: ChannelMode;
+  qualities?: number[];
   start?: boolean;
 }
 
 /** What testing a source found. */
 export type SourceProbe =
-  | { ok: true; streams: ChannelStreams; audio: 'copy' | 'aac' | 'none' }
-  | { ok: false; reason: string; streams: ChannelStreams | null };
+  | {
+      ok: true;
+      streams: ChannelStreams;
+      /** What happens to the audio of a channel that is passed through. */
+      audio: 'copy' | 'aac' | 'none';
+      /** Why the source cannot be passed through. Null when it can. */
+      copyObstacle: string | null;
+    }
+  | { ok: false; reason: string };
 
 export interface LivePlayback {
   protocol: 'hls';

@@ -17,7 +17,7 @@ import {
 import { type FormEvent, useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { channelsApi } from '@/api/endpoints';
-import type { Channel, ChannelInput, SourceProbe } from '@/api/types';
+import type { Channel, ChannelInput, ChannelMode, SourceProbe } from '@/api/types';
 import { useSession } from '@/auth/session';
 import { useConfirm } from '@/components/confirm';
 import { LivePlayer } from '@/components/live-player';
@@ -49,15 +49,21 @@ import {
   type ChannelFilter,
   codecName,
   describeAudio,
-  describeAudioPlan,
+  DEFAULT_QUALITIES,
+  describeProbePlan,
+  describeQualities,
+  exceedsSource,
   describeStreams,
   formatUptime,
   isChannelFilter,
+  isFallingBehind,
   matchesFilter,
   matchesSearch,
   parseChannelNumber,
   protocolOf,
+  QUALITY_OPTIONS,
   statusLook,
+  toggleQuality,
   totalsOf,
 } from '@/lib/channels';
 import { cn } from '@/lib/cn';
@@ -506,6 +512,11 @@ function ChannelRow({
         ) : channel.streams ? (
           <p className="truncate text-xs text-muted-foreground">
             {describeStreams(channel.streams)}
+            {channel.mode === 'TRANSCODE' ? ` → ${describeQualities(channel)}` : ''}
+          </p>
+        ) : channel.mode === 'TRANSCODE' ? (
+          <p className="truncate text-xs text-muted-foreground">
+            Transcoded to {describeQualities(channel)}
           </p>
         ) : null}
       </div>
@@ -646,6 +657,20 @@ function ChannelSheet({ id, fallback, actions, onClose }: ChannelSheetProps) {
               </p>
             ) : null}
 
+            {isFallingBehind(channel) ? (
+              <p
+                role="status"
+                className="flex items-start gap-2 rounded-lg border border-warning/30 bg-warning/5 p-3 text-sm text-warning"
+              >
+                <CircleAlert className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
+                <span className="min-w-0">
+                  The server encodes this channel slower than it arrives. Viewers will see pauses.
+                  Choose fewer or smaller qualities, or run fewer transcoded channels on this
+                  server.
+                </span>
+              </p>
+            ) : null}
+
             {enabled && playback.data ? (
               <LivePlayer url={playback.data.url} title={channel.name} />
             ) : (
@@ -676,6 +701,28 @@ function ChannelSheet({ id, fallback, actions, onClose }: ChannelSheetProps) {
                     : 'Known once the channel has run',
                 ],
                 ['Sound', channel.streams ? describeAudio(channel.streams) : '–'],
+                [
+                  'Processing',
+                  channel.mode === 'COPY' ? (
+                    'Passed through, without encoding'
+                  ) : (
+                    <span key="processing" className="flex flex-wrap items-center gap-1.5">
+                      Transcoded to
+                      {channel.outputs
+                        ? channel.outputs.map((output) => (
+                            <Tooltip
+                              key={output.name}
+                              content={`Video at ${formatBitrate(output.videoKbps * 1000)}`}
+                            >
+                              <span>
+                                <Badge>{output.name}</Badge>
+                              </span>
+                            </Tooltip>
+                          ))
+                        : channel.qualities.map((height) => <Badge key={height}>{height}p</Badge>)}
+                    </span>
+                  ),
+                ],
                 ['Bitrate', channel.health?.bitrate ? formatBitrate(channel.health.bitrate) : '–'],
                 [
                   'Pace',
@@ -760,6 +807,8 @@ function ChannelDialog({ item, open, onOpenChange, onSaved }: ChannelDialogProps
   const [description, setDescription] = useState('');
   const [source, setSource] = useState('');
   const [startNow, setStartNow] = useState(true);
+  const [mode, setMode] = useState<ChannelMode>('COPY');
+  const [qualities, setQualities] = useState<number[]>([...DEFAULT_QUALITIES]);
 
   // The stored address may carry a password, so it is asked for only when the form opens.
   const stored = useQuery({
@@ -779,6 +828,8 @@ function ChannelDialog({ item, open, onOpenChange, onSaved }: ChannelDialogProps
       setDescription(item?.description ?? '');
       setSource('');
       setStartNow(true);
+      setMode(item?.mode ?? 'COPY');
+      setQualities(item && item.qualities.length > 0 ? item.qualities : [...DEFAULT_QUALITIES]);
     }
   }, [open, item]);
   useEffect(() => {
@@ -787,7 +838,15 @@ function ChannelDialog({ item, open, onOpenChange, onSaved }: ChannelDialogProps
     }
   }, [open, storedSource]);
 
-  const probe = useMutation({ mutationFn: () => channelsApi.probe(source.trim()) });
+  const probe = useMutation({
+    mutationFn: () => channelsApi.probe(source.trim()),
+    onSuccess: (result) => {
+      // A source that cannot be passed through leaves one way to run the channel.
+      if (result.ok && result.copyObstacle) {
+        setMode('TRANSCODE');
+      }
+    },
+  });
   const resetProbe = probe.reset;
   useEffect(() => {
     // A result belongs to the address it was made for.
@@ -803,6 +862,8 @@ function ChannelDialog({ item, open, onOpenChange, onSaved }: ChannelDialogProps
         number: parsedNumber ?? null,
         description: description.trim() || null,
         source: source.trim(),
+        mode,
+        ...(mode === 'TRANSCODE' ? { qualities } : {}),
       };
       if (!item) {
         return channelsApi.create({ ...body, start: startNow });
@@ -824,8 +885,16 @@ function ChannelDialog({ item, open, onOpenChange, onSaved }: ChannelDialogProps
   };
 
   const loadingSource = item !== null && stored.isPending;
+  const probedStreams = probe.data?.ok ? probe.data.streams : (item?.streams ?? null);
+  const processingChanged =
+    item !== null &&
+    (mode !== item.mode || (mode === 'TRANSCODE' && qualities.join() !== item.qualities.join()));
   const ready =
-    name.trim() !== '' && source.trim() !== '' && parsedNumber !== undefined && !loadingSource;
+    name.trim() !== '' &&
+    source.trim() !== '' &&
+    parsedNumber !== undefined &&
+    !loadingSource &&
+    (mode === 'COPY' || qualities.length > 0);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -873,7 +942,7 @@ function ChannelDialog({ item, open, onOpenChange, onSaved }: ChannelDialogProps
               hint={
                 sourceChanged && item?.enabled
                   ? 'The channel restarts with the new source when you save.'
-                  : 'An HLS playlist or stream over HTTP, or an RTMP, SRT, UDP or RTP address. Video must be H.264 or HEVC.'
+                  : 'An HLS playlist or stream over HTTP, or an RTMP, SRT, UDP or RTP address.'
               }
             >
               {(id) => (
@@ -906,9 +975,74 @@ function ChannelDialog({ item, open, onOpenChange, onSaved }: ChannelDialogProps
                 Connecting to the source. This takes up to 15 seconds.
               </p>
             ) : null}
-            {probe.data ? <ProbeResult probe={probe.data} /> : null}
+            {probe.data ? <ProbeResult probe={probe.data} mode={mode} /> : null}
             <ErrorNote error={probe.error} />
             <ErrorNote error={stored.error} />
+
+            <fieldset className="grid gap-2">
+              <legend className="mb-2 text-sm font-medium">Processing</legend>
+              <div className="grid grid-cols-[minmax(0,1fr)] gap-2 sm:grid-cols-2">
+                <ModeOption
+                  value="COPY"
+                  current={mode}
+                  onSelect={setMode}
+                  title="Pass through"
+                  description="The picture goes out as it arrives, in the one quality the source sends. Uses hardly any CPU."
+                />
+                <ModeOption
+                  value="TRANSCODE"
+                  current={mode}
+                  onSelect={setMode}
+                  title="Transcode"
+                  description="The picture is encoded again in several qualities, and players pick what the connection carries. Uses a lot of CPU."
+                />
+              </div>
+              {mode === 'TRANSCODE' ? (
+                <div className="grid gap-2 rounded-lg border bg-muted/30 p-3">
+                  <div className="flex flex-wrap gap-2" role="group" aria-label="Qualities">
+                    {QUALITY_OPTIONS.map((option) => {
+                      const chosen = qualities.includes(option.height);
+                      const tooLarge = exceedsSource(option.height, probedStreams);
+                      return (
+                        <button
+                          key={option.height}
+                          type="button"
+                          aria-pressed={chosen}
+                          onClick={() => setQualities(toggleQuality(qualities, option.height))}
+                          className={cn(
+                            'grid min-w-20 gap-0.5 rounded-md border px-3 py-2 text-left transition-colors',
+                            chosen
+                              ? 'border-primary bg-primary/10 text-foreground'
+                              : 'bg-card text-muted-foreground hover:text-foreground',
+                            chosen && tooLarge && 'border-dashed opacity-60',
+                          )}
+                        >
+                          <span className="text-sm font-semibold tabular-nums">
+                            {option.height}p
+                          </span>
+                          <span className="text-xs tabular-nums">
+                            {formatBitrate(option.videoKbps * 1000)}
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    {qualities.length === 0
+                      ? 'Choose at least one quality.'
+                      : probedStreams &&
+                          qualities.some((height) => exceedsSource(height, probedStreams))
+                        ? `The source has ${probedStreams.height} lines. Larger qualities are left out, and the picture is never made bigger than it arrives.`
+                        : 'Each quality is encoded all the time the channel runs. Qualities larger than the source are left out.'}
+                  </p>
+                </div>
+              ) : null}
+              {item?.enabled && processingChanged ? (
+                <p className="text-xs text-muted-foreground">
+                  The channel restarts with the new processing when you save.
+                </p>
+              ) : null}
+            </fieldset>
 
             {item ? (
               <Field
@@ -963,24 +1097,31 @@ function ChannelDialog({ item, open, onOpenChange, onSaved }: ChannelDialogProps
 }
 
 /** What a test of a source found, in words an admin can act on. */
-function ProbeResult({ probe }: { probe: SourceProbe }) {
+function ProbeResult({ probe, mode }: { probe: SourceProbe; mode: ChannelMode }) {
+  // A source that works but not the way the channel is set up is a warning, not a success.
+  const blocked = probe.ok && mode === 'COPY' && probe.copyObstacle !== null;
+  const good = probe.ok && !blocked;
   return (
     <div
       role="status"
       className={cn(
         'flex items-start gap-2.5 rounded-lg border p-3 text-sm',
-        probe.ok ? 'border-success/30 bg-success/5' : 'border-destructive/30 bg-destructive/5',
+        good ? 'border-success/30 bg-success/5' : 'border-destructive/30 bg-destructive/5',
       )}
     >
-      {probe.ok ? (
+      {good ? (
         <CircleCheck className="mt-0.5 size-4 shrink-0 text-success" aria-hidden="true" />
       ) : (
         <CircleAlert className="mt-0.5 size-4 shrink-0 text-destructive" aria-hidden="true" />
       )}
       <div className="grid min-w-0 gap-0.5">
         <p className="font-medium">
-          {probe.ok ? 'The source works' : 'The source cannot be used'}
-          {probe.streams ? (
+          {!probe.ok
+            ? 'The source cannot be used'
+            : blocked
+              ? 'The source needs transcoding'
+              : 'The source works'}
+          {probe.ok ? (
             <span className="font-normal text-muted-foreground">
               {' · '}
               {describeStreams(probe.streams)}
@@ -988,9 +1129,46 @@ function ProbeResult({ probe }: { probe: SourceProbe }) {
           ) : null}
         </p>
         <p className="text-xs break-words text-muted-foreground">
-          {probe.ok ? describeAudioPlan(probe) : probe.reason}
+          {probe.ok ? describeProbePlan(probe, mode) : probe.reason}
         </p>
       </div>
     </div>
+  );
+}
+
+/** One of the two ways to run a channel, as a large radio button. */
+function ModeOption({
+  value,
+  current,
+  onSelect,
+  title,
+  description,
+}: {
+  value: ChannelMode;
+  current: ChannelMode;
+  onSelect: (mode: ChannelMode) => void;
+  title: string;
+  description: string;
+}) {
+  const selected = value === current;
+  return (
+    <label
+      className={cn(
+        'flex cursor-pointer items-start gap-2.5 rounded-lg border p-3 transition-colors has-focus-visible:ring-2 has-focus-visible:ring-ring',
+        selected ? 'border-primary bg-primary/5' : 'hover:bg-muted/40',
+      )}
+    >
+      <input
+        type="radio"
+        name="channel-mode"
+        className="mt-1 accent-primary"
+        checked={selected}
+        onChange={() => onSelect(value)}
+      />
+      <span className="grid gap-0.5">
+        <span className="text-sm font-medium">{title}</span>
+        <span className="text-xs text-muted-foreground">{description}</span>
+      </span>
+    </label>
   );
 }

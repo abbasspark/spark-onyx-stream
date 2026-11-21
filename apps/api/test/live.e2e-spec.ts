@@ -179,6 +179,72 @@ describe.skipIf(!TEST_DATABASE_URL)('Live channels (e2e)', () => {
       await http().patch(`/v1/channels/${UNKNOWN}`).set(admin()).send({ name: 'X' }).expect(404);
     });
 
+    it('passes a channel through unless told otherwise', async () => {
+      const created = await create().expect(201);
+      expect(created.body).toMatchObject({ mode: 'COPY', qualities: [], outputs: null });
+
+      // Qualities mean nothing for a channel that is passed through.
+      const ignored = await create({ name: 'Other', qualities: [720] }).expect(201);
+      expect(ignored.body.qualities).toEqual([]);
+    });
+
+    it('creates a transcoded channel with the chosen qualities, best first', async () => {
+      const usual = await create({ mode: 'TRANSCODE' }).expect(201);
+      expect(usual.body).toMatchObject({ mode: 'TRANSCODE', qualities: [1080, 720, 480] });
+
+      const chosen = await create({
+        name: 'Other',
+        mode: 'TRANSCODE',
+        qualities: [360, 720, 360],
+      }).expect(201);
+      expect(chosen.body.qualities).toEqual([720, 360]);
+      // What comes out is known once a live process has seen the source.
+      expect(chosen.body.outputs).toBeNull();
+
+      const odd = await create({ name: 'Odd', mode: 'TRANSCODE', qualities: [700] }).expect(400);
+      expect(odd.body.issues[0].field).toBe('qualities.0');
+      await create({ name: 'None', mode: 'TRANSCODE', qualities: [] }).expect(400);
+    });
+
+    it('shows the qualities that fit the source', async () => {
+      const created = await create({ mode: 'TRANSCODE', qualities: [1080, 720, 480] }).expect(201);
+      await testApp.prisma.channel.update({
+        where: { id: created.body.id },
+        data: { videoCodec: 'mpeg2video', width: 720, height: 576, frameRate: 25 },
+      });
+
+      const response = await http().get(`/v1/channels/${created.body.id}`).set(admin()).expect(200);
+      expect(response.body.outputs).toEqual([
+        { name: '576p', height: 576, videoKbps: 1950 },
+        { name: '480p', height: 480, videoKbps: 1400 },
+      ]);
+    });
+
+    it('starts a channel over when its processing changes, and only then', async () => {
+      const created = await create({ start: true }).expect(201);
+      const id = created.body.id as string;
+      const token = async () =>
+        (await testApp.prisma.channel.findUniqueOrThrow({ where: { id } })).restartToken;
+      const patch = (body: Record<string, unknown>) =>
+        http().patch(`/v1/channels/${id}`).set(admin()).send(body).expect(200);
+
+      await patch({ name: 'Renamed' });
+      expect(await token()).toBe(0);
+
+      const transcoded = await patch({ mode: 'TRANSCODE' });
+      expect(transcoded.body).toMatchObject({ mode: 'TRANSCODE', qualities: [1080, 720, 480] });
+      expect(await token()).toBe(1);
+
+      await patch({ qualities: [480, 720, 1080] });
+      expect(await token()).toBe(1);
+      await patch({ qualities: [720, 480] });
+      expect(await token()).toBe(2);
+
+      const back = await patch({ mode: 'COPY' });
+      expect(back.body.qualities).toEqual([]);
+      expect(await token()).toBe(3);
+    });
+
     it('deletes a channel', async () => {
       const created = await create().expect(201);
       await http().delete(`/v1/channels/${created.body.id}`).set(admin()).expect(204);
@@ -405,7 +471,7 @@ describe.skipIf(!TEST_DATABASE_URL || !hasFfmpeg)('Live channels (e2e, real FFmp
       // prettier-ignore
       [
         '-v', 'error', '-re',
-        '-f', 'lavfi', '-i', 'testsrc2=size=320x180:rate=25',
+        '-f', 'lavfi', '-i', 'testsrc2=size=640x360:rate=25',
         '-f', 'lavfi', '-i', 'sine=frequency=440',
         '-c:v', 'libx264', '-preset', 'ultrafast', '-tune', 'zerolatency', '-g', '25',
         '-pix_fmt', 'yuv420p', '-c:a', 'mp2', '-f', 'mpegts',
@@ -428,7 +494,8 @@ describe.skipIf(!TEST_DATABASE_URL || !hasFfmpeg)('Live channels (e2e, real FFmp
     expect(probe.body).toMatchObject({
       ok: true,
       audio: 'aac',
-      streams: { videoCodec: 'h264', width: 320, height: 180, audioCodec: 'mp2' },
+      copyObstacle: null,
+      streams: { videoCodec: 'h264', width: 640, height: 360, audioCodec: 'mp2' },
     });
 
     const created = await http()
@@ -440,7 +507,7 @@ describe.skipIf(!TEST_DATABASE_URL || !hasFfmpeg)('Live channels (e2e, real FFmp
 
     const running = await waitFor(id, 'RUNNING');
     expect(running).toMatchObject({
-      streams: { videoCodec: 'h264', width: 320, height: 180, frameRate: 25 },
+      streams: { videoCodec: 'h264', width: 640, height: 360, frameRate: 25 },
       restartCount: 0,
     });
     expect(running.startedAt).toEqual(expect.any(String));
@@ -472,6 +539,57 @@ describe.skipIf(!TEST_DATABASE_URL || !hasFfmpeg)('Live channels (e2e, real FFmp
       .filter((entry) => entry.channel === 'onyx:events')
       .map((entry) => JSON.parse(entry.message) as { type: string; change: string });
     expect(events).toContainEqual({ type: 'channel', channelId: id, change: 'status' });
+  }, 120_000);
+
+  it('encodes a channel into several qualities that players switch between', async () => {
+    const created = await http()
+      .post('/v1/channels')
+      .set(admin())
+      .send({
+        name: 'Transcoded',
+        source: `udp://127.0.0.1:${PORT}`,
+        mode: 'TRANSCODE',
+        // 720 lines are more than the source has and are left out.
+        qualities: [720, 360, 240],
+        start: true,
+      })
+      .expect(201);
+    const id = created.body.id as string;
+
+    const running = await waitFor(id, 'RUNNING', 60_000);
+    expect(running.outputs).toEqual([
+      { name: '360p', height: 360, videoKbps: 800 },
+      { name: '240p', height: 240, videoKbps: 400 },
+    ]);
+
+    const playback = await http().post(`/v1/channels/${id}/playback`).set(admin()).expect(200);
+    const master = await http().get(playback.body.url).expect(200);
+    expect(master.text).toContain('RESOLUTION=640x360');
+    expect(master.text).toContain('RESOLUTION=426x240');
+    expect(master.text).toContain('avc1.');
+    expect(master.text).toContain('mp4a.40.2');
+
+    for (const quality of ['360p', '240p']) {
+      const address = playback.body.url.replace('index.m3u8', `q-${quality}.m3u8`);
+      // The playlist of a quality appears with its first segment, a moment after the list of them.
+      let playlist = await http().get(address);
+      for (let attempt = 0; attempt < 20 && playlist.status !== 200; attempt += 1) {
+        await new Promise((resolve) => setTimeout(resolve, 500));
+        playlist = await http().get(address);
+      }
+      expect(playlist.status).toBe(200);
+      expect(playlist.text).toContain(`#EXT-X-MAP:URI="init-`);
+      const segment = playlist.text
+        .split('\n')
+        .filter((line: string) => line.endsWith('.m4s'))
+        .at(-1) as string;
+      expect(segment).toMatch(new RegExp(`^seg-${quality}-\\d+\\.m4s$`));
+      await http().get(playback.body.url.replace('index.m3u8', segment)).expect(200);
+    }
+
+    await http().delete(`/v1/channels/${id}`).set(admin()).expect(204);
+    await reconcile();
+    expect(testApp.app.get(LiveSupervisorService).runningIds()).toEqual([]);
   }, 120_000);
 
   it('reports a source that sends nothing, and keeps trying', async () => {

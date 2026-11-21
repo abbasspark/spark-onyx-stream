@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 import { ConflictException, Inject, Injectable, NotFoundException } from '@nestjs/common';
-import { type Channel, type ChannelStatus, PrismaClient } from '@onyx/database';
+import { type Channel, type ChannelMode, type ChannelStatus, PrismaClient } from '@onyx/database';
 import type { Redis } from 'ioredis';
 import { slugify, uniqueSlug } from '../catalog/slug.js';
 import { isUniqueViolation } from '../common/prisma-errors.js';
@@ -15,12 +15,8 @@ import {
 import { parseProbe } from '../processing/media/media-info.js';
 import { REDIS_CLIENT } from '../redis/redis.module.js';
 import type { CreateChannelInput, UpdateChannelInput } from './channels.schemas.js';
-import {
-  buildProbeArgs,
-  planOutput,
-  type SourceStreams,
-  UnsupportedSourceError,
-} from './live-command.js';
+import { buildProbeArgs, copyObstacle, planOutput, type SourceStreams } from './live-command.js';
+import { DEFAULT_LIVE_QUALITIES, ladderFor } from './live-ladder.js';
 import { parseSource } from './live-source.js';
 import { type ChannelHealth, healthKey, LIVE_NUDGE_CHANNEL, parseHealth } from './live-state.js';
 
@@ -43,6 +39,14 @@ export interface ChannelView {
   description: string | null;
   /** The source without anything secret. */
   source: string;
+  mode: ChannelMode;
+  /** The qualities chosen for transcoding. Empty for a channel that is passed through. */
+  qualities: number[];
+  /**
+   * The qualities the channel is encoded into, best first, once the source is
+   * known: chosen heights above the source are left out. Null otherwise.
+   */
+  outputs: { name: string; height: number; videoKbps: number }[] | null;
   enabled: boolean;
   status: ChannelState;
   statusMessage: string | null;
@@ -67,8 +71,15 @@ export interface ChannelDetails extends ChannelView {
 
 /** What testing a source found. */
 export type ProbeResult =
-  | { ok: true; streams: SourceStreams; audio: 'copy' | 'aac' | 'none' }
-  | { ok: false; reason: string; streams: SourceStreams | null };
+  | {
+      ok: true;
+      streams: SourceStreams;
+      /** What happens to the audio of a channel that is passed through. */
+      audio: 'copy' | 'aac' | 'none';
+      /** Why the source cannot be passed through and needs transcoding. Null when it can. */
+      copyObstacle: string | null;
+    }
+  | { ok: false; reason: string };
 
 @Injectable()
 export class ChannelsService {
@@ -116,6 +127,8 @@ export class ChannelsService {
           description: input.description,
           sourceEncrypted: this.secrets.encrypt(source.url),
           sourceLabel: source.label,
+          mode: input.mode,
+          qualities: qualitiesOf(input.mode, input.qualities),
           enabled: input.start,
           status: input.start ? 'STARTING' : 'STOPPED',
         },
@@ -128,8 +141,11 @@ export class ChannelsService {
   }
 
   async update(id: string, input: UpdateChannelInput): Promise<ChannelView> {
-    await this.find(id);
+    const current = await this.find(id);
     const source = input.source === undefined ? null : parseSource(input.source);
+    const mode = input.mode ?? current.mode;
+    const qualities = qualitiesOf(mode, input.qualities ?? current.qualities);
+    const reprocess = mode !== current.mode || qualities.join() !== [...current.qualities].join();
 
     try {
       const channel = await this.prisma.channel.update({
@@ -139,6 +155,10 @@ export class ChannelsService {
           slug: input.slug,
           number: input.number,
           description: input.description,
+          mode,
+          qualities,
+          // Other qualities need another process: the live process starts the channel over.
+          ...(reprocess ? { restartToken: { increment: 1 } } : {}),
           // A new address is noticed by the live process, which then starts the channel over.
           ...(source
             ? { sourceEncrypted: this.secrets.encrypt(source.url), sourceLabel: source.label }
@@ -219,34 +239,28 @@ export class ChannelsService {
 
     try {
       const info = parseProbe(await this.ffmpeg.ffprobe(buildProbeArgs(source), abort.signal));
-      try {
-        const plan = planOutput(info);
-        return { ok: true, streams: plan.streams, audio: plan.audio };
-      } catch (error) {
-        if (!(error instanceof UnsupportedSourceError)) {
-          throw error;
-        }
-        return {
-          ok: false,
-          reason: error.message,
-          streams: info.video
-            ? {
-                videoCodec: info.video.codec,
-                width: info.video.width,
-                height: info.video.height,
-                frameRate: info.video.frameRate,
-                audioCodec: info.audio[0]?.codec ?? null,
-                audioChannels: info.audio[0]?.channels ?? null,
-              }
-            : null,
-        };
+      if (!info.video) {
+        return { ok: false, reason: 'The source carries no video' };
       }
+      const obstacle = copyObstacle(info.video.codec);
+      // Planned as a transcode, which takes any video, to read the streams in one place.
+      const plan = planOutput(info, { mode: obstacle ? 'TRANSCODE' : 'COPY', qualities: [] });
+      return {
+        ok: true,
+        streams: plan.streams,
+        audio: !plan.streams.audioCodec
+          ? 'none'
+          : plan.streams.audioCodec === 'aac'
+            ? 'copy'
+            : 'aac',
+        copyObstacle: obstacle,
+      };
     } catch (error) {
       if (error instanceof FfmpegNotFoundError) {
         throw error;
       }
       if (error instanceof FfmpegAbortedError || abort.signal.aborted) {
-        return { ok: false, reason: 'The source did not answer within 15 seconds', streams: null };
+        return { ok: false, reason: 'The source did not answer within 15 seconds' };
       }
       const detail =
         error instanceof FfmpegError
@@ -260,7 +274,6 @@ export class ChannelsService {
       return {
         ok: false,
         reason: detail ? `The source could not be read: ${detail}` : 'The source could not be read',
-        streams: null,
       };
     } finally {
       clearTimeout(timeout);
@@ -309,6 +322,14 @@ export class ChannelsService {
   }
 }
 
+/** A channel that is passed through keeps no qualities. */
+function qualitiesOf(mode: ChannelMode, qualities: readonly number[] | undefined): number[] {
+  if (mode === 'COPY') {
+    return [];
+  }
+  return qualities && qualities.length > 0 ? [...qualities] : [...DEFAULT_LIVE_QUALITIES];
+}
+
 function toView(channel: Channel, health: ChannelHealth | null): ChannelView {
   const attended = channel.enabled && health !== null;
   const unattendedFor = Date.now() - channel.updatedAt.getTime();
@@ -333,6 +354,16 @@ function toView(channel: Channel, health: ChannelHealth | null): ChannelView {
     number: channel.number,
     description: channel.description,
     source: channel.sourceLabel,
+    mode: channel.mode,
+    qualities: channel.qualities,
+    outputs:
+      channel.mode === 'TRANSCODE' && channel.height
+        ? ladderFor(channel.qualities, channel.height, channel.frameRate).map((rendition) => ({
+            name: rendition.name,
+            height: rendition.height,
+            videoKbps: rendition.videoKbps,
+          }))
+        : null,
     enabled: channel.enabled,
     status,
     statusMessage,

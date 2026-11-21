@@ -3,6 +3,7 @@ import type { ChannelStatus } from '@onyx/database';
 import type { MediaInfo } from '../processing/media/media-info.js';
 import {
   buildLiveArgs,
+  type ChannelProcessing,
   type OutputPlan,
   planOutput,
   type SourceStreams,
@@ -77,6 +78,9 @@ export interface RunnerHealth {
 export interface RunnerOptions {
   source: LiveSource;
   directory: string;
+  processing: ChannelProcessing;
+  /** Speed setting of the H.264 encoder, for transcoded channels. */
+  preset: string;
   segmentSeconds: number;
   playlistSegments: number;
   engine: LiveEngine;
@@ -181,6 +185,7 @@ export class ChannelRunner {
     try {
       return planOutput(
         await this.options.engine.probe(this.options.source, this.probeAbort.signal),
+        this.options.processing,
       );
     } catch (error) {
       if (error instanceof UnsupportedSourceError) {
@@ -221,6 +226,7 @@ export class ChannelRunner {
           segmentSeconds: this.options.segmentSeconds,
           playlistSegments: this.options.playlistSegments,
           runId: startedAt.toString(36),
+          preset: this.options.preset,
         }),
         {
           onProgress: (progress) => {

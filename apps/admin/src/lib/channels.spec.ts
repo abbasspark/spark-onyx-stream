@@ -2,7 +2,10 @@
 import { describe, expect, it } from 'vitest';
 import type { Channel } from '@/api/types';
 import {
-  describeAudioPlan,
+  describeProbePlan,
+  describeQualities,
+  exceedsSource,
+  isFallingBehind,
   describeStreams,
   formatUptime,
   isChannelFilter,
@@ -13,6 +16,7 @@ import {
   protocolOf,
   qualityName,
   statusLook,
+  toggleQuality,
   totalsOf,
 } from './channels';
 
@@ -23,6 +27,9 @@ const channel = (change: Partial<Channel> = {}): Channel => ({
   number: 7,
   description: null,
   source: 'https://cdn.example.com/…/live.m3u8',
+  mode: 'COPY',
+  qualities: [],
+  outputs: null,
   enabled: true,
   status: 'RUNNING',
   statusMessage: null,
@@ -121,12 +128,22 @@ describe('describing a source', () => {
     expect(qualityName(720)).toBe('720p');
   });
 
-  it('says what happens to the audio', () => {
-    expect(describeAudioPlan({ ok: true, streams, audio: 'copy' })).toContain('untouched');
+  it('says what happens to a tested source', () => {
+    const probe = { ok: true as const, streams, audio: 'copy' as const, copyObstacle: null };
+    expect(describeProbePlan(probe, 'COPY')).toContain('untouched');
     expect(
-      describeAudioPlan({ ok: true, streams: { ...streams, audioCodec: 'mp2' }, audio: 'aac' }),
+      describeProbePlan(
+        { ...probe, streams: { ...streams, audioCodec: 'mp2' }, audio: 'aac' },
+        'COPY',
+      ),
     ).toContain('MP2 audio is converted to AAC');
-    expect(describeAudioPlan({ ok: true, streams, audio: 'none' })).toContain('silent');
+    expect(describeProbePlan({ ...probe, audio: 'none' }, 'COPY')).toContain('silent');
+    expect(describeProbePlan({ ...probe, copyObstacle: 'Needs H.264' }, 'COPY')).toBe(
+      'Needs H.264.',
+    );
+    expect(describeProbePlan({ ...probe, copyObstacle: 'Needs H.264' }, 'TRANSCODE')).toContain(
+      'encoded again',
+    );
   });
 
   it('reads the protocol', () => {
@@ -156,5 +173,38 @@ describe('parseChannelNumber', () => {
     expect(parseChannelNumber('0')).toBeUndefined();
     expect(parseChannelNumber('12a')).toBeUndefined();
     expect(parseChannelNumber('10000')).toBeUndefined();
+  });
+});
+
+describe('qualities', () => {
+  it('adds and removes, best first', () => {
+    expect(toggleQuality([1080, 480], 720)).toEqual([1080, 720, 480]);
+    expect(toggleQuality([1080, 720], 1080)).toEqual([720]);
+  });
+
+  it('knows which are more than the source has', () => {
+    expect(exceedsSource(1080, { ...streams, height: 720 })).toBe(true);
+    expect(exceedsSource(1080, { ...streams, height: 1072 })).toBe(false);
+    expect(exceedsSource(1080, null)).toBe(false);
+  });
+
+  it('names what a channel sends, or what was chosen', () => {
+    expect(describeQualities({ qualities: [1080, 720], outputs: null })).toBe('1080p, 720p');
+    expect(
+      describeQualities({
+        qualities: [1080, 720],
+        outputs: [{ name: '576p', height: 576, videoKbps: 1950 }],
+      }),
+    ).toBe('576p');
+  });
+
+  it('notices a server that cannot keep up', () => {
+    const health = { bitrate: 1, lastDataAt: null, node: 'n' };
+    const slow = channel({ mode: 'TRANSCODE', health: { ...health, speed: 0.8 } });
+    expect(isFallingBehind(slow)).toBe(true);
+    expect(isFallingBehind({ ...slow, health: { ...health, speed: 1 } })).toBe(false);
+    expect(isFallingBehind({ ...slow, mode: 'COPY' })).toBe(false);
+    expect(isFallingBehind({ ...slow, status: 'STARTING' })).toBe(false);
+    expect(isFallingBehind({ ...slow, health: null })).toBe(false);
   });
 });
