@@ -753,6 +753,8 @@ export interface Package {
   /** Titles in it, and how many of them are published and need a subscription. */
   titles: number;
   sellableTitles: number;
+  /** Live channels in it. */
+  channels: number;
   /** The plans that open it by name. Plans that open everything are not listed. */
   plans: { id: string; name: string }[];
   createdAt: string;
@@ -1025,6 +1027,11 @@ export interface Channel {
   qualities: number[];
   /** The qualities the channel is encoded into, once the source is known. */
   outputs: ChannelOutput[] | null;
+  /** Whether viewers find the channel on the website and in the apps. */
+  published: boolean;
+  /** FREE is as open as the site. PAID needs a plan that opens the channel. */
+  access: 'FREE' | 'PAID';
+  packages: { id: string; name: string }[];
   /** Whether the channel is meant to run. */
   enabled: boolean;
   status: ChannelStatus;
@@ -1057,6 +1064,9 @@ export interface ChannelInput {
   source?: string;
   mode?: ChannelMode;
   qualities?: number[];
+  published?: boolean;
+  access?: 'FREE' | 'PAID';
+  packageIds?: string[];
   start?: boolean;
 }
 

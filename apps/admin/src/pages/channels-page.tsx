@@ -2,7 +2,9 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   CircleAlert,
+  Check,
   CircleCheck,
+  Globe,
   KeyRound,
   Eye,
   MoreHorizontal,
@@ -17,7 +19,7 @@ import {
 } from 'lucide-react';
 import { type FormEvent, useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
-import { channelsApi } from '@/api/endpoints';
+import { channelsApi, packagesApi } from '@/api/endpoints';
 import type { Channel, ChannelIngest, ChannelInput, ChannelMode, SourceProbe } from '@/api/types';
 import { useSession } from '@/auth/session';
 import { useConfirm } from '@/components/confirm';
@@ -50,6 +52,7 @@ import { useAddressParams } from '@/lib/address-params';
 import {
   type ChannelFilter,
   codecName,
+  describeAudience,
   describeAudio,
   DEFAULT_QUALITIES,
   describeProbePlan,
@@ -488,6 +491,12 @@ function ChannelRow({
             className="truncate rounded-sm text-left text-sm font-semibold hover:underline"
           >
             {channel.name}
+            {channel.published ? (
+              <Globe
+                className="ml-1.5 inline size-3.5 align-[-2px] text-muted-foreground"
+                aria-label="On the website"
+              />
+            ) : null}
           </button>
           <p
             className={cn(
@@ -770,6 +779,7 @@ function ChannelSheet({ id, fallback, actions, onClose }: ChannelSheetProps) {
                       : `${channel.restartCount} since it was started`
                     : '–',
                 ],
+                ['Viewers', describeAudience(channel)],
                 ['Live process', channel.health?.node ?? '–'],
                 [
                   'Address name',
@@ -830,6 +840,14 @@ function ChannelDialog({ item, open, onOpenChange, onSaved }: ChannelDialogProps
   const [description, setDescription] = useState('');
   const [source, setSource] = useState('');
   const [startNow, setStartNow] = useState(true);
+  const [published, setPublished] = useState(false);
+  const [paid, setPaid] = useState(false);
+  const [packageIds, setPackageIds] = useState<string[]>([]);
+  const packages = useQuery({
+    queryKey: ['packages'],
+    queryFn: ({ signal }) => packagesApi.list(signal),
+    enabled: open,
+  });
   const [ingest, setIngest] = useState<ChannelIngest>('PULL');
   const [mode, setMode] = useState<ChannelMode>('COPY');
   const [qualities, setQualities] = useState<number[]>([...DEFAULT_QUALITIES]);
@@ -852,6 +870,9 @@ function ChannelDialog({ item, open, onOpenChange, onSaved }: ChannelDialogProps
       setDescription(item?.description ?? '');
       setSource('');
       setStartNow(true);
+      setPublished(item?.published ?? false);
+      setPaid(item?.access === 'PAID');
+      setPackageIds(item?.packages.map((entry) => entry.id) ?? []);
       setIngest(item?.ingest ?? 'PULL');
       setMode(item?.mode ?? 'COPY');
       setQualities(item && item.qualities.length > 0 ? item.qualities : [...DEFAULT_QUALITIES]);
@@ -892,6 +913,9 @@ function ChannelDialog({ item, open, onOpenChange, onSaved }: ChannelDialogProps
         ...(pulled ? { source: source.trim() } : {}),
         mode,
         ...(mode === 'TRANSCODE' ? { qualities } : {}),
+        published,
+        access: paid ? 'PAID' : 'FREE',
+        packageIds: paid ? packageIds : [],
       };
       if (!item) {
         return channelsApi.create({ ...body, start: startNow });
@@ -1135,7 +1159,7 @@ function ChannelDialog({ item, open, onOpenChange, onSaved }: ChannelDialogProps
                 )}
               </Field>
             ) : null}
-            <Field label="Description" hint="For you and other admins.">
+            <Field label="Description" hint="Viewers see it under the name of the channel.">
               {(id) => (
                 <Textarea
                   id={id}
@@ -1146,6 +1170,64 @@ function ChannelDialog({ item, open, onOpenChange, onSaved }: ChannelDialogProps
                 />
               )}
             </Field>
+            <fieldset className="grid gap-2">
+              <legend className="mb-2 text-sm font-medium">Viewers</legend>
+              <ToggleRow
+                label="Show on the website"
+                description="Viewers find the channel under Live and can watch it while it is on air."
+                checked={published}
+                onCheckedChange={setPublished}
+              />
+              {published ? (
+                <>
+                  <ToggleRow
+                    label="Only for subscribers"
+                    description="Off, the channel is as open as the rest of the site. On, it needs a plan that opens it."
+                    checked={paid}
+                    onCheckedChange={setPaid}
+                  />
+                  {paid && packages.data && packages.data.length > 0 ? (
+                    <div className="rounded-lg border p-3">
+                      <p className="text-sm font-medium">Packages</p>
+                      <p className="mt-0.5 mb-3 text-xs text-muted-foreground">
+                        Plans with chosen packages open the channel through them.{' '}
+                        {packageIds.length === 0
+                          ? 'In no package, only plans that open everything show it.'
+                          : 'Plans that open everything show it either way.'}
+                      </p>
+                      <div className="flex flex-wrap gap-2">
+                        {packages.data.map((entry) => {
+                          const chosen = packageIds.includes(entry.id);
+                          return (
+                            <button
+                              key={entry.id}
+                              type="button"
+                              role="checkbox"
+                              aria-checked={chosen}
+                              onClick={() =>
+                                setPackageIds(
+                                  chosen
+                                    ? packageIds.filter((id) => id !== entry.id)
+                                    : [...packageIds, entry.id],
+                                )
+                              }
+                              className={cn(
+                                'inline-flex h-8 items-center gap-1.5 rounded-full border px-3 text-[13px] font-medium transition-colors hover:bg-accent',
+                                chosen &&
+                                  'border-primary bg-primary text-primary-foreground hover:bg-primary/90',
+                              )}
+                            >
+                              {chosen ? <Check className="size-3.5" aria-hidden="true" /> : null}
+                              {entry.name}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  ) : null}
+                </>
+              ) : null}
+            </fieldset>
             {item ? null : (
               <ToggleRow
                 label="Start right away"

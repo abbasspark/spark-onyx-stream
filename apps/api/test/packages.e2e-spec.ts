@@ -135,6 +135,7 @@ describe.skipIf(!TEST_DATABASE_URL)('Packages (e2e)', () => {
         position: 0,
         titles: 0,
         sellableTitles: 0,
+        channels: 0,
         plans: [],
         createdAt: expect.any(String),
         updatedAt: expect.any(String),

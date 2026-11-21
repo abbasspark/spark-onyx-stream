@@ -515,3 +515,16 @@ This replaces the "plain CSS without a component library" part of D-018.
 **Why:** receiving RTMP and SRT from every encoder on the market is a product in itself, and MediaMTX is a well-kept one under the MIT licence that does exactly this. Putting it behind the same runner means everything built for pulled channels (pass through, transcoding, the watchdog, the panel) works for pushed ones without a second code path. A single key in the place where OBS has a field for it is what operators know from every streaming service. Asking the API on each connection keeps the keys in one place and makes switching a channel off take effect for the encoder as well. Deriving the internal password removes a setting that could only ever be wrong.
 
 **Consequence:** one more container to run, and one more thing that can be down, though only pushed channels depend on it. The stream key appears in the paths of the ingest server and so in its log, which is why that log is not for others to read. A stream is carried twice inside the server, from the ingest server to FFmpeg. Encoders need the ports 1935 (TCP) and 8890 (UDP) open.
+
+## D-040 Channels are sold the way titles are
+
+**Date:** 2026-11-22
+
+- **A channel is published or not, free or paid, and in packages,** with the meaning each has for a title.
+- **One rule opens both:** a paid channel is open to a viewer whose plan opens everything or includes one of its packages.
+- **Channels have their own place in the public catalog,** beside titles and not among them.
+- **A channel that is off air stays listed** and says so.
+
+**Why:** an operator thinks in offers such as "Sports" or "Kids", not in kinds of video, so a package has to be able to hold both and a plan has to open both at once. Using the rule that already exists means there is one thing to explain and one function that decides. Channels are kept apart from titles in the catalog because nearly everything else about them differs: no poster, no length, no episodes, no position to resume at, and a state that changes by the second. Listing channels that are off air keeps the lineup stable and tells a viewer that a channel exists and will be back.
+
+**Consequence:** a channel cannot be sold on its own, only through plans. Whether a channel is on air is known to everyone who can list it. Search and the home page do not show channels yet.

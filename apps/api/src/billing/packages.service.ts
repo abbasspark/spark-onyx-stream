@@ -23,6 +23,8 @@ export interface PackageView {
   /** Titles in it, and how many of them are published and need a subscription. */
   titles: number;
   sellableTitles: number;
+  /** Live channels in the package. */
+  channels: number;
   /** The plans that open it by name. Plans that open everything are not listed. */
   plans: { id: string; name: string }[];
   createdAt: Date;
@@ -30,7 +32,7 @@ export interface PackageView {
 }
 
 const VIEW_INCLUDE = {
-  _count: { select: { titles: true } },
+  _count: { select: { titles: true, channels: true } },
   plans: {
     where: { plan: { includesAll: false } },
     select: { plan: { select: { id: true, name: true, position: true } } },
@@ -38,7 +40,7 @@ const VIEW_INCLUDE = {
 } as const;
 
 type PackageRecord = Package & {
-  _count: { titles: number };
+  _count: { titles: number; channels: number };
   plans: { plan: { id: string; name: string; position: number } }[];
 };
 
@@ -193,6 +195,7 @@ function toView(item: PackageRecord, sellableTitles: number): PackageView {
     description: item.description,
     position: item.position,
     titles: item._count.titles,
+    channels: item._count.channels,
     sellableTitles,
     plans: item.plans
       .map((link) => link.plan)

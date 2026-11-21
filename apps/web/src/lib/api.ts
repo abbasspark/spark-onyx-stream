@@ -4,7 +4,16 @@ import { connection } from 'next/server';
 import { siteConfig } from './config';
 import { NO_PLANS, type Plans } from './plans';
 import { TtlCache } from './ttl-cache';
-import type { Category, Home, Page, TitleCard, TitleDetail, TitleSort, TitleType } from './types';
+import type {
+  Category,
+  Channel,
+  Home,
+  Page,
+  TitleCard,
+  TitleDetail,
+  TitleSort,
+  TitleType,
+} from './types';
 
 /**
  * How long the website keeps an answer of the catalog before asking again.
@@ -122,4 +131,34 @@ export async function getTitle(slug: string): Promise<TitleDetail | null> {
     }
   });
   return answer as TitleDetail | null;
+}
+
+/**
+ * Whether a channel is on air changes at any moment, so what is known about
+ * channels is kept for a much shorter time than the rest of the catalog.
+ */
+const KEEP_CHANNELS_MS = 8000;
+const channelAnswers = new TtlCache<Channel[]>(KEEP_CHANNELS_MS, 1);
+
+/**
+ * The live channels of the site, in the order of their numbers. A site
+ * without live channels, or with an API older than them, has none.
+ */
+export async function getChannels(): Promise<Channel[]> {
+  await connection();
+  return channelAnswers.get('channels', async () => {
+    try {
+      return (await load('/channels')) as Channel[];
+    } catch (error) {
+      if (error instanceof CatalogError && error.status === 404) {
+        return [];
+      }
+      throw error;
+    }
+  });
+}
+
+/** @returns Null when no channel that viewers can see has this slug. */
+export async function getChannel(slug: string): Promise<Channel | null> {
+  return (await getChannels()).find((channel) => channel.slug === slug) ?? null;
 }

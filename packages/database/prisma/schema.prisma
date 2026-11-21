@@ -973,8 +973,9 @@ model Package {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  titles TitlePackage[]
-  plans  PlanPackage[]
+  titles   TitlePackage[]
+  channels ChannelPackage[]
+  plans    PlanPackage[]
 
   @@index([position])
   @@map("packages")
@@ -989,6 +990,18 @@ model TitlePackage {
   @@id([titleId, packageId])
   @@index([packageId])
   @@map("title_packages")
+}
+
+/// A channel in a package. Plans that include the package open the channel.
+model ChannelPackage {
+  channelId String  @db.Uuid
+  channel   Channel @relation(fields: [channelId], references: [id], onDelete: Cascade)
+  packageId String  @db.Uuid
+  package   Package @relation(fields: [packageId], references: [id], onDelete: Cascade)
+
+  @@id([channelId, packageId])
+  @@index([packageId])
+  @@map("channel_packages")
 }
 
 model PlanPackage {
@@ -1107,6 +1120,12 @@ model Channel {
   mode      ChannelMode @default(COPY)
   /// Picture heights to encode with TRANSCODE, such as 1080, 720, 480. Heights above the source are left out.
   qualities Int[]       @default([])
+
+  /// Whether viewers find the channel on the website and in the apps.
+  published Boolean          @default(false)
+  /// FREE is as open as the installation. PAID needs a plan that opens the channel.
+  access    TitleAccess      @default(FREE)
+  packages  ChannelPackage[]
 
   /// The wanted state: a live process keeps an enabled channel running.
   enabled       Boolean       @default(false)

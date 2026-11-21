@@ -14,6 +14,8 @@ interface SiteHeaderProps {
   categories: Category[];
   /** Whether the site offers plans, which puts a link to them in the menu. */
   hasPlans?: boolean;
+  /** Whether the site has live channels, which puts a link to them in the menu. */
+  hasLive?: boolean;
 }
 
 const LINKS = [
@@ -25,7 +27,12 @@ const LINKS = [
  * The bar at the top of every page. It lies over the artwork and is
  * see-through at the top of a page, then turns solid once the page scrolls.
  */
-export function SiteHeader({ siteName, categories, hasPlans = false }: SiteHeaderProps) {
+export function SiteHeader({
+  siteName,
+  categories,
+  hasPlans = false,
+  hasLive = false,
+}: SiteHeaderProps) {
   const pathname = usePathname();
   const params = useSearchParams();
   const [solid, setSolid] = useState(false);
@@ -109,6 +116,15 @@ export function SiteHeader({ siteName, categories, hasPlans = false }: SiteHeade
               {link.label}
             </Link>
           ))}
+          {hasLive ? (
+            <Link
+              href="/live"
+              aria-current={pathname === '/live' ? 'page' : undefined}
+              className={linkClass(pathname === '/live')}
+            >
+              Live
+            </Link>
+          ) : null}
           {categories.length > 0 ? (
             <div ref={categoriesMenu} className="relative">
               <button
@@ -207,6 +223,7 @@ export function SiteHeader({ siteName, categories, hasPlans = false }: SiteHeade
             {[
               { href: '/browse', label: 'Everything' },
               ...LINKS,
+              ...(hasLive ? [{ href: '/live', label: 'Live' }] : []),
               ...(hasPlans ? [{ href: '/plans', label: 'Plans' }] : []),
             ].map((link) => (
               <li key={link.href}>

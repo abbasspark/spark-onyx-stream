@@ -163,6 +163,21 @@ describe('ChannelRunner', () => {
     await halt(runner);
   });
 
+  it('gives the last thing FFmpeg said as the reason, not a note of its own', async () => {
+    const { engine, runner, states } = setup();
+    runner.start();
+    await vi.advanceTimersByTimeAsync(0);
+    engine.last.handlers.onLog('[mp4] Malformed AAC bitstream detected');
+    engine.last.handlers.onProgress(progress(1000));
+    engine.last.handlers.onExit(255);
+    await vi.advanceTimersByTimeAsync(0);
+
+    expect(states.at(-1)?.message).toBe(
+      'The stream stopped: [mp4] Malformed AAC bitstream detected. Trying again in 1 s',
+    );
+    await halt(runner);
+  });
+
   it('shows a channel as failed after five attempts, and keeps trying', async () => {
     const { engine, runner, states, status } = setup();
     engine.probeResult = async () => {

@@ -195,7 +195,9 @@ export function buildLiveArgs(
       plan.audio === 'none'
         ? []
         : plan.audio === 'copy'
-          ? ['-map', '0:a:0', '-c:a', 'copy']
+          ? // AAC in a transport stream carries a header per frame that MP4 does not take.
+            // The filter removes it and leaves audio from other containers as it is.
+            ['-map', '0:a:0', '-c:a', 'copy', '-bsf:a', 'aac_adtstoasc']
           : ['-map', '0:a:0', '-c:a', 'aac', '-b:a', '128k', '-ac', String(plan.audioChannels)];
     return [
       ...input,

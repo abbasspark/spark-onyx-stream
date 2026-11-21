@@ -209,7 +209,7 @@ export function PackagesPage() {
                   ) : null}
                 </div>
 
-                <dl className="mt-4 grid grid-cols-2 gap-3 text-sm">
+                <dl className="mt-4 grid grid-cols-3 gap-3 text-sm">
                   <div>
                     <dt className="text-xs text-muted-foreground">Titles</dt>
                     <dd className="mt-0.5 text-xl font-semibold tabular-nums">{item.titles}</dd>
@@ -219,6 +219,10 @@ export function PackagesPage() {
                     <dd className="mt-0.5 text-xl font-semibold tabular-nums">
                       {item.sellableTitles}
                     </dd>
+                  </div>
+                  <div>
+                    <dt className="text-xs text-muted-foreground">Channels</dt>
+                    <dd className="mt-0.5 text-xl font-semibold tabular-nums">{item.channels}</dd>
                   </div>
                 </dl>
 

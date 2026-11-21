@@ -105,3 +105,24 @@ export interface Playback {
   thumbnailTrackUrl: string | null;
   expiresAt: string;
 }
+
+/** A live channel as viewers see it. */
+export interface Channel {
+  slug: string;
+  name: string;
+  /** The number of the channel, as on a remote control. */
+  number: number | null;
+  description: string | null;
+  access: 'FREE' | 'PAID';
+  /** The packages the channel is in, to tell whether a plan opens it. */
+  packageIds: string[];
+  /** Whether the channel is sending right now. */
+  onAir: boolean;
+}
+
+/** Where to watch a channel, for a short time. */
+export interface LivePlayback {
+  protocol: 'hls';
+  url: string;
+  expiresAt: string;
+}

@@ -7,10 +7,12 @@ export function SiteFooter({
   siteName,
   categories,
   hasPlans = false,
+  hasLive = false,
 }: {
   siteName: string;
   categories: Category[];
   hasPlans?: boolean;
+  hasLive?: boolean;
 }) {
   return (
     <footer className="gutter mt-24 border-t border-line pt-10 pb-12 text-sm text-smoke">
@@ -41,6 +43,13 @@ export function SiteFooter({
                 Search
               </Link>
             </li>
+            {hasLive ? (
+              <li>
+                <Link href="/live" className="hover:text-vein">
+                  Live
+                </Link>
+              </li>
+            ) : null}
             {hasPlans ? (
               <li>
                 <Link href="/plans" className="hover:text-vein">
