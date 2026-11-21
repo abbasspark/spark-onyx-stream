@@ -290,3 +290,17 @@ This replaces the "plain CSS without a component library" part of D-018.
 **Why:** separate shapes keep internal details from leaking and let the panel change freely without breaking apps. Hiding instead of unpublishing means reprocessing a video is safe and needs no follow-up. Short caching takes most read load off the API once many viewers browse, at the cost of a small delay.
 
 **Consequence:** with the default `open`, published means public. An operator who needs paid or private viewing has to wait for viewer accounts or set `off`. The request limit counts by IP address, so many viewers behind one address share one allowance. The limits are generous for that reason and are a guard against floods, not a precise control.
+
+## D-025 The viewer website is a separate Next.js application
+
+**Date:** 2026-11-21
+
+- **The site viewers use is its own application**, `apps/web`, built with Next.js. It reads only the public catalog API and has no database access.
+- **Pages are rendered on the server**, with catalog answers kept for 30 seconds and shared between viewers.
+- **Search and playback requests are made by the browser**, directly to the API.
+- **Watch positions are stored in the browser** until viewer accounts exist.
+- **The interface has its own look**, separate from the admin panel: black, one accent, the catalog's artwork as the only colour.
+
+**Why:** title pages must be readable by search engines and show a proper preview when a link is shared, which a page built only in the browser does not give. The admin panel has neither need, so it stays the simpler Vite application it is. Keeping the website on the public API alone means it can run on another machine, and that everything a viewer can see is, by construction, what the API decided to publish.
+
+**Consequence:** the project now has two frontend stacks to maintain. The website's server counts as one client for the API's request limit, which is why it shares cached answers and leaves search to the browser. The website is not yet part of the Docker images and the gateway. Until it is, it runs with `pnpm dev:web` or its own `start` command.

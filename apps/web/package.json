@@ -1,0 +1,35 @@
+{
+  "name": "@onyx/web",
+  "version": "0.1.0",
+  "private": true,
+  "license": "AGPL-3.0-only",
+  "type": "module",
+  "scripts": {
+    "dev": "next dev --port 3001",
+    "build": "next build",
+    "start": "next start --port 3001",
+    "typecheck": "next typegen && tsc --noEmit",
+    "lint": "oxlint src/",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@fontsource-variable/archivo": "^5.2.0",
+    "clsx": "^2.1.1",
+    "hls.js": "^1.7.4",
+    "lucide-react": "^1.76.0",
+    "next": "^16.4.0",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1",
+    "server-only": "^0.0.1"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "^4.3.5",
+    "@types/node": "^24.19.2",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "oxlint": "^1.58.0",
+    "tailwindcss": "^4.3.5",
+    "typescript": "^6.0.2",
+    "vitest": "^4.1.2"
+  }
+}
