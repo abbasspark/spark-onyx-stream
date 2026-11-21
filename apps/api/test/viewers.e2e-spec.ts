@@ -165,7 +165,12 @@ describe.skipIf(!TEST_DATABASE_URL)('Viewer accounts (e2e)', () => {
 
       // "session" answers the same question without an error for a visitor.
       const visitor = await http().get('/v1/viewer/session').expect(200);
-      expect(visitor.body).toEqual({ viewer: null, profile: null, entitled: false });
+      expect(visitor.body).toEqual({
+        viewer: null,
+        profile: null,
+        entitled: false,
+        access: null,
+      });
       expect(visitor.headers['cache-control']).toBe('no-store');
       const known = await http().get('/v1/viewer/session').set('Cookie', cookie).expect(200);
       expect(known.body.viewer).toMatchObject({ email: ANNA.email, displayName: 'Anna' });
@@ -173,7 +178,12 @@ describe.skipIf(!TEST_DATABASE_URL)('Viewer accounts (e2e)', () => {
         .get('/v1/viewer/session')
         .set('Cookie', 'onyx_viewer=onyx_view_made-up')
         .expect(200);
-      expect(forged.body).toEqual({ viewer: null, profile: null, entitled: false });
+      expect(forged.body).toEqual({
+        viewer: null,
+        profile: null,
+        entitled: false,
+        access: null,
+      });
     });
 
     it('gives the same answer for a wrong password and an unknown address', async () => {

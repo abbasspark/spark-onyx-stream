@@ -18,6 +18,7 @@ const title: TitleDetail = {
     { id: 'c2', name: 'Drama' },
     { id: 'c1', name: 'Thriller' },
   ],
+  packages: [{ id: 'p1', name: 'Films' }],
   asset: null,
   seasonCount: 0,
   episodeCount: 0,
@@ -47,6 +48,14 @@ describe('changedFields', () => {
   it('ignores spaces around a value and the order of the categories', () => {
     const form = { ...saved, name: '  Night Train ', categoryIds: ['c2', 'c1'] };
     expect(changedFields(saved, form)).toEqual({});
+  });
+
+  it('sends the packages when one was added or taken away', () => {
+    expect(changedFields(saved, { ...saved, packageIds: ['p2', 'p1'] })).toEqual({
+      packageIds: ['p2', 'p1'],
+    });
+    expect(changedFields(saved, { ...saved, packageIds: [] })).toEqual({ packageIds: [] });
+    expect(changedFields(saved, { ...saved, packageIds: ['p1'] })).toEqual({});
   });
 
   it('sends only what changed', () => {

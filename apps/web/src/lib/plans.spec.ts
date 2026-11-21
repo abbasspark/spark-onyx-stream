@@ -2,6 +2,11 @@
 import {
   bestYearlySaving,
   describeEnd,
+  describeOpens,
+  listNames,
+  opensFrom,
+  opensTitle,
+  planOpensTitle,
   describeRefund,
   subscribeLabel,
   formatMoney,
@@ -83,6 +88,65 @@ describe('describeEnd', () => {
     expect(
       describeEnd({ endsAt: '2026-12-24T12:00:00.000Z', renewsAt: null, status: 'ACTIVE' }),
     ).toBe('until 24 December 2026');
+  });
+});
+
+describe('what a subscription opens', () => {
+  const paid = (...packageIds: string[]) => ({ access: 'PAID' as const, packageIds });
+
+  it('opens a free title to everyone', () => {
+    expect(opensTitle(null, { access: 'FREE' })).toBe(true);
+    expect(opensTitle(null, {})).toBe(true);
+  });
+
+  it('opens nothing paid without a subscription', () => {
+    expect(opensTitle(null, paid('kids'))).toBe(false);
+  });
+
+  it('opens everything, or the packages of the plan', () => {
+    expect(opensTitle({ all: true, packageIds: [] }, paid())).toBe(true);
+    const kids = { all: false, packageIds: ['kids'] };
+    expect(opensTitle(kids, paid('sports', 'kids'))).toBe(true);
+    expect(opensTitle(kids, paid('sports'))).toBe(false);
+    // Not sorted into a package: only a plan that opens everything shows it.
+    expect(opensTitle(kids, paid())).toBe(false);
+    expect(opensTitle(kids, { access: 'PAID' })).toBe(false);
+  });
+
+  it('reads the answer of a site older than packages', () => {
+    expect(opensFrom({ entitled: true })).toEqual({ all: true, packageIds: [] });
+    expect(opensFrom({ entitled: false })).toBeNull();
+    expect(opensFrom({ entitled: true, access: { all: false, packageIds: ['k'] } })).toEqual({
+      all: false,
+      packageIds: ['k'],
+    });
+    expect(opensFrom({ entitled: false, access: null })).toBeNull();
+  });
+
+  it('knows which plans open a title', () => {
+    const kidsPlan = { includesAll: false, packages: [{ id: 'kids', name: 'Kids' }] };
+    expect(planOpensTitle(kidsPlan, paid('kids'))).toBe(true);
+    expect(planOpensTitle(kidsPlan, paid('sports'))).toBe(false);
+    expect(planOpensTitle({ includesAll: true }, paid())).toBe(true);
+    // A plan of a site older than packages opens everything.
+    expect(planOpensTitle({}, paid('sports'))).toBe(true);
+  });
+
+  it('puts it into words', () => {
+    expect(describeOpens({ includesAll: true })).toBe('every title with a lock');
+    expect(describeOpens({})).toBe('every title with a lock');
+    expect(
+      describeOpens({
+        includesAll: false,
+        packages: [
+          { id: 'a', name: 'Kids' },
+          { id: 'b', name: 'Sports' },
+          { id: 'c', name: 'Films' },
+        ],
+      }),
+    ).toBe('Kids, Sports and Films');
+    expect(listNames(['Kids', 'Sports'])).toBe('Kids and Sports');
+    expect(listNames(['Kids'])).toBe('Kids');
   });
 });
 

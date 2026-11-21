@@ -424,7 +424,7 @@ function DevicesSection() {
 
 /** The plan the account watches through, if any. */
 function SubscriptionSection() {
-  const { entitled } = useViewerSession();
+  const { entitled, opens } = useViewerSession();
   const [own, setOwn] = useState<OwnSubscription | null | undefined>(undefined);
   const [plansOffered, setPlansOffered] = useState(false);
   // Set while Stripe's page for the subscription is being opened.
@@ -486,6 +486,9 @@ function SubscriptionSection() {
     }
   }
   const failed = own?.status === 'PAST_DUE';
+  // A plan with chosen packages does not open everything.
+  const what =
+    opens && !opens.all ? 'the titles your plan includes' : 'every title that needs a subscription';
 
   return (
     <Section heading="Subscription">
@@ -510,8 +513,8 @@ function SubscriptionSection() {
             {failed
               ? 'The last payment did not go through. You can still watch while it is tried again. Check your card so your subscription does not end.'
               : own.cancelAtPeriodEnd && own.online && own.endsAt
-                ? `You cancelled. You can watch every title that needs a subscription until ${formatDate(own.endsAt)}, and nothing more is charged.`
-                : `You can watch every title that needs a subscription, ${describeEnd(own)}.`}
+                ? `You cancelled. You can watch ${what} until ${formatDate(own.endsAt)}, and nothing more is charged.`
+                : `You can watch ${what}, ${describeEnd(own)}.`}
           </p>
           {own.online ? (
             <>

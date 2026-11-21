@@ -64,6 +64,10 @@ export const listTitlesSchema = paginationSchema.extend({
   status: z.enum(PUBLISH_STATUSES).optional(),
   categoryId: z.uuid().optional(),
   access: z.enum(TITLE_ACCESS).optional(),
+  /** Titles in this package. */
+  packageId: z.uuid().optional(),
+  /** "none": paid titles in no package, which only plans that open everything show. */
+  packaged: z.enum(['none']).optional(),
   /** Matches the name and the original name, ignoring case. */
   q: z.string().trim().min(1).max(200).optional(),
   sort: z.enum(TITLE_SORT_FIELDS).default('createdAt'),
@@ -101,6 +105,8 @@ export const updateTitleSchema = z
     access: z.enum(TITLE_ACCESS),
     /** Replaces the title's categories. */
     categoryIds: z.array(z.uuid()).max(50),
+    /** Replaces the packages the title is in. Plans open a paid title through them. */
+    packageIds: z.array(z.uuid()).max(50),
     assetId: z.uuid().nullable(),
     trailerAssetId: z.uuid().nullable(),
     posterId: z.uuid().nullable(),

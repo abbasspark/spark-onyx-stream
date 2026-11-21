@@ -34,6 +34,8 @@ export interface DetailsForm {
   /** Whether watching needs a subscription. */
   isPaid: boolean;
   categoryIds: string[];
+  /** The packages through which plans open the title. */
+  packageIds: string[];
 }
 
 export function toForm(title: TitleDetail): DetailsForm {
@@ -49,6 +51,7 @@ export function toForm(title: TitleDetail): DetailsForm {
     isFeatured: title.isFeatured,
     isPaid: title.access === 'PAID',
     categoryIds: title.categories.map((category) => category.id).sort(),
+    packageIds: title.packages.map((item) => item.id).sort(),
   };
 }
 
@@ -85,6 +88,9 @@ export function changedFields(saved: DetailsForm, form: DetailsForm): UpdateTitl
   }
   if ([...form.categoryIds].sort().join() !== saved.categoryIds.join()) {
     changes.categoryIds = form.categoryIds;
+  }
+  if ([...form.packageIds].sort().join() !== saved.packageIds.join()) {
+    changes.packageIds = form.packageIds;
   }
   return changes;
 }

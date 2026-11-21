@@ -598,6 +598,7 @@ model Title {
   updatedAt   DateTime @updatedAt
 
   categories TitleCategory[]
+  packages   TitlePackage[]
   seasons    Season[]
   watching   WatchProgress[]
 
@@ -791,6 +792,8 @@ model Plan {
   isOffered     Boolean  @default(true)
   /// Marks the plan viewers are steered to.
   isRecommended Boolean  @default(false)
+  /// Whether the plan opens every paid title. Otherwise it opens its packages.
+  includesAll   Boolean  @default(true)
   /// Order on the page of plans, lowest first.
   position      Int      @default(0)
   createdAt     DateTime @default(now())
@@ -798,6 +801,7 @@ model Plan {
 
   subscriptions Subscription[]
   payments      Payment[]
+  packages      PlanPackage[]
 
   @@index([position])
   @@map("plans")
@@ -939,4 +943,45 @@ model Payment {
   @@index([viewerId, paidAt])
   @@index([externalPaymentId])
   @@map("payments")
+}
+
+/// A group of paid titles that plans open together, such as "Kids" or
+/// "Sports". What a cable operator calls a bouquet.
+model Package {
+  id          String   @id @default(uuid(7)) @db.Uuid
+  name        String   @unique
+  description String?
+  /// Order in lists, lowest first.
+  position    Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  titles TitlePackage[]
+  plans  PlanPackage[]
+
+  @@index([position])
+  @@map("packages")
+}
+
+model TitlePackage {
+  titleId   String  @db.Uuid
+  title     Title   @relation(fields: [titleId], references: [id], onDelete: Cascade)
+  packageId String  @db.Uuid
+  package   Package @relation(fields: [packageId], references: [id], onDelete: Cascade)
+
+  @@id([titleId, packageId])
+  @@index([packageId])
+  @@map("title_packages")
+}
+
+model PlanPackage {
+  planId    String  @db.Uuid
+  plan      Plan    @relation(fields: [planId], references: [id], onDelete: Cascade)
+  packageId String  @db.Uuid
+  /// A package that plans include is not deleted from under them.
+  package   Package @relation(fields: [packageId], references: [id], onDelete: Restrict)
+
+  @@id([planId, packageId])
+  @@index([packageId])
+  @@map("plan_packages")
 }

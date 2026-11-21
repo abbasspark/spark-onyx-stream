@@ -429,6 +429,8 @@ export interface TitleSummary {
   access: TitleAccess;
   poster: CatalogImage | null;
   categories: { id: string; name: string }[];
+  /** The packages the title is in. Plans open a paid title through them. */
+  packages: { id: string; name: string }[];
   asset: AssetRef | null;
   seasonCount: number;
   episodeCount: number;
@@ -553,6 +555,7 @@ export interface UpdateTitleInput {
   isFeatured?: boolean;
   access?: TitleAccess;
   categoryIds?: string[];
+  packageIds?: string[];
   assetId?: string | null;
   trailerAssetId?: string | null;
   posterId?: string | null;
@@ -703,6 +706,9 @@ export interface Plan {
   yearlyAmount: number | null;
   trialDays: number;
   isRecommended: boolean;
+  /** Whether the plan opens every paid title. Otherwise it opens its packages. */
+  includesAll: boolean;
+  packages: { id: string; name: string }[];
   /** Whether viewers are offered the plan. */
   isOffered: boolean;
   position: number;
@@ -722,7 +728,26 @@ export type PlanInput = Pick<
   | 'trialDays'
   | 'isRecommended'
   | 'isOffered'
->;
+  | 'includesAll'
+> & {
+  /** The packages the plan opens while it does not open everything. */
+  packageIds: string[];
+};
+
+/** A group of paid titles that plans open together. */
+export interface Package {
+  id: string;
+  name: string;
+  description: string | null;
+  position: number;
+  /** Titles in it, and how many of them are published and need a subscription. */
+  titles: number;
+  sellableTitles: number;
+  /** The plans that open it by name. Plans that open everything are not listed. */
+  plans: { id: string; name: string }[];
+  createdAt: string;
+  updatedAt: string;
+}
 
 export type SubscriptionStatus = 'TRIALING' | 'ACTIVE' | 'PAST_DUE' | 'CANCELED' | 'EXPIRED';
 
@@ -784,6 +809,11 @@ export interface BillingOverview {
   endingSoon: number;
   paidTitles: number;
   publishedTitles: number;
+  packages: number;
+  /** Plans that open only their packages. */
+  limitedPlans: number;
+  /** Published paid titles in no package, which only plans that open everything show. */
+  unpackagedPaidTitles: number;
 }
 
 /** A message Stripe sent to this installation. */

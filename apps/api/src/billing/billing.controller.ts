@@ -50,6 +50,7 @@ import type {
 } from './billing.views.js';
 import { RateLimit } from '../rate-limit/rate-limit.guard.js';
 import { CheckoutService } from './checkout.service.js';
+import type { ViewerAccess } from './entitlement.js';
 import { PlansService } from './plans.service.js';
 import { StripeWebhookService } from './stripe-webhook.service.js';
 import { SubscriptionsService } from './subscriptions.service.js';
@@ -65,6 +66,8 @@ interface OwnSubscription {
   subscription: ViewerSubscriptionView | null;
   /** Whether titles that need a subscription are open to the viewer. */
   entitled: boolean;
+  /** Which paid titles the subscription opens: all, or those of some packages. */
+  access: ViewerAccess;
   /** Whether the viewer paid online before, so a free trial is not offered again. */
   trialUsed: boolean;
 }
@@ -139,11 +142,12 @@ export class PublicBillingController {
   }
 
   private async ownOf(identity: ViewerIdentity): Promise<OwnSubscription> {
-    const [subscription, trialUsed] = await Promise.all([
+    const [subscription, access, trialUsed] = await Promise.all([
       this.subscriptions.ownOf(identity.viewer.id),
+      this.subscriptions.accessOf(identity.viewer.id),
       this.subscriptions.paidBefore(identity.viewer.id),
     ]);
-    return { subscription, entitled: subscription !== null, trialUsed };
+    return { subscription, entitled: subscription !== null, access, trialUsed };
   }
 }
 

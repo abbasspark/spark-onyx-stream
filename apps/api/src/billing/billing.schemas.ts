@@ -35,6 +35,15 @@ const planFields = {
   trialDays: z.number().int().min(0).max(90),
   isOffered: z.boolean(),
   isRecommended: z.boolean(),
+  /** Whether the plan opens every paid title. Otherwise it opens its packages. */
+  includesAll: z.boolean(),
+  /** Replaces the packages of the plan. They count while it does not open everything. */
+  packageIds: z.array(z.uuid()).max(100),
+};
+
+const NEEDS_PACKAGE = {
+  message: 'Choose at least one package, or let the plan open everything',
+  path: ['packageIds'],
 };
 
 const NEEDS_PRICE = {
@@ -52,8 +61,11 @@ export const createPlanSchema = z
     trialDays: planFields.trialDays.default(0),
     isOffered: planFields.isOffered.default(true),
     isRecommended: planFields.isRecommended.default(false),
+    includesAll: planFields.includesAll.default(true),
+    packageIds: planFields.packageIds.default([]),
   })
-  .refine((plan) => plan.monthlyAmount !== null || plan.yearlyAmount !== null, NEEDS_PRICE);
+  .refine((plan) => plan.monthlyAmount !== null || plan.yearlyAmount !== null, NEEDS_PRICE)
+  .refine((plan) => plan.includesAll || plan.packageIds.length > 0, NEEDS_PACKAGE);
 export type CreatePlanInput = z.infer<typeof createPlanSchema>;
 
 export const updatePlanSchema = z

@@ -439,3 +439,18 @@ This replaces the "plain CSS without a component library" part of D-018.
 **Why:** an operator who also sells for cash or through resellers has no single place that knows the whole income, and Stripe's reports know only Stripe's half. Rows that are never recomputed stay true when a plan is renamed, a price changes or a viewer leaves. Moving money is where mistakes cost most, so it stays with the provider that is built for it, and this application cannot send money anywhere. Counting a refund in the month of its payment keeps each month equal to what its sales were worth in the end, which is what a small operator asks. Keeping access and money apart avoids a form that does two things and half-fails: a gift is access without money, and a late payment is money without a change of access.
 
 **Consequence:** the figures of a past month change when one of its payments is refunded later, so they are not a ledger for tax filing: for that, the export and Stripe's own reports are the source. Fees of Stripe are not known here, so revenue is before fees. Payments in a currency other than the configured one are listed and left out of sums. An endpoint at Stripe from before this decision needs two more events, and earlier invoices are brought in with the import.
+
+## D-035 Plans differ through packages
+
+**Date:** 2026-11-21
+
+- **A package is a named group of paid titles.** A title can be in several packages, a plan can name several.
+- **A plan opens everything, or its packages.** "Everything" is a state of the plan, not a package that has to be kept complete.
+- **A paid title in no package is opened only by plans that open everything.**
+- **Whether a viewer may watch is worked out at the moment of asking** from the plan and the packages as they are then. Nothing is copied to the subscription.
+- **Packages are managed with billing rights and read with catalog rights.** An editor of the catalog sorts a title into packages, as they mark it paid.
+- **The website learns what a viewer's subscription opens with the session,** and which packages a paid title is in with the title, and decides the buttons itself. The API decides again when playback is asked for.
+
+**Why:** operators think in bundles: a kids offer, a sports offer, everything. Levels, where a higher plan includes all lower ones, cannot say "sports without kids". Packages can say both, and are what live channels will be sorted into in the next phase, so one structure serves films, series and channels. Keeping "everything" as a state means a new title is in every full plan without anybody remembering to add it. Refusing by default for an unsorted title costs a click when it was meant to be open, and costs revenue when it was not: the first mistake is the cheaper one. Working access out when asked means a title moved between packages, or a plan changed, takes effect at once and cannot leave stale copies behind.
+
+**Consequence:** changing the packages of a plan changes what its current subscribers get, including those who paid for a year: the operator has to judge that. A viewer cannot move between plans in place yet. The ids of the packages of paid titles are public, which names no title that is not public anyway. Sites without packages behave exactly as before.

@@ -40,7 +40,7 @@ const wait = (ms: number) => new Promise<void>((resolve) => window.setTimeout(re
 export function CheckoutReturnScreen() {
   const router = useRouter();
   const sessionId = useSearchParams().get('session');
-  const { state, viewer, setEntitled } = useViewerSession();
+  const { state, viewer, setSubscription } = useViewerSession();
   const [outcome, setOutcome] = useState<Outcome>({ state: 'working' });
   const [next, setNext] = useState('/');
   const started = useRef(false);
@@ -82,7 +82,7 @@ export function CheckoutReturnScreen() {
             return;
           }
           if (result.subscription) {
-            setEntitled(true);
+            setSubscription(result);
             setOutcome({ state: 'done', subscription: result.subscription });
             return;
           }
@@ -114,7 +114,7 @@ export function CheckoutReturnScreen() {
           'Your payment has not arrived here yet. That can take a few minutes. Your subscription then shows on your account page, and nothing is charged twice.',
       });
     })();
-  }, [state, sessionId, viewerId, router, setEntitled]);
+  }, [state, sessionId, viewerId, router, setSubscription]);
 
   if (outcome.state === 'done') {
     const { subscription } = outcome;

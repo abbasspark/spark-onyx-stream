@@ -43,7 +43,9 @@ type Loaded =
   /** Playback needs a confirmed email address and the viewer has yet to confirm. */
   | { state: 'confirm-email' }
   /** The title needs a subscription and the viewer has none. */
-  | { state: 'subscribe' };
+  | { state: 'subscribe' }
+  /** Subscribed, to a plan that does not open this title. */
+  | { state: 'other-plan' };
 
 /** Explains a refused playback request in the viewer's terms. */
 function refusal(status: number): { message: string; retry: boolean } {
@@ -121,7 +123,8 @@ export function WatchScreen({
           return;
         }
         if (response.status === 402) {
-          setLoaded({ state: 'subscribe' });
+          const body = (await response.json().catch(() => null)) as { code?: string } | null;
+          setLoaded({ state: body?.code === 'plan_required' ? 'other-plan' : 'subscribe' });
           return;
         }
         if (response.status === 403) {
@@ -275,6 +278,33 @@ export function WatchScreen({
               Create an account
             </Link>
           )}
+        </div>
+        <Link
+          href={backHref}
+          className="text-sm text-smoke underline underline-offset-4 hover:text-vein"
+        >
+          Back to {heading}
+        </Link>
+      </div>
+    );
+  }
+
+  if (loaded.state === 'other-plan') {
+    return (
+      <div className="flex h-dvh flex-col items-center justify-center gap-6 bg-onyx px-6 text-center">
+        <Lock className="size-8 text-sard" aria-hidden="true" />
+        <h1 className="display max-w-xl text-3xl sm:text-4xl">{heading} is not in your plan</h1>
+        <p className="max-w-md text-smoke">
+          Your subscription opens other titles. The page of plans shows which plan includes this
+          one. To change, cancel your plan on your account page and choose the other.
+        </p>
+        <div className="flex flex-wrap justify-center gap-3">
+          <Link href="/plans" className="button button-play">
+            See the plans
+          </Link>
+          <Link href="/account" className="button button-quiet">
+            Your account
+          </Link>
         </div>
         <Link
           href={backHref}

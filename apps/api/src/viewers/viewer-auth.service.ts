@@ -26,7 +26,7 @@ import {
   type ViewerSessionView,
   type ViewerView,
 } from './viewer.view.js';
-import { runningAt } from '../billing/entitlement.js';
+import { ACCESS_SELECT, accessOf, runningAt, type ViewerAccess } from '../billing/entitlement.js';
 import { ViewerEmailService } from './viewer-email.service.js';
 import {
   type ProfileView,
@@ -77,16 +77,13 @@ export class ViewerAuthService {
     @Inject(ViewerProfilesService) private readonly profiles: ViewerProfilesService,
   ) {}
 
-  /**
-   * Whether the viewer has a running subscription. Asked here with the rule of
-   * the billing module, so a page learns it together with who is signed in.
-   */
-  async isEntitled(viewerId: string): Promise<boolean> {
-    const running = await this.prisma.subscription.findFirst({
+  /** What the viewer's subscription opens: everything, or some packages. Null without one. */
+  async subscriptionAccess(viewerId: string): Promise<ViewerAccess> {
+    const running = await this.prisma.subscription.findMany({
       where: { viewerId, ...runningAt() },
-      select: { id: true },
+      select: ACCESS_SELECT,
     });
-    return running !== null;
+    return accessOf(running);
   }
 
   accessConfig(): ViewerAccessConfig {
