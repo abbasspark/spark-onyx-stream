@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 import { Logger, Module, type OnModuleInit } from '@nestjs/common';
+import { GuideSchedulerModule } from '../guide/guide.module.js';
 import { LiveSupervisorModule } from '../live/live.module.js';
 import { MaintenanceModule } from '../maintenance/maintenance.module.js';
 import { ProcessingWorkerModule } from '../processing/processing.module.js';
@@ -30,7 +31,7 @@ export class LiveRoleModule implements OnModuleInit {
   }
 }
 
-@Module({ imports: [MaintenanceModule] })
+@Module({ imports: [MaintenanceModule, GuideSchedulerModule] })
 export class SchedulerRoleModule implements OnModuleInit {
   private readonly logger = new Logger(SchedulerRoleModule.name);
 

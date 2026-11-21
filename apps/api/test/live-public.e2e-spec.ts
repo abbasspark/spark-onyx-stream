@@ -118,6 +118,8 @@ describe.skipIf(!TEST_DATABASE_URL)('Live channels for viewers (e2e)', () => {
           access: 'FREE',
           packageIds: [],
           onAir: true,
+          now: null,
+          next: null,
         },
         {
           slug: 'sports',
@@ -127,6 +129,8 @@ describe.skipIf(!TEST_DATABASE_URL)('Live channels for viewers (e2e)', () => {
           access: 'FREE',
           packageIds: [],
           onAir: false,
+          now: null,
+          next: null,
         },
         {
           slug: 'cartoons',
@@ -136,6 +140,8 @@ describe.skipIf(!TEST_DATABASE_URL)('Live channels for viewers (e2e)', () => {
           access: 'PAID',
           packageIds: [kids.id],
           onAir: true,
+          now: null,
+          next: null,
         },
       ]);
       expect(JSON.stringify(list.body)).not.toContain('cdn.example.com');

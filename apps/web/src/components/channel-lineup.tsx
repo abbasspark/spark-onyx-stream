@@ -3,7 +3,8 @@
 
 import { Lock } from 'lucide-react';
 import Link from 'next/link';
-import { isLocked, liveHref } from '@/lib/live';
+import { useEffect, useState } from 'react';
+import { isLocked, liveHref, onNow, progressOf } from '@/lib/live';
 import type { Channel } from '@/lib/types';
 import { useViewerSession } from './viewer-session';
 
@@ -21,12 +22,20 @@ interface ChannelLineupProps {
  */
 export function ChannelLineup({ channels, current, compact = false }: ChannelLineupProps) {
   const { opens } = useViewerSession();
+  // Times are shown in the viewer's own time zone, which only the browser knows.
+  const [now, setNow] = useState<number | null>(null);
+  useEffect(() => {
+    setNow(Date.now());
+    const timer = window.setInterval(() => setNow(Date.now()), 30_000);
+    return () => window.clearInterval(timer);
+  }, []);
 
   return (
     <ol className="border-t border-line">
       {channels.map((channel) => {
         const locked = isLocked(channel, opens);
         const playing = channel.slug === current;
+        const guide = now === null ? null : onNow(channel, now);
         return (
           <li key={channel.slug} className="border-b border-line">
             <Link
@@ -55,7 +64,35 @@ export function ChannelLineup({ channels, current, compact = false }: ChannelLin
                   ) : null}
                   {channel.name}
                 </span>
-                {channel.description && !compact ? (
+                {guide?.now ? (
+                  <span className="grid gap-1.5">
+                    <span className={`truncate text-vein ${compact ? 'text-xs' : 'text-sm'}`}>
+                      <span className="text-smoke">Now </span>
+                      {guide.now.title}
+                      {compact ? null : (
+                        <span className="text-smoke"> until {clock(guide.now.endsAt)}</span>
+                      )}
+                    </span>
+                    <span
+                      aria-hidden="true"
+                      className="block h-0.5 w-full max-w-64 overflow-hidden rounded-full bg-line"
+                    >
+                      <span
+                        className="block h-full bg-sard"
+                        style={{ width: `${progressOf(guide.now, now ?? 0) * 100}%` }}
+                      />
+                    </span>
+                    {guide.next && !compact ? (
+                      <span className="truncate text-sm text-smoke">
+                        Next {clock(guide.next.startsAt)} {guide.next.title}
+                      </span>
+                    ) : null}
+                  </span>
+                ) : guide?.next && !compact ? (
+                  <span className="truncate text-sm text-smoke">
+                    Next {clock(guide.next.startsAt)} {guide.next.title}
+                  </span>
+                ) : channel.description && !compact ? (
                   <span className="line-clamp-2 max-w-[65ch] text-sm text-smoke">
                     {channel.description}
                   </span>
@@ -87,4 +124,8 @@ export function ChannelLineup({ channels, current, compact = false }: ChannelLin
       })}
     </ol>
   );
+}
+
+function clock(iso: string): string {
+  return new Date(iso).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
 }

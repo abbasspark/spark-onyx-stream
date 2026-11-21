@@ -34,7 +34,7 @@ See [phase-1-media-engine.md](phase-1-media-engine.md) for the design.
 2. Transcoding to several qualities that players switch between, for any source the server can read. **Done.**
 3. Channels pushed by an encoder over RTMP or SRT, with a stream key per channel and an ingest server. **Done.**
 4. Going back in time and recording.
-5. A programme guide.
+5. A programme guide: import from XMLTV sources, programmes by hand, now and next in the lineup and a timetable for viewers. **Done.**
 6. Channels in the catalog, in packages and on the viewer website. **Done.** Built before steps 4 and 5, so that viewers can watch channels at all.
 
 See [phase-4-live.md](phase-4-live.md) for the design.

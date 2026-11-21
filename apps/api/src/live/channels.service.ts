@@ -27,7 +27,11 @@ import {
 } from '../processing/ffmpeg/ffmpeg-runner.js';
 import { parseProbe } from '../processing/media/media-info.js';
 import { REDIS_CLIENT } from '../redis/redis.module.js';
-import type { CreateChannelInput, UpdateChannelInput } from './channels.schemas.js';
+import {
+  type CreateChannelInput,
+  RESERVED_SLUGS,
+  type UpdateChannelInput,
+} from './channels.schemas.js';
 import { buildProbeArgs, copyObstacle, planOutput, type SourceStreams } from './live-command.js';
 import { IngestService } from './ingest.service.js';
 import { DEFAULT_LIVE_QUALITIES, ladderFor } from './live-ladder.js';
@@ -63,6 +67,8 @@ export interface ChannelView {
    * known: chosen heights above the source are left out. Null otherwise.
    */
   outputs: { name: string; height: number; videoKbps: number }[] | null;
+  /** The id of the channel in guide sources. Null when it is not linked. */
+  guideId: string | null;
   /** Whether viewers find the channel on the website and in the apps. */
   published: boolean;
   /** FREE is as open as the installation. PAID needs a plan that opens the channel. */
@@ -149,8 +155,11 @@ export class ChannelsService {
     const source = input.source === undefined ? null : parseSource(input.source);
     const slug =
       input.slug ??
-      (await uniqueSlug(slugify(input.name), async (value) =>
-        Boolean(await this.prisma.channel.findUnique({ where: { slug: value } })),
+      (await uniqueSlug(
+        slugify(input.name),
+        async (value) =>
+          RESERVED_SLUGS.includes(value) ||
+          Boolean(await this.prisma.channel.findUnique({ where: { slug: value } })),
       ));
 
     try {
@@ -161,6 +170,7 @@ export class ChannelsService {
           slug,
           number: input.number,
           description: input.description,
+          guideId: input.guideId,
           published: input.published,
           access: input.access,
           packages: { create: input.packageIds.map((packageId) => ({ packageId })) },
@@ -204,6 +214,7 @@ export class ChannelsService {
           slug: input.slug,
           number: input.number,
           description: input.description,
+          guideId: input.guideId,
           published: input.published,
           access: input.access,
           ...(input.packageIds
@@ -462,6 +473,7 @@ function toView(channel: ChannelRecord, health: ChannelHealth | null): ChannelVi
             videoKbps: rendition.videoKbps,
           }))
         : null,
+    guideId: channel.guideId,
     published: channel.published,
     access: channel.access,
     packages: channel.packages

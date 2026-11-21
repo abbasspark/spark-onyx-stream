@@ -8,9 +8,11 @@ import {
   Inject,
   Param,
   Post,
+  Query,
   Req,
 } from '@nestjs/common';
 import type { Request } from 'express';
+import { z } from 'zod';
 import { Public } from '../auth/auth.decorators.js';
 import { PUBLIC_CATALOG_ROUTE } from '../catalog/public-catalog.controller.js';
 import { slugParamSchema } from '../catalog/public-catalog.schemas.js';
@@ -19,7 +21,11 @@ import { ZodValidationPipe } from '../common/zod-validation.pipe.js';
 import { RateLimit } from '../rate-limit/rate-limit.guard.js';
 import { ViewerSessionService } from '../viewers/viewer-session.service.js';
 import type { LivePlaybackInfo } from './live-playback.service.js';
-import { type PublicChannel, PublicChannelsService } from './public-channels.service.js';
+import {
+  type PublicChannel,
+  PublicChannelsService,
+  type PublicGuideRow,
+} from './public-channels.service.js';
 
 /**
  * Whether a channel is on air changes at any moment, so these answers are
@@ -31,6 +37,41 @@ const READS = { name: 'catalog', limit: 600, windowSeconds: 60 };
 const PLAYBACK = { name: 'catalog-playback', limit: 120, windowSeconds: 60 };
 
 const slugPipe = new ZodValidationPipe(slugParamSchema);
+
+/** The longest stretch of the guide given in one answer. */
+const MAX_GUIDE_HOURS = 48;
+const guideQuerySchema = z.object({
+  /** Where the stretch begins. Left out: an hour ago, at the full hour. */
+  from: z.iso
+    .datetime({ offset: true })
+    .transform((value) => new Date(value))
+    .optional(),
+  hours: z.coerce.number().int().min(1).max(MAX_GUIDE_HOURS).default(24),
+});
+
+/**
+ * The programme guide of the published channels.
+ *
+ *   GET /v1/catalog/guide?from=2026-11-22T18:00:00Z&hours=24
+ */
+@Public()
+@Controller(`${PUBLIC_CATALOG_ROUTE}/guide`)
+export class PublicGuideController {
+  constructor(@Inject(PublicChannelsService) private readonly channels: PublicChannelsService) {}
+
+  @Get()
+  @RateLimit(READS)
+  @Header('Cache-Control', 'public, max-age=60')
+  guide(
+    @Query(new ZodValidationPipe(guideQuerySchema)) query: { from?: Date; hours: number },
+  ): Promise<{ from: string; to: string; channels: PublicGuideRow[] }> {
+    const from = query.from ?? new Date(Math.floor(Date.now() / 3_600_000 - 1) * 3_600_000);
+    const to = new Date(from.getTime() + query.hours * 3_600_000);
+    return this.channels
+      .guide(from, to)
+      .then((channels) => ({ from: from.toISOString(), to: to.toISOString(), channels }));
+  }
+}
 
 /** Live channels in the public catalog, for the viewer website and the apps. */
 @Public()

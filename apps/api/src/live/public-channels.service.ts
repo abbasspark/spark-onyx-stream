@@ -27,6 +27,47 @@ export interface PublicChannel {
   packageIds: string[];
   /** Whether the channel is sending right now. */
   onAir: boolean;
+  /** What the guide says is on now, and what comes after it. Null when it does not say. */
+  now: PublicProgramme | null;
+  next: PublicProgramme | null;
+}
+
+/** A programme as viewers see it. */
+export interface PublicProgramme {
+  title: string;
+  subtitle: string | null;
+  description: string | null;
+  category: string | null;
+  startsAt: string;
+  endsAt: string;
+}
+
+/** The programmes of one channel in a stretch of time. */
+export interface PublicGuideRow {
+  slug: string;
+  programmes: PublicProgramme[];
+}
+
+/** How far ahead "next" is looked for. */
+const NEXT_WITHIN_MS = 12 * 60 * 60 * 1000;
+const PROGRAMME_SELECT = {
+  channelId: true,
+  title: true,
+  subtitle: true,
+  description: true,
+  category: true,
+  startsAt: true,
+  endsAt: true,
+} as const;
+
+interface ProgrammeRow {
+  channelId: string;
+  title: string;
+  subtitle: string | null;
+  description: string | null;
+  category: string | null;
+  startsAt: Date;
+  endsAt: Date;
 }
 
 const PUBLIC_SELECT = {
@@ -69,11 +110,75 @@ export class PublicChannelsService {
       orderBy: [{ number: { sort: 'asc', nulls: 'last' } }, { name: 'asc' }],
       select: PUBLIC_SELECT,
     });
-    return channels.map(toPublic);
+    const now = new Date();
+    const upcoming = await this.programmes(
+      channels.map((channel) => channel.id),
+      now,
+      new Date(now.getTime() + NEXT_WITHIN_MS),
+    );
+    return channels.map((channel) => toPublic(channel, upcoming.get(channel.id) ?? [], now));
+  }
+
+  /**
+   * The guide: what every published channel shows in a stretch of time.
+   * Channels are in the order of the lineup, also those without programmes.
+   */
+  async guide(from: Date, to: Date): Promise<PublicGuideRow[]> {
+    const channels = await this.prisma.channel.findMany({
+      where: { published: true },
+      orderBy: [{ number: { sort: 'asc', nulls: 'last' } }, { name: 'asc' }],
+      select: { id: true, slug: true },
+    });
+    const programmes = await this.programmes(
+      channels.map((channel) => channel.id),
+      from,
+      to,
+    );
+    return channels.map((channel) => ({
+      slug: channel.slug,
+      programmes: (programmes.get(channel.id) ?? []).map(toProgramme),
+    }));
+  }
+
+  /** Programmes of channels that run at some point between two moments, by channel and in order. */
+  private async programmes(
+    channelIds: string[],
+    from: Date,
+    to: Date,
+  ): Promise<Map<string, ProgrammeRow[]>> {
+    const byChannel = new Map<string, ProgrammeRow[]>();
+    if (channelIds.length === 0) {
+      return byChannel;
+    }
+    const rows = await this.prisma.programme.findMany({
+      where: { channelId: { in: channelIds }, startsAt: { lt: to }, endsAt: { gt: from } },
+      orderBy: [{ startsAt: 'asc' }, { createdAt: 'asc' }],
+      select: PROGRAMME_SELECT,
+      take: 20_000,
+    });
+    for (const row of rows) {
+      const list = byChannel.get(row.channelId);
+      if (list) {
+        // Two sources can describe the same slot. The first one stands.
+        if ((list.at(-1) as ProgrammeRow).endsAt <= row.startsAt) {
+          list.push(row);
+        }
+      } else {
+        byChannel.set(row.channelId, [row]);
+      }
+    }
+    return byChannel;
   }
 
   async get(slug: string): Promise<PublicChannel> {
-    return toPublic(await this.find(slug));
+    const channel = await this.find(slug);
+    const now = new Date();
+    const upcoming = await this.programmes(
+      [channel.id],
+      now,
+      new Date(now.getTime() + NEXT_WITHIN_MS),
+    );
+    return toPublic(channel, upcoming.get(channel.id) ?? [], now);
   }
 
   /**
@@ -155,7 +260,20 @@ function isOnAir(channel: { enabled: boolean; status: string }): boolean {
   return channel.enabled && channel.status === 'RUNNING';
 }
 
-function toPublic(channel: PublicRecord): PublicChannel {
+function toProgramme(row: ProgrammeRow): PublicProgramme {
+  return {
+    title: row.title,
+    subtitle: row.subtitle,
+    description: row.description,
+    category: row.category,
+    startsAt: row.startsAt.toISOString(),
+    endsAt: row.endsAt.toISOString(),
+  };
+}
+
+function toPublic(channel: PublicRecord, upcoming: ProgrammeRow[], at: Date): PublicChannel {
+  const current = upcoming.find((row) => row.startsAt <= at && row.endsAt > at) ?? null;
+  const following = upcoming.find((row) => row.startsAt > at) ?? null;
   return {
     slug: channel.slug,
     name: channel.name,
@@ -164,5 +282,7 @@ function toPublic(channel: PublicRecord): PublicChannel {
     access: channel.access,
     packageIds: channel.packages.map((link) => link.packageId).sort(),
     onAir: isOnAir(channel),
+    now: current ? toProgramme(current) : null,
+    next: following ? toProgramme(following) : null,
   };
 }

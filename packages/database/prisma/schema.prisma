@@ -1121,6 +1121,10 @@ model Channel {
   /// Picture heights to encode with TRANSCODE, such as 1080, 720, 480. Heights above the source are left out.
   qualities Int[]       @default([])
 
+  /// The id of this channel in guide sources (XMLTV), to file imported programmes under it.
+  guideId    String?
+  programmes Programme[]
+
   /// Whether viewers find the channel on the website and in the apps.
   published Boolean          @default(false)
   /// FREE is as open as the installation. PAID needs a plan that opens the channel.
@@ -1151,4 +1155,71 @@ model Channel {
 
   @@index([enabled])
   @@map("channels")
+}
+
+// ── Programme guide ──────────────────────────────────────────────────
+
+/// A place the programme guide is imported from: an XMLTV file at an address.
+model GuideSource {
+  id   String @id @default(uuid(7)) @db.Uuid
+  name String @unique
+
+  /// Address of the file, encrypted with the master key: it may carry a token.
+  urlEncrypted String
+  /// The address without credentials or query, for display.
+  urlLabel     String
+  /// Whether the source is imported again by itself.
+  enabled      Boolean @default(true)
+
+  /// The last import: when it ended, whether it worked, what it said and how many programmes it brought.
+  lastRunAt      DateTime?
+  lastOk         Boolean?
+  lastMessage    String?
+  lastProgrammes Int?
+
+  channels   GuideSourceChannel[]
+  programmes Programme[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("guide_sources")
+}
+
+/// A channel a guide source knows. Offered when a channel is linked to the guide.
+model GuideSourceChannel {
+  sourceId String      @db.Uuid
+  source   GuideSource @relation(fields: [sourceId], references: [id], onDelete: Cascade)
+  /// The id the source uses for the channel.
+  guideId  String
+  name     String
+
+  @@id([sourceId, guideId])
+  @@index([guideId])
+  @@map("guide_source_channels")
+}
+
+/// One programme on a channel.
+model Programme {
+  id        String       @id @default(uuid(7)) @db.Uuid
+  channelId String       @db.Uuid
+  channel   Channel      @relation(fields: [channelId], references: [id], onDelete: Cascade)
+  /// The source it was imported from. Null for a programme an admin entered.
+  sourceId  String?      @db.Uuid
+  source    GuideSource? @relation(fields: [sourceId], references: [id], onDelete: Cascade)
+
+  title       String
+  subtitle    String?
+  description String?
+  category    String?
+  startsAt    DateTime
+  endsAt      DateTime
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([channelId, startsAt])
+  @@index([channelId, endsAt])
+  @@index([sourceId])
+  @@map("programmes")
 }
