@@ -1,0 +1,44 @@
+# Settings of the ingest server (MediaMTX), which receives the streams that
+# encoders push to live channels.
+#
+# It only takes streams in and hands them to the live processes. Viewers never
+# reach it: channels are sent out by the gateway as HLS.
+#
+# Addresses come from the environment, see the Compose file:
+#   MTX_AUTHHTTPADDRESS   where the API answers "may this stream be published?"
+
+logLevel: info
+
+# Every connection is checked by the API: an encoder by its stream key, the
+# live processes by a password only the platform knows.
+authMethod: http
+authHTTPAddress: http://127.0.0.1:3000/v1/live/ingest/auth
+authHTTPExclude: []
+
+# Encoders publish with RTMP or SRT.
+rtmp: yes
+rtmpAddress: :1935
+srt: yes
+srtAddress: :8890
+
+# The live processes read with RTSP, and ask over the control API which
+# streams are there. Both are for the internal network only: do not publish
+# these ports.
+rtsp: yes
+rtspAddress: :8554
+rtspTransports: [tcp]
+api: yes
+apiAddress: :9997
+
+# Nothing is sent to viewers from here.
+hls: no
+webrtc: no
+moq: no
+playback: no
+metrics: no
+pprof: no
+
+paths:
+  # One path per channel: "live/<stream key>". Anything else is refused.
+  '~^live/[A-Za-z0-9_-]{16,64}$':
+    source: publisher

@@ -30,6 +30,13 @@ export class AppConfig {
   readonly ffprobePath: string;
   /** Absolute path of the directory for working files of processing jobs. */
   readonly processingTempPath: string;
+  /** The ingest server, which receives streams pushed by encoders. */
+  readonly ingest: {
+    readonly apiUrl: string;
+    readonly rtspUrl: string;
+    readonly publicRtmpUrl: string | null;
+    readonly publicSrtUrl: string | null;
+  };
   readonly workerConcurrency: number;
   /** Where live channels write their output, and how it is cut. */
   readonly live: {
@@ -100,6 +107,12 @@ export class AppConfig {
     this.ffmpegPath = env.FFMPEG_PATH;
     this.ffprobePath = env.FFPROBE_PATH;
     this.processingTempPath = path.resolve(baseDirectory, env.PROCESSING_TEMP_PATH);
+    this.ingest = {
+      apiUrl: env.INGEST_API_URL.replace(/\/+$/, ''),
+      rtspUrl: env.INGEST_RTSP_URL,
+      publicRtmpUrl: env.INGEST_PUBLIC_RTMP_URL || null,
+      publicSrtUrl: env.INGEST_PUBLIC_SRT_URL || null,
+    };
     this.workerConcurrency = env.WORKER_CONCURRENCY;
     this.live = {
       path: path.resolve(baseDirectory, env.LIVE_PATH),

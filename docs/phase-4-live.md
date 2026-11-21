@@ -2,13 +2,14 @@
 
 Live adds channels: streams that run around the clock, or for the length of an event, and that viewers join while they run.
 
-It is built in steps. This document describes what is built so far: channels the server pulls from an address, kept running by a live process, passed through untouched or transcoded into several qualities, with signed delivery and a page in the admin panel.
+It is built in steps. This document describes what is built so far: channels the server pulls from an address or that an encoder pushes to it, kept running by a live process, passed through untouched or transcoded into several qualities, with signed delivery and a page in the admin panel.
 
 ## Model
 
 - **Channel**: a name, an optional number as on a remote control, a name for addresses, and a source.
 - **Processing**: a channel is passed through or transcoded. A transcoded channel has a list of qualities.
-- **Source**: the address the server pulls the channel from. It is stored encrypted with the master key, because it often carries a password, a token or a stream key. Lists, logs, messages and the audit log only ever show a form without those parts.
+- **Where the video comes from**: the server pulls it from an address, or an encoder pushes it to the server with a stream key.
+- **Source**: the address a pulled channel comes from. It is stored encrypted with the master key, because it often carries a password, a token or a stream key. Lists, logs, messages and the audit log only ever show a form without those parts.
 - **Wanted state**: a channel is switched on or off by an admin. A channel that is on is kept running. Nothing else decides whether a channel runs.
 - **Reported state**: what the live process last said about a channel that is on.
 
@@ -16,6 +17,7 @@ It is built in steps. This document describes what is built so far: channels the
 | -------------- | -------------------------------------------------------------------------------------- |
 | `STOPPED`      | Switched off                                                                           |
 | `WAITING`      | Switched on, and no live process reports on it. Not stored: the API works it out       |
+| `IDLE`         | Switched on and waiting for its encoder. Only for pushed channels                      |
 | `STARTING`     | A live process connects to the source                                                  |
 | `RUNNING`      | Data arrives and segments are written                                                  |
 | `RECONNECTING` | The stream broke or the source is away. The next attempt is on its way                 |
@@ -28,6 +30,7 @@ It is built in steps. This document describes what is built so far: channels the
 | HTTP, HTTPS | An HLS playlist of another server, or a continuous MPEG-TS        |
 | RTMP, RTMPS | A stream on a media server or at a provider                       |
 | SRT         | A contribution feed over the internet, in caller or listener mode |
+| RTSP, RTSPS | An IP camera or another media server, read over TCP               |
 | UDP, RTP    | A broadcast feed in a local network, also multicast               |
 
 Nothing else is accepted. A path, `file:`, `concat:`, `pipe:` and the like would let an admin read files of the server through a channel. FFmpeg is also started with a list of allowed protocols per kind of source, so a playlist on a web server cannot send it to local files either.
@@ -35,6 +38,37 @@ Nothing else is accepted. A path, `file:`, `concat:`, `pipe:` and the like would
 The server connects to whatever address an admin enters, including addresses inside its own network. The right to change channels (`live:write`) is therefore given to owners and admins only. Editors and viewers of the panel can look at channels and watch them.
 
 **Test source** in the form connects to an address for up to 15 seconds and reports what it carries, before anything is created.
+
+## Channels pushed by an encoder
+
+A studio, an event or a camera crew does not have an address to pull from. They run an encoder (OBS, vMix, a hardware encoder) that connects to the server and sends. Such a channel has no source address. It has a **stream key**.
+
+| What the encoder needs | Value                                                  |
+| ---------------------- | ------------------------------------------------------ |
+| Server (RTMP)          | `rtmp://<host>:1935/live`                              |
+| Stream key             | 32 characters, from the details of the channel         |
+| SRT, as one address    | `srt://<host>:8890?streamid=publish:live/<stream key>` |
+
+- **The key is the only thing an encoder needs,** and anyone who has it can send to the channel. It is stored encrypted and as a hash, shown only to those who may change channels, and never written to the audit log.
+- **A channel that is switched off refuses its encoder.** The operator of the encoder sees at once that the channel is off, instead of streaming into nothing.
+- **A channel that is switched on waits.** Its state is `IDLE` until an encoder connects, and it goes back to waiting when the encoder disconnects. Waiting is not a failure and is not counted as one.
+- **A new key** can be made at any time. The old one stops working at once, and an encoder connected with it is disconnected. Stopping or deleting a channel disconnects its encoder as well.
+- **Pass through or transcode** applies as for pulled channels. An encoder that sends H.264 with AAC, the usual default, can be passed through.
+
+### The ingest server
+
+Streams from encoders are received by [MediaMTX](https://github.com/bluenviron/mediamtx), a small open-source media server, running as its own container (`ingest`). It does one thing here: take streams in. Its settings are in `deploy/mediamtx/mediamtx.yml`.
+
+- **It asks the API before every connection** (`POST /v1/live/ingest/auth`). An encoder may publish to `live/<stream key>` when that key belongs to a pushed channel that is switched on.
+- **The live process reads the stream from it over RTSP** and from there treats the channel like any other. It asks the control API of the ingest server whether an encoder is sending, once a second per waiting channel.
+- **Reading and the control API are for the platform only.** It signs in with a password made from `PLAYBACK_SIGNING_SECRET`, so there is nothing to configure. Their ports are not published.
+- **Viewers never reach it.** Channels go out through the gateway as HLS, like all others.
+
+The address the API answers at is open to anyone who can reach the API, and that is harmless: it only says yes to someone who already holds a stream key or the platform's password.
+
+When the ingest server is down, pushed channels wait and say why. Pulled channels and video on demand do not notice.
+
+In development, `pnpm dev:infra` starts an ingest server beside PostgreSQL and Redis.
 
 ## Processing
 
@@ -111,30 +145,36 @@ In this step, addresses for watching are issued to admins only (`POST /v1/channe
 
 ## API
 
-| Method and path                  | Permission   | Purpose                                           |
-| -------------------------------- | ------------ | ------------------------------------------------- |
-| `GET /v1/channels`               | `live:read`  | All channels with state and figures               |
-| `POST /v1/channels`              | `live:write` | Create a channel, optionally starting it          |
-| `POST /v1/channels/probe`        | `live:write` | Test a source                                     |
-| `GET /v1/channels/:id`           | `live:read`  | One channel with the latest log lines             |
-| `GET /v1/channels/:id/source`    | `live:write` | The full address of the source, for the edit form |
-| `PATCH /v1/channels/:id`         | `live:write` | Change a channel. A new source restarts it        |
-| `DELETE /v1/channels/:id`        | `live:write` | Stop and delete a channel                         |
-| `POST /v1/channels/:id/start`    | `live:write` | Switch a channel on                               |
-| `POST /v1/channels/:id/stop`     | `live:write` | Switch a channel off                              |
-| `POST /v1/channels/:id/restart`  | `live:write` | Replace the running process                       |
-| `POST /v1/channels/:id/playback` | `live:read`  | A signed address for watching                     |
+| Method and path                    | Permission   | Purpose                                           |
+| ---------------------------------- | ------------ | ------------------------------------------------- |
+| `GET /v1/channels`                 | `live:read`  | All channels with state and figures               |
+| `POST /v1/channels`                | `live:write` | Create a channel, optionally starting it          |
+| `POST /v1/channels/probe`          | `live:write` | Test a source                                     |
+| `GET /v1/channels/:id`             | `live:read`  | One channel with the latest log lines             |
+| `GET /v1/channels/:id/source`      | `live:write` | The full address of the source, for the edit form |
+| `PATCH /v1/channels/:id`           | `live:write` | Change a channel. A new source restarts it        |
+| `DELETE /v1/channels/:id`          | `live:write` | Stop and delete a channel                         |
+| `POST /v1/channels/:id/start`      | `live:write` | Switch a channel on                               |
+| `POST /v1/channels/:id/stop`       | `live:write` | Switch a channel off                              |
+| `POST /v1/channels/:id/restart`    | `live:write` | Replace the running process                       |
+| `GET /v1/channels/:id/encoder`     | `live:write` | What to enter in an encoder, with the stream key  |
+| `POST /v1/channels/:id/stream-key` | `live:write` | Replace the stream key                            |
+| `POST /v1/channels/:id/playback`   | `live:read`  | A signed address for watching                     |
 
 Changes are written to the audit log, with the source in its form without secrets. Open panels learn about changes through the event stream (`channel` events).
 
 ## Settings
 
-| Setting                  | Default      | Meaning                                                               |
-| ------------------------ | ------------ | --------------------------------------------------------------------- |
-| `LIVE_PATH`              | `./tmp/live` | Folder of playlists and segments                                      |
-| `LIVE_SEGMENT_SECONDS`   | `4`          | Wanted length of a segment, 1 to 10                                   |
-| `LIVE_PLAYLIST_SEGMENTS` | `6`          | Segments in the playlist, 3 to 60                                     |
-| `LIVE_TRANSCODE_PRESET`  | `veryfast`   | Speed of the encoder for transcoded channels, `ultrafast` to `medium` |
+| Setting                  | Default                 | Meaning                                                                           |
+| ------------------------ | ----------------------- | --------------------------------------------------------------------------------- |
+| `LIVE_PATH`              | `./tmp/live`            | Folder of playlists and segments                                                  |
+| `LIVE_SEGMENT_SECONDS`   | `4`                     | Wanted length of a segment, 1 to 10                                               |
+| `LIVE_PLAYLIST_SEGMENTS` | `6`                     | Segments in the playlist, 3 to 60                                                 |
+| `LIVE_TRANSCODE_PRESET`  | `veryfast`              | Speed of the encoder for transcoded channels, `ultrafast` to `medium`             |
+| `INGEST_API_URL`         | `http://127.0.0.1:9997` | Control API of the ingest server, as the platform reaches it                      |
+| `INGEST_RTSP_URL`        | `rtsp://127.0.0.1:8554` | Where live processes read pushed streams                                          |
+| `INGEST_PUBLIC_RTMP_URL` | empty                   | Address for encoders as shown to admins, such as `rtmp://stream.example.com:1935` |
+| `INGEST_PUBLIC_SRT_URL`  | empty                   | The same for SRT, such as `srt://stream.example.com:8890`                         |
 
 With several servers, the live processes and the gateway need the same `LIVE_PATH`. Delivery through edges is phase 5.
 
@@ -145,7 +185,7 @@ With several servers, the live processes and the gateway need the same `LIVE_PAT
 ## Not built yet
 
 - Encoding on graphics cards, and qualities with bitrates of your own
-- Channels pushed by an encoder (RTMP or SRT ingest with a stream key)
+- Pushing from a browser (WebRTC), and RTMPS
 - Going back in time (DVR) and recording
 - A programme guide (EPG)
 - Channels in the catalog, in packages and on the viewer website

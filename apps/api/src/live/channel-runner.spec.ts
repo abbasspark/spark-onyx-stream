@@ -7,6 +7,7 @@ import {
   retryDelaySeconds,
   type RunnerState,
 } from './channel-runner.js';
+import type { EncoderState } from './ingest-client.js';
 import { parseSource } from './live-source.js';
 
 const H264: MediaInfo = {
@@ -71,7 +72,10 @@ class FakeEngine implements LiveEngine {
   }
 }
 
-function setup(url = 'https://user:secret@example.com/a/live.m3u8') {
+function setup(
+  url = 'https://user:secret@example.com/a/live.m3u8',
+  encoder?: () => Promise<EncoderState>,
+) {
   const engine = new FakeEngine();
   const states: RunnerState[] = [];
   const runner = new ChannelRunner({
@@ -82,6 +86,7 @@ function setup(url = 'https://user:secret@example.com/a/live.m3u8') {
     segmentSeconds: 4,
     playlistSegments: 6,
     engine,
+    encoder,
     onState: (state) => states.push(state),
   });
   return { engine, states, runner, status: () => states.at(-1)?.status };
@@ -307,5 +312,78 @@ describe('ChannelRunner', () => {
       '[https] Opening https://example.com/…/live.m3u8 failed',
     ]);
     await halt(runner);
+  });
+
+  describe('for a channel that an encoder pushes', () => {
+    it('waits for the encoder without counting failures', async () => {
+      let encoder: EncoderState = 'absent';
+      const { engine, runner, states, status } = setup(undefined, async () => encoder);
+      runner.start();
+      await vi.advanceTimersByTimeAsync(60_000);
+
+      expect(status()).toBe('IDLE');
+      expect(states.at(-1)).toMatchObject({ message: null, restartCount: 0 });
+      expect(engine.probes).toBe(0);
+      // Waiting is one state, not one report a second.
+      expect(states).toHaveLength(1);
+
+      encoder = 'ready';
+      await vi.advanceTimersByTimeAsync(1000);
+      expect(status()).toBe('STARTING');
+      engine.last.handlers.onProgress(progress(1000));
+      expect(status()).toBe('RUNNING');
+
+      await halt(runner);
+    });
+
+    it('goes back to waiting when the encoder disconnects', async () => {
+      let encoder: EncoderState = 'ready';
+      const { engine, runner, states, status } = setup(undefined, async () => encoder);
+      runner.start();
+      await vi.advanceTimersByTimeAsync(0);
+      engine.last.handlers.onProgress(progress(1000));
+      expect(status()).toBe('RUNNING');
+
+      encoder = 'absent';
+      engine.last.handlers.onExit(0);
+      await vi.advanceTimersByTimeAsync(0);
+      expect(status()).toBe('IDLE');
+      expect(states.at(-1)).toMatchObject({ startedAt: null, restartCount: 0 });
+
+      encoder = 'ready';
+      await vi.advanceTimersByTimeAsync(1000);
+      expect(engine.processes).toHaveLength(2);
+
+      await halt(runner);
+    });
+
+    it('still reports a stream that breaks while the encoder is sending', async () => {
+      const { engine, runner, states, status } = setup(undefined, async () => 'ready');
+      runner.start();
+      await vi.advanceTimersByTimeAsync(0);
+      engine.last.handlers.onExit(1);
+      await vi.advanceTimersByTimeAsync(0);
+      expect(status()).toBe('RECONNECTING');
+      expect(states.at(-1)?.restartCount).toBe(1);
+      await halt(runner);
+    });
+
+    it('says so when the ingest server is away', async () => {
+      const { runner, states, status } = setup(undefined, async () => 'unreachable');
+      runner.start();
+      await vi.advanceTimersByTimeAsync(3000);
+      expect(status()).toBe('IDLE');
+      expect(states.at(-1)?.message).toContain('ingest server cannot be reached');
+      await halt(runner);
+    });
+
+    it('can be stopped while it waits', async () => {
+      const { engine, runner } = setup(undefined, async () => 'absent');
+      runner.start();
+      await vi.advanceTimersByTimeAsync(2500);
+      await halt(runner);
+      await vi.advanceTimersByTimeAsync(10_000);
+      expect(engine.probes).toBe(0);
+    });
   });
 });

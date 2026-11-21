@@ -7,6 +7,7 @@ import {
   exceedsSource,
   isFallingBehind,
   describeStreams,
+  encoderAddresses,
   formatUptime,
   isChannelFilter,
   matchesFilter,
@@ -15,6 +16,7 @@ import {
   parseChannelNumber,
   protocolOf,
   qualityName,
+  sourceText,
   statusLook,
   toggleQuality,
   totalsOf,
@@ -26,6 +28,7 @@ const channel = (change: Partial<Channel> = {}): Channel => ({
   slug: 'news-24',
   number: 7,
   description: null,
+  ingest: 'PULL',
   source: 'https://cdn.example.com/…/live.m3u8',
   mode: 'COPY',
   qualities: [],
@@ -206,5 +209,47 @@ describe('qualities', () => {
     expect(isFallingBehind({ ...slow, mode: 'COPY' })).toBe(false);
     expect(isFallingBehind({ ...slow, status: 'STARTING' })).toBe(false);
     expect(isFallingBehind({ ...slow, health: null })).toBe(false);
+  });
+});
+
+describe('channels pushed by an encoder', () => {
+  const pushed = channel({ ingest: 'PUSH', source: '', status: 'IDLE', health: null });
+
+  it('wait for their encoder, which is nothing to worry about', () => {
+    expect(statusLook('IDLE')).toMatchObject({ label: 'Waiting for encoder', tone: 'info' });
+    expect(needsAttention(pushed)).toBe(false);
+    expect(
+      needsAttention({ ...pushed, statusMessage: 'The ingest server cannot be reached' }),
+    ).toBe(true);
+  });
+
+  it('are found by how they get their video', () => {
+    expect(sourceText(pushed)).toBe('Pushed by an encoder');
+    expect(sourceText(channel())).toBe('https://cdn.example.com/…/live.m3u8');
+    expect(matchesSearch(pushed, 'encoder')).toBe(true);
+  });
+
+  it('use the addresses of the server, or the host of the panel', () => {
+    expect(
+      encoderAddresses(
+        { streamKey: 'KEY', rtmpServer: null, rtmpUrl: null, srtUrl: null },
+        'tv.example.com',
+      ),
+    ).toEqual({
+      rtmpServer: 'rtmp://tv.example.com:1935/live',
+      streamKey: 'KEY',
+      srtUrl: 'srt://tv.example.com:8890?streamid=publish:live/KEY',
+    });
+    expect(
+      encoderAddresses(
+        {
+          streamKey: 'KEY',
+          rtmpServer: 'rtmp://in.example.com:1935/live',
+          rtmpUrl: 'rtmp://in.example.com:1935/live/KEY',
+          srtUrl: 'srt://in.example.com:8890?streamid=publish:live/KEY',
+        },
+        'tv.example.com',
+      ).rtmpServer,
+    ).toBe('rtmp://in.example.com:1935/live');
   });
 });

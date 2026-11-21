@@ -1059,10 +1059,20 @@ model Purchase {
 /// What a live process last reported about a channel.
 enum ChannelStatus {
   STOPPED
+  /// Switched on and waiting for an encoder to connect. Only for channels that are pushed.
+  IDLE
   STARTING
   RUNNING
   RECONNECTING
   FAILED
+}
+
+/// Where the video of a channel comes from.
+enum ChannelIngest {
+  /// The server connects to an address and pulls the stream.
+  PULL
+  /// An encoder connects to the server and pushes the stream, with a stream key.
+  PUSH
 }
 
 /// How a channel is made from its source.
@@ -1083,10 +1093,16 @@ model Channel {
   number      Int?    @unique
   description String?
 
-  /// Address of the source, encrypted with the master key: it may carry a password.
-  sourceEncrypted String
+  ingest ChannelIngest @default(PULL)
+
+  /// Address of the source of a pulled channel, encrypted with the master key: it may carry a password.
+  sourceEncrypted    String?
+  /// SHA-256 of the stream key of a pushed channel, to find the channel an encoder publishes to.
+  streamKeyHash      String? @unique
+  /// The stream key, encrypted with the master key, to show it to admins again.
+  streamKeyEncrypted String?
   /// The source without credentials or query, for display.
-  sourceLabel     String
+  sourceLabel        String
 
   mode      ChannelMode @default(COPY)
   /// Picture heights to encode with TRANSCODE, such as 1080, 720, 480. Heights above the source are left out.

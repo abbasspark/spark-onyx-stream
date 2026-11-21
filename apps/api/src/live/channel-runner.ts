@@ -9,6 +9,7 @@ import {
   type SourceStreams,
   UnsupportedSourceError,
 } from './live-command.js';
+import type { EncoderState } from './ingest-client.js';
 import type { LiveProgress } from './live-progress.js';
 import type { LiveSource } from './live-source.js';
 
@@ -23,6 +24,8 @@ const STALL_MS = 20_000;
 /** Time a new process has to deliver its first data. */
 const FIRST_DATA_MS = 30_000;
 const PROBE_TIMEOUT_MS = 15_000;
+/** How often a waiting channel asks whether its encoder has connected. */
+const ENCODER_POLL_MS = 1000;
 const LOG_LINES = 60;
 /** What the H.264 reader says while it joins a running stream before the first key frame. Harmless and loud. */
 const JOIN_NOISE = /non-existing PPS|decode_slice_header error|no frame!|Last message repeated/;
@@ -84,6 +87,11 @@ export interface RunnerOptions {
   segmentSeconds: number;
   playlistSegments: number;
   engine: LiveEngine;
+  /**
+   * Set for a channel that an encoder pushes: says whether the encoder is
+   * sending. Such a channel waits for its encoder instead of failing.
+   */
+  encoder?: () => Promise<EncoderState>;
   onState(state: RunnerState): void;
 }
 
@@ -147,6 +155,10 @@ export class ChannelRunner {
       let unsupported = false;
       const attemptStartedAt = Date.now();
 
+      if (!(await this.awaitEncoder())) {
+        break;
+      }
+
       try {
         // First, so nothing left over from an earlier run holds on to the source.
         await this.options.engine.prepare(this.options.directory);
@@ -160,6 +172,12 @@ export class ChannelRunner {
 
       if (this.stopped) {
         break;
+      }
+      // An encoder that went away is not a fault of the channel: it waits for the next one.
+      if (this.options.encoder && (await this.options.encoder()) !== 'ready') {
+        this.failures = 0;
+        this.note(this.clean(reason));
+        continue;
       }
 
       const wasHealthy =
@@ -176,6 +194,34 @@ export class ChannelRunner {
       });
       await this.sleep(delay * 1000);
     }
+  }
+
+  /**
+   * For a pushed channel: waits until an encoder sends. Resolves at once for
+   * other channels. False when the runner was stopped meanwhile.
+   */
+  private async awaitEncoder(): Promise<boolean> {
+    const encoder = this.options.encoder;
+    while (encoder && !this.stopped) {
+      const state = await encoder();
+      if (state === 'ready' || this.stopped) {
+        break;
+      }
+      const message =
+        state === 'unreachable'
+          ? 'The ingest server cannot be reached, so encoders cannot connect'
+          : null;
+      if (this.state.status !== 'IDLE' || this.state.message !== message) {
+        this.note(message ?? 'Waiting for the encoder to connect');
+        this.update({ status: 'IDLE', message, startedAt: null });
+      }
+      await this.sleep(ENCODER_POLL_MS);
+    }
+    if (encoder && !this.stopped && this.state.status === 'IDLE') {
+      this.note('The encoder connected');
+      this.update({ status: 'STARTING', message: null });
+    }
+    return !this.stopped;
   }
 
   private async probe(): Promise<OutputPlan> {

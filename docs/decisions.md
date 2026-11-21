@@ -501,3 +501,17 @@ This replaces the "plain CSS without a component library" part of D-018.
 **Why:** transcoding is what makes a channel watchable on a weak connection, and the only way to use a source in a format players do not take. It is also the most expensive thing the platform does, so it has to be a choice per channel and never a surprise. A fixed list keeps a channel from being set up with numbers that cannot work, and keeps what the panel says and what the encoder does in one small table. One process per channel keeps the supervisor as it was: a channel is still one process to watch, restart and clean up after. x264 runs on every server, which matters more for a self-hosted product than the last bit of efficiency.
 
 **Consequence:** the cost of a transcoded channel is CPU the operator has to have. A server that is too small shows it as a channel falling behind, which the panel reports but cannot fix. Bitrates cannot be tuned per channel. Graphics cards are not used. All qualities of a channel stop together when its one process does.
+
+## D-039 Encoders push to MediaMTX, which asks the API
+
+**Date:** 2026-11-22
+
+- **An ingest server of its own receives pushed streams:** MediaMTX, as one more container. The platform does not speak RTMP or SRT itself.
+- **One stream key per channel is the whole sign-in of an encoder.** It is the last part of the address the encoder publishes to. It is stored encrypted, to show it again, and hashed, to find the channel.
+- **The ingest server asks the API before every connection.** The live process reads the stream from it over RTSP and treats the channel like a pulled one from there on.
+- **The platform's own access to the ingest server uses a password made from the signing secret.**
+- **A pushed channel that is switched on waits for its encoder** in a state of its own, and refuses its encoder while switched off.
+
+**Why:** receiving RTMP and SRT from every encoder on the market is a product in itself, and MediaMTX is a well-kept one under the MIT licence that does exactly this. Putting it behind the same runner means everything built for pulled channels (pass through, transcoding, the watchdog, the panel) works for pushed ones without a second code path. A single key in the place where OBS has a field for it is what operators know from every streaming service. Asking the API on each connection keeps the keys in one place and makes switching a channel off take effect for the encoder as well. Deriving the internal password removes a setting that could only ever be wrong.
+
+**Consequence:** one more container to run, and one more thing that can be down, though only pushed channels depend on it. The stream key appears in the paths of the ingest server and so in its log, which is why that log is not for others to read. A stream is carried twice inside the server, from the ingest server to FFmpeg. Encoders need the ports 1935 (TCP) and 8890 (UDP) open.

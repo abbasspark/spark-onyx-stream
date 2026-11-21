@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   CircleAlert,
   CircleCheck,
+  KeyRound,
   Eye,
   MoreHorizontal,
   Pencil,
@@ -17,9 +18,10 @@ import {
 import { type FormEvent, useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { channelsApi } from '@/api/endpoints';
-import type { Channel, ChannelInput, ChannelMode, SourceProbe } from '@/api/types';
+import type { Channel, ChannelIngest, ChannelInput, ChannelMode, SourceProbe } from '@/api/types';
 import { useSession } from '@/auth/session';
 import { useConfirm } from '@/components/confirm';
+import { CopyField } from '@/components/copy-field';
 import { LivePlayer } from '@/components/live-player';
 import { Button } from '@/components/ui/button';
 import {
@@ -54,6 +56,7 @@ import {
   describeQualities,
   exceedsSource,
   describeStreams,
+  encoderAddresses,
   formatUptime,
   isChannelFilter,
   isFallingBehind,
@@ -62,6 +65,7 @@ import {
   parseChannelNumber,
   protocolOf,
   QUALITY_OPTIONS,
+  sourceText,
   statusLook,
   toggleQuality,
   totalsOf,
@@ -356,7 +360,8 @@ export function ChannelsPage() {
           );
           setEditing(null);
           refresh(channel.id);
-          if (created && channel.enabled) {
+          // A new pushed channel is opened as well: its stream key is the next thing needed.
+          if (created && (channel.enabled || channel.ingest === 'PUSH')) {
             setParams({ channel: channel.id });
           }
         }}
@@ -484,8 +489,14 @@ function ChannelRow({
           >
             {channel.name}
           </button>
-          <p className="truncate font-mono text-xs text-muted-foreground" title={channel.source}>
-            {channel.source}
+          <p
+            className={cn(
+              'truncate text-xs text-muted-foreground',
+              channel.ingest === 'PULL' && 'font-mono',
+            )}
+            title={sourceText(channel)}
+          >
+            {sourceText(channel)}
           </p>
         </div>
       </div>
@@ -685,13 +696,25 @@ function ChannelSheet({ id, fallback, actions, onClose }: ChannelSheetProps) {
             )}
             <ErrorNote error={playback.error} />
 
+            {channel.ingest === 'PUSH' && actions.mayWrite ? (
+              <EncoderPanel channel={channel} />
+            ) : null}
+
             <Facts
               items={[
                 [
                   'Source',
                   <span key="source" className="flex min-w-0 flex-wrap items-center gap-2">
-                    <Badge>{protocolOf(channel.source)}</Badge>
-                    <span className="min-w-0 font-mono text-xs break-all">{channel.source}</span>
+                    {channel.ingest === 'PUSH' ? (
+                      'Pushed by an encoder, over RTMP or SRT'
+                    ) : (
+                      <>
+                        <Badge>{protocolOf(channel.source)}</Badge>
+                        <span className="min-w-0 font-mono text-xs break-all">
+                          {channel.source}
+                        </span>
+                      </>
+                    )}
                   </span>,
                 ],
                 [
@@ -807,6 +830,7 @@ function ChannelDialog({ item, open, onOpenChange, onSaved }: ChannelDialogProps
   const [description, setDescription] = useState('');
   const [source, setSource] = useState('');
   const [startNow, setStartNow] = useState(true);
+  const [ingest, setIngest] = useState<ChannelIngest>('PULL');
   const [mode, setMode] = useState<ChannelMode>('COPY');
   const [qualities, setQualities] = useState<number[]>([...DEFAULT_QUALITIES]);
 
@@ -828,6 +852,7 @@ function ChannelDialog({ item, open, onOpenChange, onSaved }: ChannelDialogProps
       setDescription(item?.description ?? '');
       setSource('');
       setStartNow(true);
+      setIngest(item?.ingest ?? 'PULL');
       setMode(item?.mode ?? 'COPY');
       setQualities(item && item.qualities.length > 0 ? item.qualities : [...DEFAULT_QUALITIES]);
     }
@@ -854,14 +879,17 @@ function ChannelDialog({ item, open, onOpenChange, onSaved }: ChannelDialogProps
   }, [source, open, resetProbe]);
 
   const parsedNumber = parseChannelNumber(number);
-  const sourceChanged = item !== null && source.trim() !== storedSource;
+  const pulled = ingest === 'PULL';
+  const sourceChanged =
+    item !== null && pulled && (item.ingest !== 'PULL' || source.trim() !== storedSource);
   const save = useMutation({
     mutationFn: () => {
       const body: ChannelInput = {
         name: name.trim(),
         number: parsedNumber ?? null,
         description: description.trim() || null,
-        source: source.trim(),
+        ingest,
+        ...(pulled ? { source: source.trim() } : {}),
         mode,
         ...(mode === 'TRANSCODE' ? { qualities } : {}),
       };
@@ -891,7 +919,7 @@ function ChannelDialog({ item, open, onOpenChange, onSaved }: ChannelDialogProps
     (mode !== item.mode || (mode === 'TRANSCODE' && qualities.join() !== item.qualities.join()));
   const ready =
     name.trim() !== '' &&
-    source.trim() !== '' &&
+    (!pulled || source.trim() !== '') &&
     parsedNumber !== undefined &&
     !loadingSource &&
     (mode === 'COPY' || qualities.length > 0);
@@ -937,59 +965,105 @@ function ChannelDialog({ item, open, onOpenChange, onSaved }: ChannelDialogProps
               </p>
             ) : null}
 
-            <Field
-              label="Source"
-              hint={
-                sourceChanged && item?.enabled
-                  ? 'The channel restarts with the new source when you save.'
-                  : 'An HLS playlist or stream over HTTP, or an RTMP, SRT, UDP or RTP address.'
-              }
-            >
-              {(id) => (
-                <div className="flex flex-wrap gap-2">
-                  <Input
-                    id={id}
-                    required
-                    className="min-w-0 flex-1 font-mono text-[13px]"
-                    spellCheck={false}
-                    autoComplete="off"
-                    maxLength={2000}
-                    disabled={loadingSource}
-                    placeholder={loadingSource ? 'Loading' : 'https://example.com/live/index.m3u8'}
-                    value={source}
-                    onChange={(event) => setSource(event.target.value)}
-                  />
-                  <Button
-                    type="button"
-                    loading={probe.isPending}
-                    disabled={source.trim() === ''}
-                    onClick={() => probe.mutate()}
-                  >
-                    Test source
-                  </Button>
-                </div>
-              )}
-            </Field>
-            {probe.isPending ? (
-              <p className="text-xs text-muted-foreground" role="status">
-                Connecting to the source. This takes up to 15 seconds.
+            <fieldset className="grid gap-2">
+              <legend className="mb-2 text-sm font-medium">Where the video comes from</legend>
+              <div className="grid grid-cols-[minmax(0,1fr)] gap-2 sm:grid-cols-2">
+                <ChoiceOption
+                  name="channel-ingest"
+                  value="PULL"
+                  current={ingest}
+                  onSelect={setIngest}
+                  title="The server pulls it"
+                  description="From an address that is already streaming: another server, a provider, a camera or a broadcast feed."
+                />
+                <ChoiceOption
+                  name="channel-ingest"
+                  value="PUSH"
+                  current={ingest}
+                  onSelect={setIngest}
+                  title="An encoder pushes it"
+                  description="OBS, vMix or a hardware encoder connects to this server with a stream key, over RTMP or SRT."
+                />
+              </div>
+              {item && ingest !== item.ingest ? (
+                <p className="text-xs text-muted-foreground">
+                  {item.ingest === 'PUSH'
+                    ? 'The stream key of this channel stops working when you save.'
+                    : 'The channel gets a stream key when you save.'}
+                </p>
+              ) : null}
+            </fieldset>
+
+            {pulled ? (
+              <>
+                <Field
+                  label="Source"
+                  hint={
+                    sourceChanged && item?.enabled
+                      ? 'The channel restarts with the new source when you save.'
+                      : 'An HLS playlist or stream over HTTP, or an RTMP, SRT, RTSP, UDP or RTP address.'
+                  }
+                >
+                  {(id) => (
+                    <div className="flex flex-wrap gap-2">
+                      <Input
+                        id={id}
+                        required
+                        className="min-w-0 flex-1 font-mono text-[13px]"
+                        spellCheck={false}
+                        autoComplete="off"
+                        maxLength={2000}
+                        disabled={loadingSource}
+                        placeholder={
+                          loadingSource ? 'Loading' : 'https://example.com/live/index.m3u8'
+                        }
+                        value={source}
+                        onChange={(event) => setSource(event.target.value)}
+                      />
+                      <Button
+                        type="button"
+                        loading={probe.isPending}
+                        disabled={source.trim() === ''}
+                        onClick={() => probe.mutate()}
+                      >
+                        Test source
+                      </Button>
+                    </div>
+                  )}
+                </Field>
+                {probe.isPending ? (
+                  <p className="text-xs text-muted-foreground" role="status">
+                    Connecting to the source. This takes up to 15 seconds.
+                  </p>
+                ) : null}
+                {probe.data ? <ProbeResult probe={probe.data} mode={mode} /> : null}
+                <ErrorNote error={probe.error} />
+                <ErrorNote error={stored.error} />
+              </>
+            ) : (
+              <p className="flex items-start gap-2.5 rounded-lg border bg-muted/30 p-3 text-sm text-muted-foreground">
+                <KeyRound className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
+                <span>
+                  {item?.ingest === 'PUSH'
+                    ? 'The server address and the stream key are in the details of the channel.'
+                    : 'After saving you get a server address and a stream key to enter in the encoder. The channel goes on air when the encoder connects.'}
+                </span>
               </p>
-            ) : null}
-            {probe.data ? <ProbeResult probe={probe.data} mode={mode} /> : null}
-            <ErrorNote error={probe.error} />
-            <ErrorNote error={stored.error} />
+            )}
 
             <fieldset className="grid gap-2">
               <legend className="mb-2 text-sm font-medium">Processing</legend>
               <div className="grid grid-cols-[minmax(0,1fr)] gap-2 sm:grid-cols-2">
-                <ModeOption
+                <ChoiceOption
+                  name="channel-mode"
                   value="COPY"
                   current={mode}
                   onSelect={setMode}
                   title="Pass through"
                   description="The picture goes out as it arrives, in the one quality the source sends. Uses hardly any CPU."
                 />
-                <ModeOption
+                <ChoiceOption
+                  name="channel-mode"
                   value="TRANSCODE"
                   current={mode}
                   onSelect={setMode}
@@ -1136,17 +1210,20 @@ function ProbeResult({ probe, mode }: { probe: SourceProbe; mode: ChannelMode })
   );
 }
 
-/** One of the two ways to run a channel, as a large radio button. */
-function ModeOption({
+/** One of a few ways to set a channel up, as a large radio button. */
+function ChoiceOption<Value extends string>({
+  name,
   value,
   current,
   onSelect,
   title,
   description,
 }: {
-  value: ChannelMode;
-  current: ChannelMode;
-  onSelect: (mode: ChannelMode) => void;
+  /** Groups the options that exclude each other. */
+  name: string;
+  value: Value;
+  current: Value;
+  onSelect: (value: Value) => void;
   title: string;
   description: string;
 }) {
@@ -1160,7 +1237,7 @@ function ModeOption({
     >
       <input
         type="radio"
-        name="channel-mode"
+        name={name}
         className="mt-1 accent-primary"
         checked={selected}
         onChange={() => onSelect(value)}
@@ -1170,5 +1247,79 @@ function ModeOption({
         <span className="text-xs text-muted-foreground">{description}</span>
       </span>
     </label>
+  );
+}
+
+/** What to enter in an encoder for a pushed channel, and a way to replace its stream key. */
+function EncoderPanel({ channel }: { channel: Channel }) {
+  const queryClient = useQueryClient();
+  const confirm = useConfirm();
+  const settings = useQuery({
+    queryKey: ['channel-encoder', channel.id],
+    queryFn: ({ signal }) => channelsApi.encoder(channel.id, signal),
+    // The stream key is a secret: it is not kept once the details are closed.
+    gcTime: 0,
+  });
+  const replace = useMutation({
+    mutationFn: () => channelsApi.replaceStreamKey(channel.id),
+    onSuccess: (next) => {
+      queryClient.setQueryData(['channel-encoder', channel.id], next);
+      toast.success('New stream key made. Enter it in the encoder.');
+    },
+    onError: (error: Error) => toast.error(error.message),
+  });
+  const askReplace = async () => {
+    const confirmed = await confirm({
+      title: 'Make a new stream key?',
+      description:
+        'The current key stops working at once and an encoder that is connected is disconnected. The channel is off air until the encoder connects with the new key.',
+      confirmLabel: 'Make new key',
+      destructive: true,
+    });
+    if (confirmed) {
+      replace.mutate();
+    }
+  };
+
+  const addresses = settings.data
+    ? encoderAddresses(settings.data, window.location.hostname)
+    : null;
+  return (
+    <section className="grid gap-3 rounded-lg border p-4" aria-label="Encoder settings">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div>
+          <h3 className="text-sm font-semibold">Encoder settings</h3>
+          <p className="text-xs text-muted-foreground">
+            {channel.enabled
+              ? 'Enter these in OBS or another encoder and start streaming.'
+              : 'Start the channel first: a stopped channel refuses its encoder.'}
+          </p>
+        </div>
+        <Button size="sm" loading={replace.isPending} onClick={() => void askReplace()}>
+          <KeyRound />
+          New stream key
+        </Button>
+      </div>
+      {addresses ? (
+        <>
+          <CopyField label="Server (RTMP)" value={addresses.rtmpServer} />
+          <CopyField
+            label="Stream key"
+            value={addresses.streamKey}
+            secret
+            hint="Anyone with this key can send to the channel. Treat it like a password."
+          />
+          <CopyField
+            label="SRT address, for encoders that use SRT"
+            value={addresses.srtUrl}
+            secret
+          />
+        </>
+      ) : settings.error ? (
+        <ErrorNote error={settings.error} />
+      ) : (
+        <Skeleton className="h-28" />
+      )}
+    </section>
   );
 }

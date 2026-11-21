@@ -1,6 +1,18 @@
 // SPDX-License-Identifier: AGPL-3.0-only
-import { ConflictException, Inject, Injectable, NotFoundException } from '@nestjs/common';
-import { type Channel, type ChannelMode, type ChannelStatus, PrismaClient } from '@onyx/database';
+import {
+  BadRequestException,
+  ConflictException,
+  Inject,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
+import {
+  type Channel,
+  type ChannelIngest,
+  type ChannelMode,
+  type ChannelStatus,
+  PrismaClient,
+} from '@onyx/database';
 import type { Redis } from 'ioredis';
 import { slugify, uniqueSlug } from '../catalog/slug.js';
 import { isUniqueViolation } from '../common/prisma-errors.js';
@@ -16,6 +28,7 @@ import { parseProbe } from '../processing/media/media-info.js';
 import { REDIS_CLIENT } from '../redis/redis.module.js';
 import type { CreateChannelInput, UpdateChannelInput } from './channels.schemas.js';
 import { buildProbeArgs, copyObstacle, planOutput, type SourceStreams } from './live-command.js';
+import { IngestService } from './ingest.service.js';
 import { DEFAULT_LIVE_QUALITIES, ladderFor } from './live-ladder.js';
 import { parseSource } from './live-source.js';
 import { type ChannelHealth, healthKey, LIVE_NUDGE_CHANNEL, parseHealth } from './live-state.js';
@@ -37,7 +50,9 @@ export interface ChannelView {
   slug: string;
   number: number | null;
   description: string | null;
-  /** The source without anything secret. */
+  /** PULL: the server connects to an address. PUSH: an encoder connects with a stream key. */
+  ingest: ChannelIngest;
+  /** The address of a pulled channel without anything secret. Empty for a pushed one. */
   source: string;
   mode: ChannelMode;
   /** The qualities chosen for transcoding. Empty for a channel that is passed through. */
@@ -89,6 +104,7 @@ export class ChannelsService {
     @Inject(SecretBox) private readonly secrets: SecretBox,
     @Inject(EventPublisher) private readonly events: EventPublisher,
     @Inject(FfmpegRunner) private readonly ffmpeg: FfmpegRunner,
+    @Inject(IngestService) private readonly ingest: IngestService,
   ) {}
 
   async list(): Promise<ChannelView[]> {
@@ -107,11 +123,12 @@ export class ChannelsService {
 
   /** The full address of the source, for the edit form. It may carry a password. */
   async source(id: string): Promise<{ source: string }> {
-    return { source: this.secrets.decrypt((await this.find(id)).sourceEncrypted) };
+    const channel = await this.find(id);
+    return { source: channel.sourceEncrypted ? this.secrets.decrypt(channel.sourceEncrypted) : '' };
   }
 
   async create(input: CreateChannelInput): Promise<ChannelView> {
-    const source = parseSource(input.source);
+    const source = input.source === undefined ? null : parseSource(input.source);
     const slug =
       input.slug ??
       (await uniqueSlug(slugify(input.name), async (value) =>
@@ -125,8 +142,10 @@ export class ChannelsService {
           slug,
           number: input.number,
           description: input.description,
-          sourceEncrypted: this.secrets.encrypt(source.url),
-          sourceLabel: source.label,
+          ingest: input.ingest,
+          sourceEncrypted: source ? this.secrets.encrypt(source.url) : null,
+          sourceLabel: source?.label ?? '',
+          ...(input.ingest === 'PUSH' ? this.ingest.issueKey() : {}),
           mode: input.mode,
           qualities: qualitiesOf(input.mode, input.qualities),
           enabled: input.start,
@@ -143,6 +162,10 @@ export class ChannelsService {
   async update(id: string, input: UpdateChannelInput): Promise<ChannelView> {
     const current = await this.find(id);
     const source = input.source === undefined ? null : parseSource(input.source);
+    const ingest = input.ingest ?? current.ingest;
+    if (ingest === 'PULL' && !source && !(current.ingest === 'PULL' && current.sourceEncrypted)) {
+      throw new BadRequestException('Enter the address of the source');
+    }
     const mode = input.mode ?? current.mode;
     const qualities = qualitiesOf(mode, input.qualities ?? current.qualities);
     const reprocess = mode !== current.mode || qualities.join() !== [...current.qualities].join();
@@ -159,12 +182,24 @@ export class ChannelsService {
           qualities,
           // Other qualities need another process: the live process starts the channel over.
           ...(reprocess ? { restartToken: { increment: 1 } } : {}),
-          // A new address is noticed by the live process, which then starts the channel over.
+          // A new source is noticed by the live process, which then starts the channel over.
+          ingest,
           ...(source
             ? { sourceEncrypted: this.secrets.encrypt(source.url), sourceLabel: source.label }
             : {}),
+          ...(ingest === 'PUSH'
+            ? {
+                sourceEncrypted: null,
+                sourceLabel: '',
+                // A channel keeps its stream key. One that never had one gets it now.
+                ...(current.streamKeyHash ? {} : this.ingest.issueKey()),
+              }
+            : { streamKeyHash: null, streamKeyEncrypted: null }),
         },
       });
+      if (ingest === 'PULL' && current.streamKeyEncrypted) {
+        await this.ingest.disconnect(current.streamKeyEncrypted);
+      }
       this.changed(id, 'updated');
       return toView(channel, await this.healthOf(id));
     } catch (error) {
@@ -175,6 +210,7 @@ export class ChannelsService {
   async remove(id: string): Promise<ChannelView> {
     const channel = await this.find(id);
     await this.prisma.channel.delete({ where: { id } });
+    await this.disconnectEncoder(channel);
     this.changed(id, 'deleted');
     return toView(channel, null);
   }
@@ -199,11 +235,13 @@ export class ChannelsService {
   }
 
   async stop(id: string): Promise<ChannelView> {
-    await this.find(id);
+    const channel = await this.find(id);
     const stopped = await this.prisma.channel.update({
       where: { id },
       data: { enabled: false, status: 'STOPPED', statusMessage: null, startedAt: null },
     });
+    // The encoder is told at once that nobody is listening any more.
+    await this.disconnectEncoder(channel);
     this.changed(id, 'updated');
     return toView(stopped, null);
   }
@@ -280,6 +318,12 @@ export class ChannelsService {
     }
   }
 
+  private async disconnectEncoder(channel: Channel): Promise<void> {
+    if (channel.ingest === 'PUSH' && channel.streamKeyEncrypted) {
+      await this.ingest.disconnect(channel.streamKeyEncrypted);
+    }
+  }
+
   /** Says which value of a refused write another channel already has. */
   private async conflictOf(
     error: unknown,
@@ -353,6 +397,7 @@ function toView(channel: Channel, health: ChannelHealth | null): ChannelView {
     slug: channel.slug,
     number: channel.number,
     description: channel.description,
+    ingest: channel.ingest,
     source: channel.sourceLabel,
     mode: channel.mode,
     qualities: channel.qualities,

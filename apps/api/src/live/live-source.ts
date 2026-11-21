@@ -7,6 +7,8 @@ export const SOURCE_PROTOCOLS = {
   'rtmp:': 'RTMP',
   'rtmps:': 'RTMPS',
   'srt:': 'SRT',
+  'rtsp:': 'RTSP',
+  'rtsps:': 'RTSPS',
   'udp:': 'UDP',
   'rtp:': 'RTP',
 } as const;
@@ -116,6 +118,17 @@ export function inputOptions(source: LiveSource): string[] {
       return ['-protocol_whitelist', 'rtmp,rtmps,tcp,tls', '-rw_timeout', READ_TIMEOUT_US];
     case 'srt:':
       return ['-protocol_whitelist', 'srt,udp'];
+    case 'rtsp:':
+    case 'rtsps:':
+      // Over TCP: cameras and servers behind a firewall rarely get UDP through.
+      return [
+        '-protocol_whitelist',
+        'rtsp,rtsps,rtp,tcp,tls',
+        '-rtsp_transport',
+        'tcp',
+        '-timeout',
+        READ_TIMEOUT_US,
+      ];
     case 'udp:':
       return ['-protocol_whitelist', 'udp', '-timeout', READ_TIMEOUT_US];
     case 'rtp:':

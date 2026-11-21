@@ -34,6 +34,8 @@ import {
   type ChannelView,
   type ProbeResult,
 } from './channels.service.js';
+import type { EncoderSettings } from './ingest.js';
+import { IngestService } from './ingest.service.js';
 import { type LivePlaybackInfo, LivePlaybackService } from './live-playback.service.js';
 
 /** Live channels for admins. */
@@ -42,6 +44,7 @@ export class ChannelsController {
   constructor(
     @Inject(ChannelsService) private readonly channels: ChannelsService,
     @Inject(LivePlaybackService) private readonly playback: LivePlaybackService,
+    @Inject(IngestService) private readonly ingest: IngestService,
     @Inject(AuditService) private readonly audit: AuditService,
   ) {}
 
@@ -156,6 +159,27 @@ export class ChannelsController {
     return restarted;
   }
 
+  /** What to enter in an encoder for a pushed channel, with its stream key. */
+  @Get(':id/encoder')
+  @RequirePermissions('live:write')
+  encoder(@Param('id', ParseUUIDPipe) id: string): Promise<EncoderSettings> {
+    return this.ingest.settings(id);
+  }
+
+  /** Replaces the stream key. The old one stops working at once. */
+  @Post(':id/stream-key')
+  @HttpCode(HttpStatus.OK)
+  @RequirePermissions('live:write')
+  async replaceStreamKey(
+    @Param('id', ParseUUIDPipe) id: string,
+    @CurrentPrincipal() principal: Principal,
+    @Req() request: Request,
+  ): Promise<EncoderSettings> {
+    const settings = await this.ingest.replaceKey(id);
+    await this.record('channel.stream-key', await this.channels.get(id), principal, request);
+    return settings;
+  }
+
   /** A signed address for watching the channel in the panel. */
   @Post(':id/playback')
   @HttpCode(HttpStatus.OK)
@@ -177,7 +201,11 @@ export class ChannelsController {
       entityType: 'channel',
       entityId: channel.id,
       // The source is logged without anything secret.
-      metadata: { name: channel.name, source: channel.source, ...metadata },
+      metadata: {
+        name: channel.name,
+        source: channel.ingest === 'PUSH' ? 'encoder' : channel.source,
+        ...metadata,
+      },
       ipAddress: requestInfo(request).ipAddress,
     });
   }

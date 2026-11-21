@@ -8,6 +8,7 @@ const ACTION_LABELS: Record<string, string> = {
   'channel.start': 'Started a channel',
   'channel.stop': 'Stopped a channel',
   'channel.restart': 'Restarted a channel',
+  'channel.stream-key': 'Replaced the stream key of a channel',
   'auth.setup': 'Created the first admin',
   'auth.login': 'Signed in',
   'auth.login_failed': 'Failed sign-in',

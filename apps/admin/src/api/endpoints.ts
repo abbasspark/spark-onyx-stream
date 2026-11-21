@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 import { download, request, uploadFile } from './client';
 import type {
+  EncoderSettings,
   Channel,
   ChannelDetails,
   ChannelInput,
@@ -389,6 +390,11 @@ export const channelsApi = {
   start: (id: string) => request<Channel>(`/v1/channels/${id}/start`, { method: 'POST' }),
   stop: (id: string) => request<Channel>(`/v1/channels/${id}/stop`, { method: 'POST' }),
   restart: (id: string) => request<Channel>(`/v1/channels/${id}/restart`, { method: 'POST' }),
+  /** What to enter in an encoder, with the stream key. */
+  encoder: (id: string, signal?: AbortSignal) =>
+    request<EncoderSettings>(`/v1/channels/${id}/encoder`, { signal }),
+  replaceStreamKey: (id: string) =>
+    request<EncoderSettings>(`/v1/channels/${id}/stream-key`, { method: 'POST' }),
   /** Connects to a source and says what it carries. Takes up to 15 seconds. */
   probe: (source: string, signal?: AbortSignal) =>
     request<SourceProbe>('/v1/channels/probe', { method: 'POST', body: { source }, signal }),
