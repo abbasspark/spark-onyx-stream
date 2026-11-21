@@ -31,6 +31,12 @@ export type LiveEvent =
       type: 'asset';
       assetId: string;
       change: 'created' | 'updated' | 'uploaded' | 'deleted';
+    }
+  | {
+      type: 'channel';
+      channelId: string;
+      /** "status" is sent by the live process when a channel starts, stops or reconnects. */
+      change: 'created' | 'updated' | 'deleted' | 'status';
     };
 
 /** The permission a receiver needs for each kind of event. */
@@ -38,6 +44,7 @@ export const EVENT_PERMISSIONS: Record<LiveEvent['type'], Permission> = {
   job: 'jobs:read',
   'job-progress': 'jobs:read',
   asset: 'assets:read',
+  channel: 'live:read',
 };
 
 /** Reads an event from its channel message. Null when the message is not a valid event. */

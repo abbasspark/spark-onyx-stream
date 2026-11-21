@@ -129,6 +129,22 @@ services:
       redis:
         condition: service_healthy
 
+  # Keeps the live channels running: one FFmpeg process per channel.
+  live:
+    <<: *app
+    environment:
+      <<: *app-environment
+      APP_ROLE: live
+      LIVE_SEGMENT_SECONDS: ${LIVE_SEGMENT_SECONDS:-4}
+      LIVE_PLAYLIST_SEGMENTS: ${LIVE_PLAYLIST_SEGMENTS:-6}
+    volumes:
+      - live:/var/lib/onyx/live
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+
   # The site viewers use. It reads the catalog from the API.
   web:
     image: onyx-stream/web:local
@@ -169,6 +185,7 @@ services:
     volumes:
       # Read-only: the gateway sends media files and never changes them.
       - storage:/var/lib/onyx/storage:ro
+      - live:/var/lib/onyx/live:ro
     depends_on:
       api:
         condition: service_healthy
@@ -181,3 +198,4 @@ volumes:
   storage:
   uploads:
   processing:
+  live:

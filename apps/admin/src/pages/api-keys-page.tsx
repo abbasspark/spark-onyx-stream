@@ -32,6 +32,7 @@ const SCOPE_GROUPS: { label: string; read: Permission; write?: Permission }[] = 
   { label: 'Videos', read: 'assets:read', write: 'assets:write' },
   { label: 'Jobs', read: 'jobs:read', write: 'jobs:write' },
   { label: 'Encoding profiles', read: 'encoding-profiles:read', write: 'encoding-profiles:write' },
+  { label: 'Live channels', read: 'live:read', write: 'live:write' },
   { label: 'Storage', read: 'storage:read', write: 'storage:write' },
   { label: 'Settings', read: 'settings:read', write: 'settings:write' },
   { label: 'Admins', read: 'admins:read' },

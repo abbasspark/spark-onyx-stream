@@ -31,6 +31,12 @@ export class AppConfig {
   /** Absolute path of the directory for working files of processing jobs. */
   readonly processingTempPath: string;
   readonly workerConcurrency: number;
+  /** Where live channels write their output, and how it is cut. */
+  readonly live: {
+    readonly path: string;
+    readonly segmentSeconds: number;
+    readonly playlistSegments: number;
+  };
   readonly playbackUrlTtlSeconds: number;
   /** Who may play published titles through the public catalog. */
   readonly catalogPlayback: 'open' | 'viewers' | 'off';
@@ -94,6 +100,11 @@ export class AppConfig {
     this.ffprobePath = env.FFPROBE_PATH;
     this.processingTempPath = path.resolve(baseDirectory, env.PROCESSING_TEMP_PATH);
     this.workerConcurrency = env.WORKER_CONCURRENCY;
+    this.live = {
+      path: path.resolve(baseDirectory, env.LIVE_PATH),
+      segmentSeconds: env.LIVE_SEGMENT_SECONDS,
+      playlistSegments: env.LIVE_PLAYLIST_SEGMENTS,
+    };
     this.playbackUrlTtlSeconds = env.PLAYBACK_URL_TTL_SECONDS;
     this.catalogPlayback = env.CATALOG_PLAYBACK;
     this.viewerRegistrationOpen = env.VIEWER_REGISTRATION === 'open';

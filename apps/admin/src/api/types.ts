@@ -24,6 +24,8 @@ export type Permission =
   | 'viewers:write'
   | 'billing:read'
   | 'billing:write'
+  | 'live:read'
+  | 'live:write'
   | 'settings:read'
   | 'settings:write';
 
@@ -971,4 +973,71 @@ export interface RevenueReport {
   trialing: number;
   /** Payments in other currencies, left out of every sum. */
   otherCurrencies: { currency: string; payments: number }[];
+}
+
+// --- Live ---------------------------------------------------------------------
+
+/** "WAITING" stands for an enabled channel that no live process reports on. */
+export type ChannelStatus =
+  'STOPPED' | 'WAITING' | 'STARTING' | 'RUNNING' | 'RECONNECTING' | 'FAILED';
+
+/** What a source carries. */
+export interface ChannelStreams {
+  videoCodec: string;
+  width: number;
+  height: number;
+  frameRate: number | null;
+  audioCodec: string | null;
+  audioChannels: number | null;
+}
+
+export interface Channel {
+  id: string;
+  name: string;
+  slug: string;
+  number: number | null;
+  description: string | null;
+  /** The source without anything secret. */
+  source: string;
+  /** Whether the channel is meant to run. */
+  enabled: boolean;
+  status: ChannelStatus;
+  statusMessage: string | null;
+  startedAt: string | null;
+  restartCount: number;
+  streams: ChannelStreams | null;
+  /** Figures of the running stream. Null while no live process runs the channel. */
+  health: {
+    bitrate: number | null;
+    speed: number | null;
+    lastDataAt: string | null;
+    node: string;
+  } | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ChannelDetails extends Channel {
+  /** The latest lines of the live process, oldest first. */
+  log: string[];
+}
+
+export interface ChannelInput {
+  name: string;
+  slug?: string;
+  number: number | null;
+  description: string | null;
+  source: string;
+  start?: boolean;
+}
+
+/** What testing a source found. */
+export type SourceProbe =
+  | { ok: true; streams: ChannelStreams; audio: 'copy' | 'aac' | 'none' }
+  | { ok: false; reason: string; streams: ChannelStreams | null };
+
+export interface LivePlayback {
+  protocol: 'hls';
+  url: string;
+  expiresAt: string;
 }

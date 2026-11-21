@@ -252,6 +252,12 @@ export const envSchema = z
     FFPROBE_PATH: z.string().min(1).default('ffprobe'),
     /** Directory for the working files of processing jobs. Needs room for a source file and its outputs. */
     PROCESSING_TEMP_PATH: z.string().min(1).default('./tmp/processing'),
+    /** Directory live channels write their playlists and segments to. Temporary files: a few megabytes per channel. */
+    LIVE_PATH: z.string().min(1).default('./tmp/live'),
+    /** Wanted length of a live segment in seconds. Shorter means less delay and more requests. */
+    LIVE_SEGMENT_SECONDS: z.coerce.number().int().min(1).max(10).default(4),
+    /** Segments a live playlist lists. Players can go back this far. */
+    LIVE_PLAYLIST_SEGMENTS: z.coerce.number().int().min(3).max(60).default(6),
     /** Processing jobs one worker process runs at the same time. Transcoding uses all CPU cores already. */
     WORKER_CONCURRENCY: z.coerce.number().int().min(1).max(64).default(1),
 
