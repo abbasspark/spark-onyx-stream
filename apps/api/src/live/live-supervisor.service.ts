@@ -19,6 +19,7 @@ import { ChannelRunner, type RunnerState } from './channel-runner.js';
 import { FfmpegLiveEngine } from './ffmpeg-live-engine.js';
 import { encoderSource } from './ingest.js';
 import { IngestClient } from './ingest-client.js';
+import { playlistLength } from './live-ladder.js';
 import { measureBitrate } from './live-playlist.js';
 import { parseSource } from './live-source.js';
 import {
@@ -41,6 +42,7 @@ interface Wanted {
   restartToken: number;
   mode: ChannelMode;
   qualities: number[];
+  dvrMinutes: number;
 }
 
 function signatureOf(channel: Wanted): string {
@@ -145,6 +147,7 @@ export class LiveSupervisorService implements OnModuleInit, OnApplicationShutdow
         qualities: true,
         ingest: true,
         streamKeyEncrypted: true,
+        dvrMinutes: true,
       },
     });
     const byId = new Map(wanted.map((channel) => [channel.id, channel]));
@@ -196,7 +199,11 @@ export class LiveSupervisorService implements OnModuleInit, OnApplicationShutdow
         processing: { mode: channel.mode, qualities: channel.qualities },
         preset: this.config.live.transcodePreset,
         segmentSeconds: this.config.live.segmentSeconds,
-        playlistSegments: this.config.live.playlistSegments,
+        playlistSegments: playlistLength(
+          channel.dvrMinutes,
+          this.config.live.segmentSeconds,
+          this.config.live.playlistSegments,
+        ),
         engine: this.engine,
         onState: (state) => void this.save(channel.id, runner, state),
       });

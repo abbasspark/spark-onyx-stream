@@ -100,3 +100,35 @@ export function placeOf(
   }
   return { start: (start - from) / (to - from), width: (end - start) / (to - from) };
 }
+
+/** How far behind the present a viewer is, as a clock: "0:45", "12:34", "1:02:03". */
+export function formatBehind(seconds: number): string {
+  const whole = Math.max(0, Math.round(seconds));
+  const hours = Math.floor(whole / 3600);
+  const minutes = Math.floor((whole % 3600) / 60);
+  const rest = String(whole % 60).padStart(2, '0');
+  return hours > 0 ? `${hours}:${String(minutes).padStart(2, '0')}:${rest}` : `${minutes}:${rest}`;
+}
+
+/**
+ * Where in the video a programme began, to start it over. Null when that
+ * moment is no longer kept, lies ahead, or is where the viewer already is.
+ *
+ * @param zeroAt The moment in the world that position 0 of the video stands for, in milliseconds.
+ */
+export function startOverPosition(
+  programmeStartsAt: string,
+  zeroAt: number | null,
+  seekableStart: number,
+  current: number,
+): number | null {
+  if (zeroAt === null) {
+    return null;
+  }
+  const position = (new Date(programmeStartsAt).getTime() - zeroAt) / 1000;
+  // A few seconds of slack at the old end: those segments are about to be deleted.
+  if (!Number.isFinite(position) || position < seekableStart + 8 || position > current - 20) {
+    return null;
+  }
+  return position;
+}

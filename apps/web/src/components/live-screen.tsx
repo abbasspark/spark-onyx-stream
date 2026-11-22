@@ -10,6 +10,7 @@ import {
   Minimize,
   Pause,
   Play,
+  RotateCcw,
   Volume2,
   VolumeX,
   X,
@@ -17,7 +18,15 @@ import {
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { type LiveRefusal, liveHref, neighbour, refusalOf } from '@/lib/live';
+import {
+  formatBehind,
+  type LiveRefusal,
+  liveHref,
+  neighbour,
+  onNow,
+  refusalOf,
+  startOverPosition,
+} from '@/lib/live';
 import type { Channel, LivePlayback } from '@/lib/types';
 import { authHref } from '@/lib/viewer-api';
 import { ChannelLineup } from './channel-lineup';
@@ -255,6 +264,11 @@ function LivePlayer({ channel, channels, playback, onBroken, onZap }: LivePlayer
   const [muted, setMuted] = useState(false);
   const [volume, setVolume] = useState(1);
   const [behind, setBehind] = useState(false);
+  // For a channel that lets viewers go back: the stretch that is kept, and where the viewer is in it.
+  const keeps = (channel.dvrMinutes ?? 0) > 0;
+  const [range, setRange] = useState<{ start: number; end: number; current: number } | null>(null);
+  /** The moment in the world that position 0 of the video stands for. */
+  const [zeroAt, setZeroAt] = useState<number | null>(null);
   const [fullscreen, setFullscreen] = useState(false);
   const [controls, setControls] = useState(true);
   const [lineup, setLineup] = useState(false);
@@ -281,7 +295,8 @@ function LivePlayer({ channel, channels, playback, onBroken, onZap }: LivePlayer
     };
 
     if (Hls.isSupported()) {
-      const hls = new Hls({ liveSyncDurationCount: 3 });
+      // What was watched is dropped from memory after a minute. Going back loads it again.
+      const hls = new Hls({ liveSyncDurationCount: 3, backBufferLength: 60 });
       hlsRef.current = hls;
       hls.on(Hls.Events.MANIFEST_PARSED, start);
       hls.on(Hls.Events.ERROR, (_event, data) => {
@@ -328,6 +343,19 @@ function LivePlayer({ channel, channels, playback, onBroken, onZap }: LivePlayer
     const onTime = () => {
       const end = video.seekable.length > 0 ? video.seekable.end(video.seekable.length - 1) : 0;
       setBehind(end > 0 && end - video.currentTime > BEHIND_SECONDS);
+      if (end > 0) {
+        setRange({ start: video.seekable.start(0), end, current: video.currentTime });
+      }
+      // hls.js knows the date of what is playing. Safari knows the date of position 0.
+      const playing = hlsRef.current?.playingDate?.getTime();
+      const native = (video as HTMLVideoElement & { getStartDate?: () => Date })
+        .getStartDate?.()
+        .getTime();
+      if (playing) {
+        setZeroAt(playing - video.currentTime * 1000);
+      } else if (native && !Number.isNaN(native)) {
+        setZeroAt(native);
+      }
     };
     video.addEventListener('play', onPlay);
     video.addEventListener('pause', onPause);
@@ -375,6 +403,24 @@ function LivePlayer({ channel, channels, playback, onBroken, onZap }: LivePlayer
       video.volume = 0.5;
     }
   }, []);
+
+  const seekTo = useCallback((position: number) => {
+    const video = videoRef.current;
+    if (video && video.seekable.length > 0) {
+      const start = video.seekable.start(0);
+      const end = video.seekable.end(video.seekable.length - 1);
+      video.currentTime = Math.min(Math.max(position, start + 4), end - 4);
+    }
+  }, []);
+  const skip = useCallback(
+    (seconds: number) => {
+      const video = videoRef.current;
+      if (video) {
+        seekTo(video.currentTime + seconds);
+      }
+    },
+    [seekTo],
+  );
 
   const goLive = useCallback(() => {
     const video = videoRef.current;
@@ -440,6 +486,7 @@ function LivePlayer({ channel, channels, playback, onBroken, onZap }: LivePlayer
         l: () => setLineup(true),
         ArrowUp: () => onZap(-1),
         ArrowDown: () => onZap(1),
+        ...(keeps ? { ArrowLeft: () => skip(-10), ArrowRight: () => skip(10) } : {}),
       };
       const action = actions[event.key];
       // A button that has the focus answers the space bar itself.
@@ -451,7 +498,15 @@ function LivePlayer({ channel, channels, playback, onBroken, onZap }: LivePlayer
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [lineup, togglePlay, toggleMute, toggleFullscreen, onZap, wake]);
+  }, [lineup, togglePlay, toggleMute, toggleFullscreen, onZap, wake, keeps, skip]);
+
+  // The programme that is on, if it began within what is kept and the viewer is past its start.
+  const running = onNow(channel, Date.now()).now;
+  const startOver =
+    keeps && running && range
+      ? startOverPosition(running.startsAt, zeroAt, range.start, range.current)
+      : null;
+  const behindSeconds = range ? Math.max(0, range.end - range.current) : 0;
 
   const shown = controls || !playing || lineup;
   const button =
@@ -503,82 +558,116 @@ function LivePlayer({ channel, channels, playback, onBroken, onZap }: LivePlayer
       </div>
 
       <div
-        className={`absolute inset-x-0 bottom-0 flex items-center gap-1 bg-linear-to-t from-onyx/90 to-transparent px-3 pt-12 pb-3 transition-opacity duration-200 sm:px-5 ${
+        className={`absolute inset-x-0 bottom-0 bg-linear-to-t from-onyx/90 to-transparent px-3 pt-12 pb-3 transition-opacity duration-200 sm:px-5 ${
           shown ? 'opacity-100' : 'pointer-events-none opacity-0'
         }`}
       >
-        <button
-          type="button"
-          className={button}
-          aria-label={playing ? 'Pause' : 'Play'}
-          onClick={togglePlay}
-        >
-          {playing ? <Pause className="size-6" /> : <Play className="size-6" />}
-        </button>
-        <button
-          type="button"
-          className={button}
-          aria-label={muted ? 'Turn the sound on' : 'Turn the sound off'}
-          onClick={toggleMute}
-        >
-          {muted || volume === 0 ? <VolumeX className="size-6" /> : <Volume2 className="size-6" />}
-        </button>
-        <input
-          type="range"
-          min={0}
-          max={1}
-          step={0.05}
-          value={muted ? 0 : volume}
-          aria-label="Volume"
-          className="hidden w-24 accent-vein sm:block"
-          onChange={(event) => {
-            const video = videoRef.current;
-            if (video) {
-              video.volume = Number(event.target.value);
-              video.muted = video.volume === 0;
-            }
-          }}
-        />
-
-        {behind ? (
-          <button
-            type="button"
-            className="ml-3 flex h-9 items-center gap-2 rounded-[3px] border border-vein/40 px-3 text-sm hover:bg-vein/15"
-            onClick={goLive}
-          >
-            <span className="size-2 rounded-full bg-dust" aria-hidden="true" />
-            Back to live
-          </button>
-        ) : (
-          <span className="ml-3 flex h-9 items-center gap-2 px-1 text-sm font-medium">
-            <span
-              className="size-2 rounded-full bg-sard motion-safe:animate-pulse"
-              aria-hidden="true"
-            />
-            Live
-          </span>
-        )}
-
-        <div className="ml-auto flex items-center gap-1">
-          {channels.length > 1 ? (
-            <button
-              type="button"
-              className={button}
-              aria-label="Channels"
-              aria-expanded={lineup}
-              onClick={() => setLineup((open) => !open)}
-            >
-              <List className="size-6" />
-            </button>
-          ) : null}
+        {keeps && range && range.end - range.start > 30 ? (
+          <input
+            type="range"
+            min={Math.floor(range.start)}
+            max={Math.floor(range.end)}
+            step={1}
+            value={Math.floor(range.current)}
+            aria-label="Position in what the channel has kept"
+            aria-valuetext={behind ? `${formatBehind(behindSeconds)} behind live` : 'Live'}
+            className="mb-1 block h-5 w-full accent-sard"
+            onChange={(event) => seekTo(Number(event.target.value))}
+          />
+        ) : null}
+        <div className="flex items-center gap-1">
           <button
             type="button"
             className={button}
-            aria-label={fullscreen ? 'Leave full screen' : 'Full screen'}
-            onClick={toggleFullscreen}
+            aria-label={playing ? 'Pause' : 'Play'}
+            onClick={togglePlay}
           >
-            {fullscreen ? <Minimize className="size-6" /> : <Maximize className="size-6" />}
+            {playing ? <Pause className="size-6" /> : <Play className="size-6" />}
           </button>
+          <button
+            type="button"
+            className={button}
+            aria-label={muted ? 'Turn the sound on' : 'Turn the sound off'}
+            onClick={toggleMute}
+          >
+            {muted || volume === 0 ? (
+              <VolumeX className="size-6" />
+            ) : (
+              <Volume2 className="size-6" />
+            )}
+          </button>
+          <input
+            type="range"
+            min={0}
+            max={1}
+            step={0.05}
+            value={muted ? 0 : volume}
+            aria-label="Volume"
+            className="hidden w-24 accent-vein sm:block"
+            onChange={(event) => {
+              const video = videoRef.current;
+              if (video) {
+                video.volume = Number(event.target.value);
+                video.muted = video.volume === 0;
+              }
+            }}
+          />
+
+          {behind ? (
+            <button
+              type="button"
+              className="ml-3 flex h-9 items-center gap-2 rounded-[3px] border border-vein/40 px-3 text-sm hover:bg-vein/15"
+              onClick={goLive}
+            >
+              <span className="size-2 rounded-full bg-dust" aria-hidden="true" />
+              Back to live
+              {keeps ? (
+                <span className="text-smoke tabular-nums">−{formatBehind(behindSeconds)}</span>
+              ) : null}
+            </button>
+          ) : (
+            <span className="ml-3 flex h-9 items-center gap-2 px-1 text-sm font-medium">
+              <span
+                className="size-2 rounded-full bg-sard motion-safe:animate-pulse"
+                aria-hidden="true"
+              />
+              Live
+            </span>
+          )}
+
+          {startOver !== null && running ? (
+            <button
+              type="button"
+              className="ml-2 hidden h-9 items-center gap-2 rounded-[3px] border border-vein/40 px-3 text-sm hover:bg-vein/15 sm:flex"
+              title={`Start “${running.title}” from its beginning`}
+              onClick={() => seekTo(startOver)}
+            >
+              <RotateCcw className="size-4" aria-hidden="true" />
+              Start over
+            </button>
+          ) : null}
+
+          <div className="ml-auto flex items-center gap-1">
+            {channels.length > 1 ? (
+              <button
+                type="button"
+                className={button}
+                aria-label="Channels"
+                aria-expanded={lineup}
+                onClick={() => setLineup((open) => !open)}
+              >
+                <List className="size-6" />
+              </button>
+            ) : null}
+            <button
+              type="button"
+              className={button}
+              aria-label={fullscreen ? 'Leave full screen' : 'Full screen'}
+              onClick={toggleFullscreen}
+            >
+              {fullscreen ? <Minimize className="size-6" /> : <Maximize className="size-6" />}
+            </button>
+          </div>
         </div>
       </div>
 

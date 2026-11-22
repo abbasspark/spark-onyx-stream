@@ -33,7 +33,7 @@ See [phase-1-media-engine.md](phase-1-media-engine.md) for the design.
 1. Channels pulled from an address: sources over HTTP, RTMP, SRT, UDP and RTP, a live process that keeps them running, repackaging to HLS without re-encoding, signed delivery, and the Channels page with a live preview. **Done.**
 2. Transcoding to several qualities that players switch between, for any source the server can read. **Done.**
 3. Channels pushed by an encoder over RTMP or SRT, with a stream key per channel and an ingest server. **Done.**
-4. Going back in time and recording.
+4. Going back in time: a window of up to four hours per channel, with pause, rewind and starting the running programme over. **Done.** Recording programmes into the library is the part that is left.
 5. A programme guide: import from XMLTV sources, programmes by hand, now and next in the lineup and a timetable for viewers. **Done.**
 6. Channels in the catalog, in packages and on the viewer website. **Done.** Built before steps 4 and 5, so that viewers can watch channels at all.
 

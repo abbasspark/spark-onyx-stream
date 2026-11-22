@@ -97,3 +97,22 @@ export function ladderFor(
   }
   return heights.map((height) => rendition(Math.min(height, own), frameRate));
 }
+
+/** How far back viewers can go on a channel, in minutes. 0 means only the present. */
+export const DVR_WINDOWS = [0, 30, 60, 120, 240] as const;
+
+/**
+ * Segments a playlist has to list for a channel: the usual few for a channel
+ * that only shows the present, enough for the whole window for one that lets
+ * viewers go back.
+ */
+export function playlistLength(
+  dvrMinutes: number,
+  segmentSeconds: number,
+  liveSegments: number,
+): number {
+  if (dvrMinutes <= 0) {
+    return liveSegments;
+  }
+  return Math.max(liveSegments, Math.ceil((dvrMinutes * 60) / segmentSeconds));
+}

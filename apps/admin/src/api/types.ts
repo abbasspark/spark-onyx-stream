@@ -1027,6 +1027,8 @@ export interface Channel {
   qualities: number[];
   /** The qualities the channel is encoded into, once the source is known. */
   outputs: ChannelOutput[] | null;
+  /** Minutes viewers can go back in time. 0 means only the present. */
+  dvrMinutes: number;
   /** The id of the channel in guide sources. Null when it is not linked. */
   guideId: string | null;
   /** Whether viewers find the channel on the website and in the apps. */
@@ -1067,6 +1069,7 @@ export interface ChannelInput {
   mode?: ChannelMode;
   qualities?: number[];
   guideId?: string | null;
+  dvrMinutes?: number;
   published?: boolean;
   access?: 'FREE' | 'PAID';
   packageIds?: string[];

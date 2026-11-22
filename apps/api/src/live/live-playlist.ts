@@ -3,6 +3,9 @@ import { readFile, stat } from 'node:fs/promises';
 import path from 'node:path';
 import { LIVE_PLAYLIST_NAME } from './live-command.js';
 
+/** Segments the bitrate is measured over. */
+const MEASURED_SEGMENTS = 6;
+
 export interface PlaylistSegment {
   name: string;
   seconds: number;
@@ -51,7 +54,8 @@ export async function measureBitrate(directory: string): Promise<number | null> 
       }
       playlist = await readFile(path.join(directory, best), 'utf8');
     }
-    const segments = parseSegments(playlist);
+    // The newest few say what goes out now. A channel that keeps hours has thousands.
+    const segments = parseSegments(playlist).slice(-MEASURED_SEGMENTS);
     const sizes = await Promise.all(
       segments.map((segment) =>
         // Names come from a file FFmpeg wrote. Only plain file names are looked at all the same.

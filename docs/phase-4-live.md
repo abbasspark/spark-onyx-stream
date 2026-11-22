@@ -139,6 +139,19 @@ Asking to watch answers 401 without a viewer where one is needed, 402 with `subs
 
 On the website, **Live** lists the channels as a lineup, with what is on air and a mark on those that need another plan. The page of a channel plays it over the whole window, with the lineup one key away and the arrow keys for the channel before and after. A channel that is off air is waited for: the picture starts by itself. When a signed address runs out during a long session, the player asks for a new one and goes on.
 
+## Going back in time
+
+A channel can keep what it sent for a while, so viewers can pause, rewind and start the running programme over. It is a setting per channel: off, or 30 minutes, 1, 2 or 4 hours.
+
+- **How it works:** the playlist of such a channel lists every segment of the chosen time instead of the last few, and segments are deleted when they leave it. Players start at the present as before and can move back through the rest.
+- **Start over:** segments carry the time they were sent. With the guide, the player knows where the running programme began and offers to play it from there, as long as that moment is still kept.
+- **Disk space:** everything sent in the chosen time is on disk, for each quality: about 2 GB per hour at 5 Mbit/s. The details of a channel show the figure for its real bitrate.
+- **A restart of the stream empties it.** When the source breaks, the channel is restarted or its settings change, the window starts again from nothing. Keeping it across restarts would need joining streams that may differ, which is left for later.
+- **Changing the setting restarts a running channel.**
+- **The playlist is long:** 3600 entries for four hours of 4-second segments, fetched by every viewer every few seconds. The gateway sends it packed, which makes it about a tenth of the size.
+
+On the website the player of such a channel has a bar for the kept time, shows how far behind the present the viewer is, and takes the left and right arrow keys for ten seconds back and forth. The preview in the panel can be scrubbed the same way.
+
 ## The programme guide
 
 The guide says what each channel shows and when. Viewers meet it in three places: "now" and "next" in the lineup, the name of the running programme in the player, and the guide of the day as a timetable.
@@ -255,7 +268,7 @@ With several servers, the live processes and the gateway need the same `LIVE_PAT
 
 - Encoding on graphics cards, and qualities with bitrates of your own
 - Pushing from a browser (WebRTC), and RTMPS
-- Going back in time (DVR) and recording
+- Recording programmes into the library, and keeping what was sent across restarts of a stream
 - Pictures and age ratings of programmes, reminders, and uploading a guide file instead of an address
 - Channels on the home page and in search, and how many people are watching
 - Audio-only channels, several audio languages and subtitles

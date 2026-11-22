@@ -1,6 +1,16 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 import { describe, expect, it } from 'vitest';
-import { isLocked, liveHref, neighbour, onNow, placeOf, progressOf, refusalOf } from './live';
+import {
+  formatBehind,
+  isLocked,
+  liveHref,
+  neighbour,
+  onNow,
+  placeOf,
+  progressOf,
+  refusalOf,
+  startOverPosition,
+} from './live';
 import type { Channel } from './types';
 
 const channel = (slug: string, change: Partial<Channel> = {}): Channel => ({
@@ -109,5 +119,27 @@ describe('the guide', () => {
       width: 0.125,
     });
     expect(placeOf(programme('Gone', '15:00', '16:00'), from, to)).toBeNull();
+  });
+});
+
+describe('going back in time', () => {
+  it('writes how far behind a viewer is as a clock', () => {
+    expect(formatBehind(45)).toBe('0:45');
+    expect(formatBehind(754)).toBe('12:34');
+    expect(formatBehind(3723)).toBe('1:02:03');
+    expect(formatBehind(-3)).toBe('0:00');
+  });
+
+  it('finds where the running programme began', () => {
+    // Position 0 of the video is 18:00:00, and the programme began at 18:10.
+    const zeroAt = Date.parse('2026-11-22T18:00:00.000Z');
+    const began = '2026-11-22T18:10:00.000Z';
+    expect(startOverPosition(began, zeroAt, 0, 1500)).toBe(600);
+    // That moment has already been deleted.
+    expect(startOverPosition(began, zeroAt, 700, 1500)).toBeNull();
+    // The viewer is at the start already.
+    expect(startOverPosition(began, zeroAt, 0, 610)).toBeNull();
+    // The player cannot say what time its positions stand for.
+    expect(startOverPosition(began, null, 0, 1500)).toBeNull();
   });
 });

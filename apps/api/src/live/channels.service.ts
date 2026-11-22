@@ -67,6 +67,8 @@ export interface ChannelView {
    * known: chosen heights above the source are left out. Null otherwise.
    */
   outputs: { name: string; height: number; videoKbps: number }[] | null;
+  /** Minutes viewers can go back in time. 0 means only the present. */
+  dvrMinutes: number;
   /** The id of the channel in guide sources. Null when it is not linked. */
   guideId: string | null;
   /** Whether viewers find the channel on the website and in the apps. */
@@ -180,6 +182,7 @@ export class ChannelsService {
           ...(input.ingest === 'PUSH' ? this.ingest.issueKey() : {}),
           mode: input.mode,
           qualities: qualitiesOf(input.mode, input.qualities),
+          dvrMinutes: input.dvrMinutes,
           enabled: input.start,
           status: input.start ? 'STARTING' : 'STOPPED',
         },
@@ -203,7 +206,12 @@ export class ChannelsService {
     }
     const mode = input.mode ?? current.mode;
     const qualities = qualitiesOf(mode, input.qualities ?? current.qualities);
-    const reprocess = mode !== current.mode || qualities.join() !== [...current.qualities].join();
+    const dvrMinutes = input.dvrMinutes ?? current.dvrMinutes;
+    const reprocess =
+      mode !== current.mode ||
+      qualities.join() !== [...current.qualities].join() ||
+      // A longer or shorter memory means another playlist: the stream starts over.
+      dvrMinutes !== current.dvrMinutes;
 
     try {
       const channel = await this.prisma.channel.update({
@@ -227,6 +235,7 @@ export class ChannelsService {
             : {}),
           mode,
           qualities,
+          dvrMinutes,
           // Other qualities need another process: the live process starts the channel over.
           ...(reprocess ? { restartToken: { increment: 1 } } : {}),
           // A new source is noticed by the live process, which then starts the channel over.
@@ -473,6 +482,7 @@ function toView(channel: ChannelRecord, health: ChannelHealth | null): ChannelVi
             videoKbps: rendition.videoKbps,
           }))
         : null,
+    dvrMinutes: channel.dvrMinutes,
     guideId: channel.guideId,
     published: channel.published,
     access: channel.access,

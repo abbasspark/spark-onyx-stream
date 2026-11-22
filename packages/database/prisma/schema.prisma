@@ -1121,6 +1121,9 @@ model Channel {
   /// Picture heights to encode with TRANSCODE, such as 1080, 720, 480. Heights above the source are left out.
   qualities Int[]       @default([])
 
+  /// Minutes viewers can go back in time on the channel. 0 means only the present.
+  dvrMinutes Int @default(0)
+
   /// The id of this channel in guide sources (XMLTV), to file imported programmes under it.
   guideId    String?
   programmes Programme[]

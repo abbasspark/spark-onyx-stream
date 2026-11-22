@@ -257,6 +257,33 @@ describe.skipIf(!TEST_DATABASE_URL)('Live channels (e2e)', () => {
       expect(await token()).toBe(3);
     });
 
+    it('lets viewers go back in time for a chosen while, which restarts a running channel', async () => {
+      const created = await create({ start: true }).expect(201);
+      const id = created.body.id as string;
+      expect(created.body.dvrMinutes).toBe(0);
+      const token = async () =>
+        (await testApp.prisma.channel.findUniqueOrThrow({ where: { id } })).restartToken;
+
+      const changed = await http()
+        .patch(`/v1/channels/${id}`)
+        .set(admin())
+        .send({ dvrMinutes: 120 })
+        .expect(200);
+      expect(changed.body.dvrMinutes).toBe(120);
+      expect(await token()).toBe(1);
+
+      await http().patch(`/v1/channels/${id}`).set(admin()).send({ dvrMinutes: 120 }).expect(200);
+      expect(await token()).toBe(1);
+
+      const odd = await http()
+        .patch(`/v1/channels/${id}`)
+        .set(admin())
+        .send({ dvrMinutes: 45 })
+        .expect(400);
+      expect(odd.body.issues[0].field).toBe('dvrMinutes');
+      await create({ name: 'Other', dvrMinutes: 30 }).expect(201);
+    });
+
     it('deletes a channel', async () => {
       const created = await create().expect(201);
       await http().delete(`/v1/channels/${created.body.id}`).set(admin()).expect(204);
@@ -753,6 +780,29 @@ describe.skipIf(!TEST_DATABASE_URL || !hasFfmpeg)('Live channels (e2e, real FFmp
     await http().delete(`/v1/channels/${id}`).set(admin()).expect(204);
     await reconcile();
     expect(testApp.app.get(LiveSupervisorService).runningIds()).toEqual([]);
+  }, 120_000);
+
+  it('keeps what was sent for a channel that lets viewers go back', async () => {
+    const created = await http()
+      .post('/v1/channels')
+      .set(admin())
+      .send({ name: 'With memory', source: `udp://127.0.0.1:${PORT}`, dvrMinutes: 30, start: true })
+      .expect(201);
+    const id = created.body.id as string;
+    await waitFor(id, 'RUNNING');
+    const playback = await http().post(`/v1/channels/${id}/playback`).set(admin()).expect(200);
+
+    // Segments are a second long here and a channel without a window lists six.
+    let segments = 0;
+    for (let attempt = 0; attempt < 40 && segments <= 9; attempt += 1) {
+      await new Promise((resolve) => setTimeout(resolve, 500));
+      const playlist = await http().get(playback.body.url).expect(200);
+      segments = playlist.text.match(/\.m4s/g)?.length ?? 0;
+    }
+    expect(segments).toBeGreaterThan(9);
+
+    await http().delete(`/v1/channels/${id}`).set(admin()).expect(204);
+    await reconcile();
   }, 120_000);
 
   it('passes AAC audio from a transport stream through', async () => {
