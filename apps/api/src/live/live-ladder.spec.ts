@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-only
-import { ladderFor, videoKbpsFor } from './live-ladder.js';
+import { ladderFor, playlistLength, videoKbpsFor } from './live-ladder.js';
 
 const heights = (qualities: number[], source: number) =>
   ladderFor(qualities, source).map((rendition) => rendition.height);
@@ -53,5 +53,21 @@ describe('ladderFor', () => {
     expect(ladderFor([720], 1080)).toMatchObject([
       { name: '720p', videoKbps: 2800, maxrateKbps: 3080, profile: 'high' },
     ]);
+  });
+});
+
+describe('playlistLength', () => {
+  it('lists the usual few segments for a channel that only shows the present', () => {
+    expect(playlistLength(0, 4, 6)).toBe(6);
+  });
+
+  it('lists enough segments for the whole window', () => {
+    expect(playlistLength(30, 4, 6)).toBe(450);
+    expect(playlistLength(240, 4, 6)).toBe(3600);
+    expect(playlistLength(30, 7, 6)).toBe(258);
+  });
+
+  it('never lists fewer than a channel without a window would', () => {
+    expect(playlistLength(30, 10, 500)).toBe(500);
   });
 });

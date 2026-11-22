@@ -288,3 +288,35 @@ export function describeAudience(
       : `${names.slice(0, -1).join(', ')} and ${names.at(-1) as string}`;
   return `On the website, for plans with ${list}`;
 }
+
+/** How far back viewers can be allowed to go on a channel. */
+export const DVR_OPTIONS: readonly { value: string; label: string }[] = [
+  { value: '0', label: 'Off, only the present' },
+  { value: '30', label: '30 minutes' },
+  { value: '60', label: '1 hour' },
+  { value: '120', label: '2 hours' },
+  { value: '240', label: '4 hours' },
+];
+
+/** "Off", "30 minutes", "2 hours" */
+export function describeDvr(minutes: number): string {
+  if (minutes <= 0) {
+    return 'Off';
+  }
+  if (minutes < 60) {
+    return `${minutes} minutes`;
+  }
+  const hours = minutes / 60;
+  return hours === 1 ? '1 hour' : `${Number(hours.toFixed(1))} hours`;
+}
+
+/**
+ * Disk space the window of a channel takes, in bytes: everything it sends
+ * out, for as long as viewers can go back. Null while the bitrate is unknown.
+ */
+export function dvrDiskBytes(minutes: number, bitsPerSecond: number | null): number | null {
+  if (minutes <= 0 || !bitsPerSecond) {
+    return null;
+  }
+  return Math.round((bitsPerSecond / 8) * minutes * 60);
+}

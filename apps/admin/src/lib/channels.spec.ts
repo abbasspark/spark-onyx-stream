@@ -3,6 +3,8 @@ import { describe, expect, it } from 'vitest';
 import type { Channel } from '@/api/types';
 import {
   describeAudience,
+  describeDvr,
+  dvrDiskBytes,
   describeProbePlan,
   describeQualities,
   exceedsSource,
@@ -34,6 +36,7 @@ const channel = (change: Partial<Channel> = {}): Channel => ({
   mode: 'COPY',
   qualities: [],
   outputs: null,
+  dvrMinutes: 0,
   guideId: null,
   published: false,
   access: 'FREE',
@@ -279,5 +282,22 @@ describe('describeAudience', () => {
         }),
       ),
     ).toBe('On the website, for plans with Kids, Sports and News');
+  });
+});
+
+describe('going back in time', () => {
+  it('is named by its length', () => {
+    expect(describeDvr(0)).toBe('Off');
+    expect(describeDvr(30)).toBe('30 minutes');
+    expect(describeDvr(60)).toBe('1 hour');
+    expect(describeDvr(240)).toBe('4 hours');
+    expect(describeDvr(90)).toBe('1.5 hours');
+  });
+
+  it('costs disk space for everything sent in that time', () => {
+    // 4 Mbit/s for an hour is 1.8 GB.
+    expect(dvrDiskBytes(60, 4_000_000)).toBe(1_800_000_000);
+    expect(dvrDiskBytes(0, 4_000_000)).toBeNull();
+    expect(dvrDiskBytes(60, null)).toBeNull();
   });
 });

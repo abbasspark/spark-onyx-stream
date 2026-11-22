@@ -542,3 +542,15 @@ This replaces the "plain CSS without a component library" part of D-018.
 **Why:** XMLTV is what guide providers and the tools around them produce, so reading it covers nearly every operator without a format of our own. Linking by the provider's id is the one piece of manual work, done once per channel, and the panel offers the ids so nobody types them from a file. Replacing a source as a whole is simple to reason about and repairs itself: whatever the provider changed, moved or withdrew is right after the next import, and there is no merge to get wrong. Keeping a window instead of the whole file keeps the table small however large the file is. Refusing edits to imported programmes avoids changes that vanish a few hours later. Sending now and next with the lineup makes the page that viewers open most cost one request.
 
 **Consequence:** a provider's mistake reaches viewers until the provider fixes it, or the channel is unlinked and filled by hand. Two sources covering the same channel are not merged: the programme that starts first is shown. The guide is as fresh as the last import, a few hours at worst. Pictures, ratings and credits in XMLTV files are not read.
+
+## D-042 Going back in time is a longer playlist
+
+**Date:** 2026-11-22
+
+- **A channel keeps what it sent for a chosen time,** from a short list of lengths up to four hours, or not at all.
+- **The one playlist of the channel lists all of it.** There is no second address for the past.
+- **The window lives and dies with the stream:** a restart empties it.
+
+**Why:** a longer playlist is the whole mechanism. The same process writes it, the same files are served from the same place with the same token, and every HLS player already knows how to move through it, so pausing and rewinding work in the website, the panel and any app without code of their own. Segments carry the time they were sent, which is all "start over" needs once the guide says when a programme began. A fixed list of lengths keeps the cost in disk space something an operator chooses knowingly. Emptying the window on a restart avoids joining two runs of a stream that may differ in format, which players handle unevenly.
+
+**Consequence:** disk use grows with the window, the bitrate and the number of qualities. The playlist of a long window is large, and is sent packed for that reason. A source that drops often makes for a window that is short in practice. More than four hours, and programmes kept for good, need recording, which is separate.

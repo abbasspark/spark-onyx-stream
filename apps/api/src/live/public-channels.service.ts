@@ -27,6 +27,8 @@ export interface PublicChannel {
   packageIds: string[];
   /** Whether the channel is sending right now. */
   onAir: boolean;
+  /** Minutes viewers can go back in time. 0 means only the present. */
+  dvrMinutes: number;
   /** What the guide says is on now, and what comes after it. Null when it does not say. */
   now: PublicProgramme | null;
   next: PublicProgramme | null;
@@ -79,6 +81,7 @@ const PUBLIC_SELECT = {
   access: true,
   enabled: true,
   status: true,
+  dvrMinutes: true,
   packages: { select: { packageId: true } },
 } as const;
 
@@ -91,6 +94,7 @@ interface PublicRecord {
   access: TitleAccess;
   enabled: boolean;
   status: string;
+  dvrMinutes: number;
   packages: { packageId: string }[];
 }
 
@@ -282,6 +286,7 @@ function toPublic(channel: PublicRecord, upcoming: ProgrammeRow[], at: Date): Pu
     access: channel.access,
     packageIds: channel.packages.map((link) => link.packageId).sort(),
     onAir: isOnAir(channel),
+    dvrMinutes: channel.dvrMinutes,
     now: current ? toProgramme(current) : null,
     next: following ? toProgramme(following) : null,
   };

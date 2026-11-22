@@ -118,6 +118,8 @@ export interface Channel {
   packageIds: string[];
   /** Whether the channel is sending right now. */
   onAir: boolean;
+  /** Minutes viewers can go back in time. Nothing, or 0, means only the present. */
+  dvrMinutes?: number;
   /** What the guide says is on now and after it. Left out by an API older than the guide. */
   now?: Programme | null;
   next?: Programme | null;

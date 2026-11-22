@@ -35,7 +35,7 @@ import {
   PageHeader,
   Skeleton,
 } from '@/components/ui/display';
-import { Field, Input, Textarea, ToggleRow } from '@/components/ui/form';
+import { Field, Input, Select, Textarea, ToggleRow } from '@/components/ui/form';
 import {
   Dialog,
   DialogBody,
@@ -53,6 +53,9 @@ import {
   type ChannelFilter,
   codecName,
   describeAudience,
+  describeDvr,
+  DVR_OPTIONS,
+  dvrDiskBytes,
   describeAudio,
   DEFAULT_QUALITIES,
   describeProbePlan,
@@ -74,7 +77,7 @@ import {
   totalsOf,
 } from '@/lib/channels';
 import { cn } from '@/lib/cn';
-import { formatBitrate, formatDateTime, formatResolution } from '@/lib/format';
+import { formatBitrate, formatBytes, formatDateTime, formatResolution } from '@/lib/format';
 import { FALLBACK_POLL_MS, useLiveState } from '@/live/live';
 
 /** Bitrate and running time change without an event, so lists with running channels ask again. */
@@ -779,6 +782,18 @@ function ChannelSheet({ id, fallback, actions, onClose }: ChannelSheetProps) {
                       : `${channel.restartCount} since it was started`
                     : '–',
                 ],
+                [
+                  'Going back',
+                  channel.dvrMinutes > 0
+                    ? `${describeDvr(channel.dvrMinutes)}${
+                        dvrDiskBytes(channel.dvrMinutes, channel.health?.bitrate ?? null)
+                          ? `, about ${formatBytes(
+                              dvrDiskBytes(channel.dvrMinutes, channel.health?.bitrate ?? null),
+                            )} on disk per quality at this bitrate`
+                          : ''
+                      }`
+                    : 'Off',
+                ],
                 ['Viewers', describeAudience(channel)],
                 ['Live process', channel.health?.node ?? '–'],
                 [
@@ -850,6 +865,7 @@ function ChannelDialog({ item, open, onOpenChange, onSaved }: ChannelDialogProps
   });
   const [ingest, setIngest] = useState<ChannelIngest>('PULL');
   const [mode, setMode] = useState<ChannelMode>('COPY');
+  const [dvr, setDvr] = useState('0');
   const [qualities, setQualities] = useState<number[]>([...DEFAULT_QUALITIES]);
 
   // The stored address may carry a password, so it is asked for only when the form opens.
@@ -875,6 +891,7 @@ function ChannelDialog({ item, open, onOpenChange, onSaved }: ChannelDialogProps
       setPackageIds(item?.packages.map((entry) => entry.id) ?? []);
       setIngest(item?.ingest ?? 'PULL');
       setMode(item?.mode ?? 'COPY');
+      setDvr(String(item?.dvrMinutes ?? 0));
       setQualities(item && item.qualities.length > 0 ? item.qualities : [...DEFAULT_QUALITIES]);
     }
   }, [open, item]);
@@ -913,6 +930,7 @@ function ChannelDialog({ item, open, onOpenChange, onSaved }: ChannelDialogProps
         ...(pulled ? { source: source.trim() } : {}),
         mode,
         ...(mode === 'TRANSCODE' ? { qualities } : {}),
+        dvrMinutes: Number(dvr),
         published,
         access: paid ? 'PAID' : 'FREE',
         packageIds: paid ? packageIds : [],
@@ -940,7 +958,9 @@ function ChannelDialog({ item, open, onOpenChange, onSaved }: ChannelDialogProps
   const probedStreams = probe.data?.ok ? probe.data.streams : (item?.streams ?? null);
   const processingChanged =
     item !== null &&
-    (mode !== item.mode || (mode === 'TRANSCODE' && qualities.join() !== item.qualities.join()));
+    (mode !== item.mode ||
+      (mode === 'TRANSCODE' && qualities.join() !== item.qualities.join()) ||
+      Number(dvr) !== item.dvrMinutes);
   const ready =
     name.trim() !== '' &&
     (!pulled || source.trim() !== '') &&
@@ -1135,12 +1155,31 @@ function ChannelDialog({ item, open, onOpenChange, onSaved }: ChannelDialogProps
                   </p>
                 </div>
               ) : null}
-              {item?.enabled && processingChanged ? (
-                <p className="text-xs text-muted-foreground">
-                  The channel restarts with the new processing when you save.
-                </p>
-              ) : null}
             </fieldset>
+
+            <Field
+              label="Going back in time"
+              hint={
+                dvr === '0'
+                  ? 'Viewers see the channel as it is sent. Nothing is kept.'
+                  : 'Viewers can pause, rewind and start the running programme over. Everything sent in this time is kept on disk: about 2 GB per hour at 5 Mbit/s, for each quality. A restart of the stream empties it.'
+              }
+            >
+              {(id) => (
+                <Select
+                  id={id}
+                  className="sm:max-w-xs"
+                  value={dvr}
+                  onValueChange={setDvr}
+                  options={[...DVR_OPTIONS]}
+                />
+              )}
+            </Field>
+            {item?.enabled && processingChanged ? (
+              <p className="-mt-2 text-xs text-muted-foreground">
+                The channel restarts when you save, because how it is processed changed.
+              </p>
+            ) : null}
 
             {item ? (
               <Field

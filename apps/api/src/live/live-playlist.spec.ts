@@ -70,6 +70,20 @@ describe('measureBitrate', () => {
     expect(await measureBitrate(directory)).toBe(2_000_000);
   });
 
+  it('measures the newest segments of a channel that keeps hours', async () => {
+    const lines = ['#EXTM3U'];
+    for (let index = 0; index < 100; index += 1) {
+      lines.push('#EXTINF:1.000000,', `seg-${index}.m4s`);
+      // The old ones are large, the newest six small.
+      await writeFile(
+        path.join(directory, `seg-${index}.m4s`),
+        Buffer.alloc(index >= 94 ? 125_000 : 1_250_000),
+      );
+    }
+    await writeFile(path.join(directory, 'index.m3u8'), `${lines.join('\n')}\n`);
+    expect(await measureBitrate(directory)).toBe(1_000_000);
+  });
+
   it('has no figure before there is a playlist', async () => {
     expect(await measureBitrate(directory)).toBeNull();
   });

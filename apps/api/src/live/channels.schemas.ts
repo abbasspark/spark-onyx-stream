@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 import { z } from 'zod';
 import { MAX_SLUG_LENGTH, SLUG_PATTERN } from '../catalog/slug.js';
-import { LIVE_QUALITIES, type LiveQuality } from './live-ladder.js';
+import { DVR_WINDOWS, LIVE_QUALITIES, type LiveQuality } from './live-ladder.js';
 import { InvalidSourceError, parseSource } from './live-source.js';
 
 /** Names for addresses that the viewer website uses for pages of its own. */
@@ -75,6 +75,13 @@ const ingest = z.enum(['PULL', 'PUSH']);
 
 const access = z.enum(['FREE', 'PAID']);
 
+/** Minutes viewers can go back in time. 0 switches it off. */
+const dvrMinutes = z
+  .number()
+  .refine((value) => (DVR_WINDOWS as readonly number[]).includes(value), {
+    message: `Choose one of ${DVR_WINDOWS.join(', ')} minutes`,
+  });
+
 /** The id of the channel in guide sources. Empty means not linked. */
 const guideId = z
   .string()
@@ -124,6 +131,7 @@ export const createChannelSchema = z
     access: access.default('FREE'),
     packageIds: packageIds.default([]),
     guideId: guideId.default(null),
+    dvrMinutes: dvrMinutes.default(0),
     /** Start the channel as soon as it exists. */
     start: z.boolean().default(false),
   })
@@ -144,6 +152,7 @@ export const updateChannelSchema = z
     access,
     packageIds,
     guideId,
+    dvrMinutes,
   })
   .partial()
   .refine((value) => Object.keys(value).length > 0, { message: 'Nothing to change' })
