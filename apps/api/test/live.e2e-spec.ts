@@ -801,7 +801,8 @@ describe.skipIf(!TEST_DATABASE_URL || !hasFfmpeg)('Live channels (e2e, real FFmp
     const created = await http()
       .post('/v1/channels')
       .set(admin())
-      .send({ name: 'Silent', source: 'udp://127.0.0.1:1', start: true })
+      // A port nobody sends to. Not a low one: those need root rights to listen on.
+      .send({ name: 'Silent', source: `udp://127.0.0.1:${PORT + 2}`, start: true })
       .expect(201);
     const id = created.body.id as string;
 
