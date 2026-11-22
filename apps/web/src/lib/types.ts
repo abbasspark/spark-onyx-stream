@@ -96,6 +96,14 @@ export interface Page<Item> {
 export const TITLE_SORTS = ['newest', 'name', 'year'] as const;
 export type TitleSort = (typeof TITLE_SORTS)[number];
 
+/** How viewers of the same video or channel find each other. */
+export interface P2pInfo {
+  /** Address of the tracker, with the token that lets this viewer in. */
+  trackerUrl: string;
+  /** Names the group of viewers who watch the same files. */
+  swarmId: string;
+}
+
 /** Signed, short-lived addresses for playing one video. */
 export interface Playback {
   protocol: 'hls';
@@ -104,6 +112,8 @@ export interface Playback {
   /** WebVTT file whose cues point into a sheet of small preview pictures. */
   thumbnailTrackUrl: string | null;
   expiresAt: string;
+  /** What the player needs to share the video with other viewers. Null when P2P is off. */
+  p2p: P2pInfo | null;
 }
 
 /** A live channel as viewers see it. */
@@ -147,4 +157,5 @@ export interface LivePlayback {
   protocol: 'hls';
   url: string;
   expiresAt: string;
+  p2p: P2pInfo | null;
 }

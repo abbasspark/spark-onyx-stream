@@ -1263,3 +1263,29 @@ export interface EdgeTraffic {
   hours: number;
   edges: { id: string; name: string; points: TrafficPoint[] }[];
 }
+
+// --- P2P -------------------------------------------------------------------------
+
+/** What the tracker says about itself. */
+export interface TrackerStats {
+  version: string;
+  connections: number;
+  /** Connections turned away: no token, too many, wrong website. */
+  refusedConnections: number;
+  /** Viewers in swarms. */
+  peers: number;
+  swarms: number;
+  /** The sizes of the largest swarms, largest first. */
+  largestSwarms: number[];
+  announces: number;
+  offersRelayed: number;
+  answersRelayed: number;
+  /** Messages that made no sense. */
+  refused: number;
+  startedAt: string;
+}
+
+export type P2pStatus =
+  | { state: 'off' }
+  | { state: 'unreachable'; trackerUrl: string; message: string }
+  | { state: 'running'; trackerUrl: string; stats: TrackerStats };

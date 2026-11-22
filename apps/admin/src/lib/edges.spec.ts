@@ -3,6 +3,9 @@ import { describe, expect, it } from 'vitest';
 import type { EdgeSample, EdgeServer, EdgeTraffic } from '@/api/types';
 import {
   agentDockerCommand,
+  answerRatio,
+  newTrackerSecret,
+  p2pSettings,
   agentEnvironment,
   cachePercent,
   chartOf,
@@ -272,5 +275,31 @@ describe('the history of what was delivered', () => {
     expect(labelEvery(24, 8)).toBe(3);
     expect(labelEvery(7, 8)).toBe(1);
     expect(labelEvery(31, 8)).toBe(4);
+  });
+});
+
+describe('P2P', () => {
+  it('tells how many offers were answered', () => {
+    expect(answerRatio({ offersRelayed: 0, answersRelayed: 0 })).toBeNull();
+    expect(answerRatio({ offersRelayed: 80, answersRelayed: 60 })).toBe(0.75);
+    expect(answerRatio({ offersRelayed: 5, answersRelayed: 9 })).toBe(1);
+  });
+
+  it('makes a secret that is long enough and safe in a settings file', () => {
+    const secret = newTrackerSecret((bytes) => bytes.fill(255));
+    expect(secret).toHaveLength(48);
+    expect(secret).toMatch(/^[A-Za-z0-9_-]+$/);
+  });
+
+  it('writes the settings for both sides with the same secret', () => {
+    const settings = p2pSettings('https://stream.example.com', 'the-secret');
+    expect(settings.api.split('\n')).toEqual([
+      'P2P_TRACKER_URL=wss://stream.example.com/tracker',
+      'P2P_TRACKER_INTERNAL_URL=http://127.0.0.1:8070',
+      'P2P_TRACKER_SECRET=the-secret',
+    ]);
+    expect(settings.tracker).toContain('ONYX_TRACKER_SECRET=the-secret');
+    expect(settings.tracker).toContain('ONYX_TRACKER_ALLOWED_ORIGINS=stream.example.com');
+    expect(p2pSettings('http://localhost:8080', 's').api).toContain('ws://localhost:8080/tracker');
   });
 });

@@ -4,6 +4,7 @@ import { Inject, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaClient } from '@onyx/database';
 import { AppConfig } from '../config/app-config.js';
 import { type Audience, DeliveryRouter } from '../delivery/delivery-router.service.js';
+import { type P2pInfo, P2pService } from '../p2p/p2p.service.js';
 import { createPlaybackToken, verifyPlaybackToken } from '../playback/playback-token.js';
 import { LIVE_PLAYLIST_NAME } from './live-command.js';
 import { channelDirectory } from './live-state.js';
@@ -18,6 +19,8 @@ export interface LivePlaybackInfo {
   protocol: 'hls';
   url: string;
   expiresAt: string;
+  /** What a player needs to share the channel with other viewers. Null when P2P is off. */
+  p2p: P2pInfo | null;
 }
 
 /**
@@ -35,6 +38,7 @@ export class LivePlaybackService {
     @Inject(PrismaClient) private readonly prisma: PrismaClient,
     @Inject(AppConfig) private readonly config: AppConfig,
     @Inject(DeliveryRouter) private readonly delivery: DeliveryRouter,
+    @Inject(P2pService) private readonly p2p: P2pService,
   ) {}
 
   async createPlayback(channelId: string, audience: Audience = 'admin'): Promise<LivePlaybackInfo> {
@@ -56,6 +60,8 @@ export class LivePlaybackService {
       protocol: 'hls',
       url: `${route.baseUrl}/v1/${LIVE_ROUTE}/${channel.id}/${token}/${LIVE_PLAYLIST_NAME}`,
       expiresAt: new Date(expiresAtSeconds * 1000).toISOString(),
+      p2p:
+        audience === 'viewer' ? this.p2p.forPlayback(`live:${channel.id}`, expiresAtSeconds) : null,
     };
   }
 

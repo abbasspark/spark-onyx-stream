@@ -590,3 +590,15 @@ This replaces the "plain CSS without a component library" part of D-018.
 **Why:** an edge is a rented machine somewhere, and the easiest one to break into. With a key of its own it can check its viewers' tokens without a call to the main server and without knowing anything that works elsewhere: an address made on a stolen edge opens that edge only. Choosing the server in the API keeps delivery plain HTTP that any player follows, and lets the choice use what the API knows: what is asked for, and which edges are alive. Keeping a video on few edges is what makes their copies worth having. Spread over all edges, every edge would fetch every video. Live is the opposite case: little to keep and much to carry.
 
 **Consequence:** an address is bound to one server, so a viewer whose edge dies needs a new address. The live player gets one by itself, the film player after a click. Replacing the secret of an edge ends its viewers' sessions. Pages of the website must allow the addresses of the edges, which they learn from the API.
+
+## D-046 The tracker speaks the WebTorrent protocol, and a swarm is named by a secret
+
+**Date:** 2026-11-22
+
+- **The tracker is our own Go program that speaks the protocol of WebTorrent trackers over WebSocket.**
+- **The P2P layer in the player will be an existing open-source library that speaks it,** not one of our own.
+- **Players need a token of the main server to connect,** and the name of a swarm is made from a secret.
+
+**Why:** exchanging segments between browsers is a large problem of its own: choosing who to ask, falling back to HTTP in time, checking what arrives. Libraries that do it exist, are in use and are open, and they find peers through WebTorrent trackers. Speaking that protocol gives us the choice among them and nothing to invent in the player. The tracker itself is small, and writing it ourselves lets it check our tokens, keep to our limits and report its figures to the panel, which a public tracker would not. Naming a swarm with a secret answers the question a tracker cannot: whether a viewer may have this video. A viewer who is not let watch never learns the name, and without it there is no swarm to join.
+
+**Consequence:** one external dependency in the tracker, for WebSocket. A viewer who is let watch could hand the name of a swarm to someone else, who would still need a token for the tracker and, for encrypted videos, the key. The tracker keeps everything in memory: a restart empties it, and players announce themselves again within two minutes. One tracker process serves an installation until several are built.

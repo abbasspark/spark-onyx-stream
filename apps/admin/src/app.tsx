@@ -18,6 +18,7 @@ import { ChannelsPage } from './pages/channels-page';
 import { EdgesPage } from './pages/edges-page';
 import { GuidePage } from './pages/guide-page';
 import { RecordingsPage } from './pages/recordings-page';
+import { P2pPage } from './pages/p2p-page';
 import { PackagesPage } from './pages/packages-page';
 import { PlansPage } from './pages/plans-page';
 import { RevenuePage } from './pages/revenue-page';
@@ -95,6 +96,7 @@ function Pages() {
             <Route path="guide" element={<GuidePage />} />
             <Route path="recordings" element={<RecordingsPage />} />
             <Route path="edges" element={<EdgesPage />} />
+            <Route path="p2p" element={<P2pPage />} />
             <Route path="revenue" element={<RevenuePage />} />
             <Route path="email" element={<EmailPage />} />
             <Route path="admins" element={<AdminsPage />} />

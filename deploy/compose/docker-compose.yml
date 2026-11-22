@@ -26,6 +26,9 @@ x-app: &app
     MASTER_KEY: ${MASTER_KEY:?Run ./init-env.sh first}
     INGEST_API_URL: http://ingest:9997
     INGEST_RTSP_URL: rtsp://ingest:8554
+    P2P_TRACKER_URL: ${P2P_TRACKER_URL:-}
+    P2P_TRACKER_INTERNAL_URL: http://tracker:8070
+    P2P_TRACKER_SECRET: ${P2P_TRACKER_SECRET:-}
     INGEST_PUBLIC_RTMP_URL: ${INGEST_PUBLIC_RTMP_URL:-}
     INGEST_PUBLIC_SRT_URL: ${INGEST_PUBLIC_SRT_URL:-}
     GUIDE_REFRESH_HOURS: ${GUIDE_REFRESH_HOURS:-6}
@@ -167,6 +170,18 @@ services:
     depends_on:
       api:
         condition: service_healthy
+
+  # Lets the players of viewers who watch the same thing find each other. Only
+  # messages for setting up connections pass through it, never video. Players
+  # reach it through the gateway at /tracker.
+  tracker:
+    image: onyx-stream/tracker:local
+    build:
+      context: ../../services/tracker
+    restart: unless-stopped
+    environment:
+      ONYX_TRACKER_SECRET: ${P2P_TRACKER_SECRET:?Run ./init-env.sh first, or add P2P_TRACKER_SECRET to .env}
+      ONYX_TRACKER_TRUST_PROXY: 'true'
 
   # The site viewers use. It reads the catalog from the API.
   web:

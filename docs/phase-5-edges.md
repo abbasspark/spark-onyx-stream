@@ -1,6 +1,6 @@
 # Phase 5: Edges and P2P
 
-Phase 5 takes the load of delivery off the main server. Its first step, described here, is edge servers: machines close to viewers that deliver video in place of the main server. P2P between viewers comes after it.
+Phase 5 takes the load of delivery off the main server. It starts with edge servers: machines close to viewers that deliver video in place of the main server. P2P between viewers comes after them, and its first part, the tracker, is described near the end.
 
 ## What an edge is
 
@@ -132,6 +132,33 @@ The website's content policy must allow every address video comes from. It asks 
 
 `WEB_MEDIA_ORIGIN` can list further origins, separated by spaces, and takes `https://*.example.com` for all subdomains.
 
+## P2P between viewers: the tracker
+
+Viewers who watch the same video or channel can pass parts of it to each other over direct connections (WebRTC). They find each other through the tracker, a small program that runs beside the main server. This step builds the tracker and what the main server tells players about it. The player of the website starts using it with the next step.
+
+- **What the tracker does:** a player connects, says which swarm it is in, and sends offers for direct connections along. The tracker hands each offer to another player of the same swarm and carries the answer back. After that the two talk to each other. No video passes through the tracker.
+- **A swarm** is the group of viewers who watch the same files: one per processing of a video, one per live channel. Its name is made by the main server from a secret, so it cannot be worked out from the video. Only a viewer who is let watch learns it, which keeps others out of the swarm.
+- **Who is let in:** the main server gives every viewer it lets watch a token for the tracker, valid as long as the address of the video. The tracker refuses connections without one. It can also be limited to pages of your website (`ONYX_TRACKER_ALLOWED_ORIGINS`).
+- **Admins get neither:** a preview in the panel shares nothing.
+- **The protocol** is that of WebTorrent trackers over WebSocket, which the P2P library planned for the player speaks.
+- **Limits per connection:** ten offers per announce, eight swarms, thirty messages at once and two a second after that. A connection that floods or sends what makes no sense is closed.
+- **When the tracker is away,** viewers notice nothing: players get everything from the servers.
+
+### Switching it on
+
+Both sides need the same secret of 32 characters or more.
+
+| Where       | Setting                    | Meaning                                                                            |
+| ----------- | -------------------------- | ---------------------------------------------------------------------------------- |
+| Main server | `P2P_TRACKER_URL`          | Address for players, such as `wss://stream.example.com/tracker`. Empty: P2P is off |
+| Main server | `P2P_TRACKER_INTERNAL_URL` | Where the API reads the tracker's figures. Default `http://127.0.0.1:8070`         |
+| Main server | `P2P_TRACKER_SECRET`       | The shared secret                                                                  |
+| Tracker     | `ONYX_TRACKER_SECRET`      | The same value                                                                     |
+
+With Compose, `init-env.sh` makes the secret and the tracker runs as a service of its own. The gateway passes `/tracker` on to it. Set `P2P_TRACKER_URL` in `.env` to switch P2P on. The other settings of the tracker are in [services/tracker](../services/tracker/README.md).
+
+**Delivery → P2P** in the panel shows whether the tracker runs, how many viewers are connected, how many swarms there are and how large the largest are, and how many of the offers passed on were answered. Switched off, it shows the settings for both sides with a fresh secret.
+
 ## API
 
 | Method and path                     | Who              | Purpose                                                    |
@@ -144,6 +171,7 @@ The website's content policy must allow every address video comes from. It asks 
 | `DELETE /v1/edges/:id`              | `delivery:write` | Remove an edge and lock its agent out                      |
 | `POST /v1/edges/:id/purge`          | `delivery:write` | Ask the agent to drop its copies: `all`, `video` or `live` |
 | `GET /v1/edges/traffic?range=`      | `delivery:read`  | What each edge delivered per hour: `24h`, `7d` or `30d`    |
+| `GET /v1/p2p`                       | `delivery:read`  | Whether P2P is on, and the figures of the tracker          |
 | `GET /v1/catalog/delivery`          | everyone         | The addresses of the edges, for the website                |
 | `POST /v1/edge-agent/heartbeat`     | the agent        | Report, and get the key for checking tokens                |
 | `GET /v1/edge-agent/assets/:id`     | the agent        | Whether a video can be played, and its current processing  |
@@ -160,4 +188,5 @@ The website's content policy must allow every address video comes from. It asks 
 - Edges that fetch from other edges, and edges for pictures
 - Sending the first bytes of a new file to the viewer while it is still being fetched
 - Updating agents from the panel
-- P2P between viewers, the tracker and offload statistics, which are the next steps of this phase
+- P2P in the player, and how much viewers took off the servers, which are the next steps of this phase
+- Several trackers behind one address, and names of videos and channels beside the swarms in the panel

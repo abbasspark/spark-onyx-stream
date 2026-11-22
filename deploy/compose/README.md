@@ -43,6 +43,7 @@ Before you publish anything, set `SITE_NAME` and `SITE_URL` in `.env`. Read the 
 | `migrate`  | `onyx-stream/api`     | Brings the database to the current version, then ends |
 | `postgres` | `postgres:17-alpine`  | Database                                              |
 | `redis`    | `redis:7-alpine`      | Job queue                                             |
+| `tracker`  | `onyx-stream/tracker` | Lets the players of viewers find each other, for P2P  |
 
 Only the gateway is reachable from outside, and the ingest server on the two ports encoders push live channels to: 1935 (TCP, RTMP) and 8890 (UDP, SRT). Open those in the firewall if you use pushed channels. The API, the website, the database and Redis have no published ports.
 

@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 import { download, request, uploadFile } from './client';
 import type {
+  P2pStatus,
   EdgeInput,
   EdgeServer,
   EdgeTraffic,
@@ -467,4 +468,9 @@ export const edgesApi = {
   traffic: (range: TrafficRange, signal?: AbortSignal) =>
     request<EdgeTraffic>(`/v1/edges/traffic?range=${range}`, { signal }),
   remove: (id: string) => request<void>(`/v1/edges/${id}`, { method: 'DELETE' }),
+};
+
+export const p2pApi = {
+  /** Whether P2P is on, and how the tracker is doing. */
+  status: (signal?: AbortSignal) => request<P2pStatus>('/v1/p2p', { signal }),
 };
