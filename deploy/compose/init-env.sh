@@ -28,6 +28,7 @@ sed \
   -e "s/^JWT_SECRET=.*/JWT_SECRET=$(secret)/" \
   -e "s/^PLAYBACK_SIGNING_SECRET=.*/PLAYBACK_SIGNING_SECRET=$(secret)/" \
   -e "s/^MASTER_KEY=.*/MASTER_KEY=$(secret)/" \
+  -e "s/^P2P_TRACKER_SECRET=.*/P2P_TRACKER_SECRET=$(secret)/" \
   .env.example > .env
 
 echo "Created $(pwd)/.env with fresh secrets."

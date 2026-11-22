@@ -68,6 +68,35 @@ describe('validateEnv', () => {
     );
   });
 
+  describe('P2P', () => {
+    it('is off by default', () => {
+      const env = validateEnv(validEnv);
+      expect(env.P2P_TRACKER_URL).toBe('');
+      expect(env.P2P_TRACKER_INTERNAL_URL).toBe('http://127.0.0.1:8070');
+    });
+
+    it('needs the secret it shares with the tracker', () => {
+      const tracker = { P2P_TRACKER_URL: 'wss://stream.example.com/tracker/' };
+      expect(() => validateEnv({ ...validEnv, ...tracker })).toThrow(/P2P_TRACKER_SECRET/);
+      expect(() => validateEnv({ ...validEnv, ...tracker, P2P_TRACKER_SECRET: 'short' })).toThrow(
+        /at least 32 characters/,
+      );
+      const env = validateEnv({ ...validEnv, ...tracker, P2P_TRACKER_SECRET: 's'.repeat(32) });
+      expect(env.P2P_TRACKER_URL).toBe('wss://stream.example.com/tracker');
+    });
+
+    it('takes only addresses a player can connect to', () => {
+      for (const url of ['https://stream.example.com/tracker', 'stream.example.com', 'wss://']) {
+        expect(() =>
+          validateEnv({ ...validEnv, P2P_TRACKER_URL: url, P2P_TRACKER_SECRET: 's'.repeat(32) }),
+        ).toThrow(/P2P_TRACKER_URL/);
+      }
+      expect(() => validateEnv({ ...validEnv, P2P_TRACKER_INTERNAL_URL: 'tracker:8070' })).toThrow(
+        /P2P_TRACKER_INTERNAL_URL/,
+      );
+    });
+  });
+
   describe('email', () => {
     const mail = {
       SMTP_URL: 'smtps://user:password@smtp.example.com:465',

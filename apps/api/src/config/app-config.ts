@@ -30,6 +30,8 @@ export class AppConfig {
   readonly ffprobePath: string;
   /** Absolute path of the directory for working files of processing jobs. */
   readonly processingTempPath: string;
+  /** The tracker viewers find each other through. Null when P2P is switched off. */
+  readonly p2p: { trackerUrl: string; internalUrl: string; secret: string } | null;
   /** The ingest server, which receives streams pushed by encoders. */
   readonly ingest: {
     readonly apiUrl: string;
@@ -109,6 +111,14 @@ export class AppConfig {
     this.ffmpegPath = env.FFMPEG_PATH;
     this.ffprobePath = env.FFPROBE_PATH;
     this.processingTempPath = path.resolve(baseDirectory, env.PROCESSING_TEMP_PATH);
+    this.p2p =
+      env.P2P_TRACKER_URL === ''
+        ? null
+        : {
+            trackerUrl: env.P2P_TRACKER_URL,
+            internalUrl: env.P2P_TRACKER_INTERNAL_URL,
+            secret: env.P2P_TRACKER_SECRET,
+          };
     this.ingest = {
       apiUrl: env.INGEST_API_URL.replace(/\/+$/, ''),
       rtspUrl: env.INGEST_RTSP_URL,

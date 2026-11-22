@@ -4,6 +4,7 @@ import { PrismaClient } from '@onyx/database';
 import { AppConfig } from '../config/app-config.js';
 import { ContentKeysService } from '../crypto/content-keys.service.js';
 import { type Audience, DeliveryRouter } from '../delivery/delivery-router.service.js';
+import { type P2pInfo, P2pService } from '../p2p/p2p.service.js';
 import { outputPrefix } from '../processing/pipeline.service.js';
 import { createPlaybackToken, verifyPlaybackToken } from './playback-token.js';
 
@@ -29,6 +30,8 @@ export interface PlaybackInfo {
   thumbnailTrackUrl: string | null;
   /** When the URLs stop working. */
   expiresAt: Date;
+  /** What a player needs to share the video with other viewers. Null when P2P is off. */
+  p2p: P2pInfo | null;
 }
 
 /** Where a requested media file lives. */
@@ -55,6 +58,7 @@ export class PlaybackService {
     @Inject(AppConfig) private readonly config: AppConfig,
     @Inject(ContentKeysService) private readonly contentKeys: ContentKeysService,
     @Inject(DeliveryRouter) private readonly delivery: DeliveryRouter,
+    @Inject(P2pService) private readonly p2p: P2pService,
   ) {}
 
   /**
@@ -147,6 +151,14 @@ export class PlaybackService {
       posterUrl: poster ? urlFor(poster.path) : null,
       thumbnailTrackUrl: spriteVtt ? urlFor(spriteVtt.path) : null,
       expiresAt: new Date(expiresAtSeconds * 1000),
+      // Each processing of a video is a swarm of its own: its files differ.
+      p2p:
+        audience === 'viewer'
+          ? this.p2p.forPlayback(
+              `video:${asset.id}:${asset.readyAt?.getTime() ?? 0}`,
+              expiresAtSeconds,
+            )
+          : null,
     };
   }
 

@@ -267,6 +267,27 @@ export const envSchema = z
       .default('veryfast'),
     /** Hours after which the programme guide is imported again from its sources. */
     GUIDE_REFRESH_HOURS: z.coerce.number().int().min(1).max(168).default(6),
+    /**
+     * Address players reach the tracker at, such as "wss://stream.example.com/tracker".
+     * Empty switches P2P between viewers off.
+     */
+    P2P_TRACKER_URL: z
+      .string()
+      .default('')
+      .transform((value) => value.trim().replace(/\/+$/, ''))
+      .refine((value) => value === '' || /^wss?:\/\/[^/?#]+(\/[^?#]*)?$/.test(value), {
+        message: 'P2P_TRACKER_URL must be an address of the form wss://host/path',
+      }),
+    /** Where the API reaches the tracker to read its figures. */
+    P2P_TRACKER_INTERNAL_URL: z
+      .string()
+      .default('http://127.0.0.1:8070')
+      .transform((value) => value.trim().replace(/\/+$/, ''))
+      .refine((value) => /^https?:\/\/[^/]+$/.test(value), {
+        message: 'P2P_TRACKER_INTERNAL_URL must be an address of the form http://host:port',
+      }),
+    /** Shared with the tracker (its ONYX_TRACKER_SECRET), which lets in only players with a token signed with it. */
+    P2P_TRACKER_SECRET: z.string().default(''),
     /** Control API of the ingest server (MediaMTX), as the API and the live processes reach it. */
     INGEST_API_URL: z.url().default('http://127.0.0.1:9997'),
     /** RTSP address of the ingest server, as the live processes reach it. */
@@ -367,6 +388,14 @@ export const envSchema = z
         code: 'custom',
         path: ['STRIPE_SECRET_KEY'],
         message: 'STRIPE_SECRET_KEY is required when STRIPE_WEBHOOK_SECRET is set',
+      });
+    }
+    if (env.P2P_TRACKER_URL !== '' && env.P2P_TRACKER_SECRET.length < 32) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['P2P_TRACKER_SECRET'],
+        message:
+          'P2P_TRACKER_URL needs P2P_TRACKER_SECRET with at least 32 characters, the same value the tracker has',
       });
     }
     if (env.VIEWER_EMAIL_VERIFICATION === 'required' && env.SMTP_URL === '') {

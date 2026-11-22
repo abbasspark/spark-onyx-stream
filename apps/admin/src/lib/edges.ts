@@ -400,3 +400,43 @@ export function niceCeiling(peak: number): number {
 export function labelEvery(count: number, room: number): number {
   return Math.max(1, Math.ceil(count / Math.max(1, room)));
 }
+
+/**
+ * How many of the offers the tracker passed on were answered, 0 to 1. An
+ * offer that got no answer went to a viewer who had left or could not connect.
+ * Null before any offer.
+ */
+export function answerRatio(stats: {
+  offersRelayed: number;
+  answersRelayed: number;
+}): number | null {
+  return stats.offersRelayed > 0 ? Math.min(1, stats.answersRelayed / stats.offersRelayed) : null;
+}
+
+/** A random secret for the tracker and the main server to share: 48 characters. */
+export function newTrackerSecret(random: (bytes: Uint8Array<ArrayBuffer>) => void): string {
+  const bytes = new Uint8Array(new ArrayBuffer(36));
+  random(bytes);
+  return btoa(String.fromCharCode(...bytes))
+    .replaceAll('+', '-')
+    .replaceAll('/', '_');
+}
+
+/** The settings that switch P2P on, for the main server and for the tracker. */
+export function p2pSettings(origin: string, secret: string): { api: string; tracker: string } {
+  const url = new URL(origin);
+  const scheme = url.protocol === 'https:' ? 'wss:' : 'ws:';
+  return {
+    api: [
+      `P2P_TRACKER_URL=${scheme}//${url.host}/tracker`,
+      'P2P_TRACKER_INTERNAL_URL=http://127.0.0.1:8070',
+      `P2P_TRACKER_SECRET=${secret}`,
+    ].join('\n'),
+    tracker: [
+      `ONYX_TRACKER_SECRET=${secret}`,
+      'ONYX_TRACKER_LISTEN=:8070',
+      `ONYX_TRACKER_ALLOWED_ORIGINS=${url.host}`,
+      'ONYX_TRACKER_TRUST_PROXY=true',
+    ].join('\n'),
+  };
+}
