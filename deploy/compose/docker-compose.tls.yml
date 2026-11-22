@@ -1,0 +1,36 @@
+# SPDX-License-Identifier: AGPL-3.0-only
+#
+# HTTPS for the single-server installation: a proxy in front of the gateway
+# that gets a certificate for your domain and renews it by itself.
+#
+# Used together with docker-compose.yml. Put this line into .env, and every
+# "docker compose" command in this folder includes it from then on:
+#
+#   COMPOSE_FILE=docker-compose.yml:docker-compose.tls.yml
+#
+# It needs ONYX_DOMAIN in .env, the domain pointing at this server, and the
+# ports 80 and 443 reachable from the internet.
+
+services:
+  tls:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    environment:
+      ONYX_DOMAIN: ${ONYX_DOMAIN:?Set ONYX_DOMAIN in .env to the domain of the site}
+    ports:
+      - '80:80'
+      - '443:443'
+      # HTTP/3
+      - '443:443/udp'
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      # The certificates. Losing them only means fetching new ones.
+      - tls-data:/data
+      - tls-config:/config
+    depends_on:
+      gateway:
+        condition: service_started
+
+volumes:
+  tls-data:
+  tls-config:

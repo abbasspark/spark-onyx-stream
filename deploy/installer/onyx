@@ -1,0 +1,253 @@
+#!/usr/bin/env bash
+# SPDX-License-Identifier: AGPL-3.0-only
+#
+# Day-to-day commands for an installation of Spark Onyx Stream with Docker
+# Compose. The installer links this file to /usr/local/bin/onyx.
+#
+#   onyx status
+#   onyx help
+
+set -euo pipefail
+
+# The folder of this file, also when it was started through a link.
+SELF=$(readlink -f "${BASH_SOURCE[0]}")
+ROOT=$(cd "$(dirname "$SELF")/../.." && pwd)
+COMPOSE_DIR="${ONYX_COMPOSE_DIR:-$ROOT/deploy/compose}"
+ENV_FILE="$COMPOSE_DIR/.env"
+# Where backups are inside the containers, and the tool that handles them.
+BACKUPS="/var/lib/onyx/storage/backups"
+BACKUP_TOOL=(node dist/cli/backup.js)
+# What holds connections to the database.
+DATABASE_USERS=(api worker live)
+
+if [[ -t 1 && -z "${NO_COLOR:-}" ]]; then
+  BOLD=$'\033[1m' RED=$'\033[31m' GREEN=$'\033[32m' YELLOW=$'\033[33m' RESET=$'\033[0m'
+else
+  BOLD="" RED="" GREEN="" YELLOW="" RESET=""
+fi
+
+die() {
+  printf '%sStopped:%s %s\n' "$RED" "$RESET" "$1" >&2
+  shift
+  local line
+  for line in "$@"; do
+    printf '         %s\n' "$line" >&2
+  done
+  exit 1
+}
+
+usage() {
+  cat <<EOF
+${BOLD}onyx${RESET}: day-to-day commands for Spark Onyx Stream
+
+  onyx status                 What runs, whether the site answers, the newest backup
+  onyx logs [service ...]     Follow the logs. Without a service: the API and the worker
+  onyx start                  Start everything
+  onyx stop                   Stop everything. Data stays
+  onyx restart [service ...]  Start again, after a change in .env for example
+
+  onyx backup                 Back the database up now, into the backups folder
+  onyx backups                List the backup files
+  onyx verify <file>          Prove that a backup opens. Changes nothing
+  onyx restore <file>         Replace the database with a backup
+
+  onyx env                    Show where the settings are
+  onyx compose <...>          Run any "docker compose" command for the installation
+  onyx version                Which version is installed
+  onyx help                   Show this
+
+A backup is named by its file name in the backups folder, or by the path of a
+file on this server.
+EOF
+}
+
+compose() {
+  (cd "$COMPOSE_DIR" && docker compose "$@")
+}
+
+# Whether there is a person to ask. The file can exist without a terminal behind it.
+has_terminal() {
+  { : >/dev/tty; } 2>/dev/null
+}
+
+need_installation() {
+  [[ -f "$COMPOSE_DIR/docker-compose.yml" ]] ||
+    die "No installation found in $COMPOSE_DIR."
+  [[ -f "$ENV_FILE" ]] ||
+    die "The installation has no settings yet." "Run $COMPOSE_DIR/init-env.sh, or the installer."
+  docker info >/dev/null 2>&1 ||
+    die "Docker does not answer." "Start it, for example with: systemctl start docker" "Without root, this command needs sudo."
+}
+
+get_env() {
+  local line
+  while IFS= read -r line || [[ -n "$line" ]]; do
+    if [[ "$line" == "$1="* ]]; then
+      printf '%s' "${line#*=}"
+      return 0
+    fi
+  done <"$ENV_FILE"
+  return 0
+}
+
+# Runs the backup tool in a container of its own, which works whether the
+# application is running or not.
+backup_tool() {
+  compose --progress quiet run --rm -T --no-deps "$@"
+}
+
+# backup_target <file>: sets TARGET to the path inside the container and
+# MOUNT to what "docker compose run" needs to see it.
+backup_target() {
+  local file="$1"
+  MOUNT=()
+  if [[ -f "$file" ]]; then
+    local full
+    full=$(readlink -f "$file")
+    MOUNT=(-v "$(dirname "$full"):/restore:ro")
+    TARGET="/restore/$(basename "$full")"
+  elif [[ "$file" != */* ]]; then
+    TARGET="$BACKUPS/$file"
+  else
+    die "There is no file $file on this server." "Give the path of a file here, or the name of one in the backups folder: onyx backups"
+  fi
+}
+
+cmd_status() {
+  local site_url port
+  site_url=$(get_env SITE_URL)
+  port=$(get_env HTTP_PORT)
+
+  printf '%sSpark Onyx Stream%s  %s\n' "$BOLD" "$RESET" "$(cmd_version)"
+  printf 'Site:   %s\nPanel:  %s/admin\n\n' "$site_url" "$site_url"
+  compose ps --format 'table {{.Service}}\t{{.Status}}'
+  printf '\n'
+
+  if curl -fsS -o /dev/null --max-time 5 "http://127.0.0.1:${port:-8080}/v1/health/live" 2>/dev/null; then
+    printf '%s✓%s The site answers\n' "$GREEN" "$RESET"
+  else
+    printf '%s✗%s The site does not answer on port %s. See: onyx logs api gateway\n' "$RED" "$RESET" "${port:-8080}"
+  fi
+
+  local newest
+  newest=$(compose exec -T api sh -c "ls -1t $BACKUPS 2>/dev/null | head -n 1" 2>/dev/null || true)
+  if [[ -n "$newest" ]]; then
+    printf '%s✓%s Newest backup file: %s\n' "$GREEN" "$RESET" "$newest"
+  else
+    printf '%s!%s No backup file found. See Settings > Backups in the panel\n' "$YELLOW" "$RESET"
+  fi
+
+  local free
+  free=$(df -Ph "$(docker info --format '{{.DockerRootDir}}' 2>/dev/null || echo /)" | awk 'NR == 2 {print $4 " free of " $2}')
+  printf '  Disk: %s\n' "$free"
+}
+
+cmd_version() {
+  local version
+  version=$(git -C "$ROOT" describe --tags --always 2>/dev/null || echo unknown)
+  printf '%s (%s)' "$version" "$(git -C "$ROOT" log -1 --format=%cs 2>/dev/null || echo 'date unknown')"
+}
+
+cmd_backup() {
+  local name
+  name="by-hand-$(date -u +%Y-%m-%dT%H-%M-%SZ).onyxbackup"
+  backup_tool api "${BACKUP_TOOL[@]}" create "$BACKUPS/$name"
+  printf 'It is in the backups folder of the storage volume. The panel lists only the backups it made itself.\n'
+}
+
+cmd_backups() {
+  backup_tool api sh -c "ls -lh --time-style=long-iso $BACKUPS 2>/dev/null | tail -n +2 | awk '{print \$6, \$7, \$5, \$8}'" |
+    sort -r | awk 'BEGIN {found = 0} {found = 1; printf "%s %s  %8s  %s\n", $1, $2, $3, $4} END {if (!found) print "No backup files yet."}'
+}
+
+cmd_verify() {
+  [[ $# -eq 1 ]] || die "Which backup?" "onyx verify <file>   See the files with: onyx backups"
+  backup_target "$1"
+  backup_tool "${MOUNT[@]}" api "${BACKUP_TOOL[@]}" verify "$TARGET"
+}
+
+cmd_restore() {
+  local assume_yes=0 file=""
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --yes | -y) assume_yes=1 ;;
+      -*) die "Unknown option: $1" ;;
+      *) file="$1" ;;
+    esac
+    shift
+  done
+  [[ -n "$file" ]] || die "Which backup?" "onyx restore <file>   See the files with: onyx backups"
+  backup_target "$file"
+
+  # Opened in full before anything is stopped: a backup that does not open costs nothing.
+  backup_tool "${MOUNT[@]}" api "${BACKUP_TOOL[@]}" verify "$TARGET" ||
+    die "The backup does not open, so nothing was changed."
+
+  printf '\n%sThis replaces the whole database with the backup above.%s\n' "$BOLD" "$RESET"
+  printf 'Everything that changed since it was made is gone afterwards: new viewers,\n'
+  printf 'payments, titles. Video files are not touched. The site is down meanwhile.\n'
+  if [[ "$assume_yes" -eq 0 ]]; then
+    has_terminal || die "Not confirmed, because there is no terminal to ask on. Nothing was changed." "Run it again with --yes to restore without being asked."
+    local answer=""
+    printf 'Type "restore" to go on: ' >/dev/tty
+    IFS= read -r answer </dev/tty || true
+    [[ "$answer" == "restore" ]] || die "Not confirmed. Nothing was changed."
+  fi
+
+  local saved
+  saved="before-restore-$(date -u +%Y-%m-%dT%H-%M-%SZ).onyxbackup"
+  compose stop "${DATABASE_USERS[@]}"
+  if backup_tool "${MOUNT[@]}" api "${BACKUP_TOOL[@]}" restore "$TARGET" --yes --save-current "$BACKUPS/$saved"; then
+    compose up -d --no-build
+    printf '\n%sRestored.%s The database as it was before is in the backups folder as %s\n' "$GREEN" "$RESET" "$saved"
+  else
+    printf '\n%sThe restore failed.%s The application is left stopped, so nothing writes to a\n' "$RED" "$RESET" >&2
+    printf 'database in an unknown state. If %s was written, it holds the database as\n' "$saved" >&2
+    printf 'it was: onyx restore %s   To start without restoring: onyx start\n' "$saved" >&2
+    exit 1
+  fi
+}
+
+main() {
+  local command="${1:-help}"
+  [[ $# -gt 0 ]] && shift
+
+  case "$command" in
+    help | --help | -h)
+      usage
+      return 0
+      ;;
+    env)
+      printf '%s\n' "$ENV_FILE"
+      printf 'After a change: onyx restart\n'
+      return 0
+      ;;
+  esac
+
+  need_installation
+  case "$command" in
+    status) cmd_status ;;
+    version)
+      cmd_version
+      printf '\n'
+      ;;
+    logs)
+      if [[ $# -eq 0 ]]; then set -- api worker; fi
+      compose logs -f --tail 100 "$@"
+      ;;
+    start) compose up -d --no-build ;;
+    stop) compose stop ;;
+    restart)
+      # "up" and not "restart": only "up" reads a changed .env.
+      compose up -d --no-build --force-recreate "$@"
+      ;;
+    backup) cmd_backup ;;
+    backups) cmd_backups ;;
+    verify) cmd_verify "$@" ;;
+    restore) cmd_restore "$@" ;;
+    compose) compose "$@" ;;
+    *) die "Unknown command: $command" "See: onyx help" ;;
+  esac
+}
+
+main "$@"

@@ -1,0 +1,13 @@
+# SPDX-License-Identifier: AGPL-3.0-only
+#
+# HTTPS in front of the gateway. The certificate for the domain in
+# ONYX_DOMAIN is fetched and renewed automatically, and plain HTTP is sent
+# on to HTTPS.
+
+{$ONYX_DOMAIN} {
+	# Playback tokens are part of the path, so requests are not logged.
+	reverse_proxy gateway:8080 {
+		# Live updates of the panel and video segments are passed on as they come.
+		flush_interval -1
+	}
+}
