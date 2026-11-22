@@ -3,11 +3,16 @@ import type {
   Asset,
   AssetStatus,
   Category,
+  Credit,
+  CreditKind,
   Episode,
+  Genre,
   Image,
   ImageKind,
+  Person,
   PublishStatus,
   Season,
+  SeriesStatus,
   Title,
   TitleAccess,
   TitleType,
@@ -122,6 +127,15 @@ export interface TitleSummary {
   /** True when no subscription opens the title: it is rented or bought only. */
   purchaseOnly: boolean;
   poster: ImageView | null;
+  /** The day of the premiere, as "1999-03-31". */
+  releaseDate: string | null;
+  /** Movies: the length of the film. Series: the usual length of an episode. */
+  runtimeMinutes: number | null;
+  /** What the audience of the metadata source thinks of it, from 0 to 10. */
+  rating: number | null;
+  /** Series only: whether more episodes are to come. */
+  seriesStatus: SeriesStatus | null;
+  genres: { id: string; name: string }[];
   categories: { id: string; name: string }[];
   /** The packages the title is in. Plans open a paid title through them. */
   packages: { id: string; name: string }[];
@@ -129,6 +143,8 @@ export interface TitleSummary {
   asset: AssetRef | null;
   seasonCount: number;
   episodeCount: number;
+  /** Series: how many episodes have a video that plays. */
+  readyEpisodeCount: number;
   /**
    * Whether viewers can see the title right now: it is published and has
    * something that plays. False for a published title whose video is gone.
@@ -146,6 +162,9 @@ export interface EpisodeView {
   synopsis: string | null;
   status: PublishStatus;
   publishedAt: Date | null;
+  /** The day it was first shown, as "2021-09-05". */
+  airDate: string | null;
+  runtimeMinutes: number | null;
   asset: AssetRef | null;
   still: ImageView | null;
 }
@@ -155,7 +174,61 @@ export interface SeasonView {
   number: number;
   name: string | null;
   synopsis: string | null;
+  /** The day its first episode was first shown. */
+  airDate: string | null;
+  poster: ImageView | null;
   episodes: EpisodeView[];
+}
+
+export interface PersonRef {
+  id: string;
+  slug: string;
+  name: string;
+  portrait: ImageView | null;
+}
+
+/** One person's part in a title. */
+export interface CreditView {
+  id: string;
+  kind: CreditKind;
+  /** Cast: the character played. Crew: the job. */
+  role: string | null;
+  person: PersonRef;
+}
+
+export interface GenreView {
+  id: string;
+  slug: string;
+  name: string;
+  titleCount: number;
+  createdAt: Date;
+}
+
+export interface PersonView extends PersonRef {
+  knownFor: string | null;
+  biography: string | null;
+  /** Set when the person came with an import. */
+  metadata: { source: string; id: string } | null;
+  creditCount: number;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+/** A person with everything they have a part in. */
+export interface PersonDetail extends PersonView {
+  credits: {
+    id: string;
+    kind: CreditKind;
+    role: string | null;
+    title: {
+      id: string;
+      type: TitleType;
+      name: string;
+      releaseYear: number | null;
+      status: PublishStatus;
+      poster: ImageView | null;
+    };
+  }[];
 }
 
 export interface TitleMetadataRef {
@@ -175,6 +248,16 @@ export interface TitleDetail extends TitleSummary {
   originalLanguage: string | null;
   backdrop: ImageView | null;
   logo: ImageView | null;
+  countries: string[];
+  studios: string[];
+  keywords: string[];
+  imdbId: string | null;
+  /** How many voted for the rating. */
+  ratingCount: number | null;
+  /** Series only: the day the newest episode was first shown. */
+  lastAirDate: string | null;
+  /** The cast in order, then the crew in order. */
+  credits: CreditView[];
   trailerAsset: AssetRef | null;
   /** Where the details were imported from. Null for a title typed by hand. */
   metadata: TitleMetadataRef | null;
@@ -184,12 +267,53 @@ export interface TitleDetail extends TitleSummary {
 }
 
 export type EpisodeRecord = Episode & { asset: Asset | null; still: Image | null };
-export type SeasonRecord = Season & { episodes: EpisodeRecord[] };
+export type SeasonRecord = Season & { poster: Image | null; episodes: EpisodeRecord[] };
+export type CreditRecord = Credit & { person: Person & { portrait: Image | null } };
+
+/** A date of the database that stands for a day, as "1999-03-31". */
+export function toDay(date: Date | null): string | null {
+  return date ? date.toISOString().slice(0, 10) : null;
+}
+
+export function toPersonRef(
+  person: Person & { portrait: Image | null },
+  mediaBaseUrl: string,
+): PersonRef {
+  return {
+    id: person.id,
+    slug: person.slug,
+    name: person.name,
+    portrait: person.portrait ? toImageView(person.portrait, mediaBaseUrl) : null,
+  };
+}
+
+/** The cast in order, then the crew in order. */
+export function toCreditViews(
+  credits: readonly CreditRecord[],
+  mediaBaseUrl: string,
+): CreditView[] {
+  return [...credits]
+    .sort((a, b) => (a.kind === b.kind ? a.position - b.position : a.kind === 'CAST' ? -1 : 1))
+    .map((credit) => ({
+      id: credit.id,
+      kind: credit.kind,
+      role: credit.role,
+      person: toPersonRef(credit.person, mediaBaseUrl),
+    }));
+}
+
+function sortedGenres(links: { genre: Genre }[]): { id: string; name: string }[] {
+  return links
+    .map((link) => link.genre)
+    .sort((a, b) => a.name.localeCompare(b.name))
+    .map((genre) => ({ id: genre.id, name: genre.name }));
+}
 
 export type TitleSummaryRecord = Title & {
   poster: Image | null;
   asset: Asset | null;
   categories: { category: Category }[];
+  genres: { genre: Genre }[];
   packages: PackageLink[];
   seasons: { _count: { episodes: number } }[];
 };
@@ -201,6 +325,8 @@ export type TitleDetailRecord = Title & {
   asset: Asset | null;
   trailerAsset: Asset | null;
   categories: { category: Category }[];
+  genres: { genre: Genre }[];
+  credits: CreditRecord[];
   packages: PackageLink[];
   seasons: SeasonRecord[];
 };
@@ -214,6 +340,8 @@ export function toEpisodeView(episode: EpisodeRecord, mediaBaseUrl: string): Epi
     synopsis: episode.synopsis,
     status: episode.status,
     publishedAt: episode.publishedAt,
+    airDate: toDay(episode.airDate),
+    runtimeMinutes: episode.runtimeMinutes,
     asset: toAssetRef(episode.asset),
     still: episode.still ? toImageView(episode.still, mediaBaseUrl) : null,
   };
@@ -239,6 +367,7 @@ export function toTitleSummary(
   title: TitleSummaryRecord,
   mediaBaseUrl: string,
   isVisible: boolean,
+  readyEpisodeCount = 0,
 ): TitleSummary {
   return {
     id: title.id,
@@ -254,11 +383,17 @@ export function toTitleSummary(
     buyAmount: title.buyAmount,
     purchaseOnly: title.purchaseOnly,
     poster: title.poster ? toImageView(title.poster, mediaBaseUrl) : null,
+    releaseDate: toDay(title.releaseDate),
+    runtimeMinutes: title.runtimeMinutes,
+    rating: title.rating,
+    seriesStatus: title.type === 'SERIES' ? title.seriesStatus : null,
+    genres: sortedGenres(title.genres),
     categories: sortedCategories(title.categories),
     packages: sortedPackages(title.packages),
     asset: title.type === 'MOVIE' ? toAssetRef(title.asset) : null,
     seasonCount: title.seasons.length,
     episodeCount: title.seasons.reduce((total, season) => total + season._count.episodes, 0),
+    readyEpisodeCount,
     isVisible,
     createdAt: title.createdAt,
     updatedAt: title.updatedAt,
@@ -333,6 +468,8 @@ export function toTitleDetail(title: TitleDetailRecord, mediaBaseUrl: string): T
       number: season.number,
       name: season.name,
       synopsis: season.synopsis,
+      airDate: toDay(season.airDate),
+      poster: image(season.poster),
       episodes: [...season.episodes]
         .sort((a, b) => a.number - b.number)
         .map((episode) => toEpisodeView(episode, mediaBaseUrl)),
@@ -359,6 +496,18 @@ export function toTitleDetail(title: TitleDetailRecord, mediaBaseUrl: string): T
     poster: image(title.poster),
     backdrop: image(title.backdrop),
     logo: image(title.logo),
+    releaseDate: toDay(title.releaseDate),
+    runtimeMinutes: title.runtimeMinutes,
+    rating: title.rating,
+    ratingCount: title.ratingCount,
+    seriesStatus: title.type === 'SERIES' ? title.seriesStatus : null,
+    lastAirDate: title.type === 'SERIES' ? toDay(title.lastAirDate) : null,
+    countries: title.countries,
+    studios: title.studios,
+    keywords: title.keywords,
+    imdbId: title.imdbId,
+    genres: sortedGenres(title.genres),
+    credits: toCreditViews(title.credits, mediaBaseUrl),
     categories: sortedCategories(title.categories),
     packages: sortedPackages(title.packages),
     asset: title.type === 'MOVIE' ? toAssetRef(title.asset) : null,
@@ -374,6 +523,11 @@ export function toTitleDetail(title: TitleDetailRecord, mediaBaseUrl: string): T
         : null,
     seasonCount: seasons.length,
     episodeCount: seasons.reduce((total, season) => total + season.episodes.length, 0),
+    readyEpisodeCount: title.seasons.reduce(
+      (total, season) =>
+        total + season.episodes.filter((episode) => isPlayable(episode.asset)).length,
+      0,
+    ),
     isVisible: isTitleVisible(title),
     seasons,
     checklist: buildChecklist(title),

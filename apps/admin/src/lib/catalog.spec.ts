@@ -1,7 +1,25 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 import { describe, expect, it } from 'vitest';
 import type { TitleDetail } from '@/api/types';
-import { changedFields, describeContent, priceProblem, toForm } from './catalog';
+import {
+  changedFields,
+  countStates,
+  creditsProblem,
+  describeContent,
+  episodeState,
+  factsProblem,
+  formatRating,
+  formatRuntime,
+  parseList,
+  priceProblem,
+  sectionPath,
+  sharedSearch,
+  titlePath,
+  toCreditInputs,
+  toForm,
+  videoProgress,
+  yearsOf,
+} from './catalog';
 
 const title: TitleDetail = {
   id: 't1',
@@ -25,6 +43,19 @@ const title: TitleDetail = {
   asset: null,
   seasonCount: 0,
   episodeCount: 0,
+  readyEpisodeCount: 0,
+  releaseDate: null,
+  runtimeMinutes: null,
+  rating: null,
+  seriesStatus: null,
+  genres: [{ id: 'g1', name: 'Thriller' }],
+  countries: ['DE'],
+  studios: ['Nachtfilm'],
+  keywords: ['train', 'night'],
+  imdbId: null,
+  ratingCount: null,
+  lastAirDate: null,
+  credits: [],
   isVisible: false,
   createdAt: '2026-11-20T10:00:00.000Z',
   updatedAt: '2026-11-20T10:00:00.000Z',
@@ -138,5 +169,157 @@ describe('access', () => {
     const paid = toForm({ ...title, access: 'PAID' });
     expect(paid.isPaid).toBe(true);
     expect(changedFields(paid, { ...paid, isPaid: false })).toEqual({ access: 'FREE' });
+  });
+});
+
+describe('sections', () => {
+  it('sends a movie and a series to their own addresses', () => {
+    expect(titlePath({ id: 't1', type: 'MOVIE' })).toBe('/movies/t1');
+    expect(titlePath({ id: 't2', type: 'SERIES' })).toBe('/series/t2');
+    expect(sectionPath('SERIES')).toBe('/series');
+  });
+
+  it('carries only the filters both sections know to the other one', () => {
+    expect(
+      sharedSearch('?category=c1&q=night&page=3&sort=rating&running=ENDED&video=missing'),
+    ).toBe('?q=night&category=c1');
+    expect(sharedSearch('?page=2')).toBe('');
+    expect(sharedSearch('')).toBe('');
+  });
+});
+
+describe('facts', () => {
+  const saved = toForm(title);
+
+  it('writes lengths and ratings for reading', () => {
+    expect(formatRuntime(136)).toBe('2 h 16 min');
+    expect(formatRuntime(48)).toBe('48 min');
+    expect(formatRuntime(120)).toBe('2 h');
+    expect(formatRuntime(null)).toBe('–');
+    expect(formatRating(8)).toBe('8.0');
+    expect(formatRating(null)).toBe('–');
+  });
+
+  it('reads a typed list once per entry', () => {
+    expect(parseList(' heist, Train ,heist\n night ,, ')).toEqual(['heist', 'Train', 'night']);
+  });
+
+  it('sends facts that changed, with countries in capitals', () => {
+    expect(
+      changedFields(saved, {
+        ...saved,
+        releaseDate: '2024-03-14',
+        runtimeMinutes: '112',
+        countries: 'de, fr',
+        keywords: 'train, night, heist',
+        imdbId: ' tt1234567 ',
+        genreIds: ['g1', 'g2'],
+      }),
+    ).toEqual({
+      releaseDate: '2024-03-14',
+      runtimeMinutes: 112,
+      countries: ['DE', 'FR'],
+      keywords: ['train', 'night', 'heist'],
+      imdbId: 'tt1234567',
+      genreIds: ['g1', 'g2'],
+    });
+  });
+
+  it('leaves lists alone when only their spacing changed', () => {
+    expect(changedFields(saved, { ...saved, keywords: 'train ,night', countries: 'DE,' })).toEqual(
+      {},
+    );
+  });
+
+  it('clears facts that were emptied', () => {
+    const before = toForm({ ...title, releaseDate: '2024-03-14', runtimeMinutes: 112 });
+    expect(changedFields(before, { ...before, releaseDate: '', runtimeMinutes: '' })).toEqual({
+      releaseDate: null,
+      runtimeMinutes: null,
+    });
+  });
+
+  it('names what is wrong with the facts', () => {
+    expect(factsProblem(saved)).toBeNull();
+    expect(factsProblem({ ...saved, runtimeMinutes: '1h' })).toContain('whole minutes');
+    expect(factsProblem({ ...saved, countries: 'Germany' })).toContain('two letters');
+    expect(factsProblem({ ...saved, imdbId: '133093' })).toContain('tt0133093');
+  });
+
+  it('writes the years of a series by its state', () => {
+    const series = { releaseYear: 2019, seriesStatus: 'ENDED', lastAirDate: '2023-05-28' } as const;
+    expect(yearsOf(series)).toBe('2019–2023');
+    expect(yearsOf({ ...series, seriesStatus: 'RUNNING' })).toBe('2019–');
+    expect(yearsOf({ ...series, lastAirDate: '2019-12-01' })).toBe('2019');
+    expect(yearsOf({ ...series, releaseYear: null })).toBe('');
+  });
+});
+
+describe('episodes', () => {
+  const video = (status: 'READY' | 'PROCESSING' | 'FAILED') => ({
+    id: 'a1',
+    title: 'Video',
+    status,
+    durationMs: 1000,
+    height: 1080,
+    playable: status === 'READY',
+  });
+
+  it('tells where an episode stands', () => {
+    expect(episodeState({ status: 'DRAFT', asset: null })).toBe('empty');
+    expect(episodeState({ status: 'DRAFT', asset: video('PROCESSING') })).toBe('working');
+    expect(episodeState({ status: 'DRAFT', asset: video('FAILED') })).toBe('failed');
+    expect(episodeState({ status: 'DRAFT', asset: video('READY') })).toBe('ready');
+    expect(episodeState({ status: 'PUBLISHED', asset: video('READY') })).toBe('published');
+  });
+
+  it('counts the states in the order they are explained', () => {
+    expect(
+      countStates([
+        { status: 'DRAFT', asset: null },
+        { status: 'PUBLISHED', asset: video('READY') },
+        { status: 'DRAFT', asset: null },
+      ]),
+    ).toEqual([
+      ['published', 1],
+      ['empty', 2],
+    ]);
+  });
+
+  it('says how much of a series has its video', () => {
+    expect(videoProgress({ episodeCount: 0, readyEpisodeCount: 0 }).label).toBe('No episodes yet');
+    expect(videoProgress({ episodeCount: 8, readyEpisodeCount: 6 })).toEqual({
+      percent: 75,
+      label: '6 of 8 episodes have a video',
+      complete: false,
+    });
+    expect(videoProgress({ episodeCount: 1, readyEpisodeCount: 1 }).label).toBe(
+      'All 1 episode has a video',
+    );
+  });
+});
+
+describe('credits', () => {
+  const person = { id: 'p1', slug: 'ana', name: 'Ana', portrait: null };
+
+  it('saves credits with trimmed parts and no empty ones', () => {
+    expect(
+      toCreditInputs([
+        { kind: 'CAST', role: ' Mara ', person },
+        { kind: 'CREW', role: '  ', person },
+      ]),
+    ).toEqual([
+      { personId: 'p1', kind: 'CAST', role: 'Mara' },
+      { personId: 'p1', kind: 'CREW', role: null },
+    ]);
+  });
+
+  it('refuses the same person twice with the same part', () => {
+    const twice = [
+      { personId: 'p1', kind: 'CREW', role: 'Director' },
+      { personId: 'p1', kind: 'CREW', role: 'director' },
+    ] as const;
+    expect(creditsProblem(twice)).toContain('twice');
+    expect(creditsProblem([twice[0], { ...twice[1], role: 'Writer' }])).toBeNull();
   });
 });

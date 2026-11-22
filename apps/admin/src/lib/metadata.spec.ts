@@ -6,6 +6,9 @@ import { describeReport, describeSeasons, languageOptions, sourceUrl } from './m
 const NOTHING: ImportReport = {
   fields: [],
   categoriesCreated: [],
+  genresCreated: [],
+  peopleCreated: 0,
+  credits: 0,
   seasonsCreated: 0,
   episodesCreated: 0,
   episodesUpdated: 0,

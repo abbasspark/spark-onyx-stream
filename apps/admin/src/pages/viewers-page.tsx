@@ -73,6 +73,7 @@ import { ViewerPayments } from '@/components/viewer-payments';
 import { ViewerPurchases } from '@/components/viewer-purchases';
 import { ViewerSubscription } from '@/components/viewer-subscription';
 import { useAddressParams } from '@/lib/address-params';
+import { titlePath } from '@/lib/catalog';
 import { cn } from '@/lib/cn';
 import { formatDateTime, formatRelative, humanize } from '@/lib/format';
 import {
@@ -1109,7 +1110,7 @@ function DetailSheet({
                           <div className="min-w-0 flex-1 text-sm">
                             <div className="flex items-baseline justify-between gap-3">
                               <Link
-                                to={`/titles/${item.title.id}`}
+                                to={titlePath(item.title)}
                                 className="truncate font-medium underline-offset-4 hover:underline"
                               >
                                 {item.title.name}

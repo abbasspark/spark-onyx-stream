@@ -144,7 +144,16 @@ export class ImagesService {
     const image = await this.prisma.image.findUnique({
       where: { id },
       include: {
-        _count: { select: { posterOf: true, backdropOf: true, logoOf: true, stillOf: true } },
+        _count: {
+          select: {
+            posterOf: true,
+            backdropOf: true,
+            logoOf: true,
+            stillOf: true,
+            seasonPosterOf: true,
+            portraitOf: true,
+          },
+        },
       },
     });
     if (!image) {
@@ -152,7 +161,7 @@ export class ImagesService {
     }
     const uses = Object.values(image._count).reduce((total, count) => total + count, 0);
     if (uses > 0) {
-      throw new ConflictException('The picture is still used by a title or an episode');
+      throw new ConflictException('The picture is still in use');
     }
 
     const driver = await this.storage.getDriver(image.storagePoolId);

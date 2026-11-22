@@ -511,6 +511,17 @@ enum TitleType {
   SERIES
 }
 
+enum SeriesStatus {
+  /// Announced, with nothing shown yet.
+  UPCOMING
+  /// More episodes are to come.
+  RUNNING
+  /// The story is told. No more episodes.
+  ENDED
+  /// Stopped before its end.
+  CANCELLED
+}
+
 enum PublishStatus {
   /// Being prepared. Only admins see it.
   DRAFT
@@ -529,6 +540,8 @@ enum ImageKind {
   STILL
   /// The title as a transparent logo.
   LOGO
+  /// A picture of a person.
+  PORTRAIT
 }
 
 /// A picture uploaded for the catalog. Served without a token, because
@@ -548,20 +561,22 @@ model Image {
   createdById   String?     @db.Uuid
   createdAt     DateTime    @default(now())
 
-  posterOf   Title[]   @relation("TitlePoster")
-  backdropOf Title[]   @relation("TitleBackdrop")
-  logoOf     Title[]   @relation("TitleLogo")
-  stillOf    Episode[]
+  posterOf       Title[]   @relation("TitlePoster")
+  backdropOf     Title[]   @relation("TitleBackdrop")
+  logoOf         Title[]   @relation("TitleLogo")
+  stillOf        Episode[]
+  seasonPosterOf Season[]
+  portraitOf     Person[]
 
   @@map("images")
 }
 
 /// A movie or a series as viewers see it.
 model Title {
-  id               String      @id @default(uuid(7)) @db.Uuid
+  id               String        @id @default(uuid(7)) @db.Uuid
   type             TitleType
   /// Part of the web address, for example "the-long-road". Unique.
-  slug             String      @unique
+  slug             String        @unique
   name             String
   originalName     String?
   tagline          String?
@@ -571,16 +586,35 @@ model Title {
   ageRating        String?
   /// Language code of the original audio, for example "en".
   originalLanguage String?
+  /// The day of the premiere: in cinemas for a movie, the first episode for a series.
+  releaseDate      DateTime?     @db.Date
+  /// Movies: the length of the film. Series: the usual length of an episode. In minutes.
+  runtimeMinutes   Int?
+  /// Where it was made, as ISO 3166 codes such as "US".
+  countries        String[]      @default([])
+  /// The companies that made it.
+  studios          String[]      @default([])
+  /// Words it can be found by, beyond its name and genres.
+  keywords         String[]      @default([])
+  /// The id at IMDb, such as "tt0133093".
+  imdbId           String?
+  /// What the audience of the metadata source thinks of it, from 0 to 10, and how many voted.
+  rating           Float?
+  ratingCount      Int?
+  /// Series only: whether more episodes are to come.
+  seriesStatus     SeriesStatus?
+  /// Series only: the day the newest episode was first shown.
+  lastAirDate      DateTime?     @db.Date
   /// Shown in prominent places of the viewer site.
-  isFeatured       Boolean     @default(false)
+  isFeatured       Boolean       @default(false)
   /// Who may watch: everyone the installation lets watch, or only subscribers.
-  access           TitleAccess @default(FREE)
+  access           TitleAccess   @default(FREE)
   /// What renting and buying the title costs, in the smallest unit of the
   /// installation's currency. Empty means it is not rented or not sold.
   rentAmount       Int?
   buyAmount        Int?
   /// Set when no subscription opens the title: it is watched by renting or buying only.
-  purchaseOnly     Boolean     @default(false)
+  purchaseOnly     Boolean       @default(false)
 
   status      PublishStatus @default(DRAFT)
   publishedAt DateTime?
@@ -611,6 +645,8 @@ model Title {
   updatedAt   DateTime @updatedAt
 
   categories TitleCategory[]
+  genres     TitleGenre[]
+  credits    Credit[]
   packages   TitlePackage[]
   purchases  Purchase[]
   payments   Payment[]
@@ -618,6 +654,7 @@ model Title {
   watching   WatchProgress[]
 
   @@index([type, status])
+  @@index([type, releaseDate])
   @@index([metadataSource, metadataId])
   @@index([status, publishedAt])
   @@index([createdAt])
@@ -652,14 +689,92 @@ model TitleCategory {
   @@map("title_categories")
 }
 
+/// What kind of story a title is: drama, comedy, documentary. Genres come with
+/// the details of a title. Categories are the shelves an admin arranges by hand.
+model Genre {
+  id        String   @id @default(uuid(7)) @db.Uuid
+  slug      String   @unique
+  name      String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  titles TitleGenre[]
+
+  @@map("genres")
+}
+
+model TitleGenre {
+  titleId String @db.Uuid
+  title   Title  @relation(fields: [titleId], references: [id], onDelete: Cascade)
+  genreId String @db.Uuid
+  genre   Genre  @relation(fields: [genreId], references: [id], onDelete: Cascade)
+
+  @@id([titleId, genreId])
+  @@index([genreId])
+  @@map("title_genres")
+}
+
+/// Someone who appears in titles or made them.
+model Person {
+  id             String  @id @default(uuid(7)) @db.Uuid
+  slug           String  @unique
+  name           String
+  /// What they are mostly known as: "Acting", "Directing".
+  knownFor       String?
+  biography      String?
+  /// The id at the metadata source, so an import finds the person again.
+  metadataSource String?
+  metadataId     String?
+  portraitId     String? @db.Uuid
+  portrait       Image?  @relation(fields: [portraitId], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  credits Credit[]
+
+  @@unique([metadataSource, metadataId])
+  @@index([name])
+  @@map("people")
+}
+
+enum CreditKind {
+  /// In front of the camera, or a voice.
+  CAST
+  /// Behind it.
+  CREW
+}
+
+/// The part one person had in one title.
+model Credit {
+  id       String     @id @default(uuid(7)) @db.Uuid
+  titleId  String     @db.Uuid
+  title    Title      @relation(fields: [titleId], references: [id], onDelete: Cascade)
+  personId String     @db.Uuid
+  person   Person     @relation(fields: [personId], references: [id], onDelete: Cascade)
+  kind     CreditKind
+  /// Cast: the character played. Crew: the job, such as "Director".
+  role     String?
+  /// Where in the list the credit stands, lowest first, within its kind.
+  position Int        @default(0)
+
+  @@index([titleId, kind, position])
+  @@index([personId])
+  @@map("credits")
+}
+
 model Season {
-  id       String  @id @default(uuid(7)) @db.Uuid
-  titleId  String  @db.Uuid
-  title    Title   @relation(fields: [titleId], references: [id], onDelete: Cascade)
+  id       String    @id @default(uuid(7)) @db.Uuid
+  titleId  String    @db.Uuid
+  title    Title     @relation(fields: [titleId], references: [id], onDelete: Cascade)
   /// Season number as shown to viewers. 0 is used for specials.
   number   Int
   name     String?
   synopsis String?
+  /// The day its first episode was first shown.
+  airDate  DateTime? @db.Date
+  posterId String?   @db.Uuid
+  poster   Image?    @relation(fields: [posterId], references: [id], onDelete: SetNull)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -671,12 +786,15 @@ model Season {
 }
 
 model Episode {
-  id       String  @id @default(uuid(7)) @db.Uuid
-  seasonId String  @db.Uuid
-  season   Season  @relation(fields: [seasonId], references: [id], onDelete: Cascade)
-  number   Int
-  name     String
-  synopsis String?
+  id             String    @id @default(uuid(7)) @db.Uuid
+  seasonId       String    @db.Uuid
+  season         Season    @relation(fields: [seasonId], references: [id], onDelete: Cascade)
+  number         Int
+  name           String
+  synopsis       String?
+  /// The day it was first shown.
+  airDate        DateTime? @db.Date
+  runtimeMinutes Int?
 
   assetId String? @db.Uuid
   asset   Asset?  @relation(fields: [assetId], references: [id], onDelete: SetNull)

@@ -44,6 +44,17 @@ export function formatDateTime(iso: string | null | undefined): string {
   return Number.isNaN(date.getTime()) ? '–' : dateTime.format(date);
 }
 
+const day = new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeZone: 'UTC' });
+
+/** Formats a calendar day such as "2021-09-05" for reading. The day stays the same in every time zone. */
+export function formatDay(value: string | null | undefined): string {
+  if (!value || !/^\d{4}-\d{2}-\d{2}/.test(value)) {
+    return '–';
+  }
+  const date = new Date(`${value.slice(0, 10)}T00:00:00Z`);
+  return Number.isNaN(date.getTime()) ? '–' : day.format(date);
+}
+
 /** Turns an API constant such as "AES_128" into "Aes 128" for display. */
 export function humanize(constant: string | null | undefined): string {
   if (!constant) {

@@ -1,11 +1,19 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 import type { TitleType } from '@onyx/database';
 import type {
+  ImportedCredit,
+  ImportedFacts,
   ImportedSeasonSummary,
   ImportedTitle,
   MetadataSearchResult,
 } from './metadata.types.js';
-import type { TmdbDetails, TmdbEpisode, TmdbImage, TmdbSearchItem } from './tmdb.types.js';
+import type {
+  TmdbCredit,
+  TmdbDetails,
+  TmdbEpisode,
+  TmdbImage,
+  TmdbSearchItem,
+} from './tmdb.types.js';
 
 export type TmdbKind = 'movie' | 'tv';
 
@@ -91,6 +99,207 @@ export function yearOf(date: unknown): number | null {
   return Number.isInteger(year) && year >= 1888 && year <= 2200 ? year : null;
 }
 
+/** A date such as "1999-03-31" that is a real day, or null. */
+export function dateOf(date: unknown): string | null {
+  if (typeof date !== 'string' || yearOf(date) === null) {
+    return null;
+  }
+  const parsed = new Date(`${date}T00:00:00Z`);
+  return !Number.isNaN(parsed.getTime()) && parsed.toISOString().slice(0, 10) === date
+    ? date
+    : null;
+}
+
+/** Minutes of a film or of an episode, when the figure makes sense. */
+export function minutesOf(value: unknown): number | null {
+  return typeof value === 'number' && Number.isInteger(value) && value > 0 && value <= 1500
+    ? value
+    : null;
+}
+
+/** Cleans a list of names: trimmed, without repeats, and no more than a limit. */
+function namesOf(values: readonly unknown[], maxLength: number, limit: number): string[] {
+  const seen = new Set<string>();
+  const names: string[] = [];
+  for (const value of values) {
+    const name = cleanText(value, maxLength);
+    if (name && !seen.has(name.toLowerCase())) {
+      seen.add(name.toLowerCase());
+      names.push(name);
+    }
+  }
+  return names.slice(0, limit);
+}
+
+const SERIES_STATUS: Record<string, NonNullable<ImportedFacts['seriesStatus']>> = {
+  'returning series': 'RUNNING',
+  ended: 'ENDED',
+  canceled: 'CANCELLED',
+  cancelled: 'CANCELLED',
+  'in production': 'UPCOMING',
+  planned: 'UPCOMING',
+  pilot: 'UPCOMING',
+};
+
+/** The facts of a title that are not text: dates, length, where and by whom it was made. */
+export function factsOf(kind: TmdbKind, details: TmdbDetails): ImportedFacts {
+  const votes =
+    typeof details.vote_count === 'number' && details.vote_count > 0 ? details.vote_count : 0;
+  const rating =
+    votes > 0 && typeof details.vote_average === 'number' && details.vote_average > 0
+      ? Math.round(Math.min(10, details.vote_average) * 10) / 10
+      : null;
+  // A movie carries its IMDb id itself; a series has it among its external ids only.
+  const imdbId =
+    kind === 'movie'
+      ? (details.imdb_id ?? details.external_ids?.imdb_id)
+      : details.external_ids?.imdb_id;
+  const keywords = kind === 'movie' ? details.keywords?.keywords : details.keywords?.results;
+  return {
+    releaseDate: dateOf(kind === 'movie' ? details.release_date : details.first_air_date),
+    runtimeMinutes:
+      kind === 'movie'
+        ? minutesOf(details.runtime)
+        : minutesOf(details.episode_run_time?.find((minutes) => minutesOf(minutes) !== null)),
+    countries: (details.production_countries ?? [])
+      .map((country) => country.iso_3166_1)
+      .filter((code): code is string => typeof code === 'string' && /^[A-Z]{2}$/.test(code))
+      .filter((code, index, all) => all.indexOf(code) === index)
+      .slice(0, 8),
+    studios: namesOf(
+      (details.production_companies ?? []).map((company) => company.name),
+      120,
+      8,
+    ),
+    keywords: namesOf(
+      (keywords ?? []).map((keyword) => keyword.name),
+      60,
+      30,
+    ),
+    imdbId: typeof imdbId === 'string' && /^tt\d{6,10}$/.test(imdbId) ? imdbId : null,
+    rating,
+    ratingCount: rating === null ? null : Math.round(votes),
+    seriesStatus:
+      kind === 'tv' && typeof details.status === 'string'
+        ? (SERIES_STATUS[details.status.toLowerCase()] ?? null)
+        : null,
+    lastAirDate: kind === 'tv' ? dateOf(details.last_air_date) : null,
+  };
+}
+
+/** How many of the cast are taken. Beyond that come the extras nobody looks for. */
+export const MAX_CAST = 20;
+/**
+ * The jobs behind the camera that are taken, in the order they are listed.
+ * A film has hundreds of crew. These are the ones people look titles up by.
+ */
+const CREW_JOBS = [
+  'Creator',
+  'Director',
+  'Screenplay',
+  'Writer',
+  'Story',
+  'Novel',
+  'Producer',
+  'Executive Producer',
+  'Director of Photography',
+  'Original Music Composer',
+  'Editor',
+] as const;
+/** At most this many people per job, so a series with thirty producers does not fill the page. */
+const MAX_PER_JOB = 4;
+
+function personOf(
+  credit: TmdbCredit,
+): Pick<ImportedCredit, 'personId' | 'name' | 'portrait' | 'knownFor'> | null {
+  const name = cleanText(credit.name, 200);
+  if (!Number.isInteger(credit.id) || (credit.id as number) <= 0 || !name) {
+    return null;
+  }
+  return {
+    personId: credit.id as number,
+    name,
+    portrait: safeImagePath(credit.profile_path),
+    knownFor: cleanText(credit.known_for_department, 60),
+  };
+}
+
+/**
+ * The people of a title: the first of the cast in the order of the source,
+ * then the crew that matters, job by job.
+ *
+ * A series lists everyone over all its seasons. An actor is given the
+ * character they played in the most episodes, and a job goes to those who
+ * did it for the most episodes.
+ */
+export function creditsOf(kind: TmdbKind, details: TmdbDetails): ImportedCredit[] {
+  const source = kind === 'movie' ? details.credits : details.aggregate_credits;
+  const credits: ImportedCredit[] = [];
+
+  const cast = [...(source?.cast ?? [])].sort(
+    (a, b) => (a.order ?? Number.MAX_SAFE_INTEGER) - (b.order ?? Number.MAX_SAFE_INTEGER),
+  );
+  const seenCast = new Set<number>();
+  for (const entry of cast) {
+    const person = personOf(entry);
+    if (!person || seenCast.has(person.personId)) {
+      continue;
+    }
+    const mainRole = [...(entry.roles ?? [])].sort(
+      (a, b) => (b.episode_count ?? 0) - (a.episode_count ?? 0),
+    )[0]?.character;
+    seenCast.add(person.personId);
+    credits.push({
+      ...person,
+      kind: 'CAST',
+      role: cleanText(kind === 'movie' ? entry.character : mainRole, 200),
+    });
+    if (seenCast.size >= MAX_CAST) {
+      break;
+    }
+  }
+
+  // Everyone with the jobs they had, and for how many episodes.
+  const crew: { person: NonNullable<ReturnType<typeof personOf>>; job: string; weight: number }[] =
+    [];
+  for (const entry of details.created_by ?? []) {
+    const person = personOf(entry);
+    if (person) {
+      crew.push({ person, job: 'Creator', weight: Number.MAX_SAFE_INTEGER });
+    }
+  }
+  for (const entry of source?.crew ?? []) {
+    const person = personOf(entry);
+    if (!person) {
+      continue;
+    }
+    const jobs = kind === 'movie' ? [{ job: entry.job, episode_count: 1 }] : (entry.jobs ?? []);
+    for (const { job, episode_count: episodes } of jobs) {
+      if (typeof job === 'string') {
+        crew.push({ person, job, weight: episodes ?? 0 });
+      }
+    }
+  }
+  for (const job of CREW_JOBS) {
+    const seen = new Set<number>();
+    const holders = crew
+      .filter((entry) => entry.job === job)
+      // A stable sort: among equals the order of the source stays.
+      .sort((a, b) => b.weight - a.weight);
+    for (const { person } of holders) {
+      if (seen.has(person.personId)) {
+        continue;
+      }
+      seen.add(person.personId);
+      credits.push({ ...person, kind: 'CREW', role: job });
+      if (seen.size >= MAX_PER_JOB) {
+        break;
+      }
+    }
+  }
+  return credits;
+}
+
 /** A language code the catalog accepts, or null. TMDB uses "xx" for "no language". */
 export function languageOf(code: unknown): string | null {
   return typeof code === 'string' && /^[a-z]{2,3}$/.test(code) && code !== 'xx' ? code : null;
@@ -147,6 +356,8 @@ export function seasonsOf(details: TmdbDetails): ImportedSeasonSummary[] {
       number: season.season_number as number,
       name: seasonNameOf(season.name, season.season_number as number),
       episodeCount: season.episode_count as number,
+      airDate: dateOf(season.air_date),
+      poster: safeImagePath(season.poster_path),
     }))
     .sort((a, b) => a.number - b.number);
 }
@@ -208,6 +419,8 @@ export function toImportedTitle(
       logo: pickLogo(details.images?.logos, options.language),
     },
     seasons: kind === 'tv' ? seasonsOf(details) : [],
+    ...factsOf(kind, details),
+    credits: creditsOf(kind, details),
   };
 }
 
@@ -216,6 +429,9 @@ export interface ImportedEpisode {
   name: string;
   synopsis: string | null;
   still: string | null;
+  /** The day it was first shown, as "2021-09-05". */
+  airDate: string | null;
+  runtimeMinutes: number | null;
 }
 
 /** The episodes of a season that have a number, in order, each number once. */
@@ -232,6 +448,8 @@ export function episodesOf(episodes: readonly TmdbEpisode[] | undefined): Import
         name: cleanText(episode.name, 200) ?? `Episode ${number}`,
         synopsis: cleanLongText(episode.overview, 5000),
         still: safeImagePath(episode.still_path),
+        airDate: dateOf(episode.air_date),
+        runtimeMinutes: minutesOf(episode.runtime),
       });
     }
   }

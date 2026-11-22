@@ -11,7 +11,7 @@ import {
 import { type ImageKind, type Prisma, PrismaClient } from '@onyx/database';
 import { CategoriesService } from '../catalog/categories.service.js';
 import { ImagesService, MAX_IMAGE_BYTES } from '../catalog/images.service.js';
-import { slugify } from '../catalog/slug.js';
+import { slugify, uniqueSlug } from '../catalog/slug.js';
 import { TitlesService } from '../catalog/titles.service.js';
 import { AppConfig } from '../config/app-config.js';
 import type {
@@ -22,6 +22,8 @@ import type {
   SearchMetadataInput,
 } from './metadata.schemas.js';
 import {
+  type ImportedCredit,
+  type ImportedFacts,
   type ImportedText,
   type ImportedTitle,
   type ImportReport,
@@ -57,6 +59,7 @@ const SIZES: Record<ImageKind, readonly string[]> = {
   BACKDROP: ['original', 'w1280'],
   LOGO: ['original', 'w500'],
   STILL: ['original', 'w300'],
+  PORTRAIT: ['h632', 'w185'],
 };
 
 const TEXT_FIELDS = [
@@ -73,6 +76,9 @@ function emptyReport(): ImportReport {
   return {
     fields: [],
     categoriesCreated: [],
+    genresCreated: [],
+    peopleCreated: 0,
+    credits: 0,
     seasonsCreated: 0,
     episodesCreated: 0,
     episodesUpdated: 0,
@@ -142,10 +148,14 @@ export class MetadataService {
     const language = input.language ?? this.config.metadataLanguage;
     const imported = await this.fetchTitle(input.id, language);
     const categories = await this.categoryIndex();
-    const { artwork, genres, seasons, ...rest } = imported;
+    const { artwork, genres, seasons, credits, ...rest } = imported;
+    const cast = credits.filter((credit) => credit.kind === 'CAST');
     return {
       ...rest,
       language,
+      cast: cast.length,
+      crew: credits.length - cast.length,
+      leads: cast.slice(0, 4).map((credit) => credit.name),
       genres: genres.map((name) => ({
         name,
         categoryId: categories.get(slugify(name)) ?? null,
@@ -254,6 +264,10 @@ export class MetadataService {
       }
     }
 
+    if (parts.text) {
+      Object.assign(data, factsChange(title, imported, overwrite, report));
+    }
+
     if (parts.artwork) {
       const wanted: [field: 'posterId' | 'backdropId' | 'logoId', ImageKind, string | null][] = [
         ['posterId', 'POSTER', imported.artwork.poster],
@@ -280,6 +294,14 @@ export class MetadataService {
     await this.prisma.title.update({ where: { id: titleId }, data });
     await this.removeUnused(replaced);
 
+    if (parts.genres && imported.genres.length > 0) {
+      await this.applyRealGenres(titleId, imported.genres, overwrite, report);
+    }
+
+    if (parts.people && imported.credits.length > 0) {
+      await this.applyCredits(titleId, imported.credits, parts.portraits, overwrite, report);
+    }
+
     if (parts.categories && imported.genres.length > 0) {
       await this.applyGenres(
         titleId,
@@ -294,6 +316,135 @@ export class MetadataService {
       await this.applySeasons(titleId, imported, language, parts, overwrite, report);
     }
     return report;
+  }
+
+  /** Links the title to its genres, creating the ones that are new. */
+  private async applyRealGenres(
+    titleId: string,
+    names: readonly string[],
+    overwrite: boolean,
+    report: ImportReport,
+  ): Promise<void> {
+    const ids: string[] = [];
+    for (const name of names) {
+      const slug = slugify(name);
+      if (!slug) {
+        continue;
+      }
+      let genre = await this.prisma.genre.findFirst({
+        where: { OR: [{ slug }, { name: { equals: name, mode: 'insensitive' } }] },
+        select: { id: true },
+      });
+      if (!genre) {
+        try {
+          genre = await this.prisma.genre.create({ data: { name, slug }, select: { id: true } });
+          report.genresCreated.push(name);
+        } catch {
+          // Created by another import at the same moment.
+          genre = await this.prisma.genre.findUnique({ where: { slug }, select: { id: true } });
+        }
+      }
+      if (genre) {
+        ids.push(genre.id);
+      }
+    }
+    const current = (
+      await this.prisma.titleGenre.findMany({ where: { titleId }, select: { genreId: true } })
+    ).map((link) => link.genreId);
+    const next = [...new Set(overwrite ? ids : [...current, ...ids])];
+    if (next.length === current.length && next.every((id) => current.includes(id))) {
+      return;
+    }
+    await this.prisma.$transaction([
+      this.prisma.titleGenre.deleteMany({ where: { titleId } }),
+      this.prisma.titleGenre.createMany({ data: next.map((genreId) => ({ titleId, genreId })) }),
+    ]);
+    report.fields.push('genres');
+  }
+
+  /**
+   * Writes the cast and crew of a title.
+   *
+   * People are found again by their id at the source, so an actor is one
+   * person however many titles they are in. A list of credits that was made
+   * or changed by hand is left alone unless replacing is asked for.
+   */
+  private async applyCredits(
+    titleId: string,
+    credits: readonly ImportedCredit[],
+    portraits: boolean,
+    overwrite: boolean,
+    report: ImportReport,
+  ): Promise<void> {
+    const existing = await this.prisma.credit.count({ where: { titleId } });
+    if (existing > 0 && !overwrite) {
+      return;
+    }
+
+    const personIds = new Map<number, string>();
+    const wantPortrait: { id: string; path: string }[] = [];
+    for (const credit of credits) {
+      if (personIds.has(credit.personId)) {
+        continue;
+      }
+      const metadataId = String(credit.personId);
+      let person = await this.prisma.person.findUnique({
+        where: { metadataSource_metadataId: { metadataSource: METADATA_SOURCE, metadataId } },
+        select: { id: true, portraitId: true },
+      });
+      if (!person) {
+        const slug = await uniqueSlug(slugify(credit.name), async (value) =>
+          Boolean(
+            await this.prisma.person.findUnique({ where: { slug: value }, select: { id: true } }),
+          ),
+        );
+        try {
+          person = await this.prisma.person.create({
+            data: {
+              name: credit.name,
+              slug,
+              knownFor: credit.knownFor,
+              metadataSource: METADATA_SOURCE,
+              metadataId,
+            },
+            select: { id: true, portraitId: true },
+          });
+          report.peopleCreated += 1;
+        } catch (error) {
+          report.warnings.push(`${credit.name} could not be added`);
+          this.logger.warn(`Adding a person failed: ${(error as Error).message}`);
+          continue;
+        }
+      }
+      personIds.set(credit.personId, person.id);
+      if (portraits && credit.portrait && !person.portraitId) {
+        wantPortrait.push({ id: person.id, path: credit.portrait });
+      }
+    }
+
+    const positions = { CAST: 0, CREW: 0 };
+    const rows = credits
+      .filter((credit) => personIds.has(credit.personId))
+      .map((credit) => ({
+        titleId,
+        personId: personIds.get(credit.personId) as string,
+        kind: credit.kind,
+        role: credit.role,
+        position: positions[credit.kind]++,
+      }));
+    await this.prisma.$transaction([
+      this.prisma.credit.deleteMany({ where: { titleId } }),
+      this.prisma.credit.createMany({ data: rows }),
+    ]);
+    report.credits = rows.length;
+    report.fields.push('credits');
+
+    await inBatches(wantPortrait, DOWNLOADS_AT_ONCE, async ({ id, path }) => {
+      const imageId = await this.fetchPicture('PORTRAIT', path, report, false);
+      if (imageId) {
+        await this.prisma.person.update({ where: { id }, data: { portraitId: imageId } });
+      }
+    });
   }
 
   /** Links the title to the categories named like the genres. */
@@ -352,6 +503,7 @@ export class MetadataService {
     const sourceId = parseMetadataId(imported.id)?.id as number;
     const seasons = imported.seasons.filter((season) => season.number > 0 || parts.specials);
     const stills: { episodeId: string; path: string; replaces: string | null }[] = [];
+    const seasonPosters: { seasonId: string; path: string; replaces: string | null }[] = [];
 
     for (const summary of seasons) {
       let detail;
@@ -369,14 +521,18 @@ export class MetadataService {
         where: { titleId_number: { titleId, number: summary.number } },
         include: { episodes: true },
       });
+      const airDate = toDate(summary.airDate);
       if (!season) {
         season = await this.prisma.season.create({
-          data: { titleId, number: summary.number, name, synopsis },
+          data: { titleId, number: summary.number, name, synopsis, airDate },
           include: { episodes: true },
         });
         report.seasonsCreated += 1;
       } else {
         const change: Prisma.SeasonUpdateInput = {};
+        if (airDate && (overwrite || !season.airDate)) {
+          change.airDate = airDate;
+        }
         if (name && name !== season.name && (overwrite || !season.name)) {
           change.name = name;
         }
@@ -386,6 +542,14 @@ export class MetadataService {
         if (Object.keys(change).length > 0) {
           await this.prisma.season.update({ where: { id: season.id }, data: change });
         }
+      }
+
+      if (summary.poster && parts.artwork && (overwrite || !season.posterId)) {
+        seasonPosters.push({
+          seasonId: season.id,
+          path: summary.poster,
+          replaces: season.posterId,
+        });
       }
 
       const existing = new Map(season.episodes.map((episode) => [episode.number, episode]));
@@ -398,6 +562,8 @@ export class MetadataService {
               number: episode.number,
               name: episode.name,
               synopsis: episode.synopsis,
+              airDate: toDate(episode.airDate),
+              runtimeMinutes: episode.runtimeMinutes,
             },
           });
           report.episodesCreated += 1;
@@ -419,6 +585,15 @@ export class MetadataService {
     }
 
     const replaced: string[] = [];
+    await inBatches(seasonPosters, DOWNLOADS_AT_ONCE, async ({ seasonId, path, replaces }) => {
+      const imageId = await this.fetchPicture('POSTER', path, report, false);
+      if (imageId) {
+        await this.prisma.season.update({ where: { id: seasonId }, data: { posterId: imageId } });
+        if (replaces) {
+          replaced.push(replaces);
+        }
+      }
+    });
     await inBatches(stills, DOWNLOADS_AT_ONCE, async ({ episodeId, path, replaces }) => {
       const imageId = await this.fetchPicture('STILL', path, report, false);
       if (imageId) {
@@ -531,11 +706,32 @@ function episodesOfSeasonSynopsis(overview: unknown): string | null {
 
 /** What an existing episode takes over: what it lacks, or everything when replacing. */
 function episodeChange(
-  current: { name: string; number: number; synopsis: string | null },
+  current: {
+    name: string;
+    number: number;
+    synopsis: string | null;
+    airDate: Date | null;
+    runtimeMinutes: number | null;
+  },
   episode: ImportedEpisode,
   overwrite: boolean,
 ): Prisma.EpisodeUpdateInput {
   const change: Prisma.EpisodeUpdateInput = {};
+  const airDate = toDate(episode.airDate);
+  if (
+    airDate &&
+    airDate.getTime() !== current.airDate?.getTime() &&
+    (overwrite || !current.airDate)
+  ) {
+    change.airDate = airDate;
+  }
+  if (
+    episode.runtimeMinutes &&
+    episode.runtimeMinutes !== current.runtimeMinutes &&
+    (overwrite || !current.runtimeMinutes)
+  ) {
+    change.runtimeMinutes = episode.runtimeMinutes;
+  }
   // A name such as "Episode 3" is a placeholder, typed or imported, and gives way to a real one.
   const placeholder = /^episode \d+$/i.test(current.name);
   const real = !/^episode \d+$/i.test(episode.name);
@@ -548,6 +744,81 @@ function episodeChange(
     (overwrite || !current.synopsis)
   ) {
     change.synopsis = episode.synopsis;
+  }
+  return change;
+}
+
+/** "1999-03-31" as the date the database keeps. */
+function toDate(day: string | null): Date | null {
+  return day ? new Date(`${day}T00:00:00Z`) : null;
+}
+
+type FactsOfTitle = {
+  releaseDate: Date | null;
+  runtimeMinutes: number | null;
+  countries: string[];
+  studios: string[];
+  keywords: string[];
+  imdbId: string | null;
+  seriesStatus: ImportedFacts['seriesStatus'];
+  lastAirDate: Date | null;
+};
+
+/**
+ * The facts a title takes over. What an admin typed stays unless replacing
+ * is asked for. Three things are always brought up to date, because they
+ * describe the world and not the admin's choices: the rating, whether a
+ * series still runs, and when its newest episode was shown.
+ */
+function factsChange(
+  title: FactsOfTitle,
+  imported: ImportedFacts,
+  overwrite: boolean,
+  report: ImportReport,
+): Prisma.TitleUncheckedUpdateInput {
+  const change: Prisma.TitleUncheckedUpdateInput = {};
+  const take = (field: string, value: unknown) => {
+    Object.assign(change, { [field]: value });
+    report.fields.push(field);
+  };
+
+  const releaseDate = toDate(imported.releaseDate);
+  if (
+    releaseDate &&
+    releaseDate.getTime() !== title.releaseDate?.getTime() &&
+    (overwrite || !title.releaseDate)
+  ) {
+    take('releaseDate', releaseDate);
+  }
+  if (
+    imported.runtimeMinutes &&
+    imported.runtimeMinutes !== title.runtimeMinutes &&
+    (overwrite || !title.runtimeMinutes)
+  ) {
+    take('runtimeMinutes', imported.runtimeMinutes);
+  }
+  if (imported.imdbId && imported.imdbId !== title.imdbId && (overwrite || !title.imdbId)) {
+    take('imdbId', imported.imdbId);
+  }
+  for (const field of ['countries', 'studios', 'keywords'] as const) {
+    const value = imported[field];
+    const same =
+      value.length === title[field].length &&
+      value.every((entry, at) => entry === title[field][at]);
+    if (value.length > 0 && !same && (overwrite || title[field].length === 0)) {
+      take(field, value);
+    }
+  }
+
+  if (imported.rating !== null) {
+    Object.assign(change, { rating: imported.rating, ratingCount: imported.ratingCount });
+  }
+  if (imported.seriesStatus && imported.seriesStatus !== title.seriesStatus) {
+    take('seriesStatus', imported.seriesStatus);
+  }
+  const lastAirDate = toDate(imported.lastAirDate);
+  if (lastAirDate && lastAirDate.getTime() !== title.lastAirDate?.getTime()) {
+    take('lastAirDate', lastAirDate);
   }
   return change;
 }

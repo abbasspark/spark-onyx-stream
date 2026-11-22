@@ -29,13 +29,14 @@ import {
   toTitleDetail,
   toTitleSummary,
 } from './catalog.views.js';
-import { isPlayable, VISIBLE_TITLE } from './playable.js';
+import { isPlayable, PLAYABLE_ASSET, VISIBLE_TITLE } from './playable.js';
 import { slugify, uniqueSlug } from './slug.js';
 
 const SUMMARY_INCLUDE = {
   poster: true,
   asset: true,
   categories: { include: { category: true } },
+  genres: { include: { genre: true } },
   packages: { include: { package: { select: { id: true, name: true, position: true } } } },
   seasons: { select: { _count: { select: { episodes: true } } } },
 } satisfies Prisma.TitleInclude;
@@ -47,12 +48,51 @@ const DETAIL_INCLUDE = {
   asset: true,
   trailerAsset: true,
   categories: { include: { category: true } },
+  genres: { include: { genre: true } },
+  credits: { include: { person: { include: { portrait: true } } } },
   packages: { include: { package: { select: { id: true, name: true, position: true } } } },
-  seasons: { include: { episodes: { include: { asset: true, still: true } } } },
+  seasons: { include: { poster: true, episodes: { include: { asset: true, still: true } } } },
 } satisfies Prisma.TitleInclude;
 
 /** Sort fields that can be empty. Titles without a value come last in either direction. */
-const NULLABLE_SORT_FIELDS: readonly ListTitlesInput['sort'][] = ['releaseYear', 'publishedAt'];
+const NULLABLE_SORT_FIELDS: readonly ListTitlesInput['sort'][] = [
+  'releaseYear',
+  'publishedAt',
+  'releaseDate',
+  'rating',
+  'runtimeMinutes',
+];
+
+/** An episode without a video that plays. */
+const EPISODE_WITHOUT_VIDEO = {
+  OR: [{ assetId: null }, { asset: { NOT: PLAYABLE_ASSET } }],
+} satisfies Prisma.EpisodeWhereInput;
+
+/** Titles by whether their video is there. See "video" in the list schema. */
+const VIDEO_FILTER = {
+  ready: {
+    OR: [
+      { type: 'MOVIE', asset: PLAYABLE_ASSET },
+      {
+        type: 'SERIES',
+        seasons: { some: { episodes: { some: {} } } },
+        NOT: { seasons: { some: { episodes: { some: EPISODE_WITHOUT_VIDEO } } } },
+      },
+    ],
+  },
+  missing: {
+    OR: [
+      { type: 'MOVIE', OR: [{ assetId: null }, { asset: { NOT: PLAYABLE_ASSET } }] },
+      {
+        type: 'SERIES',
+        OR: [
+          { seasons: { none: { episodes: { some: {} } } } },
+          { seasons: { some: { episodes: { some: EPISODE_WITHOUT_VIDEO } } } },
+        ],
+      },
+    ],
+  },
+} satisfies Record<'ready' | 'missing', Prisma.TitleWhereInput>;
 
 function isUniqueViolation(error: unknown): boolean {
   return error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002';
@@ -73,7 +113,11 @@ export class TitlesService {
       type: input.type,
       status: input.status,
       access: input.access,
+      seriesStatus: input.seriesStatus,
       ...(input.categoryId ? { categories: { some: { categoryId: input.categoryId } } } : {}),
+      ...(input.genreId ? { genres: { some: { genreId: input.genreId } } } : {}),
+      ...(input.personId ? { credits: { some: { personId: input.personId } } } : {}),
+      ...(input.video ? { AND: [VIDEO_FILTER[input.video]] } : {}),
       ...(input.packageId ? { packages: { some: { packageId: input.packageId } } } : {}),
       ...(input.packaged === 'none' ? { access: 'PAID', packages: { none: {} } } : {}),
       ...(input.q
@@ -113,11 +157,38 @@ export class TitlesService {
           ).map((title) => title.id),
     );
 
+    const ready = await this.readyEpisodes(
+      titles.filter((title) => title.type === 'SERIES').map((title) => title.id),
+    );
+
     return toPage(
-      titles.map((title) => toTitleSummary(title, this.config.mediaBaseUrl, visible.has(title.id))),
+      titles.map((title) =>
+        toTitleSummary(
+          title,
+          this.config.mediaBaseUrl,
+          visible.has(title.id),
+          ready.get(title.id) ?? 0,
+        ),
+      ),
       total,
       input,
     );
+  }
+
+  /** How many episodes of each series have a video that plays. */
+  private async readyEpisodes(titleIds: readonly string[]): Promise<Map<string, number>> {
+    if (titleIds.length === 0) {
+      return new Map();
+    }
+    const rows = await this.prisma.$queryRaw<{ titleId: string; ready: number }[]>`
+      SELECT s."titleId", count(*)::int AS ready
+      FROM episodes e
+      JOIN seasons s ON s.id = e."seasonId"
+      JOIN assets a ON a.id = e."assetId"
+      WHERE s."titleId" = ANY(${[...titleIds]}::uuid[])
+        AND a.status = 'READY' AND a."manifestPath" IS NOT NULL
+      GROUP BY s."titleId"`;
+    return new Map(rows.map((row) => [row.titleId, row.ready]));
   }
 
   async get(id: string): Promise<TitleDetail> {
@@ -142,7 +213,22 @@ export class TitlesService {
 
   async update(id: string, input: UpdateTitleInput): Promise<TitleDetail> {
     const current = await this.findOrThrow(id);
-    const { categoryIds, packageIds, ...fields } = input;
+    const { categoryIds, packageIds, genreIds, releaseDate, ...fields } = input;
+    const data: Prisma.TitleUncheckedUpdateInput = {
+      ...fields,
+      ...(releaseDate !== undefined
+        ? { releaseDate: releaseDate ? new Date(`${releaseDate}T00:00:00Z`) : null }
+        : {}),
+    };
+    if (current.type === 'MOVIE' && fields.seriesStatus) {
+      throw new BadRequestException('Only a series is running or ended. This title is a movie');
+    }
+    if (genreIds) {
+      const found = await this.prisma.genre.count({ where: { id: { in: genreIds } } });
+      if (found !== new Set(genreIds).size) {
+        throw new BadRequestException('One of the chosen genres does not exist');
+      }
+    }
 
     if (current.type === 'SERIES' && fields.assetId) {
       throw new BadRequestException(
@@ -198,7 +284,13 @@ export class TitlesService {
 
     try {
       await this.prisma.$transaction(async (tx) => {
-        await tx.title.update({ where: { id }, data: fields });
+        await tx.title.update({ where: { id }, data });
+        if (genreIds) {
+          await tx.titleGenre.deleteMany({ where: { titleId: id } });
+          await tx.titleGenre.createMany({
+            data: [...new Set(genreIds)].map((genreId) => ({ titleId: id, genreId })),
+          });
+        }
         if (categoryIds) {
           await tx.titleCategory.deleteMany({ where: { titleId: id } });
           await tx.titleCategory.createMany({
@@ -284,8 +376,18 @@ export class TitlesService {
 
   async updateSeason(seasonId: string, input: UpdateSeasonInput): Promise<TitleDetail> {
     const season = await this.findSeasonOrThrow(seasonId);
+    await this.assertImages([input.posterId]);
+    const { airDate, ...fields } = input;
     try {
-      await this.prisma.season.update({ where: { id: seasonId }, data: input });
+      await this.prisma.season.update({
+        where: { id: seasonId },
+        data: {
+          ...fields,
+          ...(airDate !== undefined
+            ? { airDate: airDate ? new Date(`${airDate}T00:00:00Z`) : null }
+            : {}),
+        },
+      });
     } catch (error) {
       throw isUniqueViolation(error)
         ? new ConflictException('This series already has a season with that number')
@@ -364,6 +466,12 @@ export class TitlesService {
         where: { id: episodeId },
         data: {
           ...input,
+          airDate:
+            input.airDate === undefined
+              ? undefined
+              : input.airDate
+                ? new Date(`${input.airDate}T00:00:00Z`)
+                : null,
           publishedAt:
             input.status === 'PUBLISHED' ? (current.publishedAt ?? new Date()) : undefined,
         },

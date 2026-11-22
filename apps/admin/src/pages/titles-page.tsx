@@ -3,7 +3,6 @@ import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tansta
 import {
   ArrowDown,
   ArrowUp,
-  Clapperboard,
   DownloadCloud,
   Film,
   LayoutGrid,
@@ -16,17 +15,20 @@ import {
   Star,
   Trash2,
   Tv,
+  UserRound,
   X,
 } from 'lucide-react';
 import { type FormEvent, type ReactNode, useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router';
 import { toast } from 'sonner';
 import { apiUrl } from '@/api/client';
-import { categoriesApi, packagesApi, titlesApi } from '@/api/endpoints';
+import { categoriesApi, genresApi, packagesApi, peopleApi, titlesApi } from '@/api/endpoints';
 import {
   PUBLISH_STATUSES,
+  SERIES_STATUSES,
   TITLE_SORT_FIELDS,
   type PublishStatus,
+  type SeriesStatus,
   type SortOrder,
   type TitleAccess,
   type TitleSortField,
@@ -63,7 +65,15 @@ import {
   DropdownMenuTrigger,
   Tooltip,
 } from '@/components/ui/overlay';
-import { describeContent } from '@/lib/catalog';
+import {
+  describeContent,
+  formatRating,
+  sectionPath,
+  SERIES_STATUS_LOOKS,
+  sharedSearch,
+  titlePath,
+  videoProgress,
+} from '@/lib/catalog';
 import { MetadataDialog } from '@/components/metadata-dialog';
 import { useAddressParams } from '@/lib/address-params';
 import { announceImport } from '@/lib/metadata-toast';
@@ -82,13 +92,36 @@ const SORT_LABELS: Record<TitleSortField, string> = {
   name: 'Name',
   releaseYear: 'Release year',
   publishedAt: 'Date published',
+  releaseDate: 'Premiere',
+  rating: 'Rating',
+  runtimeMinutes: 'Length',
 };
 
-const TYPE_TABS: readonly (readonly [value: TitleType | '', label: string])[] = [
-  ['', 'All'],
-  ['MOVIE', 'Movies'],
-  ['SERIES', 'Series'],
-];
+/** What each section calls its things, and says about itself. */
+const SECTIONS = {
+  MOVIE: {
+    title: 'Movies',
+    one: 'movie',
+    many: 'movies',
+    description:
+      'Films, documentaries and recordings: one video each, with everything viewers read and see about it.',
+    empty:
+      'Create your first movie, or import one with its details, then attach its video from the library.',
+    create: 'New movie',
+    icon: Film,
+  },
+  SERIES: {
+    title: 'Series',
+    one: 'series',
+    many: 'series',
+    description:
+      'Shows in seasons and episodes. Each episode has its own video, and a series can be published while episodes are still missing.',
+    empty:
+      'Create your first series, or import one with its seasons and episodes, then attach the videos.',
+    create: 'New series',
+    icon: Tv,
+  },
+} as const;
 
 function readView(): View {
   try {
@@ -136,8 +169,20 @@ function TitleStatus({ title }: { title: TitleSummary }) {
   return <StatusBadge status={title.status} />;
 }
 
-/** The catalog: every movie and series, as a wall of posters or a table. */
-export function TitlesPage() {
+/** The movies of the catalog. */
+export function MoviesPage() {
+  return <TitlesList key="MOVIE" kind="MOVIE" />;
+}
+
+/** The series of the catalog. */
+export function SeriesPage() {
+  return <TitlesList key="SERIES" kind="SERIES" />;
+}
+
+/** One kind of title, as a wall of posters or a table. */
+function TitlesList({ kind }: { kind: TitleType }) {
+  const section = SECTIONS[kind];
+  const isSeries = kind === 'SERIES';
   const { can } = useSession();
   const mayWrite = can('catalog:write');
   const confirm = useConfirm();
@@ -146,15 +191,23 @@ export function TitlesPage() {
   const [params, change] = useAddressParams();
 
   const page = Math.max(1, Number(params.get('page')) || 1);
-  const type = (
-    ['MOVIE', 'SERIES'].includes(params.get('type') ?? '') ? params.get('type') : ''
-  ) as TitleType | '';
+  const type = kind;
   const status = (
     (PUBLISH_STATUSES as readonly string[]).includes(params.get('status') ?? '')
       ? params.get('status')
       : ''
   ) as PublishStatus | '';
   const categoryId = params.get('category') ?? '';
+  const genreId = params.get('genre') ?? '';
+  const personId = params.get('person') ?? '';
+  const video = (
+    ['ready', 'missing'].includes(params.get('video') ?? '') ? params.get('video') : ''
+  ) as 'ready' | 'missing' | '';
+  const seriesStatus = (
+    isSeries && (SERIES_STATUSES as readonly string[]).includes(params.get('running') ?? '')
+      ? params.get('running')
+      : ''
+  ) as SeriesStatus | '';
   const access = (
     ['FREE', 'PAID'].includes(params.get('access') ?? '') ? params.get('access') : ''
   ) as TitleAccess | '';
@@ -194,16 +247,34 @@ export function TitlesPage() {
     queryKey: [
       'titles',
       'list',
-      { page, type, status, categoryId, access, packageFilter, q, sort, order },
+      {
+        page,
+        type,
+        status,
+        categoryId,
+        genreId,
+        personId,
+        video,
+        seriesStatus,
+        access,
+        packageFilter,
+        q,
+        sort,
+        order,
+      },
     ],
     queryFn: ({ signal }) =>
       titlesApi.list(
         {
           page,
           pageSize: PAGE_SIZE,
-          type: type || undefined,
+          type,
           status: status || undefined,
           categoryId: categoryId || undefined,
+          genreId: genreId || undefined,
+          personId: personId || undefined,
+          video: video || undefined,
+          seriesStatus: seriesStatus || undefined,
           access: access || undefined,
           packageId: packageFilter && packageFilter !== 'none' ? packageFilter : undefined,
           packaged: packageFilter === 'none' ? 'none' : undefined,
@@ -224,13 +295,34 @@ export function TitlesPage() {
     queryFn: ({ signal }) => packagesApi.list(signal),
     staleTime: 60_000,
   });
+  const genres = useQuery({
+    queryKey: ['genres'],
+    queryFn: ({ signal }) => genresApi.list(signal),
+    staleTime: 60_000,
+  });
+  // The person the list is narrowed to, to say who it is.
+  const person = useQuery({
+    queryKey: ['people', personId],
+    queryFn: ({ signal }) => peopleApi.get(personId, signal),
+    enabled: personId !== '',
+  });
   const items = titles.data?.items ?? [];
-  const filtered = Boolean(q || status || categoryId || type || access || packageFilter);
+  const filtered = Boolean(
+    q ||
+    status ||
+    categoryId ||
+    genreId ||
+    personId ||
+    video ||
+    seriesStatus ||
+    access ||
+    packageFilter,
+  );
 
   const remove = useMutation({
     mutationFn: (title: TitleSummary) => titlesApi.remove(title.id),
     onSuccess: () => {
-      toast.success('Title deleted');
+      toast.success(isSeries ? 'Series deleted' : 'Movie deleted');
       void queryClient.invalidateQueries({ queryKey: ['titles'] });
       void queryClient.invalidateQueries({ queryKey: ['categories'] });
     },
@@ -243,7 +335,7 @@ export function TitlesPage() {
       description:
         title.type === 'SERIES'
           ? 'The series with all its seasons and episodes is removed from the catalog. The videos stay in the library.'
-          : 'The title is removed from the catalog. Its video stays in the library.',
+          : 'The movie is removed from the catalog. Its video stays in the library.',
       confirmLabel: 'Delete',
       destructive: true,
     });
@@ -277,7 +369,7 @@ export function TitlesPage() {
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end">
-        <DropdownMenuItem onSelect={() => void navigate(`/titles/${title.id}`)}>
+        <DropdownMenuItem onSelect={() => void navigate(titlePath(title))}>
           <Pencil />
           {mayWrite ? 'Edit' : 'Open'}
         </DropdownMenuItem>
@@ -302,7 +394,7 @@ export function TitlesPage() {
       </Button>
       <Button variant="primary" onClick={() => setCreateOpen(true)}>
         <Plus />
-        New title
+        {section.create}
       </Button>
     </>
   ) : null;
@@ -310,33 +402,62 @@ export function TitlesPage() {
   return (
     <>
       <PageHeader
-        title="Titles"
-        description="The movies and series viewers can watch. A title joins a video from the library with its name, artwork and categories."
+        title={
+          <>
+            {section.title}
+            {titles.data ? (
+              <span className="text-base font-normal text-muted-foreground tabular-nums">
+                {titles.data.total}
+              </span>
+            ) : null}
+          </>
+        }
+        description={section.description}
         actions={newButton}
       />
 
-      <div className="mb-4 flex gap-1 border-b" role="tablist" aria-label="Kind of title">
-        {TYPE_TABS.map(([value, label]) => (
-          <button
-            key={label}
-            type="button"
-            role="tab"
-            aria-selected={type === value}
-            onClick={() => change({ type: value || null, page: null })}
-            className={cn(
-              '-mb-px border-b-2 border-transparent px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground',
-              type === value && 'border-primary text-foreground',
-            )}
-          >
-            {label}
-          </button>
-        ))}
-        {titles.data ? (
-          <span className="ml-auto self-center text-xs text-muted-foreground tabular-nums">
-            {titles.data.total} {titles.data.total === 1 ? 'title' : 'titles'}
+      <nav
+        aria-label="Kind of title"
+        className="mb-4 inline-flex rounded-lg border bg-muted/40 p-0.5"
+      >
+        {(['MOVIE', 'SERIES'] as const).map((other) => {
+          const Icon = SECTIONS[other].icon;
+          const current = other === kind;
+          return (
+            <Link
+              key={other}
+              to={current ? '#' : `${sectionPath(other)}${sharedSearch(window.location.search)}`}
+              aria-current={current ? 'page' : undefined}
+              onClick={current ? (event) => event.preventDefault() : undefined}
+              className={cn(
+                'inline-flex h-8 items-center gap-1.5 rounded-md px-3 text-[13px] font-medium text-muted-foreground transition-colors hover:text-foreground',
+                current && 'bg-background text-foreground shadow-sm',
+              )}
+            >
+              <Icon className="size-4" aria-hidden="true" />
+              {SECTIONS[other].title}
+            </Link>
+          );
+        })}
+      </nav>
+
+      {personId ? (
+        <div className="mb-4 flex flex-wrap items-center gap-2 rounded-lg border bg-muted/40 px-3 py-2 text-sm">
+          <UserRound className="size-4 text-muted-foreground" aria-hidden="true" />
+          <span>
+            {section.title} with <strong>{person.data?.name ?? 'this person'}</strong>
           </span>
-        ) : null}
-      </div>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="ml-auto"
+            onClick={() => change({ person: null, page: null })}
+          >
+            <X />
+            Show all
+          </Button>
+        </div>
+      ) : null}
 
       <div className="mb-4 flex flex-wrap items-center gap-2">
         <div className="relative w-full sm:w-72">
@@ -363,6 +484,57 @@ export function TitlesPage() {
             ...PUBLISH_STATUSES.map((value) => ({ value, label: humanize(value) })),
           ]}
         />
+        <Select
+          aria-label="Filter by video"
+          className="w-44"
+          value={video || 'ALL'}
+          onValueChange={(value) => change({ video: value === 'ALL' ? null : value, page: null })}
+          options={[
+            { value: 'ALL', label: 'With and without video' },
+            {
+              value: 'missing',
+              label: 'Video missing',
+              description: isSeries
+                ? 'An episode has no video that plays'
+                : 'No video that plays yet',
+            },
+            {
+              value: 'ready',
+              label: 'Video ready',
+              description: isSeries ? 'Every episode has its video' : 'Its video plays',
+            },
+          ]}
+        />
+        {isSeries ? (
+          <Select
+            aria-label="Filter by whether the series runs"
+            className="w-40"
+            value={seriesStatus || 'ALL'}
+            onValueChange={(value) =>
+              change({ running: value === 'ALL' ? null : value, page: null })
+            }
+            options={[
+              { value: 'ALL', label: 'Running or not' },
+              ...SERIES_STATUSES.map((value) => ({
+                value,
+                label: SERIES_STATUS_LOOKS[value].label,
+                description: SERIES_STATUS_LOOKS[value].about,
+              })),
+            ]}
+          />
+        ) : null}
+        {genres.data && genres.data.length > 0 ? (
+          <Select
+            aria-label="Filter by genre"
+            className="w-44"
+            value={genreId || 'ALL'}
+            onValueChange={(value) => change({ genre: value === 'ALL' ? null : value, page: null })}
+            options={[
+              { value: 'ALL', label: 'All genres' },
+              ...genres.data.map((genre) => ({ value: genre.id, label: genre.name })),
+            ]}
+          />
+        ) : null}
         {categories.data && categories.data.length > 0 ? (
           <Select
             aria-label="Filter by category"
@@ -428,7 +600,10 @@ export function TitlesPage() {
                 q: null,
                 status: null,
                 category: null,
-                type: null,
+                genre: null,
+                person: null,
+                video: null,
+                running: null,
                 access: null,
                 package: null,
                 packaged: null,
@@ -482,13 +657,11 @@ export function TitlesPage() {
 
       {titles.data && items.length === 0 ? (
         <EmptyState
-          icon={filtered ? Search : Clapperboard}
-          title={filtered ? 'Nothing matches' : 'The catalog is empty'}
+          icon={filtered ? Search : section.icon}
+          title={filtered ? 'Nothing matches' : `No ${section.many} yet`}
           action={!filtered ? newButton : null}
         >
-          {filtered
-            ? 'Try another search or clear the filters.'
-            : 'Create your first movie or series, then attach a video from the library.'}
+          {filtered ? 'Try another search or clear the filters.' : section.empty}
         </EmptyState>
       ) : null}
 
@@ -499,7 +672,7 @@ export function TitlesPage() {
               key={title.id}
               className="group relative flex flex-col overflow-hidden rounded-xl border bg-card shadow-xs transition-shadow hover:shadow-md"
             >
-              <Link to={`/titles/${title.id}`} tabIndex={-1} aria-hidden="true" className="block">
+              <Link to={titlePath(title)} tabIndex={-1} aria-hidden="true" className="block">
                 <PosterArt title={title} className="aspect-[2/3]" />
               </Link>
               <div className="pointer-events-none absolute inset-x-2 top-2 flex items-start justify-between gap-2">
@@ -529,19 +702,31 @@ export function TitlesPage() {
               <div className="flex items-start gap-1 p-3">
                 <div className="min-w-0 flex-1">
                   <Link
-                    to={`/titles/${title.id}`}
+                    to={titlePath(title)}
                     className="block truncate text-sm font-medium hover:underline"
                     title={title.name}
                   >
                     {title.name}
                   </Link>
-                  <p className="mt-0.5 truncate text-xs text-muted-foreground">
-                    {title.type === 'SERIES' ? 'Series' : 'Movie'}
-                    {title.releaseYear ? ` · ${title.releaseYear}` : ''}
+                  <p className="mt-0.5 flex flex-wrap items-center gap-x-1.5 text-xs text-muted-foreground">
+                    <span className="tabular-nums">{title.releaseYear ?? 'No year'}</span>
+                    {title.rating !== null ? (
+                      <span className="inline-flex items-center gap-0.5 tabular-nums">
+                        <Star className="size-3 fill-current text-warning" aria-hidden="true" />
+                        {formatRating(title.rating)}
+                      </span>
+                    ) : null}
+                    {isSeries && title.seriesStatus ? (
+                      <span>{SERIES_STATUS_LOOKS[title.seriesStatus].label}</span>
+                    ) : null}
                   </p>
-                  <p className="mt-0.5 truncate text-xs text-muted-foreground">
-                    {describeContent(title)}
-                  </p>
+                  {isSeries ? (
+                    <EpisodeProgress title={title} className="mt-1.5" />
+                  ) : (
+                    <p className="mt-0.5 truncate text-xs text-muted-foreground">
+                      {describeContent(title)}
+                    </p>
+                  )}
                 </div>
                 {rowMenu(title)}
               </div>
@@ -557,12 +742,12 @@ export function TitlesPage() {
               <tr>
                 {(
                   [
-                    ['name', 'Title'],
+                    ['name', isSeries ? 'Series' : 'Movie'],
                     [null, 'Status'],
-                    [null, 'Kind'],
                     ['releaseYear', 'Year'],
-                    [null, 'Content'],
-                    [null, 'Categories'],
+                    [isSeries ? null : 'runtimeMinutes', isSeries ? 'Episodes' : 'Video'],
+                    ['rating', 'Rating'],
+                    [null, 'Genres'],
                     ['updatedAt', 'Changed'],
                   ] as const
                 ).map(([field, label]) => (
@@ -607,7 +792,7 @@ export function TitlesPage() {
                       <PosterArt title={title} className="aspect-[2/3] w-9 shrink-0 rounded" />
                       <div className="min-w-0">
                         <Link
-                          to={`/titles/${title.id}`}
+                          to={titlePath(title)}
                           className="block max-w-xs truncate font-medium hover:underline"
                         >
                           {title.name}
@@ -630,17 +815,44 @@ export function TitlesPage() {
                   <Td>
                     <TitleStatus title={title} />
                   </Td>
-                  <Td>{title.type === 'SERIES' ? 'Series' : 'Movie'}</Td>
-                  <Td className="tabular-nums">{title.releaseYear ?? '–'}</Td>
-                  <Td className="text-muted-foreground">{describeContent(title)}</Td>
+                  <Td className="tabular-nums">
+                    {title.releaseYear ?? '–'}
+                    {isSeries && title.seriesStatus ? (
+                      <p className="text-xs text-muted-foreground">
+                        {SERIES_STATUS_LOOKS[title.seriesStatus].label}
+                      </p>
+                    ) : null}
+                  </Td>
+                  <Td className="min-w-44 text-muted-foreground">
+                    {isSeries ? (
+                      <>
+                        <p className="text-xs">
+                          {title.seasonCount} {title.seasonCount === 1 ? 'season' : 'seasons'}
+                        </p>
+                        <EpisodeProgress title={title} className="mt-1" />
+                      </>
+                    ) : (
+                      describeContent(title)
+                    )}
+                  </Td>
+                  <Td className="tabular-nums">
+                    {title.rating !== null ? (
+                      <span className="inline-flex items-center gap-1">
+                        <Star className="size-3 fill-current text-warning" aria-hidden="true" />
+                        {formatRating(title.rating)}
+                      </span>
+                    ) : (
+                      <span className="text-muted-foreground">–</span>
+                    )}
+                  </Td>
                   <Td>
                     <div className="flex max-w-56 flex-wrap gap-1">
-                      {title.categories.length === 0 ? (
+                      {title.genres.length === 0 ? (
                         <span className="text-muted-foreground">–</span>
                       ) : (
-                        title.categories.map((category) => (
-                          <Badge key={category.id}>{category.name}</Badge>
-                        ))
+                        title.genres
+                          .slice(0, 3)
+                          .map((genre) => <Badge key={genre.id}>{genre.name}</Badge>)
                       )}
                     </div>
                   </Td>
@@ -667,21 +879,24 @@ export function TitlesPage() {
       <NewTitleDialog
         open={createOpen}
         onOpenChange={setCreateOpen}
-        initialType={type || 'MOVIE'}
+        type={kind}
         onCreated={(id) => {
           void queryClient.invalidateQueries({ queryKey: ['titles'] });
-          void navigate(`/titles/${id}`);
+          void navigate(titlePath({ id, type: kind }));
         }}
       />
       <MetadataDialog
         open={importOpen}
         onOpenChange={setImportOpen}
+        kind={kind}
         onDone={(result) => {
           setImportOpen(false);
           void queryClient.invalidateQueries({ queryKey: ['titles'] });
           void queryClient.invalidateQueries({ queryKey: ['categories'] });
+          void queryClient.invalidateQueries({ queryKey: ['genres'] });
+          void queryClient.invalidateQueries({ queryKey: ['people'] });
           announceImport(result);
-          void navigate(`/titles/${result.title.id}`);
+          void navigate(titlePath(result.title));
         }}
       />
     </>
@@ -691,19 +906,14 @@ export function TitlesPage() {
 interface NewTitleDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  initialType: TitleType;
+  type: TitleType;
   onCreated: (id: string) => void;
 }
 
-const KINDS = [
-  ['MOVIE', Film, 'Movie', 'One video: a film, a documentary, a recording.'],
-  ['SERIES', Tv, 'Series', 'Seasons with episodes, each with its own video.'],
-] as const;
-
-/** Asks for the two things a title cannot exist without, then opens its editor. */
-function NewTitleDialog({ open, onOpenChange, initialType, onCreated }: NewTitleDialogProps) {
-  const [type, setType] = useState<TitleType>(initialType);
+/** Asks for the one thing a title cannot exist without, then opens its editor. */
+function NewTitleDialog({ open, onOpenChange, type, onCreated }: NewTitleDialogProps) {
   const [name, setName] = useState('');
+  const section = SECTIONS[type];
 
   const create = useMutation({
     mutationFn: () => titlesApi.create({ type, name: name.trim() }),
@@ -717,7 +927,6 @@ function NewTitleDialog({ open, onOpenChange, initialType, onCreated }: NewTitle
   useEffect(() => {
     if (open) {
       create.reset();
-      setType(initialType);
       setName('');
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -731,34 +940,20 @@ function NewTitleDialog({ open, onOpenChange, initialType, onCreated }: NewTitle
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
-        title="New title"
-        description="It starts as a draft that viewers cannot see. You add the rest in the editor."
+        size="sm"
+        title={section.create}
+        description={
+          type === 'SERIES'
+            ? 'It starts as a draft that viewers cannot see. You add seasons, episodes and the rest in the editor.'
+            : 'It starts as a draft that viewers cannot see. You add its video and the rest in the editor.'
+        }
       >
         <form onSubmit={submit} className="contents">
           <DialogBody>
-            <div className="grid gap-2 sm:grid-cols-2" role="radiogroup" aria-label="Kind of title">
-              {KINDS.map(([value, Icon, label, description]) => (
-                <button
-                  key={value}
-                  type="button"
-                  role="radio"
-                  aria-checked={type === value}
-                  onClick={() => setType(value)}
-                  className={cn(
-                    'flex flex-col gap-1.5 rounded-lg border p-4 text-left transition-colors hover:bg-accent',
-                    type === value && 'border-primary bg-primary/5 ring-1 ring-primary',
-                  )}
-                >
-                  <Icon
-                    className={cn('size-5 text-muted-foreground', type === value && 'text-primary')}
-                    aria-hidden="true"
-                  />
-                  <span className="text-sm font-medium">{label}</span>
-                  <span className="text-xs text-muted-foreground">{description}</span>
-                </button>
-              ))}
-            </div>
-            <Field label="Name">
+            <Field
+              label="Name"
+              hint="To have the details, the artwork and the people filled in for you, use Import instead."
+            >
               {(id) => (
                 <Input
                   id={id}
@@ -787,5 +982,28 @@ function NewTitleDialog({ open, onOpenChange, initialType, onCreated }: NewTitle
         </form>
       </DialogContent>
     </Dialog>
+  );
+}
+
+/** How many episodes of a series have their video, as a bar with the figure beside it. */
+function EpisodeProgress({ title, className }: { title: TitleSummary; className?: string }) {
+  const progress = videoProgress(title);
+  return (
+    <Tooltip content={progress.label}>
+      <div className={cn('flex items-center gap-2', className)} aria-label={progress.label}>
+        <div className="h-1.5 min-w-10 flex-1 overflow-hidden rounded-full bg-muted">
+          <div
+            className={cn(
+              'h-full rounded-full transition-[width] duration-500',
+              progress.complete ? 'bg-success' : 'bg-primary',
+            )}
+            style={{ width: `${progress.percent}%` }}
+          />
+        </div>
+        <span className="shrink-0 text-xs text-muted-foreground tabular-nums">
+          {title.readyEpisodeCount}/{title.episodeCount}
+        </span>
+      </div>
+    </Tooltip>
   );
 }

@@ -43,12 +43,15 @@ export class TmdbClient {
     });
   }
 
-  /** A title with its age ratings and its logos. */
+  /** A title with its age ratings, its logos, the people in it and what it can be found by. */
   details(kind: TmdbKind, id: number, language: string): Promise<TmdbDetails> {
     const short = language.slice(0, 2);
     return this.get<TmdbDetails>(`/${kind}/${id}`, {
       language,
-      append_to_response: `${kind === 'movie' ? 'release_dates' : 'content_ratings'},images`,
+      append_to_response:
+        kind === 'movie'
+          ? 'release_dates,images,credits,keywords,external_ids'
+          : 'content_ratings,images,aggregate_credits,keywords,external_ids',
       // Logos in the wanted language, in English, and without words.
       include_image_language: [...new Set([short, 'en', 'null'])].join(','),
     });

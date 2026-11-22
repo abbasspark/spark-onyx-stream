@@ -32,9 +32,15 @@ export type PreviewMetadataInput = z.infer<typeof previewMetadataSchema>;
 const parts = {
   id: metadataId,
   language: language.optional(),
-  /** Names, tagline, synopsis, year, age rating, language. */
+  /** Names, tagline, synopsis, year, age rating, language, and the facts: dates, length, countries, studios. */
   text: z.boolean().default(true),
-  /** Genres become categories. */
+  /** Genres, as genres. */
+  genres: z.boolean().default(true),
+  /** The cast and the crew that matters. */
+  people: z.boolean().default(true),
+  /** A picture of each person who has none yet. */
+  portraits: z.boolean().default(true),
+  /** Genres also become categories of the same name. */
   categories: z.boolean().default(true),
   /** Creates a category for a genre that has none of the same name. */
   createCategories: z.boolean().default(true),

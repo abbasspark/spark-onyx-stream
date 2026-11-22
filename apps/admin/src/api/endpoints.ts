@@ -1,6 +1,12 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 import { download, request, uploadFile } from './client';
 import type {
+  Credit,
+  CreditInput,
+  Genre,
+  Person,
+  PersonDetail,
+  SeriesStatus,
   DiagnosticsReport,
   DiagnosticsSummary,
   Backup,
@@ -320,6 +326,12 @@ export interface TitleListQuery {
   status?: PublishStatus;
   access?: TitleAccess;
   categoryId?: string;
+  genreId?: string;
+  /** Titles this person has a part in. */
+  personId?: string;
+  seriesStatus?: SeriesStatus;
+  /** "ready": the video is there. "missing": a movie without one, a series with an episode that lacks one. */
+  video?: 'ready' | 'missing';
   packageId?: string;
   /** "none": paid titles in no package. */
   packaged?: 'none';
@@ -367,7 +379,13 @@ export const titlesApi = {
     request<TitleDetail>(`/v1/titles/${titleId}/seasons`, { method: 'POST', body }),
   updateSeason: (
     seasonId: string,
-    body: { number?: number; name?: string | null; synopsis?: string | null },
+    body: {
+      number?: number;
+      name?: string | null;
+      synopsis?: string | null;
+      airDate?: string | null;
+      posterId?: string | null;
+    },
   ) => request<TitleDetail>(`/v1/seasons/${seasonId}`, { method: 'PATCH', body }),
   removeSeason: (seasonId: string) =>
     request<TitleDetail>(`/v1/seasons/${seasonId}`, { method: 'DELETE' }),
@@ -378,6 +396,45 @@ export const titlesApi = {
     request<Episode>(`/v1/episodes/${episodeId}`, { method: 'PATCH', body }),
   removeEpisode: (episodeId: string) =>
     request<TitleDetail>(`/v1/episodes/${episodeId}`, { method: 'DELETE' }),
+
+  /** Replaces the cast and crew of a title with the list given, in its order. */
+  replaceCredits: (titleId: string, credits: CreditInput[]) =>
+    request<Credit[]>(`/v1/titles/${titleId}/credits`, { method: 'PUT', body: { credits } }),
+};
+
+export const genresApi = {
+  list: (signal?: AbortSignal) => request<Genre[]>('/v1/genres', { signal }),
+  create: (body: { name: string }) => request<Genre>('/v1/genres', { method: 'POST', body }),
+  update: (id: string, body: { name?: string; slug?: string }) =>
+    request<Genre>(`/v1/genres/${id}`, { method: 'PATCH', body }),
+  remove: (id: string) => request<void>(`/v1/genres/${id}`, { method: 'DELETE' }),
+};
+
+export interface PeopleQuery {
+  page: number;
+  pageSize: number;
+  q?: string;
+  sort?: 'name' | 'createdAt' | 'credits';
+  order?: SortOrder;
+}
+
+export const peopleApi = {
+  list: (query: PeopleQuery, signal?: AbortSignal) =>
+    request<Page<Person>>('/v1/people', { query: { ...query }, signal }),
+  get: (id: string, signal?: AbortSignal) => request<PersonDetail>(`/v1/people/${id}`, { signal }),
+  create: (body: { name: string; knownFor?: string | null }) =>
+    request<Person>('/v1/people', { method: 'POST', body }),
+  update: (
+    id: string,
+    body: {
+      name?: string;
+      slug?: string;
+      knownFor?: string | null;
+      biography?: string | null;
+      portraitId?: string | null;
+    },
+  ) => request<Person>(`/v1/people/${id}`, { method: 'PATCH', body }),
+  remove: (id: string) => request<void>(`/v1/people/${id}`, { method: 'DELETE' }),
 };
 
 export const categoriesApi = {

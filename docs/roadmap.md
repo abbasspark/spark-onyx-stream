@@ -57,3 +57,12 @@ See [phase-5-edges.md](phase-5-edges.md) for the design.
 4. Diagnostics: one page that says what is wrong with an installation and what to do about it, a mark in the header of the panel, emails to the owners when a problem appears, and whether a newer version exists. **Done.**
 
 See [phase-6-operations.md](phase-6-operations.md) for the design.
+
+## The catalog grows
+
+Before the apps, the panel becomes a fuller catalog system. This work is outside the numbered phases.
+
+1. Movies and series as sections of their own, facts, genres, cast and crew, season posters and air dates, all filled by the import. **Done.**
+2. Pages for all people and all genres, several trailers and extras, collections, availability dates, texts in more languages. Planned.
+3. Genres, facts and people on the viewer website. Planned.
+4. Watched folders and buckets that import files named by their TMDB id by themselves. Planned.

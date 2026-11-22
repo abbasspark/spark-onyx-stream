@@ -169,9 +169,23 @@ describe.skipIf(!TEST_DATABASE_URL)('Metadata import (e2e)', () => {
       },
       seasons: [],
       existingTitleId: null,
+      releaseDate: '1999-03-31',
+      runtimeMinutes: 136,
+      countries: ['US', 'AU'],
+      studios: ['Village Roadshow Pictures', 'Silver Pictures'],
+      keywords: ['hacker', 'dystopia'],
+      imdbId: 'tt0133093',
+      rating: 8.2,
+      ratingCount: 26_000,
+      seriesStatus: null,
+      lastAirDate: null,
+      // How many people would come, and the first of them to recognize the title by.
+      cast: 2,
+      crew: 2,
+      leads: ['Keanu Reeves', 'Carrie-Anne Moss'],
     });
     expect(tmdb.requests[0]).toBe(
-      'GET /3/movie/603?language=en-US&append_to_response=release_dates%2Cimages&include_image_language=en%2Cnull',
+      'GET /3/movie/603?language=en-US&append_to_response=release_dates%2Cimages%2Ccredits%2Ckeywords%2Cexternal_ids&include_image_language=en%2Cnull',
     );
 
     const series = await http()
@@ -181,9 +195,15 @@ describe.skipIf(!TEST_DATABASE_URL)('Metadata import (e2e)', () => {
     expect(series.body.ageRating).toBe('TV-PG');
     // Seasons without episodes are left out. "Season 1" is not a name.
     expect(series.body.seasons).toEqual([
-      { number: 0, name: 'Specials', episodeCount: 1 },
-      { number: 1, name: null, episodeCount: 2 },
-      { number: 2, name: 'The Abyss', episodeCount: 1 },
+      { number: 0, name: 'Specials', episodeCount: 1, airDate: null, poster: null },
+      {
+        number: 1,
+        name: null,
+        episodeCount: 2,
+        airDate: '2021-09-05',
+        poster: '/season-1.jpg',
+      },
+      { number: 2, name: 'The Abyss', episodeCount: 1, airDate: '2022-03-13', poster: null },
     ]);
 
     expect(await testApp.prisma.title.count()).toBe(0);
@@ -232,10 +252,14 @@ describe.skipIf(!TEST_DATABASE_URL)('Metadata import (e2e)', () => {
           'categories',
         ]),
         categoriesCreated: ['Action', 'Science Fiction'],
+        genresCreated: ['Action', 'Science Fiction'],
+        peopleCreated: 3,
+        credits: 4,
         seasonsCreated: 0,
         episodesCreated: 0,
         episodesUpdated: 0,
-        picturesAdded: 3,
+        // Poster, backdrop and logo, and the two people who have a picture at the source.
+        picturesAdded: 5,
         warnings: [],
       });
 
@@ -297,9 +321,119 @@ describe.skipIf(!TEST_DATABASE_URL)('Metadata import (e2e)', () => {
       expect(report).toMatchObject({
         seasonsCreated: 2,
         episodesCreated: 3,
-        picturesAdded: 2,
+        // The poster, one still, the poster of the first season and one person.
+        picturesAdded: 4,
         warnings: [],
       });
+    });
+
+    it('brings the facts, the genres and the people of a movie', async () => {
+      const response = await importNew({ id: 'movie:603' }).expect(201);
+      const title = response.body.title;
+      expect(title).toMatchObject({
+        releaseDate: '1999-03-31',
+        runtimeMinutes: 136,
+        countries: ['US', 'AU'],
+        studios: ['Village Roadshow Pictures', 'Silver Pictures'],
+        keywords: ['hacker', 'dystopia'],
+        imdbId: 'tt0133093',
+        rating: 8.2,
+        ratingCount: 26_000,
+        seriesStatus: null,
+        lastAirDate: null,
+      });
+      expect(title.genres.map((genre: { name: string }) => genre.name)).toEqual([
+        'Action',
+        'Science Fiction',
+      ]);
+      expect(
+        title.credits.map(
+          (credit: { kind: string; role: string; person: { name: string } }) =>
+            `${credit.kind} ${credit.person.name}: ${credit.role}`,
+        ),
+      ).toEqual([
+        'CAST Keanu Reeves: Neo',
+        'CAST Carrie-Anne Moss: Trinity',
+        'CREW Lana Wachowski: Director',
+        'CREW Lana Wachowski: Screenplay',
+      ]);
+      // A picture for those who have one at the source.
+      expect(title.credits[0].person.portrait).toMatchObject({ kind: 'PORTRAIT', width: 421 });
+      expect(title.credits[1].person.portrait).toBeNull();
+      expect(response.body.report).toMatchObject({
+        genresCreated: ['Action', 'Science Fiction'],
+        peopleCreated: 3,
+        credits: 4,
+      });
+      expect(await testApp.prisma.person.count()).toBe(3);
+    });
+
+    it('knows a person again in the next title, and does not fetch their picture twice', async () => {
+      await importNew({ id: 'movie:603' }).expect(201);
+      const before = pictureRequests().filter((line) => line.includes('keanu')).length;
+      const series = await importNew({ id: 'tv:1399' }).expect(201);
+
+      expect(series.body.report).toMatchObject({
+        peopleCreated: 2,
+        genresCreated: ['Documentary'],
+      });
+      expect(pictureRequests().filter((line) => line.includes('keanu'))).toHaveLength(before);
+      const keanu = await testApp.prisma.person.findFirstOrThrow({
+        where: { name: 'Keanu Reeves' },
+        include: { credits: true },
+      });
+      expect(keanu.credits).toHaveLength(2);
+      expect(await testApp.prisma.person.count()).toBe(5);
+
+      expect(
+        series.body.title.credits.map(
+          (credit: { role: string; person: { name: string } }) =>
+            `${credit.person.name}: ${credit.role}`,
+        ),
+      ).toEqual(['Keanu Reeves: The Narrator', 'Ada Creator: Creator', 'Dee Director: Director']);
+    });
+
+    it('brings the dates, the lengths and the season posters of a series', async () => {
+      const response = await importNew({ id: 'tv:1399' }).expect(201);
+      const title = response.body.title;
+      expect(title).toMatchObject({
+        releaseDate: '2021-09-05',
+        lastAirDate: '2022-03-13',
+        seriesStatus: 'RUNNING',
+        runtimeMinutes: 48,
+        imdbId: 'tt7654321',
+        rating: 7.4,
+      });
+      const [first, second] = title.seasons;
+      expect(first).toMatchObject({ number: 1, airDate: '2021-09-05' });
+      expect(first.poster).toMatchObject({ kind: 'POSTER', width: 1000 });
+      expect(second).toMatchObject({ number: 2, airDate: '2022-03-13', poster: null });
+      expect(
+        first.episodes.map((episode: Record<string, unknown>) => [
+          episode.airDate,
+          episode.runtimeMinutes,
+        ]),
+      ).toEqual([
+        ['2021-09-05', 47],
+        ['2021-09-12', 51],
+      ]);
+    });
+
+    it('leaves people and genres out when asked to', async () => {
+      const response = await importNew({ id: 'movie:603', people: false, genres: false }).expect(
+        201,
+      );
+      expect(response.body.title.credits).toEqual([]);
+      expect(response.body.title.genres).toEqual([]);
+      expect(await testApp.prisma.person.count()).toBe(0);
+      expect(await testApp.prisma.genre.count()).toBe(0);
+
+      const withoutPictures = await importNew({
+        id: 'movie:603',
+        allowDuplicate: true,
+        portraits: false,
+      }).expect(201);
+      expect(withoutPictures.body.title.credits[0].person.portrait).toBeNull();
     });
 
     it('brings only the parts that were asked for', async () => {
@@ -308,6 +442,7 @@ describe.skipIf(!TEST_DATABASE_URL)('Metadata import (e2e)', () => {
         categories: false,
         artwork: false,
         stills: false,
+        portraits: false,
         specials: true,
       }).expect(201);
       const { title, report } = response.body;
@@ -547,6 +682,53 @@ describe.skipIf(!TEST_DATABASE_URL)('Metadata import (e2e)', () => {
         orderBy: { createdAt: 'desc' },
       });
       expect(audit.metadata).toMatchObject({ overwrite: true, sourceId: 'tv:1399' });
+    });
+
+    it('keeps facts and credits that were set by hand, and replaces them when asked to', async () => {
+      const created = await http()
+        .post('/v1/titles')
+        .set(admin())
+        .send({ type: 'MOVIE', name: 'The Matrix' })
+        .expect(201);
+      const id = created.body.id as string;
+      const person = await http()
+        .post('/v1/people')
+        .set(admin())
+        .send({ name: 'My Cousin' })
+        .expect(201);
+      await http()
+        .patch(`/v1/titles/${id}`)
+        .set(admin())
+        .send({ runtimeMinutes: 140, studios: ['My Studio'], releaseDate: '1999-06-17' })
+        .expect(200);
+      await http()
+        .put(`/v1/titles/${id}/credits`)
+        .set(admin())
+        .send({ credits: [{ personId: person.body.id, kind: 'CAST', role: 'Extra' }] })
+        .expect(200);
+
+      const filled = await apply(id, { id: 'movie:603' }).expect(201);
+      expect(filled.body.title).toMatchObject({
+        runtimeMinutes: 140,
+        studios: ['My Studio'],
+        releaseDate: '1999-06-17',
+        // What was empty is filled.
+        countries: ['US', 'AU'],
+        imdbId: 'tt0133093',
+        // The rating describes the world, not the admin's choice.
+        rating: 8.2,
+      });
+      expect(filled.body.title.credits).toHaveLength(1);
+
+      const replaced = await apply(id, { id: 'movie:603', overwrite: true }).expect(201);
+      expect(replaced.body.title).toMatchObject({
+        runtimeMinutes: 136,
+        studios: ['Village Roadshow Pictures', 'Silver Pictures'],
+        releaseDate: '1999-03-31',
+      });
+      expect(replaced.body.title.credits).toHaveLength(4);
+      // The person added by hand is still a person, only no longer in this title.
+      expect(await testApp.prisma.person.count({ where: { name: 'My Cousin' } })).toBe(1);
     });
 
     it('adds categories to the ones a title has, or replaces them', async () => {

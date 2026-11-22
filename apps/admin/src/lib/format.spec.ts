@@ -12,6 +12,7 @@ import {
   humanize,
   titleFromFileName,
   usagePercent,
+  formatDay,
 } from './format';
 
 describe('formatBytes', () => {
@@ -113,5 +114,14 @@ describe('time in words', () => {
     expect(formatRelative('2026-03-15T12:00:00Z', now)).toMatch(/3 months ago/);
     expect(formatRelative(null, now)).toBe('–');
     expect(formatRelative('nonsense', now)).toBe('–');
+  });
+});
+
+describe('formatDay', () => {
+  it('keeps the calendar day whatever the time zone', () => {
+    expect(formatDay('2021-09-05')).toContain('2021');
+    expect(formatDay('2021-09-05')).toMatch(/\b0?5\b/);
+    expect(formatDay(null)).toBe('–');
+    expect(formatDay('soon')).toBe('–');
   });
 });

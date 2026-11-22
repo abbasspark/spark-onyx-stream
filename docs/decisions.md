@@ -377,7 +377,7 @@ This replaces the "plain CSS without a component library" part of D-018.
 
 **Why:** TMDB is the one large source with a free API, seasons and episodes, artwork, and many languages. Copying keeps the site independent of it at run time and lets the operator edit everything afterwards. Importing only into what is empty makes "update" safe to press on a title someone worked on. A request is simpler than a job and fast enough: a series of eight episodes takes under a second against a local stand-in, and a long one is bounded by its stills.
 
-**Consequence:** the terms of TMDB apply to operators who use the import, including that selling access needs an agreement with TMDB. The project cannot settle that for them and says so where the import is set up. A very long series with stills may take longer than a proxy waits for an answer; the stills can be left out and added by a second run. Cast and crew are not imported, because the catalog has no people yet.
+**Consequence:** the terms of TMDB apply to operators who use the import, including that selling access needs an agreement with TMDB. The project cannot settle that for them and says so where the import is set up. A very long series with stills may take longer than a proxy waits for an answer; the stills can be left out and added by a second run. Cast and crew were not imported at first, because the catalog had no people; D-052 added them.
 
 ## D-031 Profiles share an account and split the watch history
 
@@ -668,3 +668,17 @@ This replaces the "plain CSS without a component library" part of D-018.
 **Why:** the people who run these installations are not operators with dashboards, and the questions they have are plain: is it working, and if not, what do I do. A page of green and red lights answers the first, and a sentence answers the second. The process that serves the panel cannot know about a worker on another machine, so the others have to say so themselves, and their silence is the finding. Looking only when the page is open would find problems when it is too late: a backup that has failed for a week, a disk that filled up overnight. So the look runs by itself, and email is the one channel every installation that has viewers already has. Two looks before an email, and one email per problem, because an alert that cries during every restart is switched off within a week. The check for a newer version asks a public address a public question and sends nothing, which is the least that can tell an owner that they are behind. It can still be turned off, because some installations must not call out at all.
 
 **Consequence:** the look comes from inside, so it is blind to the installation being unreachable from outside. Alerts depend on email being set up, and the page says so when it is not. Processes of versions before this one do not report in, so the page shows them as missing until they are updated. An installation made by hand has to be told its commit to be compared.
+
+## D-052 Movies and series are one resource with two sections, and genres and people are things of their own
+
+**Date:** 2026-11-22
+
+- **One table and one API resource for titles, two sections in the panel.** `/movies` and `/series` have their own lists, filters and wording. `GET /titles?type=` serves both.
+- **Genres are separate from categories.** A genre is what a title is; a category is a shelf the operator arranges.
+- **People are entries of the catalog,** connected to titles by credits with a kind (cast or crew), a part, and an order. An imported person keeps the id of the source and is found again by it.
+- **Facts are columns of the title,** with countries, studios and keywords as lists of texts.
+- **What nobody types follows the source:** rating, votes, the state of a series. Everything else an import only fills where it is empty.
+
+**Why:** a movie and a series share nearly everything that is stored (texts, artwork, access, publishing), and splitting the table would double every query, filter and billing rule that says "title". What differs is the work: a movie is finished when its one video is there, a series is a grid that fills up over weeks. That is a difference of screens, so the split is made there. Genres were categories at first because it was the cheapest thing to do, and it mixed two meanings: an import created shelves the operator never asked for, and a shelf could not be reordered without touching what a title "is". People need their own entries because the questions asked of them cross titles: everything with this actor. Text fields on a title cannot answer that. Studios and keywords are lists of texts and not entries, because nothing is asked of a studio yet beyond showing and searching it, and a table for each would be paid for with joins on every list.
+
+**Consequence:** the panel has one more concept to explain, genre beside category, and says so on the card. Installations that imported before this keep the categories those imports made; nothing is converted. Credits are replaced as a whole list, which is simple and right for a list edited by one person at a time, and loses the edit of whoever saves second. Studios and countries cannot be renamed in one place. The public catalog API and the website do not show genres, facts or people yet.
