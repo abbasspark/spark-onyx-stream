@@ -496,6 +496,9 @@ function LivePlayer({ channel, channels, playback, onBroken, onZap }: LivePlayer
             </span>
           ) : null}
           <h1 className="heading truncate text-lg">{channel.name}</h1>
+          {channel.now ? (
+            <p className="hidden truncate text-sm text-smoke sm:block">{channel.now.title}</p>
+          ) : null}
         </div>
       </div>
 

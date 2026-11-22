@@ -118,6 +118,26 @@ export interface Channel {
   packageIds: string[];
   /** Whether the channel is sending right now. */
   onAir: boolean;
+  /** What the guide says is on now and after it. Left out by an API older than the guide. */
+  now?: Programme | null;
+  next?: Programme | null;
+}
+
+/** One programme on a channel. */
+export interface Programme {
+  title: string;
+  subtitle: string | null;
+  description: string | null;
+  category: string | null;
+  startsAt: string;
+  endsAt: string;
+}
+
+/** The programmes of the channels in a stretch of time. */
+export interface Guide {
+  from: string;
+  to: string;
+  channels: { slug: string; programmes: Programme[] }[];
 }
 
 /** Where to watch a channel, for a short time. */

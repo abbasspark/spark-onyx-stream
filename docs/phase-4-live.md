@@ -2,7 +2,7 @@
 
 Live adds channels: streams that run around the clock, or for the length of an event, and that viewers join while they run.
 
-It is built in steps. This document describes what is built so far: channels the server pulls from an address or that an encoder pushes to it, kept running by a live process, passed through untouched or transcoded into several qualities, with signed delivery, a page in the admin panel, and the channels on the viewer website for those who may watch them.
+It is built in steps. This document describes what is built so far: channels the server pulls from an address or that an encoder pushes to it, kept running by a live process, passed through untouched or transcoded into several qualities, with signed delivery, a page in the admin panel, the channels on the viewer website for those who may watch them, and the programme guide.
 
 ## Model
 
@@ -139,6 +139,50 @@ Asking to watch answers 401 without a viewer where one is needed, 402 with `subs
 
 On the website, **Live** lists the channels as a lineup, with what is on air and a mark on those that need another plan. The page of a channel plays it over the whole window, with the lineup one key away and the arrow keys for the channel before and after. A channel that is off air is waited for: the picture starts by itself. When a signed address runs out during a long session, the player asks for a new one and goes on.
 
+## The programme guide
+
+The guide says what each channel shows and when. Viewers meet it in three places: "now" and "next" in the lineup, the name of the running programme in the player, and the guide of the day as a timetable.
+
+### Where programmes come from
+
+- **Guide sources**: files in the XMLTV format at a web address, which is how guide providers deliver. A source is fetched when it is added, again every `GUIDE_REFRESH_HOURS` (6) by the scheduler, and whenever an admin asks. Packed files (gzip) are unpacked, whatever their name.
+- **By hand**: an admin enters a programme for a channel. This is for channels no provider covers, such as the operator's own.
+
+A channel is **linked** to a source by the id the source uses for it (`guideId`). After its first import, a source lists the channels it knows, and the panel offers them when a channel is linked. Only programmes of linked channels are kept, from six hours back to fourteen days ahead.
+
+- **An import replaces what the source brought before,** as a whole, so nothing the provider dropped stays behind. Programmes entered by hand are never touched.
+- **A failed import changes nothing.** The guide of the last good import stays, and the source shows what went wrong.
+- **Imported programmes cannot be changed here.** The next import would undo the change, so they are changed at the provider.
+- **The address of a source is stored encrypted** and shown without its query, where tokens usually are. Only http and https addresses are taken.
+- **Files are read piece by piece,** so a guide of hundreds of megabytes needs little memory. A file larger than 400 MB unpacked is not read to its end.
+- **Programmes that ended more than two days ago are deleted.**
+
+When two sources, or a source and a hand-made entry, describe the same slot of a channel, viewers are shown the one that starts first.
+
+### API
+
+| Method and path                           | Permission   | Purpose                                         |
+| ----------------------------------------- | ------------ | ----------------------------------------------- |
+| `GET /v1/guide/sources`                   | `live:read`  | Sources with the result of their last import    |
+| `POST /v1/guide/sources`                  | `live:write` | Add a source                                    |
+| `GET /v1/guide/sources/:id/url`           | `live:write` | The full address of a source, for the edit form |
+| `PATCH /v1/guide/sources/:id`             | `live:write` | Change a source                                 |
+| `DELETE /v1/guide/sources/:id`            | `live:write` | Delete a source with everything it brought      |
+| `POST /v1/guide/sources/:id/import`       | `live:write` | Import now. Answers when the import is done     |
+| `GET /v1/guide/channels?q=`               | `live:read`  | Channels the sources know, to link to           |
+| `GET /v1/channels/:id/programmes?from&to` | `live:read`  | Programmes of a channel in a stretch of time    |
+| `POST /v1/channels/:id/programmes`        | `live:write` | Enter a programme by hand                       |
+| `PATCH /v1/programmes/:id`                | `live:write` | Change one that was entered by hand             |
+| `DELETE /v1/programmes/:id`               | `live:write` | Delete one that was entered by hand             |
+
+For viewers, `GET /v1/catalog/channels` carries `now` and `next` for each channel, and `GET /v1/catalog/guide?from=&hours=` gives the programmes of all published channels in a stretch of up to 48 hours, by default 24 hours from an hour ago.
+
+### In the panel and on the website
+
+**Live → Guide** shows the day of a channel programme by programme, with what is on now, lets an admin link the channel to a source and enter programmes by hand, and lists the sources with the result of their last import.
+
+On the website, the lineup shows what is on and what is next with a bar for how far it has run. **The guide for today** is a timetable with a row per channel and a line at the present moment. Times are shown in the viewer's own time zone.
+
 ## The live process
 
 Processes with the `live` role keep the channels running. In development one process has every role. The Compose file starts a `live` container of its own.
@@ -195,6 +239,7 @@ Changes are written to the audit log, with the source in its form without secret
 | `LIVE_SEGMENT_SECONDS`   | `4`                     | Wanted length of a segment, 1 to 10                                               |
 | `LIVE_PLAYLIST_SEGMENTS` | `6`                     | Segments in the playlist, 3 to 60                                                 |
 | `LIVE_TRANSCODE_PRESET`  | `veryfast`              | Speed of the encoder for transcoded channels, `ultrafast` to `medium`             |
+| `GUIDE_REFRESH_HOURS`    | `6`                     | Hours after which guide sources are imported again, 1 to 168                      |
 | `INGEST_API_URL`         | `http://127.0.0.1:9997` | Control API of the ingest server, as the platform reaches it                      |
 | `INGEST_RTSP_URL`        | `rtsp://127.0.0.1:8554` | Where live processes read pushed streams                                          |
 | `INGEST_PUBLIC_RTMP_URL` | empty                   | Address for encoders as shown to admins, such as `rtmp://stream.example.com:1935` |
@@ -211,7 +256,7 @@ With several servers, the live processes and the gateway need the same `LIVE_PAT
 - Encoding on graphics cards, and qualities with bitrates of your own
 - Pushing from a browser (WebRTC), and RTMPS
 - Going back in time (DVR) and recording
-- A programme guide (EPG)
+- Pictures and age ratings of programmes, reminders, and uploading a guide file instead of an address
 - Channels on the home page and in search, and how many people are watching
 - Audio-only channels, several audio languages and subtitles
 - Pictures of channels (logos, live thumbnails)

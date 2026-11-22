@@ -4,6 +4,9 @@ import { MAX_SLUG_LENGTH, SLUG_PATTERN } from '../catalog/slug.js';
 import { LIVE_QUALITIES, type LiveQuality } from './live-ladder.js';
 import { InvalidSourceError, parseSource } from './live-source.js';
 
+/** Names for addresses that the viewer website uses for pages of its own. */
+export const RESERVED_SLUGS: readonly string[] = ['guide'];
+
 const name = z
   .string()
   .transform((value) => value.replace(/\s+/g, ' ').trim())
@@ -14,7 +17,11 @@ const slug = z
   .trim()
   .min(1)
   .max(MAX_SLUG_LENGTH)
-  .regex(SLUG_PATTERN, 'Use lowercase letters, digits and single dashes');
+  .regex(SLUG_PATTERN, 'Use lowercase letters, digits and single dashes')
+  // The website has its guide at the address a channel of this name would get.
+  .refine((value) => !RESERVED_SLUGS.includes(value), {
+    message: 'This name is used by the website itself. Choose another',
+  });
 
 const number = z
   .number()
@@ -68,6 +75,14 @@ const ingest = z.enum(['PULL', 'PUSH']);
 
 const access = z.enum(['FREE', 'PAID']);
 
+/** The id of the channel in guide sources. Empty means not linked. */
+const guideId = z
+  .string()
+  .trim()
+  .max(200)
+  .nullable()
+  .transform((value) => value || null);
+
 /** Packages the channel is in, without repeats. */
 const packageIds = z
   .array(z.uuid())
@@ -108,6 +123,7 @@ export const createChannelSchema = z
     published: z.boolean().default(false),
     access: access.default('FREE'),
     packageIds: packageIds.default([]),
+    guideId: guideId.default(null),
     /** Start the channel as soon as it exists. */
     start: z.boolean().default(false),
   })
@@ -127,6 +143,7 @@ export const updateChannelSchema = z
     published: z.boolean(),
     access,
     packageIds,
+    guideId,
   })
   .partial()
   .refine((value) => Object.keys(value).length > 0, { message: 'Nothing to change' })

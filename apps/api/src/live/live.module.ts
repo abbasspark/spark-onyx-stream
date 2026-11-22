@@ -11,7 +11,7 @@ import { IngestController } from './ingest.controller.js';
 import { IngestService } from './ingest.service.js';
 import { LiveMediaController } from './live-media.controller.js';
 import { LivePlaybackService } from './live-playback.service.js';
-import { PublicChannelsController } from './public-channels.controller.js';
+import { PublicChannelsController, PublicGuideController } from './public-channels.controller.js';
 import { PublicChannelsService } from './public-channels.service.js';
 import { LiveSupervisorService } from './live-supervisor.service.js';
 
@@ -23,6 +23,7 @@ import { LiveSupervisorService } from './live-supervisor.service.js';
     IngestController,
     LiveMediaController,
     PublicChannelsController,
+    PublicGuideController,
   ],
   providers: [
     ChannelsService,

@@ -37,6 +37,8 @@ export class AppConfig {
     readonly publicRtmpUrl: string | null;
     readonly publicSrtUrl: string | null;
   };
+  /** Time after which a guide source is imported again, in milliseconds. */
+  readonly guideRefreshMs: number;
   readonly workerConcurrency: number;
   /** Where live channels write their output, and how it is cut. */
   readonly live: {
@@ -113,6 +115,7 @@ export class AppConfig {
       publicRtmpUrl: env.INGEST_PUBLIC_RTMP_URL || null,
       publicSrtUrl: env.INGEST_PUBLIC_SRT_URL || null,
     };
+    this.guideRefreshMs = env.GUIDE_REFRESH_HOURS * 60 * 60 * 1000;
     this.workerConcurrency = env.WORKER_CONCURRENCY;
     this.live = {
       path: path.resolve(baseDirectory, env.LIVE_PATH),

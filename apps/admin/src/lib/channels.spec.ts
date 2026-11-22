@@ -34,6 +34,7 @@ const channel = (change: Partial<Channel> = {}): Channel => ({
   mode: 'COPY',
   qualities: [],
   outputs: null,
+  guideId: null,
   published: false,
   access: 'FREE',
   packages: [],

@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 import type { Metadata } from 'next';
+import Link from 'next/link';
 import { ChannelLineup } from '@/components/channel-lineup';
 import { getChannels } from '@/lib/api';
 
@@ -24,6 +25,13 @@ export default async function LivePage() {
               ? 'No channel is on air at the moment. Channels start playing as soon as they are.'
               : `${onAir} of ${channels.length} ${channels.length === 1 ? 'channel' : 'channels'} ${onAir === 1 ? 'is' : 'are'} on air right now.`}
         </p>
+        {channels.some((channel) => channel.now || channel.next) ? (
+          <p>
+            <Link href="/live/guide" className="button button-quiet">
+              The guide for today
+            </Link>
+          </p>
+        ) : null}
       </header>
       {channels.length > 0 ? <ChannelLineup channels={channels} /> : null}
     </div>

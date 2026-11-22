@@ -1027,6 +1027,8 @@ export interface Channel {
   qualities: number[];
   /** The qualities the channel is encoded into, once the source is known. */
   outputs: ChannelOutput[] | null;
+  /** The id of the channel in guide sources. Null when it is not linked. */
+  guideId: string | null;
   /** Whether viewers find the channel on the website and in the apps. */
   published: boolean;
   /** FREE is as open as the site. PAID needs a plan that opens the channel. */
@@ -1064,6 +1066,7 @@ export interface ChannelInput {
   source?: string;
   mode?: ChannelMode;
   qualities?: number[];
+  guideId?: string | null;
   published?: boolean;
   access?: 'FREE' | 'PAID';
   packageIds?: string[];
@@ -1086,4 +1089,59 @@ export interface LivePlayback {
   protocol: 'hls';
   url: string;
   expiresAt: string;
+}
+
+// --- Programme guide -----------------------------------------------------------
+
+/** A place the guide is imported from: an XMLTV file at an address. */
+export interface GuideSource {
+  id: string;
+  name: string;
+  /** The address without anything secret. */
+  url: string;
+  enabled: boolean;
+  lastRun: { at: string; ok: boolean; message: string } | null;
+  /** Programmes it holds for channels of this installation. */
+  programmes: number;
+  /** Channels its file lists. */
+  channels: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface GuideImportResult {
+  ok: boolean;
+  message: string;
+  programmes: number;
+  channels: number;
+  linked: number;
+}
+
+/** A channel some guide source knows. */
+export interface KnownGuideChannel {
+  guideId: string;
+  name: string;
+  source: string;
+}
+
+export interface Programme {
+  id: string;
+  channelId: string;
+  title: string;
+  subtitle: string | null;
+  description: string | null;
+  category: string | null;
+  startsAt: string;
+  endsAt: string;
+  /** Null for a programme an admin entered, which can be changed. */
+  source: { id: string; name: string } | null;
+}
+
+export interface ProgrammeInput {
+  title: string;
+  subtitle: string | null;
+  description: string | null;
+  category: string | null;
+  startsAt: string;
+  endsAt: string;
 }

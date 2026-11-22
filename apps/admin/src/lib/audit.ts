@@ -2,6 +2,10 @@
 
 /** What each action code of the audit log means, in words. */
 const ACTION_LABELS: Record<string, string> = {
+  'guide-source.create': 'Added a guide source',
+  'guide-source.update': 'Changed a guide source',
+  'guide-source.delete': 'Deleted a guide source',
+  'guide-source.import': 'Imported a guide source',
   'channel.create': 'Created a channel',
   'channel.update': 'Changed a channel',
   'channel.delete': 'Deleted a channel',

@@ -25,6 +25,7 @@ import { MetadataModule } from './metadata/metadata.module.js';
 import { ViewersModule } from './viewers/viewers.module.js';
 import { WatchingModule } from './watching/watching.module.js';
 import type { AppRole } from './roles/app-role.js';
+import { GuideModule } from './guide/guide.module.js';
 import { LiveModule } from './live/live.module.js';
 import { LiveRoleModule, SchedulerRoleModule, WorkerRoleModule } from './roles/role.modules.js';
 
@@ -46,6 +47,7 @@ const ROLE_MODULES: Record<AppRole, Type[]> = {
     ViewersModule,
     WatchingModule,
     LiveModule,
+    GuideModule,
     EventStreamModule,
     HealthModule,
   ],

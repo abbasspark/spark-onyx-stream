@@ -1,6 +1,11 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 import { download, request, uploadFile } from './client';
 import type {
+  GuideImportResult,
+  GuideSource,
+  KnownGuideChannel,
+  Programme,
+  ProgrammeInput,
   EncoderSettings,
   Channel,
   ChannelDetails,
@@ -400,4 +405,31 @@ export const channelsApi = {
     request<SourceProbe>('/v1/channels/probe', { method: 'POST', body: { source }, signal }),
   playback: (id: string, signal?: AbortSignal) =>
     request<LivePlayback>(`/v1/channels/${id}/playback`, { method: 'POST', signal }),
+};
+
+export const guideApi = {
+  sources: (signal?: AbortSignal) => request<GuideSource[]>('/v1/guide/sources', { signal }),
+  /** The full address of a source, which may carry a token. */
+  sourceUrl: (id: string, signal?: AbortSignal) =>
+    request<{ url: string }>(`/v1/guide/sources/${id}/url`, { signal }),
+  createSource: (body: { name: string; url: string; enabled: boolean }) =>
+    request<GuideSource>('/v1/guide/sources', { method: 'POST', body }),
+  updateSource: (id: string, body: { name?: string; url?: string; enabled?: boolean }) =>
+    request<GuideSource>(`/v1/guide/sources/${id}`, { method: 'PATCH', body }),
+  removeSource: (id: string) => request<void>(`/v1/guide/sources/${id}`, { method: 'DELETE' }),
+  /** Fetches and reads the file now. Answers when it is done, which can take a minute. */
+  importSource: (id: string) =>
+    request<GuideImportResult>(`/v1/guide/sources/${id}/import`, { method: 'POST' }),
+  known: (q: string, signal?: AbortSignal) =>
+    request<KnownGuideChannel[]>(`/v1/guide/channels?q=${encodeURIComponent(q)}`, { signal }),
+  programmes: (channelId: string, from: string, to: string, signal?: AbortSignal) =>
+    request<Programme[]>(
+      `/v1/channels/${channelId}/programmes?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`,
+      { signal },
+    ),
+  createProgramme: (channelId: string, body: ProgrammeInput) =>
+    request<Programme>(`/v1/channels/${channelId}/programmes`, { method: 'POST', body }),
+  updateProgramme: (id: string, body: Partial<ProgrammeInput>) =>
+    request<Programme>(`/v1/programmes/${id}`, { method: 'PATCH', body }),
+  removeProgramme: (id: string) => request<void>(`/v1/programmes/${id}`, { method: 'DELETE' }),
 };

@@ -128,6 +128,13 @@ describe.skipIf(!TEST_DATABASE_URL)('Live channels (e2e)', () => {
       ]);
     });
 
+    it('keeps the names the website uses for its own pages free', async () => {
+      const named = await create({ name: 'Guide' }).expect(201);
+      expect(named.body.slug).toBe('guide-2');
+      const asked = await create({ name: 'Other', slug: 'guide' }).expect(400);
+      expect(asked.body.issues[0].field).toBe('slug');
+    });
+
     it('gives two channels of the same name different slugs', async () => {
       await create().expect(201);
       const second = await create().expect(201);

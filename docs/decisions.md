@@ -528,3 +528,17 @@ This replaces the "plain CSS without a component library" part of D-018.
 **Why:** an operator thinks in offers such as "Sports" or "Kids", not in kinds of video, so a package has to be able to hold both and a plan has to open both at once. Using the rule that already exists means there is one thing to explain and one function that decides. Channels are kept apart from titles in the catalog because nearly everything else about them differs: no poster, no length, no episodes, no position to resume at, and a state that changes by the second. Listing channels that are off air keeps the lineup stable and tells a viewer that a channel exists and will be back.
 
 **Consequence:** a channel cannot be sold on its own, only through plans. Whether a channel is on air is known to everyone who can list it. Search and the home page do not show channels yet.
+
+## D-041 The guide is imported from XMLTV and replaced source by source
+
+**Date:** 2026-11-22
+
+- **Guide sources are XMLTV files at web addresses,** fetched by the scheduler every few hours. Programmes can also be entered by hand.
+- **A channel is linked to a source by the id the source gives it.** Only programmes of linked channels are kept, for a window from a few hours back to two weeks ahead.
+- **Each import replaces everything its source brought before,** inside one transaction. A failed import leaves the guide as it was.
+- **Imported programmes are read-only.** Programmes entered by hand belong to the installation and are never touched by an import.
+- **Viewers get "now" and "next" with the list of channels,** and the timetable from its own address.
+
+**Why:** XMLTV is what guide providers and the tools around them produce, so reading it covers nearly every operator without a format of our own. Linking by the provider's id is the one piece of manual work, done once per channel, and the panel offers the ids so nobody types them from a file. Replacing a source as a whole is simple to reason about and repairs itself: whatever the provider changed, moved or withdrew is right after the next import, and there is no merge to get wrong. Keeping a window instead of the whole file keeps the table small however large the file is. Refusing edits to imported programmes avoids changes that vanish a few hours later. Sending now and next with the lineup makes the page that viewers open most cost one request.
+
+**Consequence:** a provider's mistake reaches viewers until the provider fixes it, or the channel is unlinked and filled by hand. Two sources covering the same channel are not merged: the programme that starts first is shown. The guide is as fresh as the last import, a few hours at worst. Pictures, ratings and credits in XMLTV files are not read.

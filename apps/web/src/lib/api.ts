@@ -7,6 +7,7 @@ import { TtlCache } from './ttl-cache';
 import type {
   Category,
   Channel,
+  Guide,
   Home,
   Page,
   TitleCard,
@@ -161,4 +162,19 @@ export async function getChannels(): Promise<Channel[]> {
 /** @returns Null when no channel that viewers can see has this slug. */
 export async function getChannel(slug: string): Promise<Channel | null> {
   return (await getChannels()).find((channel) => channel.slug === slug) ?? null;
+}
+
+/**
+ * The guide of the next day: what each channel shows, from an hour ago on.
+ * A site whose API is older than the guide has an empty one.
+ */
+export async function getGuide(): Promise<Guide | null> {
+  try {
+    return await read<Guide>('/guide');
+  } catch (error) {
+    if (error instanceof CatalogError && error.status === 404) {
+      return null;
+    }
+    throw error;
+  }
 }

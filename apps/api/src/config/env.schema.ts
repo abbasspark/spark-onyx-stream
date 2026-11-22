@@ -265,6 +265,8 @@ export const envSchema = z
     LIVE_TRANSCODE_PRESET: z
       .enum(['ultrafast', 'superfast', 'veryfast', 'faster', 'fast', 'medium'])
       .default('veryfast'),
+    /** Hours after which the programme guide is imported again from its sources. */
+    GUIDE_REFRESH_HOURS: z.coerce.number().int().min(1).max(168).default(6),
     /** Control API of the ingest server (MediaMTX), as the API and the live processes reach it. */
     INGEST_API_URL: z.url().default('http://127.0.0.1:9997'),
     /** RTSP address of the ingest server, as the live processes reach it. */
