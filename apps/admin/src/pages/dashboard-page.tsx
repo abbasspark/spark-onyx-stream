@@ -240,7 +240,7 @@ export function DashboardPage() {
               label="Titles in the catalog"
               value={data.catalog.titles}
               detail={`${data.catalog.published} published · ${data.catalog.drafts} ${data.catalog.drafts === 1 ? 'draft' : 'drafts'}`}
-              to={can('catalog:read') ? '/titles' : undefined}
+              to={can('catalog:read') ? '/movies' : undefined}
             />
             <StatTile
               icon={UsersRound}

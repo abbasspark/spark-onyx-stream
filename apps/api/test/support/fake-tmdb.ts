@@ -59,6 +59,32 @@ const MATRIX = {
       { iso_3166_1: 'US', release_dates: [{ certification: '' }, { certification: 'R' }] },
     ],
   },
+  runtime: 136,
+  production_countries: [{ iso_3166_1: 'US' }, { iso_3166_1: 'AU' }],
+  production_companies: [{ name: 'Village Roadshow Pictures' }, { name: 'Silver Pictures' }],
+  vote_average: 8.219,
+  vote_count: 26_000,
+  status: 'Released',
+  imdb_id: 'tt0133093',
+  keywords: { keywords: [{ name: 'hacker' }, { name: 'dystopia' }] },
+  credits: {
+    cast: [
+      {
+        id: 6384,
+        name: 'Keanu Reeves',
+        character: 'Neo',
+        order: 0,
+        profile_path: '/keanu.jpg',
+        known_for_department: 'Acting',
+      },
+      { id: 530, name: 'Carrie-Anne Moss', character: 'Trinity', order: 1, profile_path: null },
+    ],
+    crew: [
+      { id: 9340, name: 'Lana Wachowski', job: 'Director', profile_path: '/lana.jpg' },
+      { id: 9340, name: 'Lana Wachowski', job: 'Screenplay', profile_path: '/lana.jpg' },
+      { id: 1, name: 'A Gaffer', job: 'Gaffer' },
+    ],
+  },
 };
 
 const DEEP = {
@@ -74,10 +100,39 @@ const DEEP = {
   backdrop_path: null,
   images: { logos: [] },
   content_ratings: { results: [{ iso_3166_1: 'US', rating: 'TV-PG' }] },
+  last_air_date: '2022-03-13',
+  episode_run_time: [48],
+  status: 'Returning Series',
+  vote_average: 7.4,
+  vote_count: 120,
+  external_ids: { imdb_id: 'tt7654321' },
+  keywords: { results: [{ name: 'ocean' }] },
+  created_by: [{ id: 77, name: 'Ada Creator' }],
+  aggregate_credits: {
+    cast: [
+      {
+        id: 6384,
+        name: 'Keanu Reeves',
+        order: 0,
+        profile_path: '/keanu.jpg',
+        roles: [
+          { character: 'A fish', episode_count: 1 },
+          { character: 'The Narrator', episode_count: 3 },
+        ],
+      },
+    ],
+    crew: [{ id: 78, name: 'Dee Director', jobs: [{ job: 'Director', episode_count: 3 }] }],
+  },
   seasons: [
     { season_number: 0, name: 'Specials', episode_count: 1 },
-    { season_number: 1, name: 'Season 1', episode_count: 2 },
-    { season_number: 2, name: 'The Abyss', episode_count: 1 },
+    {
+      season_number: 1,
+      name: 'Season 1',
+      episode_count: 2,
+      air_date: '2021-09-05',
+      poster_path: '/season-1.jpg',
+    },
+    { season_number: 2, name: 'The Abyss', episode_count: 1, air_date: '2022-03-13' },
     { season_number: 3, name: 'Season 3', episode_count: 0 },
   ],
 };
@@ -122,8 +177,22 @@ function defaults(): Record<string, unknown> {
       name: 'Season 1',
       overview: 'The first dives.',
       episodes: [
-        { episode_number: 2, name: 'Midnight Zone', overview: 'No light.', still_path: null },
-        { episode_number: 1, name: 'The Shelf', overview: 'Sunlit.', still_path: '/still-1.jpg' },
+        {
+          episode_number: 2,
+          name: 'Midnight Zone',
+          overview: 'No light.',
+          still_path: null,
+          air_date: '2021-09-12',
+          runtime: 51,
+        },
+        {
+          episode_number: 1,
+          name: 'The Shelf',
+          overview: 'Sunlit.',
+          still_path: '/still-1.jpg',
+          air_date: '2021-09-05',
+          runtime: 47,
+        },
         { episode_number: 1, name: 'A duplicate', overview: 'Ignored.' },
         { name: 'No number' },
       ],
@@ -144,6 +213,9 @@ function pictures(): Record<string, Buffer> {
     '/logo-fr.png': png(500, 200),
     '/deep-poster.jpg': png(1000, 1500),
     '/still-1.jpg': png(1280, 720),
+    '/keanu.jpg': png(421, 632),
+    '/lana.jpg': png(421, 632),
+    '/season-1.jpg': png(1000, 1500),
   };
 }
 

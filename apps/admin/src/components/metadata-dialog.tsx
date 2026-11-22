@@ -19,6 +19,7 @@ import { Button } from '@/components/ui/button';
 import { Badge, ErrorNote, Facts, Skeleton } from '@/components/ui/display';
 import { Checkbox, Input, Label, Select, ToggleRow } from '@/components/ui/form';
 import { Dialog, DialogBody, DialogContent, DialogFooter } from '@/components/ui/overlay';
+import { formatRating, formatRuntime, titlePath } from '@/lib/catalog';
 import { cn } from '@/lib/cn';
 import { describeSeasons, languageOptions, sourceUrl } from '@/lib/metadata';
 
@@ -27,6 +28,8 @@ interface MetadataDialogProps {
   onOpenChange: (open: boolean) => void;
   /** Set to bring details into this title. Left out, the import creates a new title. */
   title?: TitleDetail;
+  /** For a new title: whether a movie or a series is looked for. Left out, the admin chooses. */
+  kind?: TitleType;
   onDone: (result: ImportResult) => void;
 }
 
@@ -37,6 +40,9 @@ const KINDS: [TitleType, typeof Clapperboard, string][] = [
 
 interface Parts {
   text: boolean;
+  genres: boolean;
+  people: boolean;
+  portraits: boolean;
   categories: boolean;
   createCategories: boolean;
   artwork: boolean;
@@ -47,7 +53,11 @@ interface Parts {
 
 const ALL_PARTS: Parts = {
   text: true,
-  categories: true,
+  genres: true,
+  people: true,
+  portraits: true,
+  // Categories are the shelves an admin arranges by hand. Genres come as genres.
+  categories: false,
   createCategories: true,
   artwork: true,
   episodes: true,
@@ -69,8 +79,8 @@ function useDebounced<Value>(value: Value, delayMs: number): Value {
  * Finds a title at The Movie Database, shows what an import would bring, and
  * imports it: as a new draft, or into the title that is being edited.
  */
-export function MetadataDialog({ open, onOpenChange, title, onDone }: MetadataDialogProps) {
-  const [type, setType] = useState<TitleType>(title?.type ?? 'MOVIE');
+export function MetadataDialog({ open, onOpenChange, title, kind, onDone }: MetadataDialogProps) {
+  const [type, setType] = useState<TitleType>(title?.type ?? kind ?? 'MOVIE');
   const [query, setQuery] = useState('');
   const [year, setYear] = useState('');
   const [language, setLanguage] = useState<string | null>(null);
@@ -86,7 +96,7 @@ export function MetadataDialog({ open, onOpenChange, title, onDone }: MetadataDi
   // Each opening starts fresh: a title that was imported before opens on its entry.
   useEffect(() => {
     if (open) {
-      setType(title?.type ?? 'MOVIE');
+      setType(title?.type ?? kind ?? 'MOVIE');
       setQuery(title?.name ?? '');
       setYear('');
       setLanguage(title?.metadata?.language ?? null);
@@ -96,10 +106,16 @@ export function MetadataDialog({ open, onOpenChange, title, onDone }: MetadataDi
   }, [open]);
 
   const effectiveLanguage = language ?? status.data?.language ?? 'en-US';
-  const heading = title ? `Details for ${title.name}` : 'Import a title';
+  const heading = title
+    ? `Details for ${title.name}`
+    : kind === 'SERIES'
+      ? 'Import a series'
+      : kind === 'MOVIE'
+        ? 'Import a movie'
+        : 'Import a title';
   const description = title
-    ? 'Fills this title with details, artwork and episodes from The Movie Database.'
-    : 'Creates a draft from The Movie Database, with details, artwork and episodes. You attach the videos afterwards.';
+    ? 'Fills this title with details, artwork, cast and crew from The Movie Database.'
+    : 'Creates a draft from The Movie Database, with details, artwork, cast and crew, and the episodes of a series. You attach the videos afterwards.';
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -126,7 +142,7 @@ export function MetadataDialog({ open, onOpenChange, title, onDone }: MetadataDi
         ) : (
           <SearchStep
             type={type}
-            typeFixed={title !== undefined}
+            typeFixed={title !== undefined || kind !== undefined}
             onType={setType}
             query={query}
             onQuery={setQuery}
@@ -433,7 +449,12 @@ function Review({ metadataId, language, title, onBack, onDone }: ReviewProps) {
   const other =
     data?.existingTitleId && data.existingTitleId !== title?.id ? data.existingTitleId : null;
   const nothingChosen =
-    !parts.text && !parts.categories && !parts.artwork && !(isSeries && parts.episodes);
+    !parts.text &&
+    !parts.genres &&
+    !parts.people &&
+    !parts.categories &&
+    !parts.artwork &&
+    !(isSeries && parts.episodes);
   const blocked = !data || wrongKind || nothingChosen || (!title && other !== null && !duplicate);
   const link = sourceUrl(metadataId);
 
@@ -474,6 +495,22 @@ function Review({ metadataId, language, title, onBack, onDone }: ReviewProps) {
                       ? ([['Original name', data.originalName]] as [string, ReactNode][])
                       : []),
                     ['Age rating', data.ageRating ?? 'None for your country'],
+                    [
+                      isSeries ? 'An episode runs' : 'Length',
+                      data.runtimeMinutes ? formatRuntime(data.runtimeMinutes) : 'Unknown',
+                    ],
+                    ...(data.rating !== null
+                      ? ([['Rating at TMDB', `${formatRating(data.rating)} of 10`]] as [
+                          string,
+                          ReactNode,
+                        ][])
+                      : []),
+                    [
+                      'People',
+                      data.cast + data.crew === 0
+                        ? 'None listed'
+                        : `${data.cast} cast, ${data.crew} crew${data.leads.length > 0 ? `: ${data.leads.join(', ')}` : ''}`,
+                    ],
                     ['Original language', data.originalLanguage ?? 'Unknown'],
                     ...(isSeries
                       ? ([['Content', describeSeasons(data.seasons) ?? 'No episodes yet']] as [
@@ -526,7 +563,7 @@ function Review({ metadataId, language, title, onBack, onDone }: ReviewProps) {
                 <p>
                   The catalog already has a title made from this entry.{' '}
                   <Link
-                    to={`/titles/${other}`}
+                    to={titlePath({ id: other, type: data.type })}
                     className="font-medium underline underline-offset-4"
                   >
                     Open it
@@ -549,9 +586,28 @@ function Review({ metadataId, language, title, onBack, onDone }: ReviewProps) {
               <div className="grid gap-x-6 gap-y-2.5 sm:grid-cols-2">
                 <Part
                   label="Texts"
-                  description="Names, tagline, synopsis, year, age rating."
+                  description="Names, synopsis, age rating, and the facts: premiere, length, countries, studios."
                   checked={parts.text}
                   onChange={(text) => set({ text })}
+                />
+                <Part
+                  label="Genres"
+                  description="What kind of story it is. New genres are added."
+                  checked={parts.genres}
+                  onChange={(genres) => set({ genres })}
+                />
+                <Part
+                  label="Cast and crew"
+                  description="The first twenty of the cast, and the crew people look titles up by."
+                  checked={parts.people}
+                  onChange={(people) => set({ people })}
+                />
+                <Part
+                  label="A picture of each person"
+                  description="For those who have none yet. Copied into your storage."
+                  checked={parts.people && parts.portraits}
+                  disabled={!parts.people}
+                  onChange={(portraits) => set({ portraits })}
                 />
                 <Part
                   label="Artwork"
@@ -560,14 +616,14 @@ function Review({ metadataId, language, title, onBack, onDone }: ReviewProps) {
                   onChange={(artwork) => set({ artwork })}
                 />
                 <Part
-                  label="Categories"
-                  description="From the genres of the title."
+                  label="Also as categories"
+                  description="Puts the title on the shelves named like its genres."
                   checked={parts.categories}
                   onChange={(categories) => set({ categories })}
                 />
                 <Part
                   label="Create missing categories"
-                  description="Off, genres you have no category for are left out."
+                  description="Off, only categories you already have are used."
                   checked={parts.categories && parts.createCategories}
                   disabled={!parts.categories}
                   onChange={(createCategories) => set({ createCategories })}
@@ -576,7 +632,7 @@ function Review({ metadataId, language, title, onBack, onDone }: ReviewProps) {
                   <>
                     <Part
                       label="Seasons and episodes"
-                      description="As drafts, with name and synopsis."
+                      description="As drafts, with name, synopsis, air date and a poster per season."
                       checked={parts.episodes}
                       onChange={(episodes) => set({ episodes })}
                     />
@@ -602,7 +658,7 @@ function Review({ metadataId, language, title, onBack, onDone }: ReviewProps) {
             {title ? (
               <ToggleRow
                 label="Replace what this title already has"
-                description="Off, only empty fields are filled and missing episodes added, so nothing you typed is lost. On, texts and pictures are replaced by those of the source. Videos, the address and what is published stay in both cases."
+                description="Off, only empty fields are filled and missing episodes added, so nothing you typed is lost, and a cast list you edited is kept. On, texts, pictures and the cast and crew are replaced by those of the source. Videos, the address and what is published stay in both cases."
                 checked={overwrite}
                 onCheckedChange={setOverwrite}
               />

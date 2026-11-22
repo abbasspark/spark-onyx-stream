@@ -187,7 +187,7 @@ export function CategoriesPage() {
                   <Td className="tabular-nums">
                     {category.titleCount > 0 ? (
                       <Link
-                        to={`/titles?category=${category.id}`}
+                        to={`/movies?category=${category.id}`}
                         className="text-primary hover:underline"
                       >
                         {category.titleCount}

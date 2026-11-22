@@ -12,6 +12,7 @@ import {
   EyeOff,
   Film,
   Lock,
+  Plus,
   MoreHorizontal,
   Rocket,
   Star,
@@ -19,15 +20,22 @@ import {
   TriangleAlert,
   Tv,
 } from 'lucide-react';
-import { type FormEvent, useEffect, useMemo, useState } from 'react';
-import { Link, useNavigate, useParams } from 'react-router';
+import { type FormEvent, type ReactNode, useEffect, useMemo, useState } from 'react';
+import { Link, useLocation, useNavigate, useParams } from 'react-router';
 import { toast } from 'sonner';
 import { ApiError, apiUrl } from '@/api/client';
-import { categoriesApi, packagesApi, purchasesApi, titlesApi } from '@/api/endpoints';
-import type { PublishStatus, TitleDetail, UpdateTitleInput } from '@/api/types';
+import { categoriesApi, genresApi, packagesApi, purchasesApi, titlesApi } from '@/api/endpoints';
+import type {
+  Credit,
+  PublishStatus,
+  SeriesStatus,
+  TitleDetail,
+  UpdateTitleInput,
+} from '@/api/types';
 import { useSession } from '@/auth/session';
 import { useConfirm } from '@/components/confirm';
 import { MetadataDialog } from '@/components/metadata-dialog';
+import { TitleCredits } from '@/components/title-credits';
 import { TitleEpisodes } from '@/components/title-episodes';
 import { TitleMedia } from '@/components/title-media';
 import { Button } from '@/components/ui/button';
@@ -46,7 +54,7 @@ import {
   TabsList,
   TabsTrigger,
 } from '@/components/ui/display';
-import { Field, Input, Textarea, ToggleRow } from '@/components/ui/form';
+import { Field, Input, Select, Textarea, ToggleRow } from '@/components/ui/form';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -57,10 +65,18 @@ import {
 } from '@/components/ui/overlay';
 import {
   changedFields,
+  countryName,
   describeContent,
   type DetailsForm,
+  factsProblem,
+  formatRating,
+  formatRuntime,
+  parseList,
   priceProblem,
+  sectionPath,
+  SERIES_STATUS_LOOKS,
   toForm,
+  yearsOf,
 } from '@/lib/catalog';
 import { parsePrice } from '@/lib/billing';
 import { cn } from '@/lib/cn';
@@ -79,6 +95,8 @@ export function TitleEditorPage() {
   const mayWrite = can('catalog:write');
   const confirm = useConfirm();
   const navigate = useNavigate();
+  // The address tells the section before the title is loaded: /series/… or /movies/….
+  const inSeries = useLocation().pathname.startsWith('/series');
   const queryClient = useQueryClient();
   const pollInterval = usePollInterval();
 
@@ -136,7 +154,7 @@ export function TitleEditorPage() {
       toast.success('Title deleted');
       queryClient.removeQueries({ queryKey: ['titles', 'detail', id] });
       refresh();
-      void navigate('/titles');
+      void navigate(sectionPath(query.data?.type ?? (inSeries ? 'SERIES' : 'MOVIE')));
     },
     onError: (error: Error) => toast.error(error.message),
   });
@@ -157,10 +175,12 @@ export function TitleEditorPage() {
     return missing ? (
       <EmptyState
         icon={Film}
-        title="Title not found"
+        title={inSeries ? 'Series not found' : 'Movie not found'}
         action={
           <Button asChild>
-            <Link to="/titles">Back to the titles</Link>
+            <Link to={inSeries ? '/series' : '/movies'}>
+              {inSeries ? 'Back to the series' : 'Back to the movies'}
+            </Link>
           </Button>
         }
       >
@@ -227,11 +247,11 @@ export function TitleEditorPage() {
   return (
     <>
       <Link
-        to="/titles"
+        to={sectionPath(title.type)}
         className="mb-3 inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground"
       >
         <ArrowLeft className="size-4" aria-hidden="true" />
-        Titles
+        {title.type === 'SERIES' ? 'Series' : 'Movies'}
       </Link>
 
       {mayWrite ? (
@@ -256,8 +276,26 @@ export function TitleEditorPage() {
           <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-muted-foreground">
             <TypeIcon className="size-4" aria-hidden="true" />
             {title.type === 'SERIES' ? 'Series' : 'Movie'}
-            {title.releaseYear ? <span>· {title.releaseYear}</span> : null}
+            {title.releaseYear ? (
+              <span>· {title.type === 'SERIES' ? yearsOf(title) : title.releaseYear}</span>
+            ) : null}
             <span>· {describeContent(title)}</span>
+            {title.type === 'MOVIE' && title.runtimeMinutes && title.asset?.status !== 'READY' ? (
+              <span>· {formatRuntime(title.runtimeMinutes)}</span>
+            ) : null}
+            {title.rating !== null ? (
+              <span className="inline-flex items-center gap-1">
+                ·
+                <Star className="size-3.5 fill-warning text-warning" aria-hidden="true" />
+                <span className="tabular-nums">{formatRating(title.rating)}</span>
+                <span className="sr-only">out of 10</span>
+              </span>
+            ) : null}
+            {title.seriesStatus ? (
+              <Badge tone={SERIES_STATUS_LOOKS[title.seriesStatus].tone} dot>
+                {SERIES_STATUS_LOOKS[title.seriesStatus].label}
+              </Badge>
+            ) : null}
             {title.isFeatured ? (
               <Badge tone="primary">
                 <Star className="size-3 fill-current" aria-hidden="true" />
@@ -362,7 +400,7 @@ export function TitleEditorPage() {
           defaultValue={title.type === 'SERIES' ? 'episodes' : 'details'}
           className="min-w-0"
         >
-          <TabsList>
+          <TabsList className="overflow-x-auto overflow-y-hidden pb-px [scrollbar-width:none]">
             {title.type === 'SERIES' ? (
               <TabsTrigger value="episodes">
                 Episodes
@@ -370,6 +408,10 @@ export function TitleEditorPage() {
               </TabsTrigger>
             ) : null}
             <TabsTrigger value="details">Details</TabsTrigger>
+            <TabsTrigger value="people">
+              Cast and crew
+              {title.credits.length > 0 ? <Badge>{title.credits.length}</Badge> : null}
+            </TabsTrigger>
             <TabsTrigger value="media">Media and artwork</TabsTrigger>
           </TabsList>
           {title.type === 'SERIES' ? (
@@ -379,6 +421,17 @@ export function TitleEditorPage() {
           ) : null}
           <TabsContent value="details">
             <DetailsTab key={title.id} title={title} disabled={!mayWrite} save={save} />
+          </TabsContent>
+          <TabsContent value="people">
+            <TitleCredits
+              key={title.id}
+              title={title}
+              disabled={!mayWrite}
+              onSaved={(credits: Credit[]) => {
+                queryClient.setQueryData(['titles', 'detail', id], { ...title, credits });
+                void queryClient.invalidateQueries({ queryKey: ['people'] });
+              }}
+            />
           </TabsContent>
           <TabsContent value="media">
             <TitleMedia title={title} disabled={!mayWrite} save={save} />
@@ -444,7 +497,7 @@ export function TitleEditorPage() {
               />
             ) : null}
             <CardContent className="flex gap-4">
-              <div className="aspect-[2/3] w-20 shrink-0 overflow-hidden rounded-md bg-muted">
+              <div className="aspect-[2/3] w-20 shrink-0 self-start overflow-hidden rounded-md bg-muted">
                 {title.poster ? (
                   <img src={apiUrl(title.poster.url)} alt="" className="size-full object-cover" />
                 ) : (
@@ -466,6 +519,22 @@ export function TitleEditorPage() {
                         ? `TMDB, ${title.metadata.syncedAt ? formatRelative(title.metadata.syncedAt) : 'imported'}`
                         : 'Typed by hand',
                     ],
+                    ...(title.imdbId
+                      ? [
+                          [
+                            'IMDb',
+                            <a
+                              href={`https://www.imdb.com/title/${title.imdbId}/`}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="inline-flex items-center gap-1 text-primary hover:underline"
+                            >
+                              {title.imdbId}
+                              <ExternalLink className="size-3.5" aria-hidden="true" />
+                            </a>,
+                          ] as [string, ReactNode],
+                        ]
+                      : []),
                     [
                       'Public data',
                       title.isVisible ? (
@@ -526,6 +595,24 @@ function DetailsTab({ title, disabled, save }: DetailsTabProps) {
   const changes = changedFields(saved, form, currency);
   const dirty = Object.keys(changes).length > 0;
   const pricesWrong = priceProblem(form, currency);
+  const factsWrong = factsProblem(form);
+  const genres = useQuery({
+    queryKey: ['genres'],
+    queryFn: ({ signal }) => genresApi.list(signal),
+  });
+  const queryClient = useQueryClient();
+  const [newGenre, setNewGenre] = useState('');
+  const addGenre = useMutation({
+    mutationFn: () => genresApi.create({ name: newGenre.trim() }),
+    onSuccess: (genre) => {
+      void queryClient.invalidateQueries({ queryKey: ['genres'] });
+      setForm((current) => ({ ...current, genreIds: [...current.genreIds, genre.id] }));
+      setNewGenre('');
+    },
+    onError: (error: Error) => toast.error(error.message),
+  });
+  const isSeries = title.type === 'SERIES';
+  const countries = parseList(form.countries);
 
   // What was saved elsewhere (another admin, another tab) shows up unless there are unsaved edits.
   useEffect(() => {
@@ -552,8 +639,9 @@ function DetailsTab({ title, disabled, save }: DetailsTabProps) {
 
   const onSubmit = (event: FormEvent) => {
     event.preventDefault();
-    if (pricesWrong) {
-      toast.error(pricesWrong);
+    const wrong = factsWrong ?? pricesWrong;
+    if (wrong) {
+      toast.error(wrong);
       return;
     }
     submit.mutate();
@@ -567,6 +655,14 @@ function DetailsTab({ title, disabled, save }: DetailsTabProps) {
         : [...form.packageIds, packageId],
     );
 
+  const toggleGenre = (genreId: string) =>
+    set(
+      'genreIds',
+      form.genreIds.includes(genreId)
+        ? form.genreIds.filter((value) => value !== genreId)
+        : [...form.genreIds, genreId],
+    );
+
   const toggleCategory = (categoryId: string) =>
     set(
       'categoryIds',
@@ -578,7 +674,10 @@ function DetailsTab({ title, disabled, save }: DetailsTabProps) {
   return (
     <form onSubmit={onSubmit} className="grid gap-6">
       <Card>
-        <CardHeader title="About" description="What viewers read about this title." />
+        <CardHeader
+          title="About"
+          description={`What viewers read about this ${isSeries ? 'series' : 'movie'}.`}
+        />
         <CardContent className="grid gap-4">
           <div className="grid gap-4 sm:grid-cols-2">
             <Field label="Name">
@@ -681,8 +780,251 @@ function DetailsTab({ title, disabled, save }: DetailsTabProps) {
 
       <Card>
         <CardHeader
+          title="Facts"
+          description={
+            title.metadata
+              ? 'Filled in from TMDB. What you change here stays until you choose to overwrite it.'
+              : 'The details people search and filter by.'
+          }
+        />
+        <CardContent className="grid gap-4">
+          <div className="grid gap-4 sm:grid-cols-3">
+            <Field
+              label={isSeries ? 'First shown' : 'Release date'}
+              hint={isSeries ? 'The day the first episode was shown.' : undefined}
+            >
+              {(id) => (
+                <Input
+                  id={id}
+                  type="date"
+                  disabled={disabled}
+                  value={form.releaseDate}
+                  onChange={(event) => {
+                    const day = event.target.value;
+                    // The year follows the date, so the two cannot disagree.
+                    setForm((current) => ({
+                      ...current,
+                      releaseDate: day,
+                      releaseYear: day ? day.slice(0, 4) : current.releaseYear,
+                    }));
+                  }}
+                />
+              )}
+            </Field>
+            <Field
+              label={isSeries ? 'Episode length (minutes)' : 'Length (minutes)'}
+              hint={
+                form.runtimeMinutes.trim() && !factsWrong
+                  ? formatRuntime(Number(form.runtimeMinutes))
+                  : isSeries
+                    ? 'What an episode usually runs.'
+                    : 'Shown until the video tells its exact length.'
+              }
+            >
+              {(id) => (
+                <Input
+                  id={id}
+                  inputMode="numeric"
+                  placeholder={isSeries ? '48' : '112'}
+                  disabled={disabled}
+                  value={form.runtimeMinutes}
+                  onChange={(event) => set('runtimeMinutes', event.target.value)}
+                />
+              )}
+            </Field>
+            {isSeries ? (
+              <Field label="State of the series">
+                {(id) => (
+                  <Select
+                    id={id}
+                    disabled={disabled}
+                    value={form.seriesStatus || 'none'}
+                    onValueChange={(value) =>
+                      set('seriesStatus', value === 'none' ? '' : (value as SeriesStatus))
+                    }
+                    options={[
+                      { value: 'none', label: 'Not known' },
+                      ...Object.entries(SERIES_STATUS_LOOKS).map(([value, look]) => ({
+                        value,
+                        label: look.label,
+                        description: look.about,
+                      })),
+                    ]}
+                  />
+                )}
+              </Field>
+            ) : (
+              <Field label="IMDb id" hint="Optional. Links the movie to its IMDb page.">
+                {(id) => (
+                  <Input
+                    id={id}
+                    maxLength={12}
+                    placeholder="tt0133093"
+                    className="font-mono"
+                    disabled={disabled}
+                    value={form.imdbId}
+                    onChange={(event) => set('imdbId', event.target.value)}
+                  />
+                )}
+              </Field>
+            )}
+          </div>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <Field
+              label="Countries"
+              hint={
+                countries.length > 0 && !factsWrong
+                  ? countries.map((code) => countryName(code.toUpperCase())).join(', ')
+                  : 'Where it was made, as codes of two letters: US, DE.'
+              }
+            >
+              {(id) => (
+                <Input
+                  id={id}
+                  placeholder="US, DE"
+                  disabled={disabled}
+                  value={form.countries}
+                  onChange={(event) => set('countries', event.target.value)}
+                />
+              )}
+            </Field>
+            <Field
+              label={isSeries ? 'Networks and studios' : 'Studios'}
+              hint="Separated by commas."
+            >
+              {(id) => (
+                <Input
+                  id={id}
+                  disabled={disabled}
+                  value={form.studios}
+                  onChange={(event) => set('studios', event.target.value)}
+                />
+              )}
+            </Field>
+          </div>
+          {isSeries ? (
+            <Field
+              label="IMDb id"
+              hint="Optional. Links the series to its IMDb page."
+              className="max-w-xs"
+            >
+              {(id) => (
+                <Input
+                  id={id}
+                  maxLength={12}
+                  placeholder="tt0903747"
+                  className="font-mono"
+                  disabled={disabled}
+                  value={form.imdbId}
+                  onChange={(event) => set('imdbId', event.target.value)}
+                />
+              )}
+            </Field>
+          ) : null}
+          <Field
+            label="Keywords"
+            hint="Separated by commas. They help the search find this title by what it is about."
+          >
+            {(id) => (
+              <Textarea
+                id={id}
+                rows={2}
+                disabled={disabled}
+                value={form.keywords}
+                onChange={(event) => set('keywords', event.target.value)}
+              />
+            )}
+          </Field>
+          {title.rating !== null ? (
+            <p className="flex items-center gap-1.5 text-sm text-muted-foreground">
+              <Star className="size-4 fill-warning text-warning" aria-hidden="true" />
+              <span className="font-medium text-foreground tabular-nums">
+                {formatRating(title.rating)}
+              </span>
+              out of 10 on TMDB
+              {title.ratingCount ? `, from ${title.ratingCount.toLocaleString()} votes` : ''}. It is
+              refreshed with every import.
+            </p>
+          ) : null}
+          {factsWrong ? (
+            <p role="alert" className="text-sm text-destructive">
+              {factsWrong}
+            </p>
+          ) : null}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader
+          title="Genres"
+          description="What kind of story it is. Genres come with an import and are shared by all titles."
+        />
+        <CardContent className="grid gap-4">
+          <ErrorNote error={genres.error} />
+          {genres.data?.length === 0 ? (
+            <p className="text-sm text-muted-foreground">
+              There are no genres yet. Add the first one below, or import a title from TMDB.
+            </p>
+          ) : null}
+          <div className="flex flex-wrap gap-2">
+            {genres.data?.map((genre) => {
+              const chosen = form.genreIds.includes(genre.id);
+              return (
+                <button
+                  key={genre.id}
+                  type="button"
+                  role="checkbox"
+                  aria-checked={chosen}
+                  disabled={disabled}
+                  onClick={() => toggleGenre(genre.id)}
+                  className={cn(
+                    'inline-flex h-8 items-center gap-1.5 rounded-full border px-3 text-[13px] font-medium transition-colors hover:bg-accent disabled:pointer-events-none disabled:opacity-60',
+                    chosen &&
+                      'border-primary bg-primary text-primary-foreground hover:bg-primary/90',
+                  )}
+                >
+                  {chosen ? <Check className="size-3.5" aria-hidden="true" /> : null}
+                  {genre.name}
+                </button>
+              );
+            })}
+          </div>
+          {disabled ? null : (
+            <div className="flex max-w-sm gap-2">
+              <Input
+                aria-label="Name of a new genre"
+                placeholder="New genre"
+                maxLength={60}
+                value={newGenre}
+                onChange={(event) => setNewGenre(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter') {
+                    // Enter adds the genre and does not save the form around it.
+                    event.preventDefault();
+                    if (newGenre.trim()) {
+                      addGenre.mutate();
+                    }
+                  }
+                }}
+              />
+              <Button
+                type="button"
+                loading={addGenre.isPending}
+                disabled={!newGenre.trim()}
+                onClick={() => addGenre.mutate()}
+              >
+                <Plus />
+                Add
+              </Button>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader
           title="Categories"
-          description="Where viewers find this title when they browse."
+          description="Shelves of your own making, such as “Staff picks”. Where viewers find this title when they browse."
           actions={
             <Button asChild variant="link" size="sm">
               <Link to="/categories">Manage categories</Link>

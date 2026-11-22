@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 import {
   Activity,
-  Clapperboard,
   Database,
   DatabaseBackup,
   Film,
@@ -22,6 +21,7 @@ import {
   SlidersHorizontal,
   Stethoscope,
   Tags,
+  Tv,
   Users,
   UsersRound,
 } from 'lucide-react';
@@ -52,11 +52,18 @@ export const NAVIGATION: NavGroup[] = [
     label: 'Catalog',
     items: [
       {
-        to: '/titles',
-        label: 'Titles',
-        icon: Clapperboard,
+        to: '/movies',
+        label: 'Movies',
+        icon: Film,
         permission: 'catalog:read',
-        keywords: 'movies series films shows episodes catalog',
+        keywords: 'films titles documentaries catalog',
+      },
+      {
+        to: '/series',
+        label: 'Series',
+        icon: Tv,
+        permission: 'catalog:read',
+        keywords: 'shows titles seasons episodes catalog',
       },
       {
         to: '/categories',

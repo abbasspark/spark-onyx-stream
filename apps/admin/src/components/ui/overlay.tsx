@@ -73,7 +73,10 @@ export function DialogContent({
 /** Scrolling middle part of a dialog. */
 export function DialogBody({ className, ...props }: ComponentProps<'div'>) {
   return (
-    <div className={cn('grid flex-1 gap-4 overflow-y-auto px-6 py-5', className)} {...props} />
+    <div
+      className={cn('grid flex-1 content-start gap-4 overflow-y-auto px-6 py-5', className)}
+      {...props}
+    />
   );
 }
 

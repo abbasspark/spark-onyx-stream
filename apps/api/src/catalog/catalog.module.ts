@@ -6,20 +6,22 @@ import { ViewersModule } from '../viewers/viewers.module.js';
 import { CatalogController } from './catalog.controller.js';
 import { CategoriesService } from './categories.service.js';
 import { ImagesService } from './images.service.js';
+import { PeopleController } from './people.controller.js';
+import { PeopleService } from './people.service.js';
 import { PublicCatalogController } from './public-catalog.controller.js';
 import { PublicCatalogService } from './public-catalog.service.js';
 import { TitlesService } from './titles.service.js';
 
 /**
- * The catalog: titles, seasons, episodes, categories and artwork, and the
+ * The catalog: titles, seasons, episodes, genres, people, categories and artwork, and the
  * public view of it for viewers.
  * Loaded only in the api role. It reads assets of the media engine but the
  * media engine does not depend on it.
  */
 @Module({
   imports: [PlaybackModule, ViewersModule, BillingModule],
-  controllers: [CatalogController, PublicCatalogController],
-  providers: [TitlesService, CategoriesService, ImagesService, PublicCatalogService],
-  exports: [TitlesService, CategoriesService, ImagesService],
+  controllers: [CatalogController, PeopleController, PublicCatalogController],
+  providers: [TitlesService, CategoriesService, ImagesService, PeopleService, PublicCatalogService],
+  exports: [TitlesService, CategoriesService, ImagesService, PeopleService],
 })
 export class CatalogModule {}

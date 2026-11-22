@@ -4,8 +4,13 @@ import {
   ageRatingOf,
   cleanLongText,
   cleanText,
+  creditsOf,
+  dateOf,
   episodesOf,
+  factsOf,
   languageOf,
+  MAX_CAST,
+  minutesOf,
   parseMetadataId,
   pickLogo,
   safeImagePath,
@@ -152,15 +157,21 @@ describe('seasons and episodes', () => {
     expect(
       seasonsOf({
         seasons: [
-          { season_number: 2, name: 'Two', episode_count: 3 },
-          { season_number: 1, name: 'Season 1', episode_count: 8 },
+          {
+            season_number: 2,
+            name: 'Two',
+            episode_count: 3,
+            air_date: '2022-01-10',
+            poster_path: '/s2.jpg',
+          },
+          { season_number: 1, name: 'Season 1', episode_count: 8, air_date: 'soon' },
           { season_number: 3, episode_count: 0 },
           { name: 'No number', episode_count: 4 },
         ],
       }),
     ).toEqual([
-      { number: 1, name: null, episodeCount: 8 },
-      { number: 2, name: 'Two', episodeCount: 3 },
+      { number: 1, name: null, episodeCount: 8, airDate: null, poster: null },
+      { number: 2, name: 'Two', episodeCount: 3, airDate: '2022-01-10', poster: '/s2.jpg' },
     ]);
   });
 
@@ -168,14 +179,34 @@ describe('seasons and episodes', () => {
     expect(
       episodesOf([
         { episode_number: 2, name: '', still_path: '/b.jpg' },
-        { episode_number: 1, name: 'Pilot', overview: 'It begins.' },
+        {
+          episode_number: 1,
+          name: 'Pilot',
+          overview: 'It begins.',
+          air_date: '2021-09-05',
+          runtime: 52,
+        },
         { episode_number: 2, name: 'Again' },
         { episode_number: -1, name: 'Negative' },
         { name: 'No number' },
       ]),
     ).toEqual([
-      { number: 1, name: 'Pilot', synopsis: 'It begins.', still: null },
-      { number: 2, name: 'Episode 2', synopsis: null, still: '/b.jpg' },
+      {
+        number: 1,
+        name: 'Pilot',
+        synopsis: 'It begins.',
+        still: null,
+        airDate: '2021-09-05',
+        runtimeMinutes: 52,
+      },
+      {
+        number: 2,
+        name: 'Episode 2',
+        synopsis: null,
+        still: '/b.jpg',
+        airDate: null,
+        runtimeMinutes: null,
+      },
     ]);
     expect(episodesOf(undefined)).toEqual([]);
   });
@@ -231,5 +262,195 @@ describe('titles', () => {
     expect(() =>
       toImportedTitle('movie', { title: 'X' }, { language: 'en', region: 'US' }),
     ).toThrow();
+  });
+});
+
+describe('facts', () => {
+  it('reads the facts of a movie', () => {
+    expect(
+      factsOf('movie', {
+        release_date: '1999-03-31',
+        runtime: 136,
+        production_countries: [
+          { iso_3166_1: 'US' },
+          { iso_3166_1: 'AU' },
+          { iso_3166_1: 'US' },
+          { iso_3166_1: 'usa' },
+        ],
+        production_companies: [
+          { name: 'Village Roadshow' },
+          { name: ' Village  Roadshow ' },
+          { name: '' },
+          { name: 'Silver Pictures' },
+        ],
+        keywords: { keywords: [{ name: 'hacker' }, { name: 'Hacker' }, { name: 'dystopia' }] },
+        imdb_id: 'tt0133093',
+        vote_average: 8.219,
+        vote_count: 26_000,
+        status: 'Released',
+      }),
+    ).toEqual({
+      releaseDate: '1999-03-31',
+      runtimeMinutes: 136,
+      countries: ['US', 'AU'],
+      studios: ['Village Roadshow', 'Silver Pictures'],
+      keywords: ['hacker', 'dystopia'],
+      imdbId: 'tt0133093',
+      rating: 8.2,
+      ratingCount: 26_000,
+      seriesStatus: null,
+      lastAirDate: null,
+    });
+  });
+
+  it('finds the IMDb id of a movie among its external ids when it is not on the movie itself', () => {
+    expect(factsOf('movie', { external_ids: { imdb_id: 'tt0133093' } }).imdbId).toBe('tt0133093');
+    expect(factsOf('movie', { imdb_id: 'not-an-id' }).imdbId).toBeNull();
+  });
+
+  it('reads the facts of a series from where a series keeps them', () => {
+    const facts = factsOf('tv', {
+      first_air_date: '2021-09-05',
+      last_air_date: '2023-04-02',
+      episode_run_time: [0, 48, 52],
+      external_ids: { imdb_id: 'tt1234567' },
+      imdb_id: 'tt9999999',
+      keywords: { results: [{ name: 'ocean' }] },
+      status: 'Returning Series',
+    });
+    expect(facts).toMatchObject({
+      releaseDate: '2021-09-05',
+      lastAirDate: '2023-04-02',
+      runtimeMinutes: 48,
+      imdbId: 'tt1234567',
+      keywords: ['ocean'],
+      seriesStatus: 'RUNNING',
+    });
+  });
+
+  it('tells how a series stands', () => {
+    const status = (value: string) => factsOf('tv', { status: value }).seriesStatus;
+    expect(status('Ended')).toBe('ENDED');
+    expect(status('Canceled')).toBe('CANCELLED');
+    expect(status('In Production')).toBe('UPCOMING');
+    expect(status('Planned')).toBe('UPCOMING');
+    expect(status('Something new')).toBeNull();
+  });
+
+  it('takes nothing that makes no sense', () => {
+    expect(
+      factsOf('movie', {
+        release_date: '1999-02-31',
+        runtime: -5,
+        imdb_id: 'nm0000206',
+        vote_average: 7,
+        vote_count: 0,
+      }),
+    ).toEqual({
+      releaseDate: null,
+      runtimeMinutes: null,
+      countries: [],
+      studios: [],
+      keywords: [],
+      imdbId: null,
+      rating: null,
+      ratingCount: null,
+      seriesStatus: null,
+      lastAirDate: null,
+    });
+    expect(dateOf('1999-03-31')).toBe('1999-03-31');
+    expect(dateOf('1999-13-01')).toBeNull();
+    expect(dateOf(19990331)).toBeNull();
+    expect(minutesOf(90)).toBe(90);
+    expect(minutesOf(90.5)).toBeNull();
+    expect(minutesOf(100_000)).toBeNull();
+  });
+});
+
+describe('people', () => {
+  const person = (id: number, name: string, extra: object = {}) => ({ id, name, ...extra });
+
+  it('lists the cast of a movie in order, then the crew that matters', () => {
+    const credits = creditsOf('movie', {
+      credits: {
+        cast: [
+          person(2, 'Carrie-Anne Moss', { character: 'Trinity', order: 2 }),
+          person(1, 'Keanu Reeves', {
+            character: 'Neo',
+            order: 0,
+            profile_path: '/keanu.jpg',
+            known_for_department: 'Acting',
+          }),
+          person(1, 'Keanu Reeves', { character: 'Thomas Anderson', order: 5 }),
+          { name: 'No id', character: 'Nobody' },
+        ],
+        crew: [
+          person(10, 'Bill Pope', { job: 'Director of Photography' }),
+          person(11, 'A Gaffer', { job: 'Gaffer' }),
+          person(12, 'Lana Wachowski', { job: 'Director' }),
+          person(13, 'Lilly Wachowski', { job: 'Director' }),
+          person(12, 'Lana Wachowski', { job: 'Screenplay' }),
+        ],
+      },
+    });
+    expect(credits.map(({ kind, name, role }) => `${kind} ${name}: ${role}`)).toEqual([
+      'CAST Keanu Reeves: Neo',
+      'CAST Carrie-Anne Moss: Trinity',
+      'CREW Lana Wachowski: Director',
+      'CREW Lilly Wachowski: Director',
+      'CREW Lana Wachowski: Screenplay',
+      'CREW Bill Pope: Director of Photography',
+    ]);
+    expect(credits[0]).toMatchObject({ personId: 1, portrait: '/keanu.jpg', knownFor: 'Acting' });
+  });
+
+  it('gives an actor of a series the part played longest, and its makers first', () => {
+    const credits = creditsOf('tv', {
+      created_by: [person(20, 'Ada Creator')],
+      aggregate_credits: {
+        cast: [
+          person(1, 'Ben Diver', {
+            order: 0,
+            roles: [
+              { character: 'Young Ben', episode_count: 2 },
+              { character: 'Ben', episode_count: 30 },
+            ],
+          }),
+        ],
+        crew: [
+          person(30, 'One Episode', { jobs: [{ job: 'Director', episode_count: 1 }] }),
+          person(31, 'Most Episodes', {
+            jobs: [
+              { job: 'Director', episode_count: 12 },
+              { job: 'Writer', episode_count: 3 },
+            ],
+          }),
+        ],
+      },
+    });
+    expect(credits.map(({ name, role }) => `${name}: ${role}`)).toEqual([
+      'Ben Diver: Ben',
+      'Ada Creator: Creator',
+      'Most Episodes: Director',
+      'One Episode: Director',
+      'Most Episodes: Writer',
+    ]);
+  });
+
+  it('stops at twenty of the cast and four per job', () => {
+    const cast = Array.from({ length: 40 }, (_, index) =>
+      person(index + 1, `Actor ${index}`, { order: index }),
+    );
+    const crew = Array.from({ length: 9 }, (_, index) =>
+      person(100 + index, `Producer ${index}`, { job: 'Producer' }),
+    );
+    const credits = creditsOf('movie', { credits: { cast, crew } });
+    expect(credits.filter((credit) => credit.kind === 'CAST')).toHaveLength(MAX_CAST);
+    expect(credits.filter((credit) => credit.role === 'Producer')).toHaveLength(4);
+  });
+
+  it('copes with a title nobody is listed for', () => {
+    expect(creditsOf('movie', {})).toEqual([]);
+    expect(creditsOf('tv', { aggregate_credits: {} })).toEqual([]);
   });
 });

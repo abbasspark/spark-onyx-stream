@@ -243,7 +243,7 @@ function Overview({ overview }: { overview: BillingOverview }) {
               Subscribers of a plan with chosen packages cannot watch{' '}
               {overview.unpackagedPaidTitles === 1 ? 'it' : 'them'}.
             </span>{' '}
-            <Link to="/titles?packaged=none" className="underline underline-offset-4">
+            <Link to="/movies?packaged=none" className="underline underline-offset-4">
               Show {overview.unpackagedPaidTitles === 1 ? 'it' : 'them'}
             </Link>
           </p>

@@ -142,7 +142,7 @@ export function PackagesPage() {
             <span className="text-muted-foreground">
               Only plans that open everything show {loose === 1 ? 'it' : 'them'}.
             </span>{' '}
-            <Link to="/titles?packaged=none" className="underline underline-offset-4">
+            <Link to="/movies?packaged=none" className="underline underline-offset-4">
               Show {loose === 1 ? 'it' : 'them'}
             </Link>
           </p>
@@ -242,12 +242,22 @@ export function PackagesPage() {
                       <ListVideo />
                       {mayWrite ? 'Choose titles' : 'See titles'}
                     </Button>
-                    <Link
-                      to={`/titles?package=${item.id}`}
-                      className="text-xs text-muted-foreground underline-offset-4 hover:underline"
-                    >
-                      Open in Titles
-                    </Link>
+                    <span className="text-xs text-muted-foreground">
+                      Open in{' '}
+                      <Link
+                        to={`/movies?package=${item.id}`}
+                        className="underline underline-offset-4 hover:text-foreground"
+                      >
+                        Movies
+                      </Link>{' '}
+                      or{' '}
+                      <Link
+                        to={`/series?package=${item.id}`}
+                        className="underline underline-offset-4 hover:text-foreground"
+                      >
+                        Series
+                      </Link>
+                    </span>
                   </div>
                 </div>
               </CardContent>

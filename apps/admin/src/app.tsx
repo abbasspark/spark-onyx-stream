@@ -1,16 +1,18 @@
 // SPDX-License-Identifier: AGPL-3.0-only
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { QueryClient, QueryClientProvider, useQuery } from '@tanstack/react-query';
 import { Compass } from 'lucide-react';
 import { lazy, Suspense } from 'react';
-import { BrowserRouter, Link, Route, Routes } from 'react-router';
+import { BrowserRouter, Link, Navigate, Route, Routes, useLocation, useParams } from 'react-router';
 import { Toaster } from 'sonner';
 import { ApiError } from './api/client';
+import { titlesApi } from './api/endpoints';
 import { SessionProvider, useSession } from './auth/session';
 import { AppShell } from './components/app-shell';
 import { ConfirmProvider } from './components/confirm';
 import { Button } from './components/ui/button';
-import { EmptyState, Spinner } from './components/ui/display';
+import { EmptyState, ErrorNote, Spinner } from './components/ui/display';
 import { TooltipProvider } from './components/ui/overlay';
+import { titlePath } from './lib/catalog';
 import { LiveProvider } from './live/live';
 import { AccountPage } from './pages/account-page';
 import { EmailPage } from './pages/email-page';
@@ -36,7 +38,7 @@ import { JobsPage } from './pages/jobs-page';
 import { LoginPage } from './pages/login-page';
 import { StoragePage } from './pages/storage-page';
 import { TitleEditorPage } from './pages/title-editor-page';
-import { TitlesPage } from './pages/titles-page';
+import { MoviesPage, SeriesPage } from './pages/titles-page';
 import { ViewersPage } from './pages/viewers-page';
 import { ThemeProvider, useTheme } from './theme/theme';
 import { UploadsProvider } from './uploads/uploads';
@@ -56,6 +58,26 @@ const queryClient = new QueryClient({
     },
   },
 });
+
+/** /titles became /movies and /series. Saved links keep working, with their filters. */
+function OldTitlesAddress() {
+  const { search } = useLocation();
+  const section = new URLSearchParams(search).get('type') === 'SERIES' ? '/series' : '/movies';
+  return <Navigate replace to={`${section}${search}`} />;
+}
+
+/** A saved link to one title is sent on to the section the title belongs to. */
+function OldTitleAddress() {
+  const { id = '' } = useParams();
+  const title = useQuery({
+    queryKey: ['titles', 'detail', id],
+    queryFn: ({ signal }) => titlesApi.get(id, signal),
+  });
+  if (title.data) {
+    return <Navigate replace to={titlePath(title.data)} />;
+  }
+  return title.isPending ? <Spinner label="Loading" /> : <ErrorNote error={title.error} />;
+}
 
 function Pages() {
   const { state } = useSession();
@@ -86,8 +108,13 @@ function Pages() {
                 </Suspense>
               }
             />
-            <Route path="titles" element={<TitlesPage />} />
-            <Route path="titles/:id" element={<TitleEditorPage />} />
+            <Route path="movies" element={<MoviesPage />} />
+            <Route path="movies/:id" element={<TitleEditorPage />} />
+            <Route path="series" element={<SeriesPage />} />
+            <Route path="series/:id" element={<TitleEditorPage />} />
+            {/* Addresses from before movies and series had sections of their own. */}
+            <Route path="titles" element={<OldTitlesAddress />} />
+            <Route path="titles/:id" element={<OldTitleAddress />} />
             <Route path="categories" element={<CategoriesPage />} />
             <Route path="viewers" element={<ViewersPage />} />
             <Route path="jobs" element={<JobsPage />} />

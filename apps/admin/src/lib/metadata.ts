@@ -53,6 +53,17 @@ const FIELD_NAMES: Record<string, string> = {
   backdrop: 'backdrop',
   logo: 'logo',
   categories: 'categories',
+  genres: 'genres',
+  credits: 'cast and crew',
+  // The facts are many and small. Together they are one thing that was filled.
+  releaseDate: 'facts',
+  runtimeMinutes: 'facts',
+  imdbId: 'facts',
+  countries: 'facts',
+  studios: 'facts',
+  keywords: 'facts',
+  seriesStatus: 'facts',
+  lastAirDate: 'facts',
 };
 
 /**
@@ -61,7 +72,7 @@ const FIELD_NAMES: Record<string, string> = {
  */
 export function describeReport(report: ImportReport): string {
   const sentences: string[] = [];
-  const fields = report.fields.map((field) => FIELD_NAMES[field] ?? field);
+  const fields = [...new Set(report.fields.map((field) => FIELD_NAMES[field] ?? field))];
   if (fields.length > 0) {
     const last = fields.at(-1) as string;
     sentences.push(
@@ -77,6 +88,9 @@ export function describeReport(report: ImportReport): string {
   }
   if (report.episodesUpdated > 0) {
     sentences.push(`Updated ${count(report.episodesUpdated, 'episode')}.`);
+  }
+  if (report.peopleCreated > 0) {
+    sentences.push(`${count(report.peopleCreated, 'person', 'people')} new to the catalog.`);
   }
   if (report.categoriesCreated.length > 0) {
     sentences.push(

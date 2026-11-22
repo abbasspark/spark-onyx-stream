@@ -23,15 +23,37 @@ const languageCode = z
   .trim()
   .regex(/^[A-Za-z]{2,3}(-[A-Za-z0-9]{2,8})*$/, 'Use a language code such as "en"');
 
+/** A day without a time, such as "1999-03-31". */
+const day = z
+  .string()
+  .regex(/^\d{4}-\d{2}-\d{2}$/, 'Use a date such as 1999-03-31')
+  .refine((value) => {
+    const parsed = new Date(`${value}T00:00:00Z`);
+    return !Number.isNaN(parsed.getTime()) && parsed.toISOString().slice(0, 10) === value;
+  }, 'This day does not exist')
+  .nullable();
+const minutes = z.number().int().min(1, 'At least one minute').max(1500).nullable();
+/** A list of short names without repeats: studios, keywords. */
+const nameList = (maxItems: number, maxLength: number) =>
+  z
+    .array(z.string().trim().min(1).max(maxLength))
+    .max(maxItems)
+    .transform((names) => [...new Set(names)]);
+
 export const TITLE_TYPES = ['MOVIE', 'SERIES'] as const;
+export const SERIES_STATUSES = ['UPCOMING', 'RUNNING', 'ENDED', 'CANCELLED'] as const;
+export const CREDIT_KINDS = ['CAST', 'CREW'] as const;
 export const PUBLISH_STATUSES = ['DRAFT', 'PUBLISHED', 'ARCHIVED'] as const;
-export const IMAGE_KINDS = ['POSTER', 'BACKDROP', 'STILL', 'LOGO'] as const;
+export const IMAGE_KINDS = ['POSTER', 'BACKDROP', 'STILL', 'LOGO', 'PORTRAIT'] as const;
 export const TITLE_SORT_FIELDS = [
   'createdAt',
   'updatedAt',
   'name',
   'releaseYear',
   'publishedAt',
+  'releaseDate',
+  'rating',
+  'runtimeMinutes',
 ] as const;
 
 // --- Categories ----------------------------------------------------------------
@@ -70,6 +92,15 @@ export const listTitlesSchema = paginationSchema.extend({
   type: z.enum(TITLE_TYPES).optional(),
   status: z.enum(PUBLISH_STATUSES).optional(),
   categoryId: z.uuid().optional(),
+  genreId: z.uuid().optional(),
+  /** Titles this person has a part in. */
+  personId: z.uuid().optional(),
+  seriesStatus: z.enum(SERIES_STATUSES).optional(),
+  /**
+   * "ready": a movie whose video plays, a series where every episode has one.
+   * "missing": a movie without a video that plays, a series with an episode that lacks one.
+   */
+  video: z.enum(['ready', 'missing']).optional(),
   access: z.enum(TITLE_ACCESS).optional(),
   /** Titles in this package. */
   packageId: z.uuid().optional(),
@@ -107,6 +138,28 @@ export const updateTitleSchema = z
       .nullable(),
     ageRating: optionalText(16),
     originalLanguage: languageCode.nullable(),
+    /** The day of the premiere. */
+    releaseDate: day,
+    /** Movies: the length of the film. Series: the usual length of an episode. */
+    runtimeMinutes: minutes,
+    /** Where it was made, as ISO 3166 codes such as "US". */
+    countries: z
+      .array(
+        z.string().regex(/^[A-Z]{2}$/, 'Use country codes of two capital letters, such as "US"'),
+      )
+      .max(8)
+      .transform((codes) => [...new Set(codes)]),
+    studios: nameList(8, 120),
+    keywords: nameList(30, 60),
+    imdbId: z
+      .string()
+      .trim()
+      .regex(/^tt\d{6,10}$/, 'An IMDb id looks like tt0133093')
+      .nullable(),
+    /** Series only. */
+    seriesStatus: z.enum(SERIES_STATUSES).nullable(),
+    /** Replaces the title's genres. */
+    genreIds: z.array(z.uuid()).max(30),
     isFeatured: z.boolean(),
     /** FREE: open to everyone the installation lets watch. PAID: needs a subscription. */
     access: z.enum(TITLE_ACCESS),
@@ -145,7 +198,14 @@ export const createSeasonSchema = z.object({
 export type CreateSeasonInput = z.infer<typeof createSeasonSchema>;
 
 export const updateSeasonSchema = z
-  .object({ number, name: optionalText(200), synopsis: optionalText(5000) })
+  .object({
+    number,
+    name: optionalText(200),
+    synopsis: optionalText(5000),
+    /** The day its first episode was first shown. */
+    airDate: day,
+    posterId: z.uuid().nullable(),
+  })
   .partial()
   .refine((value) => Object.keys(value).length > 0, 'Send at least one field to change');
 export type UpdateSeasonInput = z.infer<typeof updateSeasonSchema>;
@@ -164,6 +224,8 @@ export const updateEpisodeSchema = z
     number,
     name,
     synopsis: optionalText(5000),
+    airDate: day,
+    runtimeMinutes: minutes,
     assetId: z.uuid().nullable(),
     stillId: z.uuid().nullable(),
     status: z.enum(['DRAFT', 'PUBLISHED']),
@@ -171,6 +233,66 @@ export const updateEpisodeSchema = z
   .partial()
   .refine((value) => Object.keys(value).length > 0, 'Send at least one field to change');
 export type UpdateEpisodeInput = z.infer<typeof updateEpisodeSchema>;
+
+// --- Genres ----------------------------------------------------------------------------
+
+export const createGenreSchema = z.object({
+  name: z.string().trim().min(1, 'Enter a name').max(80),
+  /** Left out, the slug is made from the name. */
+  slug: slug.optional(),
+});
+export type CreateGenreInput = z.infer<typeof createGenreSchema>;
+
+export const updateGenreSchema = createGenreSchema
+  .partial()
+  .refine((value) => Object.keys(value).length > 0, 'Send at least one field to change');
+export type UpdateGenreInput = z.infer<typeof updateGenreSchema>;
+
+// --- People and credits ------------------------------------------------------------------
+
+export const listPeopleSchema = paginationSchema.extend({
+  /** Matches the name, ignoring case. */
+  q: z.string().trim().min(1).max(200).optional(),
+  sort: z.enum(['name', 'createdAt', 'credits']).default('name'),
+  order: z.enum(['asc', 'desc']).default('asc'),
+});
+export type ListPeopleInput = z.infer<typeof listPeopleSchema>;
+
+export const createPersonSchema = z.object({
+  name,
+  /** What they are mostly known as: "Acting", "Directing". */
+  knownFor: optionalText(60).optional(),
+  biography: optionalText(5000).optional(),
+  portraitId: z.uuid().nullable().optional(),
+});
+export type CreatePersonInput = z.infer<typeof createPersonSchema>;
+
+export const updatePersonSchema = z
+  .object({
+    name,
+    slug,
+    knownFor: optionalText(60),
+    biography: optionalText(5000),
+    portraitId: z.uuid().nullable(),
+  })
+  .partial()
+  .refine((value) => Object.keys(value).length > 0, 'Send at least one field to change');
+export type UpdatePersonInput = z.infer<typeof updatePersonSchema>;
+
+/** The whole cast and crew of a title, in the order they are shown. */
+export const replaceCreditsSchema = z.object({
+  credits: z
+    .array(
+      z.object({
+        personId: z.uuid(),
+        kind: z.enum(CREDIT_KINDS),
+        /** Cast: the character played. Crew: the job. */
+        role: optionalText(200),
+      }),
+    )
+    .max(300),
+});
+export type ReplaceCreditsInput = z.infer<typeof replaceCreditsSchema>;
 
 // --- Images ----------------------------------------------------------------------------
 

@@ -378,7 +378,7 @@ export interface AssetMedia {
 export type TitleType = 'MOVIE' | 'SERIES';
 export const PUBLISH_STATUSES = ['DRAFT', 'PUBLISHED', 'ARCHIVED'] as const;
 export type PublishStatus = (typeof PUBLISH_STATUSES)[number];
-export type ImageKind = 'POSTER' | 'BACKDROP' | 'STILL' | 'LOGO';
+export type ImageKind = 'POSTER' | 'BACKDROP' | 'STILL' | 'LOGO' | 'PORTRAIT';
 
 export interface CatalogImage {
   id: string;
@@ -437,16 +437,81 @@ export interface TitleSummary {
   /** True when no subscription opens the title: it is rented or bought only. */
   purchaseOnly: boolean;
   poster: CatalogImage | null;
+  /** The day of the premiere, as "1999-03-31". */
+  releaseDate: string | null;
+  /** Movies: the length of the film. Series: the usual length of an episode. In minutes. */
+  runtimeMinutes: number | null;
+  /** What the audience of the metadata source thinks of it, from 0 to 10. */
+  rating: number | null;
+  /** Series only: whether more episodes are to come. */
+  seriesStatus: SeriesStatus | null;
+  genres: { id: string; name: string }[];
   categories: { id: string; name: string }[];
   /** The packages the title is in. Plans open a paid title through them. */
   packages: { id: string; name: string }[];
   asset: AssetRef | null;
   seasonCount: number;
   episodeCount: number;
+  /** Series: how many episodes have a video that plays. */
+  readyEpisodeCount: number;
   /** Whether viewers can see the title right now. False for a published title with nothing that plays. */
   isVisible: boolean;
   createdAt: string;
   updatedAt: string;
+}
+
+export const SERIES_STATUSES = ['UPCOMING', 'RUNNING', 'ENDED', 'CANCELLED'] as const;
+export type SeriesStatus = (typeof SERIES_STATUSES)[number];
+export type CreditKind = 'CAST' | 'CREW';
+
+export interface PersonRef {
+  id: string;
+  slug: string;
+  name: string;
+  portrait: CatalogImage | null;
+}
+
+/** One person's part in a title. */
+export interface Credit {
+  id: string;
+  kind: CreditKind;
+  /** Cast: the character played. Crew: the job. */
+  role: string | null;
+  person: PersonRef;
+}
+
+export interface Genre {
+  id: string;
+  slug: string;
+  name: string;
+  titleCount: number;
+  createdAt: string;
+}
+
+export interface Person extends PersonRef {
+  knownFor: string | null;
+  biography: string | null;
+  /** Set when the person came with an import. */
+  metadata: { source: string; id: string } | null;
+  creditCount: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface PersonDetail extends Person {
+  credits: {
+    id: string;
+    kind: CreditKind;
+    role: string | null;
+    title: {
+      id: string;
+      type: TitleType;
+      name: string;
+      releaseYear: number | null;
+      status: PublishStatus;
+      poster: CatalogImage | null;
+    };
+  }[];
 }
 
 export interface Episode {
@@ -457,6 +522,9 @@ export interface Episode {
   synopsis: string | null;
   status: PublishStatus;
   publishedAt: string | null;
+  /** The day it was first shown, as "2021-09-05". */
+  airDate: string | null;
+  runtimeMinutes: number | null;
   asset: AssetRef | null;
   still: CatalogImage | null;
 }
@@ -466,6 +534,9 @@ export interface Season {
   number: number;
   name: string | null;
   synopsis: string | null;
+  /** The day its first episode was first shown. */
+  airDate: string | null;
+  poster: CatalogImage | null;
   episodes: Episode[];
 }
 
@@ -477,6 +548,16 @@ export interface TitleDetail extends TitleSummary {
   originalLanguage: string | null;
   backdrop: CatalogImage | null;
   logo: CatalogImage | null;
+  countries: string[];
+  studios: string[];
+  keywords: string[];
+  imdbId: string | null;
+  /** How many voted for the rating. */
+  ratingCount: number | null;
+  /** Series only: the day the newest episode was first shown. */
+  lastAirDate: string | null;
+  /** The cast in order, then the crew in order. */
+  credits: Credit[];
   trailerAsset: AssetRef | null;
   /** Where the details were imported from. Null for a title typed by hand. */
   metadata: { source: string; id: string; language: string | null; syncedAt: string | null } | null;
@@ -522,6 +603,16 @@ export interface MetadataPreview {
   artwork: { poster: string | null; backdrop: string | null; logo: string | null };
   seasons: { number: number; name: string | null; episodeCount: number }[];
   existingTitleId: string | null;
+  releaseDate: string | null;
+  runtimeMinutes: number | null;
+  countries: string[];
+  studios: string[];
+  rating: number | null;
+  seriesStatus: SeriesStatus | null;
+  /** How many people the import would bring, and the first of the cast. */
+  cast: number;
+  crew: number;
+  leads: string[];
 }
 
 /** Which parts an import brings. Left out, a part is brought. */
@@ -529,6 +620,11 @@ export interface MetadataParts {
   id: string;
   language?: string;
   text?: boolean;
+  /** Genres, as genres. */
+  genres?: boolean;
+  /** The cast and the crew that matters, and a picture of each. */
+  people?: boolean;
+  portraits?: boolean;
   categories?: boolean;
   createCategories?: boolean;
   artwork?: boolean;
@@ -540,6 +636,9 @@ export interface MetadataParts {
 export interface ImportReport {
   fields: string[];
   categoriesCreated: string[];
+  genresCreated: string[];
+  peopleCreated: number;
+  credits: number;
   seasonsCreated: number;
   episodesCreated: number;
   episodesUpdated: number;
@@ -561,6 +660,14 @@ export interface UpdateTitleInput {
   releaseYear?: number | null;
   ageRating?: string | null;
   originalLanguage?: string | null;
+  releaseDate?: string | null;
+  runtimeMinutes?: number | null;
+  countries?: string[];
+  studios?: string[];
+  keywords?: string[];
+  imdbId?: string | null;
+  seriesStatus?: SeriesStatus | null;
+  genreIds?: string[];
   isFeatured?: boolean;
   access?: TitleAccess;
   rentAmount?: number | null;
@@ -581,6 +688,9 @@ export const TITLE_SORT_FIELDS = [
   'name',
   'releaseYear',
   'publishedAt',
+  'releaseDate',
+  'rating',
+  'runtimeMinutes',
 ] as const;
 export type TitleSortField = (typeof TITLE_SORT_FIELDS)[number];
 
@@ -588,9 +698,18 @@ export interface EpisodeInput {
   number?: number;
   name?: string;
   synopsis?: string | null;
+  airDate?: string | null;
+  runtimeMinutes?: number | null;
   assetId?: string | null;
   stillId?: string | null;
   status?: 'DRAFT' | 'PUBLISHED';
+}
+
+/** One line of the cast and crew of a title, as it is saved. */
+export interface CreditInput {
+  personId: string;
+  kind: CreditKind;
+  role: string | null;
 }
 
 // --- Viewers ---------------------------------------------------------------
