@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { AppConfig } from '../config/app-config.js';
+import { deliveryHint } from './delivery-hint.js';
 import { chooseEdge } from './delivery-pick.js';
 import { edgeSigningKey } from './edge-credentials.js';
 import { EdgeRegistry } from './edge-registry.service.js';
@@ -40,13 +41,17 @@ export class DeliveryRouter {
   }
 
   async route(kind: 'video' | 'live', contentId: string): Promise<DeliveryRoute> {
+    const avoid = deliveryHint.getStore()?.avoid ?? null;
     try {
       const online = await this.edges.online();
       const edge = chooseEdge(
         kind,
         contentId,
-        online.filter((candidate) =>
-          kind === 'live' ? candidate.serveLive : candidate.serveVideo,
+        online.filter(
+          (candidate) =>
+            (kind === 'live' ? candidate.serveLive : candidate.serveVideo) &&
+            // The viewer's player just failed on this one.
+            candidate.publicUrl !== avoid,
         ),
       );
       if (edge) {

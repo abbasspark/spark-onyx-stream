@@ -5,8 +5,20 @@ import { isUniqueViolation } from '../common/prisma-errors.js';
 import { EventPublisher } from '../events/event-publisher.js';
 import { formatEdgeToken, hashEdgeSecret, newEdgeSecret } from './edge-credentials.js';
 import { EdgeRegistry } from './edge-registry.service.js';
-import { type EdgeSample, type EdgeState, type EdgeStatus, statusOf } from './edge-state.js';
-import type { CreateEdgeInput, UpdateEdgeInput } from './edges.schemas.js';
+import {
+  type EdgeSample,
+  type EdgeState,
+  type EdgeStatus,
+  hourOf,
+  type PurgeScope,
+  statusOf,
+} from './edge-state.js';
+import {
+  type CreateEdgeInput,
+  TRAFFIC_RANGES,
+  type TrafficRange,
+  type UpdateEdgeInput,
+} from './edges.schemas.js';
 
 export interface EdgeView {
   id: string;
@@ -44,7 +56,21 @@ export interface EdgeView {
   } | null;
   /** Traffic of the last hour, oldest first: [seconds, bits per second, requests per second]. */
   samples: EdgeSample[];
+  /** What its copies are being emptied of, until the agent says it is done. */
+  purging: PurgeScope[];
   createdAt: Date;
+}
+
+/** One hour of an edge: [start in seconds, bytes, requests, from copies, fetched first]. */
+export type TrafficPoint = [number, number, number, number, number];
+
+export interface TrafficView {
+  range: TrafficRange;
+  /** The start of the first hour. */
+  from: Date;
+  /** How many hours the range has, the running one included. */
+  hours: number;
+  edges: { id: string; name: string; points: TrafficPoint[] }[];
 }
 
 /** An edge with the token of its agent, which is shown this once. */
@@ -125,6 +151,60 @@ export class EdgesService {
   }
 
   /**
+   * Asks the agent of an edge to drop its copies. It does so with its next
+   * heartbeat, and fetches again what viewers ask for after that.
+   */
+  async purge(id: string, scope: PurgeScope): Promise<EdgeView> {
+    const edge = await this.find(id);
+    const status = statusOf(edge, Date.now());
+    if (status !== 'ONLINE' && status !== 'DISABLED') {
+      throw new ConflictException(
+        'The agent of this edge is not connected, so there is nobody to empty its copies',
+      );
+    }
+    await this.registry.command(id, { type: 'purge', scope });
+    this.events.publish({ type: 'edge', edgeId: id });
+    return this.view(edge);
+  }
+
+  /**
+   * What the edges delivered, hour by hour, for the last day, week or month.
+   * Hours in which an edge delivered nothing are left out.
+   */
+  async traffic(range: TrafficRange): Promise<TrafficView> {
+    const hours = TRAFFIC_RANGES[range];
+    const from = new Date(hourOf(Date.now()).getTime() - (hours - 1) * 3_600_000);
+    const [edges, rows] = await Promise.all([
+      this.prisma.edgeServer.findMany({
+        select: { id: true, name: true },
+        orderBy: { name: 'asc' },
+      }),
+      this.prisma.edgeTrafficHour.findMany({
+        where: { hour: { gte: from } },
+        orderBy: { hour: 'asc' },
+      }),
+    ]);
+    return {
+      range,
+      from,
+      hours,
+      edges: edges.map((edge) => ({
+        id: edge.id,
+        name: edge.name,
+        points: rows
+          .filter((row) => row.edgeId === edge.id)
+          .map((row) => [
+            Math.round(row.hour.getTime() / 1000),
+            Number(row.bytes),
+            Number(row.requests),
+            Number(row.hits),
+            Number(row.misses),
+          ]),
+      })),
+    };
+  }
+
+  /**
    * Addresses of all edges, for the website's content policy. Paused edges
    * are among them: a page that is open must still be allowed to play from an
    * edge that is switched on a moment later.
@@ -148,9 +228,10 @@ export class EdgesService {
   private async view(edge: EdgeServer): Promise<EdgeView> {
     const status = statusOf(edge, Date.now());
     const connected = status === 'ONLINE' || status === 'DISABLED';
-    const [state, samples] = await Promise.all([
+    const [state, samples, commands] = await Promise.all([
       connected ? this.registry.state(edge.id) : null,
       this.registry.samples(edge.id),
+      this.registry.commands(edge.id),
     ]);
     return {
       id: edge.id,
@@ -170,6 +251,9 @@ export class EdgesService {
       requestsServed: edge.requestsServed.toString(),
       now: state ? nowOf(state) : null,
       samples,
+      purging: commands
+        .filter((command) => command.type === 'purge')
+        .map((command) => command.scope),
       createdAt: edge.createdAt,
     };
   }

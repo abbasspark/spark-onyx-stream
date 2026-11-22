@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 import { z } from 'zod';
 import { EDGE_PROTOCOL } from './edge-credentials.js';
+import { PURGE_SCOPES } from './edge-state.js';
 
 const name = z.string().trim().min(1).max(80);
 
@@ -72,4 +73,17 @@ export const edgeReportSchema = z.object({
     diskFreeBytes: count.nullable().default(null),
     diskTotalBytes: count.nullable().default(null),
   }),
+  /** Commands of the main server the agent has carried out. */
+  acknowledged: z.array(z.string().min(1).max(40)).max(50).default([]),
 });
+
+export const purgeSchema = z.object({ scope: z.enum(PURGE_SCOPES).default('all') });
+export type PurgeInput = z.infer<typeof purgeSchema>;
+
+export const TRAFFIC_RANGES = { '24h': 24, '7d': 7 * 24, '30d': 30 * 24 } as const;
+export type TrafficRange = keyof typeof TRAFFIC_RANGES;
+
+export const trafficQuerySchema = z.object({
+  range: z.enum(['24h', '7d', '30d']).default('24h'),
+});
+export type TrafficQuery = z.infer<typeof trafficQuerySchema>;

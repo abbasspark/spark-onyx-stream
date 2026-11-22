@@ -3,7 +3,10 @@ import { download, request, uploadFile } from './client';
 import type {
   EdgeInput,
   EdgeServer,
+  EdgeTraffic,
   EdgeWithToken,
+  PurgeScope,
+  TrafficRange,
   Recording,
   RecordingInput,
   GuideImportResult,
@@ -458,5 +461,10 @@ export const edgesApi = {
     request<EdgeServer>(`/v1/edges/${id}`, { method: 'PATCH', body }),
   /** Replaces the token of the agent. The old one stops working at once. */
   replaceToken: (id: string) => request<EdgeWithToken>(`/v1/edges/${id}/token`, { method: 'POST' }),
+  /** Asks the agent to drop its copies. It does so with its next report. */
+  purge: (id: string, scope: PurgeScope) =>
+    request<EdgeServer>(`/v1/edges/${id}/purge`, { method: 'POST', body: { scope } }),
+  traffic: (range: TrafficRange, signal?: AbortSignal) =>
+    request<EdgeTraffic>(`/v1/edges/traffic?range=${range}`, { signal }),
   remove: (id: string) => request<void>(`/v1/edges/${id}`, { method: 'DELETE' }),
 };

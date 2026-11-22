@@ -12,6 +12,7 @@ const ACTION_LABELS: Record<string, string> = {
   'edge.create': 'Added an edge server',
   'edge.update': 'Changed an edge server',
   'edge.token': 'Replaced the token of an edge server',
+  'edge.purge': 'Emptied the copies of an edge server',
   'edge.delete': 'Removed an edge server',
   'channel.create': 'Created a channel',
   'channel.update': 'Changed a channel',

@@ -116,3 +116,28 @@ export function ensureMediaAllowed(url: string): boolean {
   window.location.reload();
   return false;
 }
+
+/**
+ * The server of a media address, when it is another one than the site: the
+ * one to name when asking for a different server. Null for the site itself.
+ */
+export function otherServerOf(url: string, own: string): string | null {
+  try {
+    const origin = new URL(url, own).origin;
+    return origin === own ? null : origin;
+  } catch {
+    return null;
+  }
+}
+
+/** A playback address with the request to avoid a server, if there is one to avoid. */
+export function withAvoid(path: string, avoid: string | null): string {
+  return avoid
+    ? `${path}${path.includes('?') ? '&' : '?'}avoid=${encodeURIComponent(avoid)}`
+    : path;
+}
+
+/** How often a page moves to another server by itself before it shows the error. */
+export const MAX_FAILOVERS = 2;
+/** Requests for parts of a video that may fail in a row before the server counts as gone. */
+export const FAILED_LOADS_BEFORE_MOVING = 3;

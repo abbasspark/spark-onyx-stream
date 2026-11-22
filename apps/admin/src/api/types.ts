@@ -1228,6 +1228,8 @@ export interface EdgeServer {
   } | null;
   /** Traffic of the last hour, oldest first. */
   samples: EdgeSample[];
+  /** What its copies are being emptied of, until the agent says it is done. */
+  purging: PurgeScope[];
   createdAt: string;
 }
 
@@ -1245,4 +1247,19 @@ export interface EdgeInput {
 export interface EdgeWithToken {
   edge: EdgeServer;
   token: string;
+}
+
+export type PurgeScope = 'all' | 'video' | 'live';
+
+export type TrafficRange = '24h' | '7d' | '30d';
+
+/** One hour of an edge: [start in seconds, bytes, requests, from copies, fetched first]. */
+export type TrafficPoint = [number, number, number, number, number];
+
+/** What the edges delivered, hour by hour. Hours without traffic are left out. */
+export interface EdgeTraffic {
+  range: TrafficRange;
+  from: string;
+  hours: number;
+  edges: { id: string; name: string; points: TrafficPoint[] }[];
 }

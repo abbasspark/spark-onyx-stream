@@ -42,7 +42,7 @@ See [phase-4-live.md](phase-4-live.md) for the design.
 ## Phase 5 in steps
 
 1. Edge servers: the edge agent, adding edges in the panel, sending viewers to them by content and weight, a key per edge, and the Edge servers page with live figures. **Done.**
-2. Edges in daily use: moving film viewers between servers without a click, routing by country, emptying and filling caches, traffic history.
+2. Edges in daily use: players that move to another server by themselves when theirs goes away, emptying the copies of an edge from the panel, and the history of what each edge delivered. **Done.** Routing by country and filling an edge ahead of a premiere are left for later: the first needs a source for the country of a viewer.
 3. The tracker: the service viewers find each other through.
 4. P2P in the player: viewers of the same video or channel exchange segments, with HTTP as the fallback.
 5. Offload statistics: how much edges and viewers took off the main server.

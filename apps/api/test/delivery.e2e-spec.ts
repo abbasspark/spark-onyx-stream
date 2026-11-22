@@ -223,6 +223,7 @@ describe.skipIf(!TEST_DATABASE_URL)('Delivery through edges (e2e)', () => {
         signingKey: edgeSigningKey(SIGNING_SECRET, edge.id, stored.secretHash),
         heartbeatSeconds: 10,
         protocol: 1,
+        commands: [],
       });
       // Not the secret of the platform, and not that of another edge.
       expect(answer.body.signingKey).not.toBe(SIGNING_SECRET);
@@ -404,6 +405,120 @@ describe.skipIf(!TEST_DATABASE_URL)('Delivery through edges (e2e)', () => {
     });
   });
 
+  describe('emptying the copies of an edge', () => {
+    it('hands the request to the agent with its next heartbeat, until the agent says it is done', async () => {
+      const { edge, token } = await createEdge();
+      await beat(token).expect(200);
+
+      const asked = await http()
+        .post(`/v1/edges/${edge.id}/purge`)
+        .set(admin())
+        .send({ scope: 'video' })
+        .expect(202);
+      expect(asked.body.purging).toEqual(['video']);
+      // Asking again for the same is asking once.
+      await http()
+        .post(`/v1/edges/${edge.id}/purge`)
+        .set(admin())
+        .send({ scope: 'video' })
+        .expect(202);
+
+      const told = await beat(token).expect(200);
+      expect(told.body.commands).toEqual([
+        { id: expect.any(String), type: 'purge', scope: 'video' },
+      ]);
+      // Not confirmed yet: it is sent again.
+      expect((await beat(token).expect(200)).body.commands).toHaveLength(1);
+
+      const after = await beat(token, { acknowledged: [told.body.commands[0].id] }).expect(200);
+      expect(after.body.commands).toEqual([]);
+      const shown = (await http().get(`/v1/edges/${edge.id}`).set(admin()).expect(200)).body;
+      expect(shown.purging).toEqual([]);
+
+      const entry = await testApp.prisma.auditLog.findFirstOrThrow({
+        where: { action: 'edge.purge' },
+      });
+      expect(entry.metadata).toMatchObject({ scope: 'video', name: 'Frankfurt 1' });
+    });
+
+    it('refuses when no agent is there to do it, and what it does not know', async () => {
+      const { edge, token } = await createEdge();
+      const refused = await http()
+        .post(`/v1/edges/${edge.id}/purge`)
+        .set(admin())
+        .send({ scope: 'all' })
+        .expect(409);
+      expect(refused.body.message).toMatch(/not connected/);
+
+      await beat(token).expect(200);
+      await http()
+        .post(`/v1/edges/${edge.id}/purge`)
+        .set(admin())
+        .send({ scope: 'pictures' })
+        .expect(400);
+      await http().post(`/v1/edges/${edge.id}/purge`).set(admin()).send({}).expect(202);
+      expect((await beat(token).expect(200)).body.commands[0].scope).toBe('all');
+    });
+  });
+
+  describe('the history of what was delivered', () => {
+    const counters = (bytesSent: number, requests: number, hits: number, misses: number) => ({
+      counters: { requests, bytesSent, hits, misses, refused: 0, originErrors: 0 },
+    });
+
+    it('adds up the heartbeats of an hour, per edge', async () => {
+      const first = await createEdge();
+      const second = await createEdge({ name: 'Paris', publicUrl: 'https://edge2.example.com' });
+      await beat(first.token, counters(1000, 10, 8, 2)).expect(200);
+      await beat(first.token, counters(4000, 30, 25, 5)).expect(200);
+      await beat(second.token, counters(0, 0, 0, 0)).expect(200);
+
+      const traffic = (await http().get('/v1/edges/traffic').set(admin()).expect(200)).body;
+      expect(traffic).toMatchObject({ range: '24h', hours: 24 });
+      const hour = Math.floor(Date.now() / 3_600_000) * 3600;
+      const byName = Object.fromEntries(
+        (traffic.edges as { name: string; points: number[][] }[]).map((edge) => [
+          edge.name,
+          edge.points,
+        ]),
+      );
+      // An hour that began between the two heartbeats would split them.
+      const total = (byName['Frankfurt 1'] as number[][]).reduce(
+        (sum, point) => sum + (point[1] as number),
+        0,
+      );
+      expect(total).toBe(4000);
+      expect((byName['Frankfurt 1'] as number[][]).at(-1)?.[0]).toBeGreaterThanOrEqual(hour - 3600);
+      // Nothing delivered, nothing stored.
+      expect(byName.Paris).toEqual([]);
+    });
+
+    it('reaches back a day, a week or a month, and no further', async () => {
+      const { edge } = await createEdge();
+      const hoursAgo = (hours: number) =>
+        new Date((Math.floor(Date.now() / 3_600_000) - hours) * 3_600_000);
+      await testApp.prisma.edgeTrafficHour.createMany({
+        data: [2, 30, 24 * 10, 24 * 40].map((hours) => ({
+          edgeId: edge.id,
+          hour: hoursAgo(hours),
+          bytes: BigInt(hours),
+          requests: 1n,
+        })),
+      });
+      const pointsOf = async (range: string) =>
+        (
+          (await http().get('/v1/edges/traffic').query({ range }).set(admin()).expect(200)).body
+            .edges[0].points as number[][]
+        ).map((point) => point[1]);
+
+      expect(await pointsOf('24h')).toEqual([2]);
+      expect(await pointsOf('7d')).toEqual([30, 2]);
+      expect(await pointsOf('30d')).toEqual([240, 30, 2]);
+      await http().get('/v1/edges/traffic').query({ range: '1y' }).set(admin()).expect(400);
+      await http().get('/v1/edges/traffic').expect(401);
+    });
+  });
+
   describe('sending viewers to an edge', () => {
     it('gives a viewer the address of an edge that is online, signed for that edge', async () => {
       const channel = await channelOnAir();
@@ -466,6 +581,38 @@ describe.skipIf(!TEST_DATABASE_URL)('Delivery through edges (e2e)', () => {
       expect(await watch(channel.slug)).not.toMatch(viaEdge);
       const shown = (await http().get(`/v1/edges/${edge.id}`).set(admin()).expect(200)).body;
       expect(shown).toMatchObject({ status: 'OFFLINE', now: null });
+    });
+
+    it('gives a player whose edge went away another server', async () => {
+      const channel = await channelOnAir();
+      const first = await createEdge();
+      await beat(first.token).expect(200);
+      const ask = async (avoid: string) =>
+        (
+          await http()
+            .post(`/v1/catalog/channels/${channel.slug}/playback`)
+            .query({ avoid })
+            .expect(200)
+        ).body.url as string;
+
+      // The only edge is the one to avoid: the main server takes over.
+      expect(await ask('https://edge1.example.com')).toMatch(/^\/v1\/live\//);
+      // Naming another server, or nothing sensible, changes nothing.
+      expect(await ask('https://elsewhere.example.com')).toMatch(
+        /^https:\/\/edge1\.example\.com\//,
+      );
+      expect(await ask('javascript:alert(1)')).toMatch(/^https:\/\/edge1\.example\.com\//);
+
+      const second = await createEdge({ name: 'Paris', publicUrl: 'https://edge2.example.com' });
+      await beat(second.token).expect(200);
+      await http()
+        .patch(`/v1/edges/${second.edge.id}`)
+        .set(admin())
+        .send({ weight: 1 })
+        .expect(200);
+      for (let attempt = 0; attempt < 10; attempt += 1) {
+        expect(await ask('https://edge1.example.com/')).toMatch(/^https:\/\/edge2\.example\.com\//);
+      }
     });
 
     it('tells the website which addresses video may come from', async () => {

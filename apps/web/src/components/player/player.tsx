@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 'use client';
 
-import { ensureMediaAllowed } from '@/lib/delivery';
+import { ensureMediaAllowed, FAILED_LOADS_BEFORE_MOVING } from '@/lib/delivery';
 import Hls from 'hls.js';
 import {
   ArrowLeft,
@@ -64,7 +64,11 @@ interface PlayerProps {
   onTime: (position: number, duration: number) => void;
   onEnded: () => void;
   /** Playback broke for good. The message is written for the viewer. */
-  onFatal: (message: string) => void;
+  /**
+   * The video cannot go on. "network" says that the server did not answer,
+   * which another server may.
+   */
+  onFatal: (message: string, network?: boolean) => void;
   /** Drawn over the video, above the controls: the end screen. */
   overlay?: ReactNode;
 }
@@ -219,8 +223,24 @@ export function Player({
         );
       });
       hls.on(Hls.Events.SUBTITLE_TRACK_SWITCH, (_event, data) => setTextTrack(data.id));
+      // The player tries a part that fails again and again, for most of a
+      // minute. When several fail in a row the server is likely gone, and
+      // asking for another one is quicker than waiting.
+      let failedLoads = 0;
+      hls.on(Hls.Events.FRAG_LOADED, () => {
+        failedLoads = 0;
+      });
       hls.on(Hls.Events.ERROR, (_event, data) => {
         if (!data.fatal) {
+          if (data.type === Hls.ErrorTypes.NETWORK_ERROR) {
+            failedLoads += 1;
+            if (failedLoads === FAILED_LOADS_BEFORE_MOVING) {
+              callbacks.current.onFatal(
+                'The video could not be loaded. Check your connection.',
+                true,
+              );
+            }
+          }
           return;
         }
         // A decoding hiccup can often be repaired once without the viewer noticing.
@@ -233,6 +253,7 @@ export function Player({
           data.type === Hls.ErrorTypes.NETWORK_ERROR
             ? 'The video could not be loaded. Check your connection.'
             : 'The video stopped because of a playback problem.',
+          data.type === Hls.ErrorTypes.NETWORK_ERROR,
         );
       });
       hls.loadSource(source);
@@ -260,7 +281,7 @@ export function Player({
         begin();
       };
       const onError = () =>
-        callbacks.current.onFatal('The video could not be loaded. Check your connection.');
+        callbacks.current.onFatal('The video could not be loaded. Check your connection.', true);
       element.addEventListener('loadedmetadata', onLoaded, { once: true });
       element.addEventListener('error', onError);
       element.src = source;

@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-only
+import { randomUUID } from 'node:crypto';
 import { Inject, Injectable } from '@nestjs/common';
 import { PrismaClient } from '@onyx/database';
 import type { Redis } from 'ioredis';
@@ -6,7 +7,11 @@ import { EventPublisher } from '../events/event-publisher.js';
 import { REDIS_CLIENT } from '../redis/redis.module.js';
 import { isEdgeSecret, parseEdgeToken } from './edge-credentials.js';
 import {
+  COMMAND_TTL_SECONDS,
   deltaOf,
+  type EdgeCommand,
+  edgeCommandsKey,
+  hourOf,
   type EdgeReport,
   type EdgeSample,
   type EdgeState,
@@ -39,6 +44,8 @@ export interface RoutableEdge {
 const KNOWN_FOR_MS = 15_000;
 /** How long the list of edges that take viewers is remembered. */
 const ROUTABLE_FOR_MS = 3000;
+/** How long the hourly traffic of an edge is kept. */
+export const TRAFFIC_KEPT_DAYS = 90;
 /** The state of an edge is dropped from Redis when it has been silent this long. */
 const STATE_TTL_SECONDS = 600;
 
@@ -50,6 +57,7 @@ const STATE_TTL_SECONDS = 600;
 export class EdgeRegistry {
   private readonly known = new Map<string, { edge: KnownEdge | null; until: number }>();
   private routable: { edges: RoutableEdge[]; until: number } | null = null;
+  private prunedAt = 0;
 
   constructor(
     @Inject(PrismaClient) private readonly prisma: PrismaClient,
@@ -120,6 +128,9 @@ export class EdgeRegistry {
       .expire(edgeSamplesKey(edge.id), 2 * 3600)
       .exec();
 
+    // The first report of an agent that was already running would count
+    // everything since it started a second time.
+    const counts = previous !== null || !edge.lastSeenAt;
     await this.prisma.edgeServer.updateMany({
       where: { id: edge.id },
       data: {
@@ -127,9 +138,7 @@ export class EdgeRegistry {
         version: report.version,
         hostname: report.hostname,
         remoteIp,
-        // The first report of an agent that was already running would count
-        // everything since it started a second time.
-        ...(previous || !edge.lastSeenAt
+        ...(counts
           ? {
               bytesServed: { increment: BigInt(delta.bytes) },
               requestsServed: { increment: BigInt(delta.requests) },
@@ -138,6 +147,26 @@ export class EdgeRegistry {
       },
     });
 
+    if (counts && (delta.bytes > 0 || delta.requests > 0)) {
+      const amounts = {
+        bytes: BigInt(delta.bytes),
+        requests: BigInt(delta.requests),
+        hits: BigInt(delta.hits),
+        misses: BigInt(delta.misses),
+      };
+      await this.prisma.edgeTrafficHour.upsert({
+        where: { edgeId_hour: { edgeId: edge.id, hour: hourOf(now) } },
+        create: { edgeId: edge.id, hour: hourOf(now), ...amounts },
+        update: {
+          bytes: { increment: amounts.bytes },
+          requests: { increment: amounts.requests },
+          hits: { increment: amounts.hits },
+          misses: { increment: amounts.misses },
+        },
+      });
+    }
+    await this.prune(now);
+
     const wasOnline =
       edge.lastSeenAt !== null && now - edge.lastSeenAt.getTime() <= ONLINE_WITHIN_MS;
     edge.lastSeenAt = new Date(now);
@@ -145,6 +174,60 @@ export class EdgeRegistry {
       this.routable = null;
       this.events.publish({ type: 'edge', edgeId: edge.id });
     }
+  }
+
+  /** Drops the hours that are older than what is kept, now and then. */
+  private async prune(now: number): Promise<void> {
+    if (now - this.prunedAt < 3_600_000) {
+      return;
+    }
+    this.prunedAt = now;
+    await this.prisma.edgeTrafficHour.deleteMany({
+      where: { hour: { lt: new Date(now - TRAFFIC_KEPT_DAYS * 86_400_000) } },
+    });
+  }
+
+  /** Asks an agent to do something with its next heartbeat. */
+  async command(edgeId: string, command: Omit<EdgeCommand, 'id'>): Promise<EdgeCommand> {
+    const full: EdgeCommand = { id: randomUUID(), ...command };
+    const pending = (await this.commands(edgeId)).filter(
+      // Asking twice for the same thing is asking once.
+      (other) => !(other.type === full.type && other.scope === full.scope),
+    );
+    await this.storeCommands(edgeId, [...pending, full]);
+    return full;
+  }
+
+  /** What an agent has yet to do. */
+  async commands(edgeId: string): Promise<EdgeCommand[]> {
+    return parse<EdgeCommand[]>(await this.redis.get(edgeCommandsKey(edgeId))) ?? [];
+  }
+
+  /** Takes what an agent says it has done off its list, and returns what is left. */
+  async acknowledge(edgeId: string, done: readonly string[]): Promise<EdgeCommand[]> {
+    const pending = await this.commands(edgeId);
+    if (pending.length === 0 || done.length === 0) {
+      return pending;
+    }
+    const left = pending.filter((command) => !done.includes(command.id));
+    if (left.length !== pending.length) {
+      await this.storeCommands(edgeId, left);
+      this.events.publish({ type: 'edge', edgeId });
+    }
+    return left;
+  }
+
+  private async storeCommands(edgeId: string, commands: EdgeCommand[]): Promise<void> {
+    if (commands.length === 0) {
+      await this.redis.del(edgeCommandsKey(edgeId));
+      return;
+    }
+    await this.redis.set(
+      edgeCommandsKey(edgeId),
+      JSON.stringify(commands),
+      'EX',
+      COMMAND_TTL_SECONDS,
+    );
   }
 
   async state(edgeId: string): Promise<EdgeState | null> {
@@ -161,7 +244,7 @@ export class EdgeRegistry {
   }
 
   async clear(edgeId: string): Promise<void> {
-    await this.redis.del(edgeStateKey(edgeId), edgeSamplesKey(edgeId));
+    await this.redis.del(edgeStateKey(edgeId), edgeSamplesKey(edgeId), edgeCommandsKey(edgeId));
     this.forget(edgeId);
   }
 

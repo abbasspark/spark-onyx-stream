@@ -4,6 +4,7 @@ import {
   Check,
   CircleAlert,
   Copy,
+  Eraser,
   KeyRound,
   LoaderCircle,
   MoreHorizontal,
@@ -15,10 +16,11 @@ import {
 import { type FormEvent, type ReactNode, useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import { edgesApi } from '@/api/endpoints';
-import type { EdgeInput, EdgeSample, EdgeServer, EdgeWithToken } from '@/api/types';
+import type { EdgeInput, EdgeSample, EdgeServer, EdgeWithToken, PurgeScope } from '@/api/types';
 import { useSession } from '@/auth/session';
 import { useConfirm } from '@/components/confirm';
 import { CopyField } from '@/components/copy-field';
+import { EdgeTrafficHistory } from '@/components/edge-traffic-history';
 import { Button } from '@/components/ui/button';
 import {
   Badge,
@@ -57,6 +59,7 @@ import {
   formatRatio,
   loadPercent,
   publicUrlProblem,
+  PURGE_CHOICES,
   summarize,
 } from '@/lib/edges';
 import { formatBitrate, formatBytes, formatDateTime, formatRelative } from '@/lib/format';
@@ -73,6 +76,7 @@ export function EdgesPage() {
   const [editing, setEditing] = useState<EdgeServer | 'new' | null>(null);
   const [openId, setOpenId] = useState<string | null>(null);
   const [setup, setSetup] = useState<EdgeWithToken | null>(null);
+  const [emptying, setEmptying] = useState<EdgeServer | null>(null);
 
   const edges = useQuery({
     queryKey: ['edges'],
@@ -164,6 +168,10 @@ export function EdgesPage() {
             <Pencil />
             Edit
           </DropdownMenuItem>
+          <DropdownMenuItem disabled={edge.now === null} onSelect={() => setEmptying(edge)}>
+            <Eraser />
+            Empty the copies
+          </DropdownMenuItem>
           <DropdownMenuItem onSelect={() => void askReplaceToken(edge)}>
             <KeyRound />
             Replace token
@@ -223,6 +231,8 @@ export function EdgesPage() {
             />
           </Card>
 
+          <EdgeTrafficHistory />
+
           <Card className="overflow-hidden">
             <ul className="divide-y">
               {items.map((edge) => {
@@ -251,6 +261,12 @@ export function EdgesPage() {
                           .filter(Boolean)
                           .join(' · ')}
                       </p>
+                      {edge.purging.length > 0 ? (
+                        <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                          <LoaderCircle className="size-3.5 animate-spin" aria-hidden="true" />
+                          Emptying its copies
+                        </p>
+                      ) : null}
                       {concern ? (
                         <p className="flex items-start gap-1.5 text-xs text-warning">
                           <CircleAlert className="mt-px size-3.5 shrink-0" aria-hidden="true" />
@@ -337,6 +353,10 @@ export function EdgesPage() {
                 <Pencil />
                 Edit
               </Button>
+              <Button disabled={open.now === null} onClick={() => setEmptying(open)}>
+                <Eraser />
+                Empty the copies
+              </Button>
               <Button onClick={() => void askReplaceToken(open)}>
                 <KeyRound />
                 Replace token
@@ -361,6 +381,16 @@ export function EdgesPage() {
         onSaved={(edge) => {
           toast.success(`${edge.name} saved`);
           setEditing(null);
+          refresh();
+        }}
+      />
+
+      <EmptyDialog
+        edge={emptying}
+        onClose={() => setEmptying(null)}
+        onAsked={(edge) => {
+          toast.success(`${edge.name} empties its copies with its next report`);
+          setEmptying(null);
           refresh();
         }}
       />
@@ -901,5 +931,80 @@ function CodeBlock({ label, code, note }: { label: string; code: string; note: s
       </div>
       <p className="text-xs text-muted-foreground">{note}</p>
     </div>
+  );
+}
+
+interface EmptyDialogProps {
+  edge: EdgeServer | null;
+  onClose: () => void;
+  onAsked: (edge: EdgeServer) => void;
+}
+
+/** Asks which copies of an edge to drop, and says what that costs. */
+function EmptyDialog({ edge, onClose, onAsked }: EmptyDialogProps) {
+  const [scope, setScope] = useState<PurgeScope>('all');
+  useEffect(() => {
+    if (edge) {
+      setScope('all');
+    }
+  }, [edge]);
+
+  const ask = useMutation({
+    mutationFn: () => edgesApi.purge((edge as EdgeServer).id, scope),
+    onSuccess: onAsked,
+  });
+
+  return (
+    <Dialog open={edge !== null} onOpenChange={(open) => !open && onClose()}>
+      <DialogContent
+        size="sm"
+        title={edge ? `Empty the copies of ${edge.name}` : 'Empty the copies'}
+        description="For when an edge serves something it should not, or to free its disk. Viewers keep watching: what they ask for is fetched from the main server again."
+      >
+        <DialogBody>
+          <div className="grid gap-2" role="radiogroup" aria-label="What to empty">
+            {PURGE_CHOICES.map((choice) => (
+              <button
+                key={choice.value}
+                type="button"
+                role="radio"
+                aria-checked={scope === choice.value}
+                onClick={() => setScope(choice.value)}
+                className={cn(
+                  'grid gap-0.5 rounded-lg border p-3 text-left transition-colors',
+                  scope === choice.value ? 'border-primary bg-primary/5' : 'hover:bg-accent/50',
+                )}
+              >
+                <span className="text-sm font-medium">{choice.label}</span>
+                <span className="text-xs text-muted-foreground">{choice.explain}</span>
+              </button>
+            ))}
+          </div>
+          {edge?.now ? (
+            <p className="text-xs text-muted-foreground">
+              It keeps {formatBytes(edge.now.cache.bytes)} in{' '}
+              {edge.now.cache.files.toLocaleString()} files now. Until the copies are back, this
+              edge takes more from the main server.
+            </p>
+          ) : null}
+          <ErrorNote error={ask.error} />
+        </DialogBody>
+        <DialogFooter>
+          <Button type="button" onClick={onClose}>
+            Cancel
+          </Button>
+          <Button
+            variant="destructive"
+            loading={ask.isPending}
+            onClick={() => {
+              ask.reset();
+              ask.mutate();
+            }}
+          >
+            Empty
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }

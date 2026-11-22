@@ -53,9 +53,19 @@ type Answer struct {
 		Name    string `json:"name"`
 		Enabled bool   `json:"enabled"`
 	} `json:"edge"`
-	SigningKey       string `json:"signingKey"`
-	HeartbeatSeconds int    `json:"heartbeatSeconds"`
-	Protocol         int    `json:"protocol"`
+	SigningKey       string    `json:"signingKey"`
+	HeartbeatSeconds int       `json:"heartbeatSeconds"`
+	Protocol         int       `json:"protocol"`
+	Commands         []Command `json:"commands"`
+}
+
+// Command is something the main server asks of the agent. The agent names its
+// id in a later heartbeat once it is done.
+type Command struct {
+	ID   string `json:"id"`
+	Type string `json:"type"`
+	// For "purge": "all", "video" or "live".
+	Scope string `json:"scope"`
 }
 
 // Heartbeat sends a report and returns what the main server has to say.

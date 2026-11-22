@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-only
+import { DeliveryHintInterceptor } from '../delivery/delivery-hint.js';
 import {
   Controller,
   Get,
@@ -10,6 +11,7 @@ import {
   Post,
   Query,
   Req,
+  UseInterceptors,
 } from '@nestjs/common';
 import type { Request } from 'express';
 import { z } from 'zod';
@@ -98,6 +100,7 @@ export class PublicChannelsController {
 
   /** A signed, short-lived address for watching a channel. Never cached. */
   @Post(':slug/playback')
+  @UseInterceptors(DeliveryHintInterceptor)
   @RateLimit(PLAYBACK)
   @HttpCode(HttpStatus.OK)
   @Header('Cache-Control', 'no-store')

@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 'use client';
 
+import { MAX_FAILOVERS, otherServerOf, withAvoid } from '@/lib/delivery';
 import { Loader2, Lock, Mail, Play, RotateCcw, SkipForward } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -113,7 +114,7 @@ export function WatchScreen({
     };
 
     Promise.all([
-      fetch(playbackPath, { method: 'POST', signal: controller.signal }),
+      fetch(withAvoid(playbackPath, avoid.current), { method: 'POST', signal: controller.signal }),
       whereToStart(),
     ])
       .then(async ([response, startAt]) => {
@@ -256,9 +257,23 @@ export function WatchScreen({
     return () => window.clearTimeout(timer);
   }, [countdown, next, router]);
 
-  const onFatal = useCallback((message: string) => {
-    setLoaded({ state: 'failed', message, retry: true });
-  }, []);
+  // A server that stopped answering is left for another one, a few times,
+  // before the viewer is shown an error. The video goes on where it was.
+  const avoid = useRef<string | null>(null);
+  const failovers = useRef(0);
+  const playingFrom = loaded.state === 'ready' ? loaded.playback.manifestUrl : null;
+  const onFatal = useCallback(
+    (message: string, network = false) => {
+      if (network && playingFrom && failovers.current < MAX_FAILOVERS) {
+        failovers.current += 1;
+        avoid.current = otherServerOf(playingFrom, window.location.origin);
+        setAttempt((value) => value + 1);
+        return;
+      }
+      setLoaded({ state: 'failed', message, retry: true });
+    },
+    [playingFrom],
+  );
 
   const watchAgain = () => {
     setEnded(false);

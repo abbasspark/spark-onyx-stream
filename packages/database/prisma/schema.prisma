@@ -1292,7 +1292,7 @@ model EdgeServer {
   name String @unique
 
   /// The address viewers reach it at, such as https://edge1.example.com.
-  publicUrl String @unique
+  publicUrl String  @unique
   /// Where it stands, as a note for the operator.
   location  String?
 
@@ -1316,8 +1316,29 @@ model EdgeServer {
   bytesServed    BigInt @default(0)
   requestsServed BigInt @default(0)
 
+  trafficHours EdgeTrafficHour[]
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   @@map("edge_servers")
+}
+
+/// What an edge delivered in one hour. Written from its heartbeats, kept for
+/// the history of the Edge servers page.
+model EdgeTrafficHour {
+  edgeId String     @db.Uuid
+  edge   EdgeServer @relation(fields: [edgeId], references: [id], onDelete: Cascade)
+  /// The start of the hour, in UTC.
+  hour   DateTime
+
+  bytes    BigInt @default(0)
+  requests BigInt @default(0)
+  /// Requests answered from copies on the edge, and those fetched first.
+  hits     BigInt @default(0)
+  misses   BigInt @default(0)
+
+  @@id([edgeId, hour])
+  @@index([hour])
+  @@map("edge_traffic_hours")
 }

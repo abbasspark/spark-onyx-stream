@@ -122,6 +122,31 @@ func (s *Server) Ready() bool {
 	return key != nil && *key != ""
 }
 
+// Purge drops the copies: all of them, or those of videos or of live channels.
+// What viewers ask for afterwards is fetched again. It returns how many files went.
+func (s *Server) Purge(scope string) (int, bool) {
+	var prefix string
+	switch scope {
+	case "all":
+		prefix = ""
+	case "video":
+		prefix = "media/"
+	case "live":
+		prefix = "live/"
+	default:
+		return 0, false
+	}
+	removed := s.cache.RemovePrefix(prefix, "")
+	s.mu.Lock()
+	if scope != "live" {
+		// Ask again which processing of each video is current.
+		s.knownAssets = map[string]assetVersion{}
+	}
+	s.memory = map[string]*memoryFile{}
+	s.mu.Unlock()
+	return removed, true
+}
+
 // Tidy drops what has no use any more. Called now and then.
 func (s *Server) Tidy() {
 	removed := s.cache.RemoveOlder("live/", s.now().Add(-liveKeptFor))
