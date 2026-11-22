@@ -81,9 +81,10 @@ When a viewer starts a video or a channel, the API chooses a server for that ses
 ### When an edge goes away
 
 - No new viewers are sent to it 35 seconds after its last report.
-- **A live viewer** on it moves by itself: the player notices that the picture stands still, asks for the channel again and gets another server. In a test this took about 36 seconds, most of it the wait until the edge counts as gone.
-- **A viewer of a film** sees the player's error with "Try again", which gets another server and goes on where the viewer was. Moving without that click is not built yet.
-- An edge that cannot reach the main server keeps serving what it has. Viewers whose video is on it go on watching; files it does not have fail.
+- **A player that loses its server asks for another one.** It names the server that failed (`?avoid=` on the playback request), so it is not sent there again while the main server still counts that edge as alive.
+- **A viewer of a film** goes on where the video was. The player moves after three requests in a row failed, which in a test took about a second. It does so twice per page before it shows its error with "Try again".
+- **A live viewer** moves when the player reports the stream as broken, or when the picture has stood still for twelve seconds.
+- An edge that cannot reach the main server keeps serving what it has. Viewers whose video is on it go on watching; files it does not have fail, and their players move.
 
 ## Security
 
@@ -102,6 +103,14 @@ When a viewer starts a video or a channel, the API chooses a server for that ses
 - **Many viewers asking for the same new file cause one fetch.**
 - A restart keeps the copies.
 
+## Emptying an edge
+
+**Empty the copies** in the menu of an edge drops what it keeps: everything, the copies of films and episodes, or those of live channels. It is for an edge that serves something it should not, and for freeing its disk.
+
+The request waits for the agent's next heartbeat, travels in the answer, and is taken off the list when the agent reports it as done with the heartbeat after that. The copies are gone within ten seconds, and the panel shows it as done within twenty. Viewers keep watching: what they ask for is fetched from the main server again. A request nobody confirmed is dropped after fifteen minutes.
+
+A video that was processed again or deleted needs no emptying. The agent notices within a minute.
+
 ## What the panel shows
 
 **Delivery → Edge servers** lists the edges with their state, traffic, the share of requests answered from copies, how full the cache is, and the traffic of the last hour. Above the list: how many are online, the traffic of all of them together and what they delivered in total. The details of an edge add the machine's load and disk space, refused requests and failed fetches, the version of the agent and where it connects from.
@@ -113,7 +122,9 @@ When a viewer starts a video or a channel, the API chooses a server for that ses
 | Offline               | The agent stopped reporting                            |
 | Waiting for the agent | No agent has connected with the token of this edge yet |
 
-The figures come from the heartbeats and are kept in Redis for an hour. Totals are kept in the database.
+**Delivered by the edges** shows what was delivered over the last 24 hours, 7 days or 30 days, edge by edge: a bar per hour for a day, a bar per day for longer. The same figures can be shown as a table. Days are those of the time zone of the computer the panel is open on.
+
+The figures come from the heartbeats. Those of the last hour are kept in Redis. What each edge delivered per hour is kept in the database for 90 days, as are the totals.
 
 ## The viewer website
 
@@ -123,28 +134,29 @@ The website's content policy must allow every address video comes from. It asks 
 
 ## API
 
-| Method and path                     | Who              | Purpose                                                   |
-| ----------------------------------- | ---------------- | --------------------------------------------------------- |
-| `GET /v1/edges`                     | `delivery:read`  | All edges with state, figures and traffic history         |
-| `GET /v1/edges/:id`                 | `delivery:read`  | One edge                                                  |
-| `POST /v1/edges`                    | `delivery:write` | Add an edge. The answer carries its token, once           |
-| `PATCH /v1/edges/:id`               | `delivery:write` | Change an edge, pause it or switch it on                  |
-| `POST /v1/edges/:id/token`          | `delivery:write` | Replace the token                                         |
-| `DELETE /v1/edges/:id`              | `delivery:write` | Remove an edge and lock its agent out                     |
-| `GET /v1/catalog/delivery`          | everyone         | The addresses of the edges, for the website               |
-| `POST /v1/edge-agent/heartbeat`     | the agent        | Report, and get the key for checking tokens               |
-| `GET /v1/edge-agent/assets/:id`     | the agent        | Whether a video can be played, and its current processing |
-| `GET /v1/edge-agent/media/:id/…`    | the agent        | A file of a video, or its content key                     |
-| `GET /v1/edge-agent/live/:id/:file` | the agent        | A playlist or segment of a channel                        |
+| Method and path                     | Who              | Purpose                                                    |
+| ----------------------------------- | ---------------- | ---------------------------------------------------------- |
+| `GET /v1/edges`                     | `delivery:read`  | All edges with state, figures and traffic history          |
+| `GET /v1/edges/:id`                 | `delivery:read`  | One edge                                                   |
+| `POST /v1/edges`                    | `delivery:write` | Add an edge. The answer carries its token, once            |
+| `PATCH /v1/edges/:id`               | `delivery:write` | Change an edge, pause it or switch it on                   |
+| `POST /v1/edges/:id/token`          | `delivery:write` | Replace the token                                          |
+| `DELETE /v1/edges/:id`              | `delivery:write` | Remove an edge and lock its agent out                      |
+| `POST /v1/edges/:id/purge`          | `delivery:write` | Ask the agent to drop its copies: `all`, `video` or `live` |
+| `GET /v1/edges/traffic?range=`      | `delivery:read`  | What each edge delivered per hour: `24h`, `7d` or `30d`    |
+| `GET /v1/catalog/delivery`          | everyone         | The addresses of the edges, for the website                |
+| `POST /v1/edge-agent/heartbeat`     | the agent        | Report, and get the key for checking tokens                |
+| `GET /v1/edge-agent/assets/:id`     | the agent        | Whether a video can be played, and its current processing  |
+| `GET /v1/edge-agent/media/:id/…`    | the agent        | A file of a video, or its content key                      |
+| `GET /v1/edge-agent/live/:id/:file` | the agent        | A playlist or segment of a channel                         |
 
 `delivery:read` and `delivery:write` are held by owners and admins. Changes are written to the audit log. An agent that speaks an older version of this conversation than the main server is refused and stays offline.
 
 ## Not built yet
 
-- Moving a viewer of a film to another server without a click, and a second address in the answer for players to fall back to
 - Sending viewers to the nearest edge by country or network, and limits per edge (bandwidth, connections)
-- Emptying the cache of an edge from the panel, and filling it ahead of a premiere
-- Traffic history beyond an hour, per day and per title
+- Filling the copies of an edge ahead of a premiere, and emptying one video only
+- Traffic per title and per country, and what the main server itself delivered
 - Edges that fetch from other edges, and edges for pictures
 - Sending the first bytes of a new file to the viewer while it is still being fetched
 - Updating agents from the panel

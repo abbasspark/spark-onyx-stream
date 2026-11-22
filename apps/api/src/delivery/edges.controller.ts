@@ -11,6 +11,7 @@ import {
   ParseUUIDPipe,
   Patch,
   Post,
+  Query,
   Req,
 } from '@nestjs/common';
 import type { Request } from 'express';
@@ -22,10 +23,19 @@ import { ZodValidationPipe } from '../common/zod-validation.pipe.js';
 import {
   type CreateEdgeInput,
   createEdgeSchema,
+  type PurgeInput,
+  purgeSchema,
+  type TrafficQuery,
+  trafficQuerySchema,
   type UpdateEdgeInput,
   updateEdgeSchema,
 } from './edges.schemas.js';
-import { type EdgeView, type EdgeWithToken, EdgesService } from './edges.service.js';
+import {
+  type EdgeView,
+  type EdgeWithToken,
+  EdgesService,
+  type TrafficView,
+} from './edges.service.js';
 
 /** Edge servers: the machines that deliver video in place of the main server. */
 @Controller('edges')
@@ -39,6 +49,15 @@ export class EdgesController {
   @RequirePermissions('delivery:read')
   list(): Promise<EdgeView[]> {
     return this.edges.list();
+  }
+
+  /** What the edges delivered over the last day, week or month. Before ":id", which would take it. */
+  @Get('traffic')
+  @RequirePermissions('delivery:read')
+  traffic(
+    @Query(new ZodValidationPipe(trafficQuerySchema)) query: TrafficQuery,
+  ): Promise<TrafficView> {
+    return this.edges.traffic(query.range);
   }
 
   @Get(':id')
@@ -85,6 +104,21 @@ export class EdgesController {
     const replaced = await this.edges.replaceToken(id);
     await this.record('edge.token', replaced.edge, principal, request);
     return replaced;
+  }
+
+  /** Asks the agent to drop its copies: all of them, or those of videos or of live channels. */
+  @Post(':id/purge')
+  @HttpCode(HttpStatus.ACCEPTED)
+  @RequirePermissions('delivery:write')
+  async purge(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body(new ZodValidationPipe(purgeSchema)) body: PurgeInput,
+    @CurrentPrincipal() principal: Principal,
+    @Req() request: Request,
+  ): Promise<EdgeView> {
+    const edge = await this.edges.purge(id, body.scope);
+    await this.record('edge.purge', edge, principal, request, { scope: body.scope });
+    return edge;
   }
 
   @Delete(':id')

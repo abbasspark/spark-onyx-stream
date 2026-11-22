@@ -369,3 +369,36 @@ func TestAnswersThePreflightOfABrowser(t *testing.T) {
 		t.Errorf("POST: %d", post.Code)
 	}
 }
+
+func TestDropsCopiesWhenAsked(t *testing.T) {
+	e := newEdge(t)
+	e.get(e.url("media", asset, "hls/v0/seg1.m4s"))
+	e.get(e.url("live", channel, "seg-1.m4s"))
+	e.get(e.url("media", asset, "hls/key"))
+
+	if removed, ok := e.Purge("live"); !ok || removed != 1 {
+		t.Fatalf("live: removed %d, %v", removed, ok)
+	}
+	if e.get(e.url("media", asset, "hls/v0/seg1.m4s")).Header().Get("X-Cache") != "HIT" {
+		t.Error("the copy of the video went with the live ones")
+	}
+	if _, ok := e.Purge("everything"); ok {
+		t.Error("an unknown kind was accepted")
+	}
+
+	asked := e.origin.versions.Load()
+	if removed, ok := e.Purge("all"); !ok || removed != 1 {
+		t.Fatalf("all: removed %d, %v", removed, ok)
+	}
+	again := e.get(e.url("media", asset, "hls/v0/seg1.m4s"))
+	if again.Code != 200 || again.Header().Get("X-Cache") != "MISS" {
+		t.Fatalf("after emptying: %d %s", again.Code, again.Header().Get("X-Cache"))
+	}
+	if e.origin.versions.Load() != asked+1 {
+		t.Error("the version of the video was not asked for again")
+	}
+	e.get(e.url("media", asset, "hls/key"))
+	if fetched := e.origin.fetched("media/" + asset + "/hls/key"); fetched != 2 {
+		t.Errorf("the key was fetched %d times, it should have been dropped too", fetched)
+	}
+}

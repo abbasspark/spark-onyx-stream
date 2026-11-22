@@ -1,6 +1,13 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 import type { BadgeTone } from '@/components/ui/display';
-import type { EdgeSample, EdgeServer, EdgeStatus } from '@/api/types';
+import type {
+  EdgeSample,
+  EdgeServer,
+  EdgeStatus,
+  EdgeTraffic,
+  PurgeScope,
+  TrafficRange,
+} from '@/api/types';
 
 export const EDGE_STATUS_LOOKS: Record<
   EdgeStatus,
@@ -194,4 +201,202 @@ export function publicUrlProblem(value: string): string | null {
   return /^https?:\/\/[A-Za-z0-9.-]+(:\d{1,5})?$/.test(text)
     ? null
     : 'Write it like https://edge1.example.com, without a path.';
+}
+
+export const PURGE_CHOICES: { value: PurgeScope; label: string; explain: string }[] = [
+  {
+    value: 'all',
+    label: 'Everything',
+    explain: 'All copies. The edge starts empty and fetches again what viewers ask for.',
+  },
+  {
+    value: 'video',
+    label: 'Films and episodes',
+    explain: 'Copies of video on demand. Live channels are not touched.',
+  },
+  {
+    value: 'live',
+    label: 'Live channels',
+    explain: 'Segments of live channels, also those kept for going back in time.',
+  },
+];
+
+export const TRAFFIC_RANGES: { value: TrafficRange; label: string }[] = [
+  { value: '24h', label: '24 hours' },
+  { value: '7d', label: '7 days' },
+  { value: '30d', label: '30 days' },
+];
+
+/** How many edges get a colour of their own in the history. The rest are shown together. */
+export const MAX_CHART_SERIES = 7;
+export const OTHER_SERIES = 'other';
+
+export interface TrafficSeries {
+  /** Id of the edge, or OTHER_SERIES for the rest taken together. */
+  id: string;
+  name: string;
+  /** Position in the colour order. It belongs to the edge and does not move with the figures. */
+  slot: number;
+  bytes: number;
+}
+
+export interface TrafficBucket {
+  /** Start of the hour or the day, in milliseconds. */
+  start: number;
+  /** For the axis: "14:00" or "Nov 22". */
+  label: string;
+  /** For the tooltip: "Nov 22, 14:00 to 15:00" or "Sunday, Nov 22". */
+  title: string;
+  bytes: number;
+  requests: number;
+  hits: number;
+  misses: number;
+  /** Bytes per series, in the order of the series. */
+  parts: number[];
+}
+
+export interface TrafficChart {
+  series: TrafficSeries[];
+  buckets: TrafficBucket[];
+  /** The highest bucket, for the scale. */
+  peak: number;
+  bytes: number;
+  requests: number;
+  /** Share answered from copies over the whole range. Null without requests. */
+  hitRatio: number | null;
+}
+
+/**
+ * Turns the hours of the API into the bars of the history: one per hour for a
+ * day, one per day (of this computer's time zone) for longer ranges.
+ *
+ * Edges get their colour by the order they were added in, so an edge keeps
+ * its colour when others come and go or deliver more.
+ */
+export function trafficChartOf(traffic: EdgeTraffic, now: number = Date.now()): TrafficChart {
+  const daily = traffic.range !== '24h';
+  const startOf = (at: number) => {
+    const date = new Date(at);
+    return daily
+      ? new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime()
+      : Math.floor(at / 3_600_000) * 3_600_000;
+  };
+
+  // Ids are made in the order of time, so sorting by id is sorting by age.
+  const byAge = [...traffic.edges].sort((a, b) => a.id.localeCompare(b.id));
+  const own = byAge.slice(0, MAX_CHART_SERIES);
+  const rest = byAge.slice(MAX_CHART_SERIES);
+  const series: TrafficSeries[] = own.map((edge, slot) => ({
+    id: edge.id,
+    name: edge.name,
+    slot,
+    bytes: 0,
+  }));
+  if (rest.length > 0) {
+    series.push({
+      id: OTHER_SERIES,
+      name: `${rest.length} more`,
+      slot: MAX_CHART_SERIES,
+      bytes: 0,
+    });
+  }
+  const seriesIndex = new Map<string, number>(own.map((edge, index) => [edge.id, index]));
+  for (const edge of rest) {
+    seriesIndex.set(edge.id, MAX_CHART_SERIES);
+  }
+
+  const buckets: TrafficBucket[] = [];
+  const bucketAt = new Map<number, TrafficBucket>();
+  const first = startOf(new Date(traffic.from).getTime());
+  for (let start = first; start <= now; start = nextStart(start, daily)) {
+    const bucket: TrafficBucket = {
+      start,
+      label: bucketLabel(start, daily),
+      title: bucketTitle(start, daily),
+      bytes: 0,
+      requests: 0,
+      hits: 0,
+      misses: 0,
+      parts: series.map(() => 0),
+    };
+    buckets.push(bucket);
+    bucketAt.set(start, bucket);
+  }
+
+  for (const edge of traffic.edges) {
+    const index = seriesIndex.get(edge.id) as number;
+    for (const [seconds, bytes, requests, hits, misses] of edge.points) {
+      const bucket = bucketAt.get(startOf(seconds * 1000));
+      if (!bucket) {
+        continue;
+      }
+      bucket.bytes += bytes;
+      bucket.requests += requests;
+      bucket.hits += hits;
+      bucket.misses += misses;
+      bucket.parts[index] = (bucket.parts[index] ?? 0) + bytes;
+      (series[index] as TrafficSeries).bytes += bytes;
+    }
+  }
+
+  const sum = (pick: (bucket: TrafficBucket) => number) =>
+    buckets.reduce((total, bucket) => total + pick(bucket), 0);
+  const answered = sum((bucket) => bucket.hits + bucket.misses);
+  return {
+    series,
+    buckets,
+    peak: Math.max(0, ...buckets.map((bucket) => bucket.bytes)),
+    bytes: sum((bucket) => bucket.bytes),
+    requests: sum((bucket) => bucket.requests),
+    hitRatio: answered > 0 ? sum((bucket) => bucket.hits) / answered : null,
+  };
+}
+
+function nextStart(start: number, daily: boolean): number {
+  if (!daily) {
+    return start + 3_600_000;
+  }
+  // By the calendar, so a day with a clock change is still one bar.
+  const date = new Date(start);
+  return new Date(date.getFullYear(), date.getMonth(), date.getDate() + 1).getTime();
+}
+
+function bucketLabel(start: number, daily: boolean): string {
+  const date = new Date(start);
+  return daily
+    ? date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
+    : date.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
+}
+
+function bucketTitle(start: number, daily: boolean): string {
+  const date = new Date(start);
+  if (daily) {
+    return date.toLocaleDateString(undefined, { weekday: 'long', month: 'short', day: 'numeric' });
+  }
+  const clock = (value: Date) =>
+    value.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
+  return `${date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}, ${clock(date)} to ${clock(new Date(start + 3_600_000))}`;
+}
+
+const STEPS = [
+  1, 1.5, 2, 3, 4, 5, 7.5, 10, 15, 20, 30, 40, 50, 75, 100, 150, 200, 300, 400, 500, 750, 1024,
+];
+
+/**
+ * A round number at or above the peak for the top of the scale, in bytes,
+ * that reads well in the unit the peak is shown in.
+ */
+export function niceCeiling(peak: number): number {
+  if (peak <= 0) {
+    return 1024 * 1024;
+  }
+  const unit = 1024 ** Math.floor(Math.log(peak) / Math.log(1024));
+  const inUnit = peak / unit;
+  const step = STEPS.find((value) => value >= inUnit) ?? 1024;
+  return step * unit;
+}
+
+/** Which bars carry a label under them, so labels never run into each other. */
+export function labelEvery(count: number, room: number): number {
+  return Math.max(1, Math.ceil(count / Math.max(1, room)));
 }

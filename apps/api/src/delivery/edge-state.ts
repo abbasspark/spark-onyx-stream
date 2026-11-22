@@ -75,23 +75,55 @@ export function statusOf(
   return edge.enabled ? 'ONLINE' : 'DISABLED';
 }
 
+/** What an edge did between two reports. */
+export interface EdgeDelta {
+  bytes: number;
+  requests: number;
+  hits: number;
+  misses: number;
+}
+
 /**
  * What was delivered between two reports. A counter that fell means the agent
  * restarted, and then everything it counts is new.
  */
-export function deltaOf(
-  previous: EdgeReport | null,
-  current: EdgeReport,
-): { bytes: number; requests: number } {
+export function deltaOf(previous: EdgeReport | null, current: EdgeReport): EdgeDelta {
+  const now = current.counters;
+  const before = previous?.counters;
   const restarted =
-    !previous ||
+    !before ||
     previous.startedAt !== current.startedAt ||
-    current.counters.bytesSent < previous.counters.bytesSent ||
-    current.counters.requests < previous.counters.requests;
+    now.bytesSent < before.bytesSent ||
+    now.requests < before.requests;
   return restarted
-    ? { bytes: current.counters.bytesSent, requests: current.counters.requests }
+    ? { bytes: now.bytesSent, requests: now.requests, hits: now.hits, misses: now.misses }
     : {
-        bytes: current.counters.bytesSent - previous.counters.bytesSent,
-        requests: current.counters.requests - previous.counters.requests,
+        bytes: now.bytesSent - before.bytesSent,
+        requests: now.requests - before.requests,
+        hits: Math.max(0, now.hits - before.hits),
+        misses: Math.max(0, now.misses - before.misses),
       };
+}
+
+/** The start of the hour a moment lies in, in UTC. */
+export function hourOf(at: number): Date {
+  return new Date(Math.floor(at / 3_600_000) * 3_600_000);
+}
+
+export const edgeCommandsKey = (edgeId: string) => `onyx:edge:${edgeId}:commands`;
+/** A command nobody fetched or confirmed is dropped after this long. */
+export const COMMAND_TTL_SECONDS = 15 * 60;
+
+/** What the copies of an edge are emptied of. */
+export const PURGE_SCOPES = ['all', 'video', 'live'] as const;
+export type PurgeScope = (typeof PURGE_SCOPES)[number];
+
+/**
+ * Something the main server asks of an agent. It travels in the answer to a
+ * heartbeat, and the agent names it in a later report once it is done.
+ */
+export interface EdgeCommand {
+  id: string;
+  type: 'purge';
+  scope: PurgeScope;
 }

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-only
-import { isAllowedOrigin } from './delivery';
+import { isAllowedOrigin, otherServerOf, withAvoid } from './delivery';
 
 describe('isAllowedOrigin', () => {
   const own = 'https://stream.example.com';
@@ -27,5 +27,26 @@ describe('isAllowedOrigin', () => {
     expect(isAllowedOrigin('https://evilcdn.example.org.attacker.net/x', allowed, own)).toBe(false);
     expect(isAllowedOrigin('http://a.lab.test:8080/x', allowed, own)).toBe(true);
     expect(isAllowedOrigin('http://a.lab.test/x', allowed, own)).toBe(false);
+  });
+});
+
+describe('asking for another server', () => {
+  const own = 'https://stream.example.com';
+
+  it('names the server of an address, unless it is the site itself', () => {
+    expect(otherServerOf('https://edge1.example.net/v1/media/a/t/hls/master.m3u8', own)).toBe(
+      'https://edge1.example.net',
+    );
+    expect(otherServerOf('/v1/media/a/t/hls/master.m3u8', own)).toBeNull();
+    expect(otherServerOf('https://stream.example.com/v1/live/x', own)).toBeNull();
+  });
+
+  it('adds the server to avoid to the request', () => {
+    expect(withAvoid('/v1/catalog/titles/film/playback', null)).toBe(
+      '/v1/catalog/titles/film/playback',
+    );
+    expect(withAvoid('/v1/catalog/titles/film/playback', 'https://edge1.example.net')).toBe(
+      '/v1/catalog/titles/film/playback?avoid=https%3A%2F%2Fedge1.example.net',
+    );
   });
 });

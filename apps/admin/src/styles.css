@@ -32,6 +32,17 @@
   --ring: oklch(0.52 0.21 275);
   --sidebar: oklch(0.975 0.004 265);
   --overlay: oklch(0.2 0.02 265 / 45%);
+
+  /* Colours that tell the series of a chart apart, in a fixed order. Checked
+     for readers with colour blindness against this surface. */
+  --series-1: #2a78d6;
+  --series-2: #eb6834;
+  --series-3: #1baf7a;
+  --series-4: #eda100;
+  --series-5: #e87ba4;
+  --series-6: #008300;
+  --series-7: #6250d6;
+  --series-rest: #8a8f98;
 }
 
 .dark {
@@ -58,6 +69,15 @@
   --ring: oklch(0.68 0.17 277);
   --sidebar: oklch(0.175 0.013 270);
   --overlay: oklch(0.08 0.01 270 / 65%);
+
+  --series-1: #3987e5;
+  --series-2: #d95926;
+  --series-3: #199e70;
+  --series-4: #c98500;
+  --series-5: #d55181;
+  --series-6: #0ca30c;
+  --series-7: #9085e9;
+  --series-rest: #7b808a;
 }
 
 @theme inline {

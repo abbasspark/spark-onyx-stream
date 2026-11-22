@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-only
+import { DeliveryHintInterceptor } from '../delivery/delivery-hint.js';
 import {
   Controller,
   Get,
@@ -11,6 +12,7 @@ import {
   Post,
   Query,
   Req,
+  UseInterceptors,
 } from '@nestjs/common';
 import type { Request } from 'express';
 import { Public } from '../auth/auth.decorators.js';
@@ -90,6 +92,7 @@ export class PublicCatalogController {
 
   /** Signed, short-lived addresses for playing a movie. Never cached. */
   @Post('titles/:slug/playback')
+  @UseInterceptors(DeliveryHintInterceptor)
   @RateLimit(PLAYBACK)
   @HttpCode(HttpStatus.OK)
   @Header('Cache-Control', 'no-store')
@@ -101,6 +104,7 @@ export class PublicCatalogController {
   }
 
   @Post('titles/:slug/trailer/playback')
+  @UseInterceptors(DeliveryHintInterceptor)
   @RateLimit(PLAYBACK)
   @HttpCode(HttpStatus.OK)
   @Header('Cache-Control', 'no-store')
@@ -112,6 +116,7 @@ export class PublicCatalogController {
   }
 
   @Post('episodes/:id/playback')
+  @UseInterceptors(DeliveryHintInterceptor)
   @RateLimit(PLAYBACK)
   @HttpCode(HttpStatus.OK)
   @Header('Cache-Control', 'no-store')

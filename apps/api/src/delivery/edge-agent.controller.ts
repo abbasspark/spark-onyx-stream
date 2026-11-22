@@ -30,7 +30,7 @@ import { StorageService } from '../storage/storage.service.js';
 import { CurrentEdge, EdgeAgentGuard } from './edge-agent.guard.js';
 import { EDGE_PROTOCOL, edgeSigningKey } from './edge-credentials.js';
 import { EdgeRegistry, type KnownEdge } from './edge-registry.service.js';
-import { HEARTBEAT_SECONDS } from './edge-state.js';
+import { type EdgeCommand, HEARTBEAT_SECONDS } from './edge-state.js';
 import { edgeReportSchema } from './edges.schemas.js';
 
 /** What an agent is told in answer to a heartbeat. */
@@ -40,6 +40,8 @@ export interface HeartbeatAnswer {
   signingKey: string;
   heartbeatSeconds: number;
   protocol: number;
+  /** What the agent is asked to do. It names them in a later report once done. */
+  commands: EdgeCommand[];
 }
 
 /**
@@ -86,12 +88,15 @@ export class EdgeAgentController {
         426,
       );
     }
-    await this.registry.report(edge, report, requestInfo(request).ipAddress);
+    const { acknowledged, ...said } = report;
+    await this.registry.report(edge, said, requestInfo(request).ipAddress);
+    const commands = await this.registry.acknowledge(edge.id, acknowledged);
     return {
       edge: { id: edge.id, name: edge.name, enabled: edge.enabled },
       signingKey: edgeSigningKey(this.config.playbackSigningSecret, edge.id, edge.secretHash),
       heartbeatSeconds: HEARTBEAT_SECONDS,
       protocol: EDGE_PROTOCOL,
+      commands,
     };
   }
 

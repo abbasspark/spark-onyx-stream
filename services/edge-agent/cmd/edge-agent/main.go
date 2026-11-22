@@ -147,6 +147,8 @@ type report struct {
 	ActiveRequests int64          `json:"activeRequests"`
 	Cache          cacheReport    `json:"cache"`
 	System         sysinfo.System `json:"system"`
+	// Commands of the main server that were carried out.
+	Acknowledged []string `json:"acknowledged"`
 }
 
 type cacheReport struct {
@@ -163,6 +165,7 @@ func heartbeats(ctx context.Context, log *slog.Logger, mainServer *origin.Client
 	interval := 10 * time.Second
 	connected := false
 	lastProblem := ""
+	done := []string{}
 
 	for {
 		bytes, count, limit := files.Usage()
@@ -175,12 +178,16 @@ func heartbeats(ctx context.Context, log *slog.Logger, mainServer *origin.Client
 			ActiveRequests: counters.Active.Load(),
 			Cache:          cacheReport{Bytes: bytes, Files: count, LimitBytes: limit},
 			System:         sysinfo.Read(files.Dir()),
+			Acknowledged:   done,
 		})
 
 		wait := interval
 		switch {
 		case err == nil:
 			handler.SetSigningKey(answer.SigningKey)
+			// What was reported as done has arrived. What is asked now is done
+			// here and reported with the next heartbeat.
+			done = carryOut(log, handler, answer.Commands)
 			if answer.HeartbeatSeconds >= 2 && answer.HeartbeatSeconds <= 300 {
 				interval = time.Duration(answer.HeartbeatSeconds) * time.Second
 				wait = interval
@@ -273,4 +280,25 @@ func (r *reloadingCertificate) keepOr(err error) (*tls.Certificate, error) {
 		return r.loaded, nil
 	}
 	return nil, err
+}
+
+// carryOut does what the main server asks and returns the ids of what was
+// handled. A command this agent does not know is reported as handled too, so
+// it is not sent for ever.
+func carryOut(log *slog.Logger, handler *server.Server, commands []origin.Command) []string {
+	done := []string{}
+	for _, command := range commands {
+		switch command.Type {
+		case "purge":
+			if removed, ok := handler.Purge(command.Scope); ok {
+				log.Info("dropped copies as the main server asked", "scope", command.Scope, "files", removed)
+			} else {
+				log.Warn("asked to drop copies of a kind this agent does not know", "scope", command.Scope)
+			}
+		default:
+			log.Warn("the main server asks for something this agent does not know", "command", command.Type)
+		}
+		done = append(done, command.ID)
+	}
+	return done
 }

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 'use client';
 
-import { ensureMediaAllowed } from '@/lib/delivery';
+import { ensureMediaAllowed, otherServerOf, withAvoid } from '@/lib/delivery';
 import Hls from 'hls.js';
 import {
   ArrowLeft,
@@ -65,6 +65,8 @@ export function LiveScreen({ channel, channels }: LiveScreenProps) {
   const [loaded, setLoaded] = useState<Loaded>({ state: 'loading' });
   const [attempt, setAttempt] = useState(0);
   const retry = useCallback(() => setAttempt((value) => value + 1), []);
+  /** The server the player just failed on, to be given another one. */
+  const avoid = useRef<string | null>(null);
 
   useEffect(() => {
     if (sessionState === 'loading') {
@@ -73,7 +75,10 @@ export function LiveScreen({ channel, channels }: LiveScreenProps) {
     const controller = new AbortController();
     let timer: number | undefined;
 
-    fetch(`/v1/catalog/channels/${channel.slug}/playback`, {
+    // Named once: if the next server fails too, it is that one's turn.
+    const avoiding = avoid.current;
+    avoid.current = null;
+    fetch(withAvoid(`/v1/catalog/channels/${channel.slug}/playback`, avoiding), {
       method: 'POST',
       signal: controller.signal,
     })
@@ -121,8 +126,12 @@ export function LiveScreen({ channel, channels }: LiveScreenProps) {
         channel={channel}
         channels={channels}
         playback={loaded.playback}
-        // The address ran out, or the channel went off air: ask again and see which.
-        onBroken={retry}
+        // The address ran out, the channel went off air or its server went
+        // away: ask again, for another server, and see which.
+        onBroken={() => {
+          avoid.current = otherServerOf(loaded.playback.url, window.location.origin);
+          retry();
+        }}
         onZap={zap}
       />
     );

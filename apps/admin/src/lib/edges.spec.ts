@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 import { describe, expect, it } from 'vitest';
-import type { EdgeSample, EdgeServer } from '@/api/types';
+import type { EdgeSample, EdgeServer, EdgeTraffic } from '@/api/types';
 import {
   agentDockerCommand,
   agentEnvironment,
@@ -8,9 +8,13 @@ import {
   chartOf,
   concernOf,
   formatRatio,
+  labelEvery,
   loadPercent,
+  MAX_CHART_SERIES,
+  niceCeiling,
   publicUrlProblem,
   summarize,
+  trafficChartOf,
 } from './edges';
 
 function edge(more: Partial<EdgeServer> = {}, now: Partial<NonNullable<EdgeServer['now']>> = {}) {
@@ -43,6 +47,7 @@ function edge(more: Partial<EdgeServer> = {}, now: Partial<NonNullable<EdgeServe
       ...now,
     },
     samples: [],
+    purging: [],
     createdAt: '2026-11-20T10:00:00.000Z',
   };
   return { ...base, ...more };
@@ -163,5 +168,109 @@ describe('setting up an agent', () => {
     expect(publicUrlProblem('http://10.0.0.5:8080/')).toBeNull();
     expect(publicUrlProblem('edge1.example.com')).not.toBeNull();
     expect(publicUrlProblem('https://edge1.example.com/video')).not.toBeNull();
+  });
+});
+
+describe('the history of what was delivered', () => {
+  const HOUR = 3_600_000;
+  const now = new Date(2026, 10, 22, 14, 30).getTime();
+  const thisHour = new Date(2026, 10, 22, 14).getTime();
+  const seconds = (at: number) => Math.round(at / 1000);
+
+  it('makes a bar per hour for a day, also for hours without traffic', () => {
+    const traffic: EdgeTraffic = {
+      range: '24h',
+      from: new Date(thisHour - 23 * HOUR).toISOString(),
+      hours: 24,
+      edges: [
+        { id: 'b', name: 'Paris', points: [[seconds(thisHour), 300, 3, 2, 1]] },
+        {
+          id: 'a',
+          name: 'Frankfurt',
+          points: [
+            [seconds(thisHour - HOUR), 1000, 10, 9, 1],
+            [seconds(thisHour), 700, 7, 7, 0],
+          ],
+        },
+      ],
+    };
+    const chart = trafficChartOf(traffic, now);
+
+    expect(chart.buckets).toHaveLength(24);
+    // The older edge comes first and keeps the first colour.
+    expect(chart.series.map((series) => [series.name, series.slot, series.bytes])).toEqual([
+      ['Frankfurt', 0, 1700],
+      ['Paris', 1, 300],
+    ]);
+    expect(chart.buckets.at(-1)).toMatchObject({ bytes: 1000, requests: 10, parts: [700, 300] });
+    expect(chart.buckets.at(-2)).toMatchObject({ bytes: 1000, parts: [1000, 0] });
+    expect(chart.buckets[0]).toMatchObject({ bytes: 0, parts: [0, 0] });
+    expect(chart).toMatchObject({ peak: 1000, bytes: 2000, requests: 20 });
+    expect(chart.hitRatio).toBeCloseTo(0.9, 5);
+  });
+
+  it('makes a bar per day of this time zone for longer ranges', () => {
+    const today = new Date(2026, 10, 22).getTime();
+    const traffic: EdgeTraffic = {
+      range: '7d',
+      from: new Date(thisHour - (7 * 24 - 1) * HOUR).toISOString(),
+      hours: 168,
+      edges: [
+        {
+          id: 'a',
+          name: 'Frankfurt',
+          points: [
+            [seconds(today - 2 * HOUR), 100, 1, 1, 0],
+            [seconds(today + HOUR), 200, 1, 1, 0],
+            [seconds(today + 9 * HOUR), 300, 1, 0, 1],
+          ],
+        },
+      ],
+    };
+    const chart = trafficChartOf(traffic, now);
+
+    // The hour the range starts in belongs to a day of its own.
+    expect(chart.buckets).toHaveLength(8);
+    expect(chart.buckets.at(-1)).toMatchObject({ start: today, bytes: 500 });
+    expect(chart.buckets.at(-2)).toMatchObject({ bytes: 100 });
+    expect(chart.hitRatio).toBeCloseTo(2 / 3, 5);
+  });
+
+  it('shows edges beyond the colours there are as one', () => {
+    const edges = Array.from({ length: MAX_CHART_SERIES + 2 }, (_value, index) => ({
+      id: `edge-${String(index).padStart(2, '0')}`,
+      name: `Edge ${index}`,
+      points: [[seconds(thisHour), 10, 1, 1, 0]] as EdgeTraffic['edges'][number]['points'],
+    }));
+    const chart = trafficChartOf(
+      { range: '24h', from: new Date(thisHour).toISOString(), hours: 1, edges },
+      now,
+    );
+    expect(chart.series).toHaveLength(MAX_CHART_SERIES + 1);
+    expect(chart.series.at(-1)).toMatchObject({ name: '2 more', bytes: 20 });
+    expect(chart.buckets[0]?.parts.at(-1)).toBe(20);
+  });
+
+  it('has no hit ratio without requests', () => {
+    const chart = trafficChartOf(
+      { range: '24h', from: new Date(thisHour).toISOString(), hours: 1, edges: [] },
+      now,
+    );
+    expect(chart).toMatchObject({ peak: 0, bytes: 0, hitRatio: null, series: [] });
+  });
+
+  it('rounds the top of the scale up to a number that reads well', () => {
+    expect(niceCeiling(0)).toBe(1024 ** 2);
+    expect(niceCeiling(1.3 * 1024 ** 3)).toBe(1.5 * 1024 ** 3);
+    expect(niceCeiling(37 * 1024 ** 2)).toBe(40 * 1024 ** 2);
+    expect(niceCeiling(600 * 1024 ** 2)).toBe(750 * 1024 ** 2);
+    expect(niceCeiling(900 * 1024 ** 2)).toBe(1024 ** 3);
+    expect(niceCeiling(5 * 1024 ** 3)).toBe(5 * 1024 ** 3);
+  });
+
+  it('thins out the labels under the bars', () => {
+    expect(labelEvery(24, 8)).toBe(3);
+    expect(labelEvery(7, 8)).toBe(1);
+    expect(labelEvery(31, 8)).toBe(4);
   });
 });
