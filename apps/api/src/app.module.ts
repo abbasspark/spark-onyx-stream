@@ -20,6 +20,8 @@ import { RedisModule } from './redis/redis.module.js';
 import { StatsModule } from './stats/stats.module.js';
 import { StorageModule, StoragePoolsModule } from './storage/storage.module.js';
 import { BackupsModule } from './backups/backups.module.js';
+import { DiagnosticsModule } from './diagnostics/diagnostics.module.js';
+import { ProcessBeaconModule } from './diagnostics/process-beacon.service.js';
 import { BillingModule } from './billing/billing.module.js';
 import { MailModule } from './mail/mail.module.js';
 import { MetadataModule } from './metadata/metadata.module.js';
@@ -55,6 +57,7 @@ const ROLE_MODULES: Record<AppRole, Type[]> = {
     DeliveryCoreModule,
     DeliveryModule,
     BackupsModule,
+    DiagnosticsModule,
     EventStreamModule,
     HealthModule,
   ],
@@ -84,6 +87,7 @@ export class AppModule {
         CryptoModule,
         StorageModule,
         ProcessingCoreModule,
+        ProcessBeaconModule,
         ...roleModules,
       ],
     };

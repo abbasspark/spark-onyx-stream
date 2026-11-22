@@ -1374,3 +1374,58 @@ export interface BackupOverview {
   pools: { id: string; name: string; driver: string; isDefault: boolean; isActive: boolean }[];
   backups: Backup[];
 }
+
+// --- Diagnostics -----------------------------------------------------------------
+
+/** "off" is something that is not set up. It is no fault. */
+export type CheckStatus = 'ok' | 'warning' | 'problem' | 'off';
+export type CheckGroup =
+  'core' | 'processing' | 'storage' | 'protection' | 'delivery' | 'live' | 'connections' | 'setup';
+
+export interface DiagnosticCheck {
+  id: string;
+  group: CheckGroup;
+  title: string;
+  status: CheckStatus;
+  summary: string;
+  /** What to do about it. */
+  hint?: string;
+  /** The page of the panel where it is dealt with. */
+  link?: { label: string; to: string };
+  facts?: [label: string, value: string][];
+}
+
+export interface ProcessReport {
+  id: string;
+  roles: string[];
+  host: string;
+  pid: number;
+  version: string;
+  node: string;
+  startedAt: string;
+  seenAt: string;
+  memoryBytes: number;
+}
+
+export interface DiagnosticsSummary {
+  status: 'ok' | 'warning' | 'problem';
+  problems: number;
+  warnings: number;
+  checkedAt: string;
+}
+
+export interface DiagnosticsReport extends DiagnosticsSummary {
+  tookMs: number;
+  version: {
+    version: string;
+    commit: string | null;
+    node: string;
+    update: 'current' | 'available' | 'unknown';
+    latestCommit: string | null;
+    /** Why it is not known whether a newer version exists. */
+    updateNote: string | null;
+  };
+  checks: DiagnosticCheck[];
+  processes: ProcessReport[];
+  alerts: { emailAlerts: boolean; mailEnabled: boolean; recipients: string[] };
+}

@@ -8,6 +8,7 @@ import { BackupsService } from './backups.service.js';
 @Module({
   controllers: [BackupsController],
   providers: [BackupsService],
+  exports: [BackupsService],
 })
 export class BackupsModule {}
 

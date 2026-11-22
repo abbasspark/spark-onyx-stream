@@ -9,12 +9,16 @@ import {
   PanelLeft,
   Search,
   Sun,
+  TriangleAlert,
   UserRound,
 } from 'lucide-react';
+import { useQuery } from '@tanstack/react-query';
 import { useEffect, useState } from 'react';
 import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router';
+import { diagnosticsApi } from '@/api/endpoints';
 import { useSession } from '@/auth/session';
 import { cn } from '@/lib/cn';
+import { markOf } from '@/lib/diagnostics';
 import { humanize } from '@/lib/format';
 import { findNavItem, NAVIGATION } from '@/lib/navigation';
 import { SITE_URL } from '@/lib/site';
@@ -264,6 +268,7 @@ export function AppShell() {
                 </a>
               </Button>
             ) : null}
+            <HealthMark />
             <Tooltip
               content={
                 live === 'live'
@@ -342,5 +347,40 @@ export function AppShell() {
       <UploadTray />
       <CommandPalette open={paletteOpen} onOpenChange={setPaletteOpen} />
     </div>
+  );
+}
+
+/**
+ * Says in the header when something is wrong with the installation, on
+ * whatever page the admin is. Stays away when all is well.
+ */
+function HealthMark() {
+  const { can } = useSession();
+  const allowed = can('settings:read');
+  const summary = useQuery({
+    queryKey: ['diagnostics', 'summary'],
+    queryFn: ({ signal }) => diagnosticsApi.summary(signal),
+    enabled: allowed,
+    refetchInterval: 60_000,
+  });
+  const mark = markOf(summary.data?.summary ?? null);
+  if (!allowed || !mark) {
+    return null;
+  }
+  return (
+    <Tooltip content="Something is wrong with the installation. Open diagnostics to see what.">
+      <Link
+        to="/diagnostics"
+        className={cn(
+          'inline-flex items-center gap-1.5 rounded-full border px-2 py-0.5 text-xs font-medium transition-colors',
+          mark.tone === 'danger'
+            ? 'border-destructive/30 bg-destructive/10 text-destructive hover:bg-destructive/15'
+            : 'border-warning/30 bg-warning/10 text-warning hover:bg-warning/15',
+        )}
+      >
+        <TriangleAlert className="size-3.5" aria-hidden="true" />
+        {mark.label}
+      </Link>
+    </Tooltip>
   );
 }

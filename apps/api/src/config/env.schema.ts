@@ -260,6 +260,28 @@ export const envSchema = z
         message: 'GATEWAY_INTERNAL_URL must be an address of the form http://host:port',
       }),
 
+    /**
+     * The commit the installation was built from. Written to .env by the
+     * installer and by "onyx update". Empty when the installation was made by
+     * hand: the panel then shows the version without it.
+     */
+    ONYX_COMMIT: z
+      .string()
+      .default('')
+      .transform((value) => value.trim().toLowerCase())
+      .refine((value) => value === '' || /^[0-9a-f]{7,40}$/.test(value), {
+        message: 'ONYX_COMMIT must be a commit of 7 to 40 hexadecimal characters',
+      }),
+    /**
+     * Whether the panel may ask whether a newer version exists. It is one
+     * request without any detail of the installation, to the address below.
+     */
+    UPDATE_CHECK: z.enum(['on', 'off']).default('on'),
+    /** Answers with the newest commit, as plain text. The default is the project on GitHub. */
+    UPDATE_CHECK_URL: z
+      .url()
+      .default('https://api.github.com/repos/abbasspark/spark-onyx-stream/commits/main'),
+
     /** Programs used for media processing. A name is looked up on the PATH. */
     FFMPEG_PATH: z.string().min(1).default('ffmpeg'),
     FFPROBE_PATH: z.string().min(1).default('ffprobe'),

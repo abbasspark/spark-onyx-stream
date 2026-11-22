@@ -20,6 +20,7 @@ import {
   Radio,
   ScrollText,
   SlidersHorizontal,
+  Stethoscope,
   Tags,
   Users,
   UsersRound,
@@ -205,6 +206,13 @@ export const NAVIGATION: NavGroup[] = [
         icon: DatabaseBackup,
         permission: 'settings:read',
         keywords: 'backup restore database dump schedule recovery disaster',
+      },
+      {
+        to: '/diagnostics',
+        label: 'Diagnostics',
+        icon: Stethoscope,
+        permission: 'settings:read',
+        keywords: 'health status problems errors version update processes alerts',
       },
       {
         to: '/admins',

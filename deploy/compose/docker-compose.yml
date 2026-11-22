@@ -35,6 +35,11 @@ x-app: &app
     P2P_TURN_SECRET: ${P2P_TURN_SECRET:-}
     # Where the API reads what the gateway sent to viewers itself.
     GATEWAY_INTERNAL_URL: http://gateway:8080
+    # Which commit this was built from, written by the installer and by "onyx update",
+    # and whether the panel may ask whether a newer version exists.
+    ONYX_COMMIT: ${ONYX_COMMIT:-}
+    UPDATE_CHECK: ${UPDATE_CHECK:-on}
+    UPDATE_CHECK_URL: ${UPDATE_CHECK_URL:-https://api.github.com/repos/abbasspark/spark-onyx-stream/commits/main}
     INGEST_PUBLIC_RTMP_URL: ${INGEST_PUBLIC_RTMP_URL:-}
     INGEST_PUBLIC_SRT_URL: ${INGEST_PUBLIC_SRT_URL:-}
     GUIDE_REFRESH_HOURS: ${GUIDE_REFRESH_HOURS:-6}

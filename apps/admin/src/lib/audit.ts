@@ -2,6 +2,7 @@
 
 /** What each action code of the audit log means, in words. */
 const ACTION_LABELS: Record<string, string> = {
+  'diagnostics.settings': 'Switched alerts by email on or off',
   'backup.create': 'Asked for a backup',
   'backup.settings': 'Changed the backup schedule',
   'backup.download': 'Downloaded a backup',

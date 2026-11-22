@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 import { download, request, uploadFile } from './client';
 import type {
+  DiagnosticsReport,
+  DiagnosticsSummary,
   Backup,
   BackupOverview,
   BackupSettings,
@@ -497,4 +499,14 @@ export const backupsApi = {
   downloadLink: (id: string) =>
     request<{ path: string; expiresAt: string }>(`/v1/backups/${id}/download`, { method: 'POST' }),
   remove: (id: string) => request<void>(`/v1/backups/${id}`, { method: 'DELETE' }),
+};
+
+export const diagnosticsApi = {
+  /** Looks at every part of the installation now. Takes a second or two. */
+  report: (signal?: AbortSignal) => request<DiagnosticsReport>('/v1/diagnostics', { signal }),
+  /** What the last look found, without looking again. */
+  summary: (signal?: AbortSignal) =>
+    request<{ summary: DiagnosticsSummary | null }>('/v1/diagnostics/summary', { signal }),
+  saveSettings: (body: { emailAlerts: boolean }) =>
+    request<{ emailAlerts: boolean }>('/v1/diagnostics/settings', { method: 'PUT', body }),
 };

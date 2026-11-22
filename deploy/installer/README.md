@@ -125,6 +125,7 @@ Files of the installation that were changed by hand stop an update, because it w
 - The database is backed up every night. Where to, and how many are kept, is set in the panel under **Settings → Backups**.
 - Live channels pushed by an encoder use the ports 1935 (TCP) and 8890 (UDP). Open them in the firewall of your hosting provider if you use them.
 - Everything else, such as email, payments and who may watch, is set in `.env`. After a change: `onyx restart`.
+- **Settings → Diagnostics** in the panel says what is wrong with the installation, if anything, and whether a newer version exists. Set up email to be told by email when a problem appears.
 
 ## Tests
 

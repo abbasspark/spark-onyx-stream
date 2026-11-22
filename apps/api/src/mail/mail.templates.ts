@@ -168,3 +168,53 @@ export function testMail(options: { siteName: string; sentBy: string }): Content
     }),
   };
 }
+
+/**
+ * Tells the owners that something is wrong with the installation, or that
+ * something that was wrong is solved.
+ */
+export function diagnosticsMail(options: {
+  siteName: string;
+  /** What is wrong, in the words of the diagnostics page. */
+  problems: { title: string; summary: string; hint?: string }[];
+  /** Titles of problems that were written about before and are gone. */
+  solved: string[];
+  /** Address of the diagnostics page. Empty when the address of the site is not known. */
+  panelUrl: string;
+}): Content {
+  const { siteName, problems, solved, panelUrl } = options;
+  const count = problems.length;
+  const heading =
+    count === 0
+      ? 'Solved'
+      : count === 1
+        ? (problems[0] as { title: string }).title
+        : `${count} things need your attention`;
+  const subject =
+    count === 0
+      ? `Solved on ${siteName}: ${solved.join(', ')}`
+      : count === 1
+        ? `Problem on ${siteName}: ${(problems[0] as { title: string }).title}`
+        : `${count} problems on ${siteName}`;
+  return {
+    subject: oneLine(subject),
+    ...layout({
+      siteName,
+      heading,
+      intro: [
+        ...problems.flatMap((problem) => [
+          count === 1 ? problem.summary : `${problem.title}: ${problem.summary}`,
+          ...(problem.hint ? [problem.hint] : []),
+        ]),
+        ...(solved.length > 0
+          ? [`${count === 0 ? 'No longer a problem' : 'Solved meanwhile'}: ${solved.join(', ')}.`]
+          : []),
+      ],
+      action: panelUrl ? { label: 'Open diagnostics', url: panelUrl } : undefined,
+      notes: [
+        'You get this because you are an owner of the installation. A problem is written about once, when it appears, and once more when it is gone.',
+        'Alerts are switched off on the diagnostics page of the admin panel.',
+      ],
+    }),
+  };
+}

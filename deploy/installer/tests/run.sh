@@ -333,6 +333,8 @@ stops 'an update nobody confirmed' 'Not confirmed' in_installation 'has_terminal
 stops 'an unknown option of update' 'Unknown option' in_installation 'cmd_update --fast'
 
 in_installation "checkout $SECOND main"
+equals 'tells the application which version it is' "$SECOND" "$(get_env ONYX_COMMIT "$INSTALLED/deploy/compose/.env")"
+equals 'and leaves the other settings alone' '8080' "$(get_env HTTP_PORT "$INSTALLED/deploy/compose/.env")"
 equals 'moves the files and keeps the branch' "main $SECOND" "$(git -C "$INSTALLED" symbolic-ref --short HEAD) $(git -C "$INSTALLED" rev-parse HEAD)"
 in_installation "checkout $FIRST ''"
 equals 'or stays at an exact version' "$FIRST" "$(git -C "$INSTALLED" rev-parse HEAD)"
