@@ -12,6 +12,7 @@ import {
   type LucideIcon,
   CalendarClock,
   Disc,
+  Network,
   Mail,
   Radio,
   ScrollText,
@@ -123,6 +124,18 @@ export const NAVIGATION: NavGroup[] = [
         icon: Disc,
         permission: 'live:read',
         keywords: 'record recording dvr catch-up keep save programme library',
+      },
+    ],
+  },
+  {
+    label: 'Delivery',
+    items: [
+      {
+        to: '/edges',
+        label: 'Edge servers',
+        icon: Network,
+        permission: 'delivery:read',
+        keywords: 'edge cdn cache delivery servers agent bandwidth traffic offload nodes',
       },
     ],
   },

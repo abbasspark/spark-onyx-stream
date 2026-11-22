@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-only
+import { DeliveryCoreModule } from '../../src/delivery/delivery.module.js';
 import { getQueueToken } from '@nestjs/bullmq';
 import { Global, type INestApplication, Module, type Type } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
@@ -62,7 +63,10 @@ export class FakeRedis {
   async del(...keys: string[]): Promise<number> {
     let removed = 0;
     for (const key of keys) {
-      removed += Number(this.counters.delete(key)) + Number(this.strings.delete(key));
+      removed +=
+        Number(this.counters.delete(key)) +
+        Number(this.strings.delete(key)) +
+        Number(this.lists.delete(key));
     }
     return removed;
   }
@@ -78,6 +82,52 @@ export class FakeRedis {
 
   async pexpire(): Promise<number> {
     return 1;
+  }
+
+  private readonly lists = new Map<string, string[]>();
+
+  async lpush(key: string, ...values: string[]): Promise<number> {
+    const list = this.lists.get(key) ?? [];
+    list.unshift(...values.reverse());
+    this.lists.set(key, list);
+    return list.length;
+  }
+
+  async ltrim(key: string, start: number, stop: number): Promise<'OK'> {
+    this.lists.set(key, (this.lists.get(key) ?? []).slice(start, stop + 1));
+    return 'OK';
+  }
+
+  async lrange(key: string, start: number, stop: number): Promise<string[]> {
+    return (this.lists.get(key) ?? []).slice(start, stop + 1);
+  }
+
+  /** Several commands sent together. Here they simply run one after the other. */
+  multi() {
+    const commands: (() => Promise<unknown>)[] = [];
+    const chain = {
+      set: (key: string, value: string, ...options: (string | number)[]) => {
+        commands.push(() => this.set(key, value, ...options));
+        return chain;
+      },
+      lpush: (key: string, ...values: string[]) => {
+        commands.push(() => this.lpush(key, ...values));
+        return chain;
+      },
+      ltrim: (key: string, start: number, stop: number) => {
+        commands.push(() => this.ltrim(key, start, stop));
+        return chain;
+      },
+      expire: () => chain,
+      exec: async () => {
+        const results: [null, unknown][] = [];
+        for (const command of commands) {
+          results.push([null, await command()]);
+        }
+        return results;
+      },
+    };
+    return chain;
   }
 
   /** A second connection, as subscribers need one. It never receives anything. */
@@ -96,6 +146,7 @@ export class FakeRedis {
   clear(): void {
     this.counters.clear();
     this.strings.clear();
+    this.lists.clear();
     this.published.length = 0;
   }
 }
@@ -211,6 +262,7 @@ export async function createTestApp(
       AuditModule,
       StorageModule,
       ProcessingCoreModule,
+      DeliveryCoreModule,
       MailModule,
       ...featureModules,
     ],
@@ -258,6 +310,7 @@ export async function createTestApp(
       await prisma.auditLog.deleteMany();
       await prisma.payment.deleteMany();
       await prisma.recording.deleteMany();
+      await prisma.edgeServer.deleteMany();
       await prisma.channel.deleteMany();
       await prisma.guideSource.deleteMany();
       // Catalog rows point to assets, pictures and pools, so they go first.

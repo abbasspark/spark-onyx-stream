@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 'use client';
 
+import { ensureMediaAllowed } from '@/lib/delivery';
 import Hls from 'hls.js';
 import {
   ArrowLeft,
@@ -165,6 +166,9 @@ export function Player({
       return;
     }
     const source = playback.manifestUrl;
+    if (!ensureMediaAllowed(source)) {
+      return;
+    }
     setQualities([]);
     setQuality(NONE);
     setPlayingHeight(null);

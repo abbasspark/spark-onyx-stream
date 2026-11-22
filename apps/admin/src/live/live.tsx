@@ -19,6 +19,7 @@ type LiveEvent =
   | { type: 'job-progress'; jobId: string; progress: number }
   | { type: 'asset'; assetId: string; change: 'created' | 'updated' | 'uploaded' | 'deleted' }
   | { type: 'recording'; recordingId: string }
+  | { type: 'edge'; edgeId: string }
   | { type: 'channel'; channelId: string; change: 'created' | 'updated' | 'deleted' | 'status' };
 
 export type LiveState = 'connecting' | 'live' | 'offline';
@@ -102,6 +103,10 @@ export function LiveProvider({ children }: { children: ReactNode }) {
       }
       if (event.type === 'recording') {
         refresh(['recordings']);
+        return;
+      }
+      if (event.type === 'edge') {
+        refresh(['edges']);
         return;
       }
       if (event.type === 'channel') {

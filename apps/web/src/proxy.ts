@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 import { type NextRequest, NextResponse } from 'next/server';
 import { siteConfig } from '@/lib/config';
-import { buildCsp } from '@/lib/csp';
+import { buildCsp, mediaOrigins } from '@/lib/csp';
+import { knownEdgeOrigins, MEDIA_ORIGINS_HEADER } from '@/lib/delivery';
 
 /**
  * Runs before every request the website answers.
@@ -10,11 +11,14 @@ import { buildCsp } from '@/lib/csp';
  * them there itself and they never get here. Without a gateway, as in
  * development, this makes the browser talk to one origin either way.
  *
+ * Video may come from edge servers, which are added in the admin panel. The
+ * API tells which, and the policy of every page allows them.
+ *
  * Pages get a content security policy with a nonce that is new for each
  * response. Next.js reads the policy from the request and puts the nonce on
  * the scripts it writes into the page.
  */
-export function proxy(request: NextRequest): NextResponse {
+export async function proxy(request: NextRequest): Promise<NextResponse> {
   const { pathname, search } = request.nextUrl;
 
   if (pathname.startsWith('/v1/')) {
@@ -32,14 +36,22 @@ export function proxy(request: NextRequest): NextResponse {
   }
 
   const nonce = Buffer.from(crypto.randomUUID()).toString('base64');
+  const edgeOrigins = await knownEdgeOrigins();
   const policy = buildCsp({
     nonce,
     development: process.env.NODE_ENV === 'development',
     mediaOrigin: process.env.WEB_MEDIA_ORIGIN,
+    edgeOrigins,
   });
 
   const headers = new Headers(request.headers);
   headers.set('x-nonce', nonce);
+  // The page carries the list too, so a tab that was opened before an edge
+  // was added can tell that it has to be loaded again.
+  headers.set(
+    MEDIA_ORIGINS_HEADER,
+    mediaOrigins(process.env.WEB_MEDIA_ORIGIN, edgeOrigins).join(' '),
+  );
   headers.set('Content-Security-Policy', policy);
 
   const response = NextResponse.next({ request: { headers } });

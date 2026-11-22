@@ -205,7 +205,7 @@ export class PublicChannelsService {
         code: 'off_air',
       });
     }
-    return this.playback.createPlayback(channel.id);
+    return this.playback.createPlayback(channel.id, 'viewer');
   }
 
   private async find(slug: string): Promise<PublicRecord> {

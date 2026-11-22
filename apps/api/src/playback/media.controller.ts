@@ -3,7 +3,7 @@ import path from 'node:path';
 import { Controller, Get, Head, HttpStatus, Inject, Logger, Param, Req, Res } from '@nestjs/common';
 import type { Request, Response } from 'express';
 import { Public } from '../auth/auth.decorators.js';
-import { StorageObjectNotFoundError } from '../storage/storage-driver.js';
+import { type StorageDriver, StorageObjectNotFoundError } from '../storage/storage-driver.js';
 import { StorageService } from '../storage/storage.service.js';
 import { parseRange } from './byte-range.js';
 import { CONTENT_KEY_PATH, MEDIA_ROUTE, PlaybackService } from './playback.service.js';
@@ -87,56 +87,7 @@ export class MediaController {
       return;
     }
 
-    response.setHeader(
-      'Content-Type',
-      CONTENT_TYPES[path.extname(location.key)] ?? 'application/octet-stream',
-    );
-    response.setHeader('Accept-Ranges', 'bytes');
-    response.setHeader('Cache-Control', CACHE_CONTROL);
-    response.setHeader('Last-Modified', info.modifiedAt.toUTCString());
-    response.setHeader('X-Content-Type-Options', 'nosniff');
-
-    const range = parseRange(request.headers.range, info.size);
-    if (range.kind === 'unsatisfiable') {
-      response.setHeader('Content-Range', `bytes */${info.size}`);
-      response.status(HttpStatus.REQUESTED_RANGE_NOT_SATISFIABLE).end();
-      return;
-    }
-
-    const start = range.kind === 'range' ? range.range.start : 0;
-    const end = range.kind === 'range' ? range.range.end : info.size - 1;
-    response.setHeader('Content-Length', String(info.size === 0 ? 0 : end - start + 1));
-    if (range.kind === 'range') {
-      response.setHeader('Content-Range', `bytes ${start}-${end}/${info.size}`);
-      response.status(HttpStatus.PARTIAL_CONTENT);
-    }
-
-    if (request.method === 'HEAD' || info.size === 0) {
-      response.end();
-      return;
-    }
-
-    try {
-      const stream = await driver.read(
-        location.key,
-        range.kind === 'range' ? range.range : undefined,
-      );
-      // A viewer who seeks or leaves closes the connection. Stop reading the file then.
-      response.on('close', () => stream.destroy());
-      stream.on('error', (error) => {
-        this.logger.warn(`Reading ${location.key} failed: ${error.message}`);
-        response.destroy();
-      });
-      stream.pipe(response);
-    } catch (error) {
-      if (error instanceof StorageObjectNotFoundError) {
-        response.removeHeader('Content-Length');
-        response.removeHeader('Content-Range');
-        response.status(HttpStatus.NOT_FOUND).json({ statusCode: 404, message: 'Not found' });
-        return;
-      }
-      throw error;
-    }
+    await sendStoredFile(driver, location.key, info, request, response, this.logger);
   }
 
   /**
@@ -156,11 +107,74 @@ export class MediaController {
       return;
     }
 
-    response.setHeader('Content-Type', 'application/octet-stream');
-    response.setHeader('Content-Length', String(key.length));
-    // A key must not be kept by caches or proxies between the player and the server.
-    response.setHeader('Cache-Control', 'no-store');
-    response.setHeader('X-Content-Type-Options', 'nosniff');
-    response.end(request.method === 'HEAD' ? undefined : key);
+    sendContentKey(key, request, response);
   }
+}
+
+/** Sends a generated file from storage, whole or the part a player asked for. */
+export async function sendStoredFile(
+  driver: StorageDriver,
+  key: string,
+  info: { size: number; modifiedAt: Date },
+  request: Request,
+  response: Response,
+  logger: Logger,
+): Promise<void> {
+  response.setHeader(
+    'Content-Type',
+    CONTENT_TYPES[path.extname(key)] ?? 'application/octet-stream',
+  );
+  response.setHeader('Accept-Ranges', 'bytes');
+  response.setHeader('Cache-Control', CACHE_CONTROL);
+  response.setHeader('Last-Modified', info.modifiedAt.toUTCString());
+  response.setHeader('X-Content-Type-Options', 'nosniff');
+
+  const range = parseRange(request.headers.range, info.size);
+  if (range.kind === 'unsatisfiable') {
+    response.setHeader('Content-Range', `bytes */${info.size}`);
+    response.status(HttpStatus.REQUESTED_RANGE_NOT_SATISFIABLE).end();
+    return;
+  }
+
+  const start = range.kind === 'range' ? range.range.start : 0;
+  const end = range.kind === 'range' ? range.range.end : info.size - 1;
+  response.setHeader('Content-Length', String(info.size === 0 ? 0 : end - start + 1));
+  if (range.kind === 'range') {
+    response.setHeader('Content-Range', `bytes ${start}-${end}/${info.size}`);
+    response.status(HttpStatus.PARTIAL_CONTENT);
+  }
+
+  if (request.method === 'HEAD' || info.size === 0) {
+    response.end();
+    return;
+  }
+
+  try {
+    const stream = await driver.read(key, range.kind === 'range' ? range.range : undefined);
+    // A viewer who seeks or leaves closes the connection. Stop reading the file then.
+    response.on('close', () => stream.destroy());
+    stream.on('error', (error) => {
+      logger.warn(`Reading ${key} failed: ${error.message}`);
+      response.destroy();
+    });
+    stream.pipe(response);
+  } catch (error) {
+    if (error instanceof StorageObjectNotFoundError) {
+      response.removeHeader('Content-Length');
+      response.removeHeader('Content-Range');
+      response.status(HttpStatus.NOT_FOUND).json({ statusCode: 404, message: 'Not found' });
+      return;
+    }
+    throw error;
+  }
+}
+
+/** Sends the 16-byte content key of an encrypted asset. */
+export function sendContentKey(key: Buffer, request: Request, response: Response): void {
+  response.setHeader('Content-Type', 'application/octet-stream');
+  response.setHeader('Content-Length', String(key.length));
+  // A key must not be kept by caches or proxies between the player and the server.
+  response.setHeader('Cache-Control', 'no-store');
+  response.setHeader('X-Content-Type-Options', 'nosniff');
+  response.end(request.method === 'HEAD' ? undefined : key);
 }

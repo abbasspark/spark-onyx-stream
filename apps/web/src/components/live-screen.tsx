@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 'use client';
 
+import { ensureMediaAllowed } from '@/lib/delivery';
 import Hls from 'hls.js';
 import {
   ArrowLeft,
@@ -36,6 +37,8 @@ import { useViewerSession } from './viewer-session';
 const OFF_AIR_RETRY_MS = 8000;
 /** Wait before a stream that broke is opened again. */
 const BROKEN_RETRY_MS = 3000;
+/** A picture that has not moved for this long, without the viewer pausing it, counts as broken. */
+const STALL_GIVE_UP_MS = 12_000;
 /** The controls go away after this long without a move of the pointer. */
 const HIDE_CONTROLS_MS = 3500;
 /** Further behind the newest picture than this, the viewer is offered to catch up. */
@@ -294,6 +297,30 @@ function LivePlayer({ channel, channels, playback, onBroken, onZap }: LivePlayer
       });
     };
 
+    if (!ensureMediaAllowed(playback.url)) {
+      return undefined;
+    }
+
+    // A server that goes away without a word leaves the player waiting for
+    // ever. When the picture has stood still this long, ask for the channel
+    // again, which may come from another server then.
+    let lastTime = video.currentTime;
+    let movedAt = Date.now();
+    let gaveUp = false;
+    const watchdog = window.setInterval(() => {
+      if (video.paused || video.currentTime !== lastTime) {
+        lastTime = video.currentTime;
+        movedAt = Date.now();
+        return;
+      }
+      if (!gaveUp && Date.now() - movedAt > STALL_GIVE_UP_MS) {
+        gaveUp = true;
+        hlsRef.current?.destroy();
+        hlsRef.current = null;
+        broken();
+      }
+    }, 2000);
+
     if (Hls.isSupported()) {
       // What was watched is dropped from memory after a minute. Going back loads it again.
       const hls = new Hls({ liveSyncDurationCount: 3, backBufferLength: 60 });
@@ -318,6 +345,7 @@ function LivePlayer({ channel, channels, playback, onBroken, onZap }: LivePlayer
 
     return () => {
       window.clearTimeout(timer);
+      window.clearInterval(watchdog);
       hlsRef.current?.destroy();
       hlsRef.current = null;
       video.removeAttribute('src');

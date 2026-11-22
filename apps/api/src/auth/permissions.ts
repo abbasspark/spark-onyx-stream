@@ -27,6 +27,8 @@ export const PERMISSIONS = [
   'billing:write',
   'live:read',
   'live:write',
+  'delivery:read',
+  'delivery:write',
   'settings:read',
   'settings:write',
 ] as const;

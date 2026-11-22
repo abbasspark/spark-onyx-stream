@@ -26,6 +26,8 @@ export type Permission =
   | 'billing:write'
   | 'live:read'
   | 'live:write'
+  | 'delivery:read'
+  | 'delivery:write'
   | 'settings:read'
   | 'settings:write';
 
@@ -1177,4 +1179,70 @@ export interface RecordingInput {
   title: string;
   startsAt: string;
   endsAt: string;
+}
+
+// --- Delivery --------------------------------------------------------------------
+
+export type EdgeStatus = 'ONLINE' | 'OFFLINE' | 'DISABLED' | 'NEVER_CONNECTED';
+
+/** One point of an edge's traffic: [time in seconds, bits per second, requests per second]. */
+export type EdgeSample = [number, number, number];
+
+/** A server that delivers video to viewers in place of the main server. */
+export interface EdgeServer {
+  id: string;
+  name: string;
+  /** The address viewers reach it at. */
+  publicUrl: string;
+  location: string | null;
+  enabled: boolean;
+  /** Its share of viewers compared with the other edges, 1 to 100. */
+  weight: number;
+  serveVideo: boolean;
+  serveLive: boolean;
+  status: EdgeStatus;
+  lastSeenAt: string | null;
+  version: string | null;
+  hostname: string | null;
+  remoteIp: string | null;
+  /** Everything delivered since the edge was added. */
+  bytesServed: string;
+  requestsServed: string;
+  /** What the agent reports now. Null while it is not connected. */
+  now: {
+    bitsPerSecond: number;
+    requestsPerSecond: number;
+    activeRequests: number;
+    /** Share of requests answered from copies on the edge, 0 to 1. */
+    hitRatio: number | null;
+    startedAt: string;
+    cache: { bytes: number; files: number; limitBytes: number };
+    system: {
+      cpus: number;
+      load1: number | null;
+      diskFreeBytes: number | null;
+      diskTotalBytes: number | null;
+    };
+    refused: number;
+    originErrors: number;
+  } | null;
+  /** Traffic of the last hour, oldest first. */
+  samples: EdgeSample[];
+  createdAt: string;
+}
+
+export interface EdgeInput {
+  name: string;
+  publicUrl: string;
+  location: string | null;
+  weight: number;
+  serveVideo: boolean;
+  serveLive: boolean;
+  enabled: boolean;
+}
+
+/** An edge with the token of its agent, which the API shows once. */
+export interface EdgeWithToken {
+  edge: EdgeServer;
+  token: string;
 }

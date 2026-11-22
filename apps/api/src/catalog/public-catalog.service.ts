@@ -244,7 +244,7 @@ export class PublicCatalogService {
     if (title.type !== 'MOVIE' || !title.assetId) {
       throw new ConflictException('A series is played episode by episode');
     }
-    return this.playback.createPlayback(title.assetId);
+    return this.playback.createPlayback(title.assetId, 'viewer');
   }
 
   /** Signed addresses for playing the trailer of a title. */
@@ -258,7 +258,7 @@ export class PublicCatalogService {
     if (!title?.trailerAsset || !isPlayable(title.trailerAsset)) {
       throw new NotFoundException('This title has no trailer');
     }
-    return this.playback.createPlayback(title.trailerAsset.id);
+    return this.playback.createPlayback(title.trailerAsset.id, 'viewer');
   }
 
   /** Signed addresses for playing an episode of a visible series. */
@@ -276,7 +276,7 @@ export class PublicCatalogService {
     }
     // An episode is as open as its series.
     await this.assertMayPlay(watcher, episode.season.title);
-    return this.playback.createPlayback(episode.assetId);
+    return this.playback.createPlayback(episode.assetId, 'viewer');
   }
 
   /**

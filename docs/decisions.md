@@ -566,3 +566,27 @@ This replaces the "plain CSS without a component library" part of D-018.
 **Why:** the channel's files are the one place where the stream already exists in a clean form, with the time each segment was sent. Reading them costs almost nothing, works the same for pulled, pushed, copied and transcoded channels, and lets a recording reach back into what the channel keeps. A second connection to the source would double the load on providers that count connections and would not have the past. Making the result an asset means the library, processing, storage, encryption and titles need no knowledge of recordings: a recording is a video that came from a channel instead of an upload.
 
 **Consequence:** a recording can only hold what the channel sent while it was on air, in the best quality the channel makes, and it is encoded again by processing when the profile asks for it. The live server needs room for a running recording. A recording is tied to the server that runs its channel until it is written to storage.
+
+## D-044 The edge is one Go program that keeps copies itself
+
+**Date:** 2026-11-22
+
+- **An edge runs the edge agent and nothing else.** The agent checks tokens, keeps copies on disk and fetches what it does not have. There is no Nginx on an edge.
+- **The agent connects to the main server.** It reports every ten seconds and fetches files over the same address, with the token of its edge.
+- **An edge holds no state that matters.**
+
+**Why:** the earlier plan had Nginx on edges with an agent that configures it. That makes two programs, a configuration that is written by one and read by the other, and a token check in a scripting module that has to be installed with it. Serving files from disk and fetching them over HTTP is what Go's standard library does well, with the kernel sending files directly. One program with no dependencies is easier to install on a rented server, to update and to reason about, and its behaviour can be tested as ordinary code. Connecting outwards means an edge behind a firewall or address translation works, and the main server needs no list of ways into the edges.
+
+**Consequence:** the agent has to do well what Nginx would have done: ranges, many connections, eviction. HTTPS needs a certificate given to the agent or a proxy in front. The first viewer of a file waits until the edge has fetched it whole. Supersedes the part of the architecture that put Nginx on edges.
+
+## D-045 Every edge has its own key, and viewers are sent by content
+
+**Date:** 2026-11-22
+
+- **Playback tokens for an edge are signed with a key of that edge,** made from the platform's signing secret and the edge's secret.
+- **The API chooses the server when playback starts** and puts it into the address. There is no redirect and no DNS trick.
+- **A video goes to the same few edges every time, a live channel to all of them by weight.**
+
+**Why:** an edge is a rented machine somewhere, and the easiest one to break into. With a key of its own it can check its viewers' tokens without a call to the main server and without knowing anything that works elsewhere: an address made on a stolen edge opens that edge only. Choosing the server in the API keeps delivery plain HTTP that any player follows, and lets the choice use what the API knows: what is asked for, and which edges are alive. Keeping a video on few edges is what makes their copies worth having. Spread over all edges, every edge would fetch every video. Live is the opposite case: little to keep and much to carry.
+
+**Consequence:** an address is bound to one server, so a viewer whose edge dies needs a new address. The live player gets one by itself, the film player after a click. Replacing the secret of an edge ends its viewers' sessions. Pages of the website must allow the addresses of the edges, which they learn from the API.
