@@ -27,6 +27,7 @@ import { WatchingModule } from './watching/watching.module.js';
 import type { AppRole } from './roles/app-role.js';
 import { GuideModule } from './guide/guide.module.js';
 import { LiveModule } from './live/live.module.js';
+import { RecordingsModule } from './recordings/recordings.module.js';
 import { LiveRoleModule, SchedulerRoleModule, WorkerRoleModule } from './roles/role.modules.js';
 
 /** Modules that are loaded only when the process runs the given role. */
@@ -48,6 +49,7 @@ const ROLE_MODULES: Record<AppRole, Type[]> = {
     WatchingModule,
     LiveModule,
     GuideModule,
+    RecordingsModule,
     EventStreamModule,
     HealthModule,
   ],

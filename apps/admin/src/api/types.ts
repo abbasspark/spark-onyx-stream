@@ -1148,3 +1148,33 @@ export interface ProgrammeInput {
   startsAt: string;
   endsAt: string;
 }
+
+// --- Recordings ------------------------------------------------------------------
+
+export type RecordingStatus =
+  'SCHEDULED' | 'RECORDING' | 'FINISHING' | 'DONE' | 'FAILED' | 'CANCELLED';
+
+/** A stretch of a live channel kept as a file, which becomes an asset in the library. */
+export interface Recording {
+  id: string;
+  title: string;
+  /** The id is null once the channel is deleted. Its name is kept. */
+  channel: { id: string | null; name: string };
+  startsAt: string;
+  endsAt: string;
+  status: RecordingStatus;
+  statusMessage: string | null;
+  /** How much was really recorded. Null until it is known. */
+  recordedSeconds: number | null;
+  bytes: string | null;
+  /** What it became in the library, and how far that is processed. */
+  asset: { id: string; status: AssetStatus } | null;
+  createdAt: string;
+}
+
+export interface RecordingInput {
+  channelId: string;
+  title: string;
+  startsAt: string;
+  endsAt: string;
+}

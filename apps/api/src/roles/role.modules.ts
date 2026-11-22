@@ -2,6 +2,7 @@
 import { Logger, Module, type OnModuleInit } from '@nestjs/common';
 import { GuideSchedulerModule } from '../guide/guide.module.js';
 import { LiveSupervisorModule } from '../live/live.module.js';
+import { RecordingSupervisorModule } from '../recordings/recordings.module.js';
 import { MaintenanceModule } from '../maintenance/maintenance.module.js';
 import { ProcessingWorkerModule } from '../processing/processing.module.js';
 
@@ -22,7 +23,7 @@ export class WorkerRoleModule implements OnModuleInit {
   }
 }
 
-@Module({ imports: [LiveSupervisorModule] })
+@Module({ imports: [LiveSupervisorModule, RecordingSupervisorModule] })
 export class LiveRoleModule implements OnModuleInit {
   private readonly logger = new Logger(LiveRoleModule.name);
 

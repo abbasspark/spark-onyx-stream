@@ -98,3 +98,8 @@ export function timesProblem(startsAt: string | null, endsAt: string | null): st
   }
   return length > DAY_MS ? 'A programme lasts a day at most.' : null;
 }
+
+/** A programme that has not ended can be recorded: what is to come, and what the channel may still keep. */
+export function canRecord(programme: Pick<Programme, 'endsAt'>, now: number): boolean {
+  return new Date(programme.endsAt).getTime() > now;
+}

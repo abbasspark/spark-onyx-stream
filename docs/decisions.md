@@ -554,3 +554,15 @@ This replaces the "plain CSS without a component library" part of D-018.
 **Why:** a longer playlist is the whole mechanism. The same process writes it, the same files are served from the same place with the same token, and every HLS player already knows how to move through it, so pausing and rewinding work in the website, the panel and any app without code of their own. Segments carry the time they were sent, which is all "start over" needs once the guide says when a programme began. A fixed list of lengths keeps the cost in disk space something an operator chooses knowingly. Emptying the window on a restart avoids joining two runs of a stream that may differ in format, which players handle unevenly.
 
 **Consequence:** disk use grows with the window, the bitrate and the number of qualities. The playlist of a long window is large, and is sent packed for that reason. A source that drops often makes for a window that is short in practice. More than four hours, and programmes kept for good, need recording, which is separate.
+
+## D-043 A recording is cut from the channel's own files and becomes an asset
+
+**Date:** 2026-11-22
+
+- **Recordings are made by the live process that runs the channel,** from the playlist and segments it already writes for viewers. Nothing is read from the source a second time and nothing is encoded.
+- **A finished recording is an ordinary asset** in the default storage pool, handed to the processing pipeline like an upload.
+- **Interruptions make pieces,** which are joined at the end.
+
+**Why:** the channel's files are the one place where the stream already exists in a clean form, with the time each segment was sent. Reading them costs almost nothing, works the same for pulled, pushed, copied and transcoded channels, and lets a recording reach back into what the channel keeps. A second connection to the source would double the load on providers that count connections and would not have the past. Making the result an asset means the library, processing, storage, encryption and titles need no knowledge of recordings: a recording is a video that came from a channel instead of an upload.
+
+**Consequence:** a recording can only hold what the channel sent while it was on air, in the best quality the channel makes, and it is encoded again by processing when the profile asks for it. The live server needs room for a running recording. A recording is tied to the server that runs its channel until it is written to storage.
