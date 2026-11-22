@@ -3,6 +3,7 @@ import {
   Activity,
   Clapperboard,
   Database,
+  DatabaseBackup,
   Film,
   KeyRound,
   LayoutDashboard,
@@ -197,6 +198,13 @@ export const NAVIGATION: NavGroup[] = [
         icon: Mail,
         permission: 'settings:read',
         keywords: 'smtp mail server password reset verification',
+      },
+      {
+        to: '/backups',
+        label: 'Backups',
+        icon: DatabaseBackup,
+        permission: 'settings:read',
+        keywords: 'backup restore database dump schedule recovery disaster',
       },
       {
         to: '/admins',

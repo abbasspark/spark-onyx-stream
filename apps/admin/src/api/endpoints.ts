@@ -1,6 +1,9 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 import { download, request, uploadFile } from './client';
 import type {
+  Backup,
+  BackupOverview,
+  BackupSettings,
   DeliveryOverview,
   P2pStatus,
   EdgeInput,
@@ -481,4 +484,17 @@ export const p2pApi = {
   /** How much of what viewers played came from other viewers. */
   traffic: (range: TrafficRange, signal?: AbortSignal) =>
     request<SharingTraffic>(`/v1/p2p/traffic?range=${range}`, { signal }),
+};
+
+export const backupsApi = {
+  /** The settings, how well the installation is protected, and the backups there are. */
+  overview: (signal?: AbortSignal) => request<BackupOverview>('/v1/backups', { signal }),
+  /** Asks for a backup now. It is made within about twenty seconds. */
+  create: () => request<Backup>('/v1/backups', { method: 'POST' }),
+  saveSettings: (body: BackupSettings) =>
+    request<BackupSettings>('/v1/backups/settings', { method: 'PUT', body }),
+  /** A link that downloads the file. It works for a minute and needs no sign-in. */
+  downloadLink: (id: string) =>
+    request<{ path: string; expiresAt: string }>(`/v1/backups/${id}/download`, { method: 'POST' }),
+  remove: (id: string) => request<void>(`/v1/backups/${id}`, { method: 'DELETE' }),
 };

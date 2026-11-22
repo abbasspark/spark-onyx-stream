@@ -9,7 +9,7 @@ The project is built in phases. Each phase ends with something that works end to
 | 3. Billing                    | Plans, payments, entitlements, coupons. First complete VOD service                  | Done, coupons later |
 | 4. Live                       | Ingest, copy and transcode channels, DVR, EPG, channels in the catalog              | Done                |
 | 5. Edges and P2P              | Edge agent, tracker, P2P in the player, offload statistics                          | Done                |
-| 6. Operations                 | Installer, updates with rollback, backup and restore, diagnostics                   | Starts in phase 1   |
+| 6. Operations                 | Installer, updates with rollback, backup and restore, diagnostics                   | In progress         |
 | 7. Apps                       | Android mobile and Android TV                                                       | Planned             |
 | 8. Advanced                   | DRM, ads, analytics dashboards, further apps                                        | Planned             |
 
@@ -48,3 +48,12 @@ See [phase-4-live.md](phase-4-live.md) for the design.
 5. Offload statistics: how much edges and viewers took off the main server. **Done.**
 
 See [phase-5-edges.md](phase-5-edges.md) for the design.
+
+## Phase 6 in steps
+
+1. Backup and restore: scheduled, encrypted backups of the database in a storage pool, each proven to open, the Backups page in the panel, and a command line tool that restores one. **Done.**
+2. The installer: one command that sets up a server.
+3. Updates with rollback.
+4. Diagnostics: one page that says what is wrong with an installation.
+
+See [phase-6-operations.md](phase-6-operations.md) for the design.

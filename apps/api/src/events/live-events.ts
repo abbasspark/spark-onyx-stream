@@ -43,6 +43,11 @@ export type LiveEvent =
       edgeId: string;
     }
   | {
+      /** A backup was asked for, started, finished or removed. */
+      type: 'backup';
+      backupId: string;
+    }
+  | {
       type: 'channel';
       channelId: string;
       /** "status" is sent by the live process when a channel starts, stops or reconnects. */
@@ -57,6 +62,7 @@ export const EVENT_PERMISSIONS: Record<LiveEvent['type'], Permission> = {
   channel: 'live:read',
   recording: 'live:read',
   edge: 'delivery:read',
+  backup: 'settings:read',
 };
 
 /** Reads an event from its channel message. Null when the message is not a valid event. */

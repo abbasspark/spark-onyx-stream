@@ -308,6 +308,8 @@ export async function createTestApp(
       mail.clear();
       queue.clear();
       await prisma.auditLog.deleteMany();
+      await prisma.backup.deleteMany();
+      await prisma.setting.deleteMany();
       await prisma.payment.deleteMany();
       await prisma.recording.deleteMany();
       await prisma.edgeServer.deleteMany();

@@ -47,6 +47,7 @@ model AdminUser {
   subscriptionsGranted Subscription[]
   paymentsRecorded     Payment[]
   purchasesGranted     Purchase[]
+  backups              Backup[]
 
   @@map("admin_users")
 }
@@ -197,8 +198,9 @@ model StoragePool {
   createdAt  DateTime      @default(now())
   updatedAt  DateTime      @updatedAt
 
-  assets Asset[]
-  images Image[]
+  assets  Asset[]
+  images  Image[]
+  backups Backup[]
 
   @@map("storage_pools")
 }
@@ -1377,4 +1379,56 @@ model OriginTrafficHour {
 
   @@id([hour, kind])
   @@map("origin_traffic_hours")
+}
+
+// ---------------------------------------------------------------------------
+// Operations
+// ---------------------------------------------------------------------------
+
+enum BackupStatus {
+  /// Asked for, and waiting for the scheduler to pick it up.
+  PENDING
+  RUNNING
+  COMPLETED
+  FAILED
+}
+
+enum BackupTrigger {
+  MANUAL
+  SCHEDULED
+}
+
+/// One backup of the database: an encrypted file in a storage pool.
+model Backup {
+  id      String        @id @default(uuid(7)) @db.Uuid
+  status  BackupStatus  @default(PENDING)
+  trigger BackupTrigger
+
+  storagePoolId String      @db.Uuid
+  storagePool   StoragePool @relation(fields: [storagePoolId], references: [id])
+  /// Where the file is in the pool. Set when the backup starts.
+  storageKey    String?
+  /// Size of the encrypted file.
+  sizeBytes     BigInt?
+  /// SHA-256 of the encrypted file, in hexadecimal.
+  sha256        String?
+  /// How many database objects the file holds, counted when it was read back.
+  entries       Int?
+
+  /// The version of the application that wrote the backup.
+  appVersion String
+  /// The newest migration the database had.
+  migration  String?
+  /// Why the backup failed.
+  error      String?
+
+  createdById String?    @db.Uuid
+  createdBy   AdminUser? @relation(fields: [createdById], references: [id], onDelete: SetNull)
+  createdAt   DateTime   @default(now())
+  startedAt   DateTime?
+  finishedAt  DateTime?
+
+  @@index([createdAt])
+  @@index([status])
+  @@map("backups")
 }

@@ -615,3 +615,16 @@ This replaces the "plain CSS without a component library" part of D-018.
 **Why:** only the edge knows what it served from its copies, only the player knows which part came from another viewer, and only the gateway knows what it sent without the API hearing of it. Counting anywhere else would mean guessing. With all three, what reached viewers is their sum, and what the main server carried is its own part plus what edges fetched from it. The gateway counts while it writes its log line, in a table in shared memory, which costs a request nothing and needs no log files to be read.
 
 **Consequence:** the part of the viewers rests on what players say, so it can be skewed by someone who wants to, and the figures are kept apart from anything that decides or bills. An installation without the gateway has no figure for the main server's own part, and is told so.
+
+## D-048 Backups are made by the installation, encrypted, and proven to open
+
+**Date:** 2026-11-22
+
+- **The application makes its own backups, on a schedule that is on from the first day.** They are not left to a cron job the operator has to write.
+- **A backup is the output of `pg_dump`, encrypted under a key made from `MASTER_KEY`, in a storage pool.**
+- **A backup counts only after it was read back and opened.**
+- **Restoring is done with a command line tool, not from the panel.**
+
+**Why:** the installations this is built for are run by one person, and a backup that has to be set up by hand is one that is set up after the first loss. On by default costs a few megabytes a night. `pg_dump` is the tool PostgreSQL itself stands behind, across versions, and its archive can be loaded by anyone with `pg_restore`, with or without us. Storage pools already know disks and buckets, so backups can leave the server without a second mechanism. The file is encrypted because it holds every viewer's address and password hash and will be copied to places that are less guarded than the database. Reading it back is the only test that says anything: most backups that fail, fail on the day they are needed. A restore replaces the database under the running application, panel included, so the panel cannot be the thing that does it. A tool that needs only the database and the key also works on the day nothing else does.
+
+**Consequence:** the API image carries the PostgreSQL client tools, which must be no older than the database server. The key is not in the backup, so losing `.env` loses every backup with it. The panel says so where backups are set up. Video files are outside of this and stay the operator's task. Every backup is written twice over the network when the pool is a bucket: once out, once back to check.
