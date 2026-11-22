@@ -172,6 +172,74 @@ The copy of the database for a rollback is a plain `pg_dump` archive, not one of
 
 Updates brought a fault to light that was there before them. Nginx looks a name up once, when it starts. A container that is made anew, as the API is on every update, can come back with another address, and the gateway went on sending requests to the old one: every page answered with an error until the gateway was restarted. The gateway now asks Docker's name service again every few seconds and follows the API and the website wherever they come back.
 
-## Still to come in this phase
+## Diagnostics
 
-- Diagnostics: one page that says what is wrong with an installation.
+**Settings → Diagnostics** is one page that says what is wrong with an installation, in words, with what to do about it. The same look is taken every five minutes in the background, and the owners get an email when a problem appears.
+
+### What is looked at
+
+| Part        | Looked at                                                                                               |
+| ----------- | ------------------------------------------------------------------------------------------------------- |
+| Core        | The database and Redis answer; no migration was cut off; Redis will not drop jobs when its memory fills |
+| Processing  | A worker and a scheduler are running; jobs are not failing, waiting for hours or stuck                  |
+| Storage     | Every pool can be reached; its disk and its limit have room; so do the folders uploads and jobs work in |
+| Backups     | The newest backup is fresh; the last one did not fail; the tools to make one are there                  |
+| Delivery    | Edge servers are online; the tracker answers                                                            |
+| Live        | A live process runs when a channel is switched on; no channel has failed                                |
+| Connections | Email, Stripe and TMDB, where they are set up                                                           |
+| Setup       | The site is reached over HTTPS                                                                          |
+
+Each finding is one of four: **fine**, a **warning** (works, but look at it), a **problem** (something does not work, or will stop soon), or **not set up**. What is not set up is no fault and is counted with neither.
+
+The findings are sentences, not codes: "No worker is running. Uploaded videos wait and are not made ready to watch." Where there is something to do, the page says what, and links to the page of the panel where it is done.
+
+### How processes are known
+
+An installation is several processes, possibly on several servers, and the one that answers the panel cannot see the others. So every process reports in every fifteen seconds: its roles, its server, its version, how long it has been running, and how much room its working folders have. One that is silent for a minute is taken to be gone. That is how the page knows that there is no worker, that two versions run side by side after a half-finished update, or that the disk a worker on another machine works on is nearly full.
+
+Folders that share a disk are reported once. On a single server the pool, the uploads, the processing and the live channels are often on the same disk, and a full disk is one problem, not four.
+
+### The mark in the header
+
+When something is wrong, the header of the panel says so on every page: "2 problems" or "1 warning", linking to the diagnostics page. It shows what the last look found and stays away when all is well.
+
+### Alerts
+
+The owners who can sign in get an email when a problem appears, and one more when it is gone.
+
+- **Only problems are sent,** not warnings.
+- **A problem must be there for two looks in a row,** five minutes apart, before anyone is written to. A restart is not worth an email.
+- **Each problem is written about once,** however long it lasts.
+- Alerts are switched off on the diagnostics page. They need email to be set up, and the page says so when it is not.
+
+### Newer versions
+
+The page shows the installed version and whether a newer one exists. To know, the server asks GitHub for the newest commit of the project, at most every six hours, and compares it with the commit the installation was built from. The question carries nothing about the installation. `UPDATE_CHECK=off` in `.env` stops it. Installing the newer version stays a step on the server: `onyx update`.
+
+The installer and `onyx update` write the commit into `.env` as `ONYX_COMMIT`. An installation made by hand does not know its commit unless it is set there, and the page then shows the version without comparing.
+
+### Copy report
+
+**Copy report** puts the whole page into the clipboard as text: versions, every finding with its figures, and the processes. It is made for bug reports and for whoever helps with an installation, and holds no password and no key.
+
+### API
+
+| Method and path                | Does                                                  |
+| ------------------------------ | ----------------------------------------------------- |
+| `GET /v1/diagnostics`          | Looks at everything now and answers with the findings |
+| `GET /v1/diagnostics/summary`  | What the last look found, without looking again       |
+| `PUT /v1/diagnostics/settings` | Switches the alerts by email on or off                |
+
+Reading needs `settings:read`, changing `settings:write`.
+
+### Limits
+
+- The look is taken from inside the installation. It cannot tell that the site is unreachable from the internet, because then nothing it sends arrives either. An outside monitor that calls `/v1/health` covers that.
+- The state of email is that of the process that answers: whether its last email was taken by the mail server.
+- "A newer version is there" compares with the main branch of the project. An installation that follows another branch or a fork should set `UPDATE_CHECK_URL`, or switch the check off.
+
+## What phase 6 leaves for later
+
+- Published images and releases, which would turn the build step of an installation and of an update into a download.
+- Backups of video files.
+- Alerts through other channels than email.

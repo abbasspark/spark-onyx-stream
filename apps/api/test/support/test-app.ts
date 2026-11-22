@@ -84,6 +84,37 @@ export class FakeRedis {
     return 1;
   }
 
+  private readonly hashes = new Map<string, Map<string, string>>();
+
+  async hset(key: string, field: string, value: string): Promise<number> {
+    const hash = this.hashes.get(key) ?? new Map<string, string>();
+    this.hashes.set(key, hash);
+    const added = hash.has(field) ? 0 : 1;
+    hash.set(field, value);
+    return added;
+  }
+
+  async hgetall(key: string): Promise<Record<string, string>> {
+    return Object.fromEntries(this.hashes.get(key) ?? []);
+  }
+
+  async hdel(key: string, ...fields: string[]): Promise<number> {
+    const hash = this.hashes.get(key);
+    return fields.filter((field) => hash?.delete(field)).length;
+  }
+
+  async ping(): Promise<'PONG'> {
+    return 'PONG';
+  }
+
+  /** What "INFO" answers, as far as the application reads it. Tests may change it. */
+  infoText =
+    'redis_version:7.4.1\r\nused_memory:1048576\r\nmaxmemory:0\r\nmaxmemory_policy:noeviction\r\n';
+
+  async info(): Promise<string> {
+    return this.infoText;
+  }
+
   private readonly lists = new Map<string, string[]>();
 
   async lpush(key: string, ...values: string[]): Promise<number> {
@@ -147,6 +178,7 @@ export class FakeRedis {
     this.counters.clear();
     this.strings.clear();
     this.lists.clear();
+    this.hashes.clear();
     this.published.length = 0;
   }
 }

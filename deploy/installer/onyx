@@ -105,6 +105,25 @@ get_env() {
   return 0
 }
 
+# env_set <key> <value>: sets one line of the settings and leaves every other as it is.
+env_set() {
+  local line found=0 tmp
+  tmp=$(mktemp "$ENV_FILE.XXXXXX")
+  chmod 600 "$tmp"
+  while IFS= read -r line || [[ -n "$line" ]]; do
+    if [[ "$line" == "$1="* && "$found" -eq 0 ]]; then
+      printf '%s=%s\n' "$1" "$2"
+      found=1
+    else
+      printf '%s\n' "$line"
+    fi
+  done <"$ENV_FILE" >"$tmp"
+  if [[ "$found" -eq 0 ]]; then
+    printf '%s=%s\n' "$1" "$2" >>"$tmp"
+  fi
+  mv "$tmp" "$ENV_FILE"
+}
+
 # Runs the backup tool in a container of its own, which works whether the
 # application is running or not.
 backup_tool() {
@@ -306,6 +325,10 @@ checkout() {
   else
     repo checkout --quiet --detach "$commit"
   fi
+  # Told to the application, so the panel can say which version runs.
+  if [[ -f "$ENV_FILE" ]]; then
+    env_set ONYX_COMMIT "$commit"
+  fi
 }
 
 site_answers() {
@@ -396,8 +419,8 @@ go_back() {
   compose --progress quiet stop "${DATABASE_USERS[@]}" web gateway >/dev/null 2>&1 || true
   checkout "$commit" "$branch"
   tag_images rollback local
-  # The settings stay as they are: an update only ever adds to them, and the
-  # older version does not mind what was added.
+  # The settings stay as they are, but for the note of the version: an update
+  # only ever adds to them, and the older version does not mind what was added.
   ok "Files and images are those of $(short "$commit") again"
 
   if [[ "${migrations:-0}" -gt 0 ]]; then

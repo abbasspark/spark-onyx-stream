@@ -66,6 +66,10 @@ export class AppConfig {
   readonly mediaBaseUrl: string;
   /** Where the API reads what the gateway delivered. Null without a gateway. */
   readonly gatewayInternalUrl: string | null;
+  /** The commit the installation was built from, when it is known. */
+  readonly commit: string | null;
+  /** Where to ask for the newest version. Null when asking is switched off. */
+  readonly updateCheckUrl: string | null;
   /** Currency of all prices, such as "EUR". */
   readonly billingCurrency: string;
   /** Where viewers ask for a subscription. Empty when not set. */
@@ -152,6 +156,8 @@ export class AppConfig {
     this.viewerRegistrationOpen = env.VIEWER_REGISTRATION === 'open';
     this.mediaBaseUrl = env.MEDIA_BASE_URL;
     this.gatewayInternalUrl = env.GATEWAY_INTERNAL_URL || null;
+    this.commit = env.ONYX_COMMIT || null;
+    this.updateCheckUrl = env.UPDATE_CHECK === 'on' ? env.UPDATE_CHECK_URL : null;
     this.billingCurrency = env.BILLING_CURRENCY;
     this.billingContactUrl = env.BILLING_CONTACT_URL;
     this.rental = { startDays: env.RENTAL_START_DAYS, watchHours: env.RENTAL_WATCH_HOURS };

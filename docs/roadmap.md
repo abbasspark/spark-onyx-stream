@@ -9,7 +9,7 @@ The project is built in phases. Each phase ends with something that works end to
 | 3. Billing                    | Plans, payments, entitlements, coupons. First complete VOD service                  | Done, coupons later |
 | 4. Live                       | Ingest, copy and transcode channels, DVR, EPG, channels in the catalog              | Done                |
 | 5. Edges and P2P              | Edge agent, tracker, P2P in the player, offload statistics                          | Done                |
-| 6. Operations                 | Installer, updates with rollback, backup and restore, diagnostics                   | In progress         |
+| 6. Operations                 | Installer, updates with rollback, backup and restore, diagnostics                   | Done                |
 | 7. Apps                       | Android mobile and Android TV                                                       | Planned             |
 | 8. Advanced                   | DRM, ads, analytics dashboards, further apps                                        | Planned             |
 
@@ -54,6 +54,6 @@ See [phase-5-edges.md](phase-5-edges.md) for the design.
 1. Backup and restore: scheduled, encrypted backups of the database in a storage pool, each proven to open, the Backups page in the panel, and a command line tool that restores one. **Done.**
 2. The installer: one command that sets up a server, with HTTPS for a domain, and the `onyx` command for the days after. **Done.**
 3. Updates with rollback: `onyx update` builds the new version beside the running one, copies the database at the last moment, switches, and goes back by itself when the new version does not answer. `onyx rollback` undoes an update later. **Done.**
-4. Diagnostics: one page that says what is wrong with an installation.
+4. Diagnostics: one page that says what is wrong with an installation and what to do about it, a mark in the header of the panel, emails to the owners when a problem appears, and whether a newer version exists. **Done.**
 
 See [phase-6-operations.md](phase-6-operations.md) for the design.

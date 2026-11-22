@@ -494,6 +494,13 @@ compose() {
 start_everything() {
   step "Building and starting"
 
+  # Told to the application, so the panel can say which version runs.
+  local commit
+  commit=$(git -c safe.directory="$INSTALL_DIR" -C "$INSTALL_DIR" rev-parse HEAD 2>/dev/null || true)
+  if [[ -n "$commit" ]]; then
+    set_env ONYX_COMMIT "$commit" "$ENV_FILE"
+  fi
+
   if [[ "$OPT_BUILD" -eq 1 ]]; then
     say "The first build takes 5 to 15 minutes, depending on the server."
     compose build ||
