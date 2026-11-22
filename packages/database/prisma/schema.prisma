@@ -1282,3 +1282,42 @@ model Recording {
   @@index([channelId])
   @@map("recordings")
 }
+
+// --- Delivery --------------------------------------------------------------------
+
+/// A server that delivers video to viewers in place of the main server. It runs
+/// the edge agent, which keeps copies of what it is asked for.
+model EdgeServer {
+  id   String @id @default(uuid(7)) @db.Uuid
+  name String @unique
+
+  /// The address viewers reach it at, such as https://edge1.example.com.
+  publicUrl String @unique
+  /// Where it stands, as a note for the operator.
+  location  String?
+
+  /// Hash of the secret the agent signs in with. The secret itself is shown once.
+  secretHash String
+
+  /// Switched off, it gets no new viewers. The agent may stay connected.
+  enabled    Boolean @default(true)
+  /// Its share of viewers compared with the other edges, 1 to 100.
+  weight     Int     @default(10)
+  serveVideo Boolean @default(true)
+  serveLive  Boolean @default(true)
+
+  /// What the agent last said about itself.
+  lastSeenAt DateTime?
+  version    String?
+  hostname   String?
+  remoteIp   String?
+
+  /// Everything it delivered since it was added.
+  bytesServed    BigInt @default(0)
+  requestsServed BigInt @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("edge_servers")
+}

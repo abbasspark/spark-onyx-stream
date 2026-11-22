@@ -1,0 +1,151 @@
+# Phase 5: Edges and P2P
+
+Phase 5 takes the load of delivery off the main server. Its first step, described here, is edge servers: machines close to viewers that deliver video in place of the main server. P2P between viewers comes after it.
+
+## What an edge is
+
+An edge is a server that runs one program, the edge agent. Viewers who are sent to it get playlists and segments from it instead of from the main server.
+
+- **It keeps copies.** The first viewer who asks for a file makes the agent fetch it from the main server. Everyone after that gets the copy. The main server sends a file once per edge instead of once per viewer.
+- **It holds nothing that matters.** No database, no settings beyond its own. An edge can be stopped, wiped or replaced at any time. What it kept is fetched again when asked for.
+- **It connects to the main server, never the other way round.** An edge needs one open port, the one for viewers. The main server needs to know nothing but that the edge exists.
+- **It serves video on demand and live channels**, each of which can be switched off per edge.
+
+```
+viewer ──▶ website / API (main server): "play this"  ──▶ address on an edge, signed for that edge
+viewer ──▶ edge: playlist, segments ──▶ copy on disk, or fetched from the main server once
+edge   ──▶ main server: heartbeat every 10 seconds, and the files it does not have
+```
+
+## Setting one up
+
+1. In the panel, open **Delivery → Edge servers** and add the edge: a name, the address viewers reach it at, and its weight.
+2. The panel shows the token of the agent, once, with the settings to start it with.
+3. Start the agent on the server. As soon as it reports, the panel shows it online and new viewers are sent to it.
+
+With Docker and automatic HTTPS, on the edge:
+
+```bash
+git clone https://github.com/abbasspark/spark-onyx-stream.git
+cd spark-onyx-stream/deploy/edge
+cp .env.example .env     # the address of the main server, the token, the domain of this edge
+docker compose up -d --build
+```
+
+This runs the agent with Caddy in front of it, which gets and renews the certificate for the domain by itself. The domain must point to the server, and ports 80 and 443 must be reachable.
+
+Without Docker, build the one program and run it as a service:
+
+```bash
+cd services/edge-agent
+go build -o /usr/local/bin/onyx-edge-agent ./cmd/edge-agent
+```
+
+```ini
+# /etc/systemd/system/onyx-edge.service
+[Service]
+EnvironmentFile=/etc/onyx-edge.env
+ExecStart=/usr/local/bin/onyx-edge-agent
+Restart=always
+User=onyx
+```
+
+**An edge needs HTTPS when the website uses it.** A browser does not play video from an `http://` address on an `https://` page. Put a proxy with a certificate in front, as the Compose file does, or give the agent a certificate with `ONYX_EDGE_TLS_CERT` and `ONYX_EDGE_TLS_KEY`. It reads the files again when they change, so a renewed certificate needs no restart.
+
+**Use HTTPS between edge and main server too.** The token of the edge and the files travel over that connection.
+
+### Settings of the agent
+
+| Variable               | Default   | Meaning                                                          |
+| ---------------------- | --------- | ---------------------------------------------------------------- |
+| `ONYX_ORIGIN_URL`      | required  | Address of the main server, such as `https://stream.example.com` |
+| `ONYX_EDGE_TOKEN`      | required  | Token shown when the edge was added                              |
+| `ONYX_EDGE_TOKEN_FILE` |           | A file holding the token, instead of `ONYX_EDGE_TOKEN`           |
+| `ONYX_EDGE_LISTEN`     | `:8080`   | Address viewers are served on                                    |
+| `ONYX_EDGE_CACHE_DIR`  | `./cache` | Folder for the copies                                            |
+| `ONYX_EDGE_CACHE_SIZE` | `20GB`    | How much may be kept. At least `64MB`                            |
+| `ONYX_EDGE_TLS_CERT`   |           | Certificate file, to serve HTTPS itself                          |
+| `ONYX_EDGE_TLS_KEY`    |           | Key file of the certificate                                      |
+
+## Who is sent where
+
+When a viewer starts a video or a channel, the API chooses a server for that session and signs the address for it.
+
+- **Edges that can take viewers** are those that are switched on and reported within the last 35 seconds. When there is none, the main server delivers, as it did before.
+- **A video goes to one of two edges,** always the same two for the same video. Copies of a video are then on two edges instead of thinly on all of them. Which two follows from the video and the edges alone (weighted rendezvous hashing), so adding or removing an edge moves only the videos of that edge.
+- **A live channel goes to any edge,** by weight. What is kept of a channel is small and short-lived, and a popular channel needs every edge.
+- **Weight** is an edge's share: one with weight 20 gets twice the viewers of one with weight 10.
+- **Admins always watch from the main server,** so a preview in the panel shows what is stored and does not depend on an edge.
+- **Pictures** (posters, backdrops) stay on the main server.
+
+### When an edge goes away
+
+- No new viewers are sent to it 35 seconds after its last report.
+- **A live viewer** on it moves by itself: the player notices that the picture stands still, asks for the channel again and gets another server. In a test this took about 36 seconds, most of it the wait until the edge counts as gone.
+- **A viewer of a film** sees the player's error with "Try again", which gets another server and goes on where the viewer was. Moving without that click is not built yet.
+- An edge that cannot reach the main server keeps serving what it has. Viewers whose video is on it go on watching; files it does not have fail.
+
+## Security
+
+- **Every edge has its own key for playback tokens,** made from the platform's signing secret and the edge's own secret. An address signed for one edge works on that edge only. An edge never learns the platform's secret, so a server that is broken into cannot make addresses for the main server or for other edges.
+- **The token of an edge is shown once** and stored as a hash. Whoever has it can fetch every video and every content key, so it is to be kept like a password. Replacing it locks the running agent out at once and takes the edge out of use until its agent is back with the new one.
+- **Edges check tokens themselves,** the same way the main server does: wrong and run-out tokens get a plain 404.
+- **Content keys of encrypted videos** are handed out by the edge to viewers with a valid token. It fetches them from the main server, keeps them in memory for a minute and never writes them to disk.
+- **An edge serves nothing before its first heartbeat was answered,** and stops serving when the main server refuses its token.
+
+## What the agent keeps, and for how long
+
+- **Copies on disk** up to the size it is given. When that is reached, the copies not asked for the longest go first.
+- **Files of a video** are kept under the processing they belong to. The agent asks the main server at most once a minute per video whether that is still current. A video that was processed again has its old copies dropped, and one that was deleted is no longer served, both within a minute.
+- **Segments of a channel** never change and are kept until they are six hours old or space is needed.
+- **Playlists of a channel** are fetched again after one second, however many viewers ask in between, and are sent packed to players that take it.
+- **Many viewers asking for the same new file cause one fetch.**
+- A restart keeps the copies.
+
+## What the panel shows
+
+**Delivery → Edge servers** lists the edges with their state, traffic, the share of requests answered from copies, how full the cache is, and the traffic of the last hour. Above the list: how many are online, the traffic of all of them together and what they delivered in total. The details of an edge add the machine's load and disk space, refused requests and failed fetches, the version of the agent and where it connects from.
+
+| State                 | Meaning                                                |
+| --------------------- | ------------------------------------------------------ |
+| Online                | Connected and taking viewers                           |
+| Paused                | Connected, but switched off: no new viewers            |
+| Offline               | The agent stopped reporting                            |
+| Waiting for the agent | No agent has connected with the token of this edge yet |
+
+The figures come from the heartbeats and are kept in Redis for an hour. Totals are kept in the database.
+
+## The viewer website
+
+The website's content policy must allow every address video comes from. It asks the API for the addresses of the edges (`GET /v1/catalog/delivery`) and puts them into the policy of each page, so adding an edge needs no setting and no restart. A tab that was open before an edge was added loads itself again, once, when it is sent to that edge.
+
+`WEB_MEDIA_ORIGIN` can list further origins, separated by spaces, and takes `https://*.example.com` for all subdomains.
+
+## API
+
+| Method and path                     | Who              | Purpose                                                   |
+| ----------------------------------- | ---------------- | --------------------------------------------------------- |
+| `GET /v1/edges`                     | `delivery:read`  | All edges with state, figures and traffic history         |
+| `GET /v1/edges/:id`                 | `delivery:read`  | One edge                                                  |
+| `POST /v1/edges`                    | `delivery:write` | Add an edge. The answer carries its token, once           |
+| `PATCH /v1/edges/:id`               | `delivery:write` | Change an edge, pause it or switch it on                  |
+| `POST /v1/edges/:id/token`          | `delivery:write` | Replace the token                                         |
+| `DELETE /v1/edges/:id`              | `delivery:write` | Remove an edge and lock its agent out                     |
+| `GET /v1/catalog/delivery`          | everyone         | The addresses of the edges, for the website               |
+| `POST /v1/edge-agent/heartbeat`     | the agent        | Report, and get the key for checking tokens               |
+| `GET /v1/edge-agent/assets/:id`     | the agent        | Whether a video can be played, and its current processing |
+| `GET /v1/edge-agent/media/:id/…`    | the agent        | A file of a video, or its content key                     |
+| `GET /v1/edge-agent/live/:id/:file` | the agent        | A playlist or segment of a channel                        |
+
+`delivery:read` and `delivery:write` are held by owners and admins. Changes are written to the audit log. An agent that speaks an older version of this conversation than the main server is refused and stays offline.
+
+## Not built yet
+
+- Moving a viewer of a film to another server without a click, and a second address in the answer for players to fall back to
+- Sending viewers to the nearest edge by country or network, and limits per edge (bandwidth, connections)
+- Emptying the cache of an edge from the panel, and filling it ahead of a premiere
+- Traffic history beyond an hour, per day and per title
+- Edges that fetch from other edges, and edges for pictures
+- Sending the first bytes of a new file to the viewer while it is still being fetched
+- Updating agents from the panel
+- P2P between viewers, the tracker and offload statistics, which are the next steps of this phase

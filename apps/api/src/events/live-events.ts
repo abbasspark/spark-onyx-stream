@@ -38,6 +38,11 @@ export type LiveEvent =
       recordingId: string;
     }
   | {
+      /** An edge server was added, changed or removed, or its agent connected. */
+      type: 'edge';
+      edgeId: string;
+    }
+  | {
       type: 'channel';
       channelId: string;
       /** "status" is sent by the live process when a channel starts, stops or reconnects. */
@@ -51,6 +56,7 @@ export const EVENT_PERMISSIONS: Record<LiveEvent['type'], Permission> = {
   asset: 'assets:read',
   channel: 'live:read',
   recording: 'live:read',
+  edge: 'delivery:read',
 };
 
 /** Reads an event from its channel message. Null when the message is not a valid event. */

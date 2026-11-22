@@ -3,6 +3,7 @@ import { ConflictException, Inject, Injectable, NotFoundException } from '@nestj
 import { PrismaClient } from '@onyx/database';
 import { AppConfig } from '../config/app-config.js';
 import { ContentKeysService } from '../crypto/content-keys.service.js';
+import { type Audience, DeliveryRouter } from '../delivery/delivery-router.service.js';
 import { outputPrefix } from '../processing/pipeline.service.js';
 import { createPlaybackToken, verifyPlaybackToken } from './playback-token.js';
 
@@ -40,6 +41,8 @@ export interface MediaLocation {
 /** Path of the content key under an asset's playback URL. It is not a file in storage. */
 export const CONTENT_KEY_PATH = 'hls/key';
 
+const ASSET_ID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
+
 /** Generated files a playback token may read, relative to the asset's output folder. */
 const ALLOWED_FILE_PATTERN = /^(hls|thumbs)\/[A-Za-z0-9._-]+(\/[A-Za-z0-9._-]+)*$/;
 
@@ -51,6 +54,7 @@ export class PlaybackService {
     @Inject(PrismaClient) private readonly prisma: PrismaClient,
     @Inject(AppConfig) private readonly config: AppConfig,
     @Inject(ContentKeysService) private readonly contentKeys: ContentKeysService,
+    @Inject(DeliveryRouter) private readonly delivery: DeliveryRouter,
   ) {}
 
   /**
@@ -99,7 +103,7 @@ export class PlaybackService {
   }
 
   /** Issues signed URLs for playing an asset. */
-  async createPlayback(assetId: string): Promise<PlaybackInfo> {
+  async createPlayback(assetId: string, audience: Audience = 'admin'): Promise<PlaybackInfo> {
     const asset = await this.prisma.asset.findUnique({
       where: { id: assetId },
       include: { thumbnails: true },
@@ -125,15 +129,15 @@ export class PlaybackService {
       Math.ceil(durationSeconds * DURATION_FACTOR) + DURATION_MARGIN_SECONDS,
     );
     const expiresAtSeconds = Math.floor(Date.now() / 1000) + lifetimeSeconds;
-    const token = createPlaybackToken(
-      asset.id,
-      expiresAtSeconds,
-      this.config.playbackSigningSecret,
-    );
+    // Viewers are sent to an edge when there is one. Admins always watch from
+    // the main server, so a preview shows what is stored and not a copy.
+    const route =
+      audience === 'viewer' ? await this.delivery.route('video', asset.id) : this.delivery.origin();
+    const token = createPlaybackToken(asset.id, expiresAtSeconds, route.signingSecret);
 
     const prefix = `${outputPrefix(asset.id)}/`;
     const urlFor = (storageKey: string): string =>
-      `${this.config.mediaBaseUrl}/v1/${MEDIA_ROUTE}/${asset.id}/${token}/${storageKey.slice(prefix.length)}`;
+      `${route.baseUrl}/v1/${MEDIA_ROUTE}/${asset.id}/${token}/${storageKey.slice(prefix.length)}`;
 
     const poster = asset.thumbnails.find((thumbnail) => thumbnail.type === 'POSTER');
     const spriteVtt = asset.thumbnails.find((thumbnail) => thumbnail.type === 'SPRITE_VTT');
@@ -155,6 +159,21 @@ export class PlaybackService {
    */
   async locate(assetId: string, token: string, filePath: string): Promise<MediaLocation | null> {
     if (!verifyPlaybackToken(token, assetId, this.config.playbackSigningSecret).valid) {
+      return null;
+    }
+    return this.locateFile(assetId, filePath);
+  }
+
+  /**
+   * Resolves a file an edge asks for. The edge has proven who it is, and it
+   * checks the tokens of its viewers itself, so there is no token here.
+   */
+  locateFile(assetId: string, filePath: string): Promise<MediaLocation | null> {
+    return this.find(assetId, filePath);
+  }
+
+  private async find(assetId: string, filePath: string): Promise<MediaLocation | null> {
+    if (!ASSET_ID_PATTERN.test(assetId)) {
       return null;
     }
     if (
@@ -182,13 +201,35 @@ export class PlaybackService {
     if (!verifyPlaybackToken(token, assetId, this.config.playbackSigningSecret).valid) {
       return null;
     }
-    if (!(await this.readyAssetPool(assetId))) {
+    return this.keyOf(assetId);
+  }
+
+  /** The content key of an asset, for an edge that has proven who it is. */
+  async keyOf(assetId: string): Promise<Buffer | null> {
+    if (!ASSET_ID_PATTERN.test(assetId) || !(await this.readyAssetPool(assetId))) {
       return null;
     }
 
     // A player asks for the key once per quality, so it is read fresh each time.
     // A remembered key would be wrong for a while after reprocessing.
     return (await this.contentKeys.find(assetId))?.key ?? null;
+  }
+
+  /**
+   * What tells one processing of an asset from the next. An edge keeps copies
+   * of a video's files under this, and drops them when it changes.
+   *
+   * @returns Null when the asset cannot be played.
+   */
+  async versionOf(assetId: string): Promise<string | null> {
+    if (!ASSET_ID_PATTERN.test(assetId)) {
+      return null;
+    }
+    const asset = await this.prisma.asset.findUnique({
+      where: { id: assetId },
+      select: { status: true, readyAt: true },
+    });
+    return asset?.status === 'READY' && asset.readyAt ? String(asset.readyAt.getTime()) : null;
   }
 
   /** Returns the storage pool of an asset that is ready to play, or null. Cached briefly. */

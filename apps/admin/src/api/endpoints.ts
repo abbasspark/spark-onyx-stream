@@ -1,6 +1,9 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 import { download, request, uploadFile } from './client';
 import type {
+  EdgeInput,
+  EdgeServer,
+  EdgeWithToken,
   Recording,
   RecordingInput,
   GuideImportResult,
@@ -446,4 +449,14 @@ export const recordingsApi = {
   /** Calls a waiting recording off, or stops a running one and keeps what it has. */
   stop: (id: string) => request<Recording>(`/v1/recordings/${id}/stop`, { method: 'POST' }),
   remove: (id: string) => request<void>(`/v1/recordings/${id}`, { method: 'DELETE' }),
+};
+
+export const edgesApi = {
+  list: (signal?: AbortSignal) => request<EdgeServer[]>('/v1/edges', { signal }),
+  create: (body: EdgeInput) => request<EdgeWithToken>('/v1/edges', { method: 'POST', body }),
+  update: (id: string, body: Partial<EdgeInput>) =>
+    request<EdgeServer>(`/v1/edges/${id}`, { method: 'PATCH', body }),
+  /** Replaces the token of the agent. The old one stops working at once. */
+  replaceToken: (id: string) => request<EdgeWithToken>(`/v1/edges/${id}/token`, { method: 'POST' }),
+  remove: (id: string) => request<void>(`/v1/edges/${id}`, { method: 'DELETE' }),
 };

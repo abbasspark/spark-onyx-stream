@@ -1,0 +1,12 @@
+# SPDX-License-Identifier: AGPL-3.0-only
+#
+# HTTPS in front of the edge agent. The certificate is fetched and renewed
+# automatically for the domain in EDGE_DOMAIN.
+
+{$EDGE_DOMAIN} {
+	# Playback tokens are part of the path, so requests are not logged.
+	reverse_proxy agent:8080 {
+		# Segments are passed on as they come.
+		flush_interval -1
+	}
+}

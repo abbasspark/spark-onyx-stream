@@ -6,10 +6,13 @@ export interface CspOptions {
   /** Development needs "eval", which React uses to rebuild error stacks. */
   development: boolean;
   /**
-   * Origin that serves media and artwork when it is not the site itself, such
-   * as a CDN. The value of MEDIA_BASE_URL of the API.
+   * Origins that serve media and artwork when it is not the site itself, such
+   * as a CDN: the value of MEDIA_BASE_URL of the API. Several are separated
+   * by spaces or commas, and a host may start with "*." for all its subdomains.
    */
   mediaOrigin?: string;
+  /** Addresses of the edge servers, as the API tells them. */
+  edgeOrigins?: readonly string[];
 }
 
 /** Keeps only the scheme, host and port of an address. Empty when it is not one. */
@@ -25,6 +28,17 @@ export function originOf(value: string | undefined): string {
   }
 }
 
+/** Every origin media may come from besides the site itself, each one once. */
+export function mediaOrigins(
+  configured: string | undefined,
+  edgeOrigins: readonly string[] = [],
+): string[] {
+  const origins = [...(configured ?? '').split(/[\s,]+/), ...edgeOrigins]
+    .map((value) => originOf(value))
+    .filter((origin) => origin !== '');
+  return [...new Set(origins)];
+}
+
 /**
  * The content security policy of the website.
  *
@@ -32,8 +46,13 @@ export function originOf(value: string | undefined): string {
  * one that does. "blob:" is how the player hands video to the browser. Inline
  * style attributes are allowed because progress bars and previews set them.
  */
-export function buildCsp({ nonce, development, mediaOrigin }: CspOptions): string {
-  const media = originOf(mediaOrigin);
+export function buildCsp({
+  nonce,
+  development,
+  mediaOrigin,
+  edgeOrigins = [],
+}: CspOptions): string {
+  const media = mediaOrigins(mediaOrigin, edgeOrigins).join(' ');
   const withMedia = (sources: string) => (media ? `${sources} ${media}` : sources);
 
   return [

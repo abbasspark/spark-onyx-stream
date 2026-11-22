@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-only
-import { buildCsp, originOf } from './csp';
+import { buildCsp, mediaOrigins, originOf } from './csp';
 
 describe('buildCsp', () => {
   it('lets scripts run only with the nonce', () => {
@@ -27,6 +27,38 @@ describe('buildCsp', () => {
     expect(policy).toContain("media-src 'self' blob: data: https://cdn.example.org;");
     expect(policy).toContain("connect-src 'self' https://cdn.example.org;");
     expect(policy).not.toMatch(/script-src[^;]*cdn\.example\.org/);
+  });
+});
+
+describe('mediaOrigins', () => {
+  it('joins what is configured with the edges, each origin once', () => {
+    expect(
+      mediaOrigins('https://cdn.example.org, https://*.edge.example.org', [
+        'https://edge1.example.net',
+        'https://cdn.example.org/',
+        'not an address',
+      ]),
+    ).toEqual([
+      'https://cdn.example.org',
+      'https://*.edge.example.org',
+      'https://edge1.example.net',
+    ]);
+    expect(mediaOrigins(undefined)).toEqual([]);
+  });
+
+  it('puts the edges into the policy for media, pictures and requests only', () => {
+    const policy = buildCsp({
+      nonce: 'n',
+      development: false,
+      edgeOrigins: ['https://edge1.example.net', 'https://edge2.example.net'],
+    });
+    expect(policy).toContain(
+      "media-src 'self' blob: data: https://edge1.example.net https://edge2.example.net;",
+    );
+    expect(policy).toContain(
+      "connect-src 'self' https://edge1.example.net https://edge2.example.net;",
+    );
+    expect(policy).not.toMatch(/script-src[^;]*edge1/);
   });
 });
 

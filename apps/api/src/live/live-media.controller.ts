@@ -58,44 +58,53 @@ export class LiveMediaController {
     response: Response,
   ): Promise<void> {
     const file = this.playback.locate(channelId, token, fileName);
-    const info = file ? await stat(file).catch(() => null) : null;
-    if (!file || !info?.isFile()) {
-      response.status(HttpStatus.NOT_FOUND).json({ statusCode: 404, message: 'Not found' });
-      return;
-    }
-
-    const extension = path.extname(file);
-    response.setHeader('Content-Type', CONTENT_TYPES[extension] ?? 'application/octet-stream');
-    // The playlist changes with every segment. A segment never changes once it is written.
-    response.setHeader(
-      'Cache-Control',
-      extension === '.m3u8' ? 'no-cache, no-store' : 'private, max-age=60',
-    );
-    response.setHeader('Accept-Ranges', 'bytes');
-    response.setHeader('X-Content-Type-Options', 'nosniff');
-
-    const range = parseRange(request.headers.range, info.size);
-    if (range.kind === 'unsatisfiable') {
-      response.setHeader('Content-Range', `bytes */${info.size}`);
-      response.status(HttpStatus.REQUESTED_RANGE_NOT_SATISFIABLE).end();
-      return;
-    }
-    const start = range.kind === 'range' ? range.range.start : 0;
-    const end = range.kind === 'range' ? range.range.end : info.size - 1;
-    response.setHeader('Content-Length', String(info.size === 0 ? 0 : end - start + 1));
-    if (range.kind === 'range') {
-      response.setHeader('Content-Range', `bytes ${start}-${end}/${info.size}`);
-      response.status(HttpStatus.PARTIAL_CONTENT);
-    }
-    if (request.method === 'HEAD' || info.size === 0) {
-      response.end();
-      return;
-    }
-
-    const stream = createReadStream(file, { start, end });
-    response.on('close', () => stream.destroy());
-    // A segment can leave the playlist window between the check and the read.
-    stream.on('error', () => response.destroy());
-    stream.pipe(response);
+    await sendLiveFile(file, request, response);
   }
+}
+
+/** Sends a file of a running channel, or 404 when there is none. */
+export async function sendLiveFile(
+  file: string | null,
+  request: Request,
+  response: Response,
+): Promise<void> {
+  const info = file ? await stat(file).catch(() => null) : null;
+  if (!file || !info?.isFile()) {
+    response.status(HttpStatus.NOT_FOUND).json({ statusCode: 404, message: 'Not found' });
+    return;
+  }
+
+  const extension = path.extname(file);
+  response.setHeader('Content-Type', CONTENT_TYPES[extension] ?? 'application/octet-stream');
+  // The playlist changes with every segment. A segment never changes once it is written.
+  response.setHeader(
+    'Cache-Control',
+    extension === '.m3u8' ? 'no-cache, no-store' : 'private, max-age=60',
+  );
+  response.setHeader('Accept-Ranges', 'bytes');
+  response.setHeader('X-Content-Type-Options', 'nosniff');
+
+  const range = parseRange(request.headers.range, info.size);
+  if (range.kind === 'unsatisfiable') {
+    response.setHeader('Content-Range', `bytes */${info.size}`);
+    response.status(HttpStatus.REQUESTED_RANGE_NOT_SATISFIABLE).end();
+    return;
+  }
+  const start = range.kind === 'range' ? range.range.start : 0;
+  const end = range.kind === 'range' ? range.range.end : info.size - 1;
+  response.setHeader('Content-Length', String(info.size === 0 ? 0 : end - start + 1));
+  if (range.kind === 'range') {
+    response.setHeader('Content-Range', `bytes ${start}-${end}/${info.size}`);
+    response.status(HttpStatus.PARTIAL_CONTENT);
+  }
+  if (request.method === 'HEAD' || info.size === 0) {
+    response.end();
+    return;
+  }
+
+  const stream = createReadStream(file, { start, end });
+  response.on('close', () => stream.destroy());
+  // A segment can leave the playlist window between the check and the read.
+  stream.on('error', () => response.destroy());
+  stream.pipe(response);
 }

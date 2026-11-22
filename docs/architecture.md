@@ -43,18 +43,18 @@ A small install runs everything on one server. A larger install starts more `wor
 
 ## Infrastructure
 
-| Component  | Use                                       |
-| ---------- | ----------------------------------------- |
-| PostgreSQL | All durable state                         |
-| Redis      | Job queue (BullMQ), cache, pub/sub        |
-| Nginx      | Serves segments and caches on edges       |
-| FFmpeg     | Probing, remuxing, transcoding, packaging |
+| Component  | Use                                         |
+| ---------- | ------------------------------------------- |
+| PostgreSQL | All durable state                           |
+| Redis      | Job queue (BullMQ), cache, pub/sub          |
+| Nginx      | Gateway of the main server: serves segments |
+| FFmpeg     | Probing, remuxing, transcoding, packaging   |
 
 ## Communication
 
 - **Inside the monolith:** direct calls between module services, and an internal event bus where modules should stay decoupled.
 - **API to workers:** BullMQ jobs over Redis. Every job also has a row in the `jobs` table, so history survives a Redis restart.
-- **Main server to edge agents:** the agent opens an outbound connection to the main server. No inbound ports are needed on edges.
+- **Main server to edge agents:** the agent connects to the main server, reports every ten seconds and fetches the files its viewers ask for. An edge needs no open port except the one for viewers. See [phase-5-edges.md](phase-5-edges.md).
 - **State:** PostgreSQL only. Workers and edges hold no state and can be restarted at any time.
 
 ## Rules that are never broken
@@ -70,7 +70,7 @@ A small install runs everything on one server. A larger install starts more `wor
 2. The API checks that playback is allowed. In phase 1 this is an admin session or API key. From phase 2 it also covers the viewer session, device limits, geography and entitlement.
 3. The API returns a signed, short-lived manifest URL.
 4. Nginx verifies the signature on every manifest and segment request, without calling the API.
-5. The player loads segments over HTTP and, from phase 5, also from peers.
+5. The player loads segments over HTTP from the main server or from an edge the API chose, and later also from peers.
 
 ## Repository layout
 
