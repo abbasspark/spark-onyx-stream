@@ -1332,13 +1332,34 @@ model EdgeTrafficHour {
   /// The start of the hour, in UTC.
   hour   DateTime
 
-  bytes    BigInt @default(0)
-  requests BigInt @default(0)
+  bytes        BigInt @default(0)
+  requests     BigInt @default(0)
   /// Requests answered from copies on the edge, and those fetched first.
-  hits     BigInt @default(0)
-  misses   BigInt @default(0)
+  hits         BigInt @default(0)
+  misses       BigInt @default(0)
+  /// What the edge had to fetch from the main server to deliver this.
+  fetchedBytes BigInt @default(0)
 
   @@id([edgeId, hour])
   @@index([hour])
   @@map("edge_traffic_hours")
+}
+
+/// What the players of viewers reported for one hour: how much of what they
+/// played came from servers and how much from other viewers.
+model SharingHour {
+  /// The start of the hour, in UTC.
+  hour DateTime
+  /// "video" or "live".
+  kind String
+
+  fromServers BigInt @default(0)
+  fromViewers BigInt @default(0)
+  /// What players gave to others. Close to fromViewers, counted at the other end.
+  toViewers   BigInt @default(0)
+  /// How many reports the figures are made of.
+  reports     Int    @default(0)
+
+  @@id([hour, kind])
+  @@map("sharing_hours")
 }

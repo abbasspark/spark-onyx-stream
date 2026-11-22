@@ -2,7 +2,7 @@
 import { createHmac } from 'node:crypto';
 import { Inject, Injectable } from '@nestjs/common';
 import { AppConfig } from '../config/app-config.js';
-import { createPlaybackToken } from '../playback/playback-token.js';
+import { createPlaybackToken, verifyPlaybackToken } from '../playback/playback-token.js';
 
 /** What the tokens for the tracker are signed for. The tracker knows the same words. */
 const SUBJECT_CONNECT = 'tracker';
@@ -22,6 +22,8 @@ export interface P2pInfo {
   swarmId: string;
   /** STUN servers, which tell a player the address others can reach it at. */
   stunUrls: string[];
+  /** Whether the player shares until the viewer chooses. */
+  sharingDefault: boolean;
 }
 
 /** What the tracker says about itself. */
@@ -74,6 +76,7 @@ export class P2pService {
         .digest('hex')
         .slice(0, 40),
       stunUrls: p2p.stunUrls,
+      sharingDefault: p2p.sharingDefault,
     };
   }
 
@@ -84,6 +87,12 @@ export class P2pService {
   trackerOrigin(): string | null {
     const p2p = this.config.p2p;
     return p2p ? new URL(p2p.trackerUrl).origin.replace(/^http/, 'ws') : null;
+  }
+
+  /** Whether a token is one this service gave a viewer for the tracker, and still good. */
+  isViewerToken(token: string): boolean {
+    const p2p = this.config.p2p;
+    return p2p !== null && verifyPlaybackToken(token, SUBJECT_CONNECT, p2p.secret).valid;
   }
 
   /** Asks the tracker how it is doing, for the admin panel. */

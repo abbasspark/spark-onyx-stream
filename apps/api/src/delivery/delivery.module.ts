@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 import { Global, Module } from '@nestjs/common';
 import { LiveModule } from '../live/live.module.js';
-import { P2pController } from '../p2p/p2p.controller.js';
+import { P2pController, SharingReportController } from '../p2p/p2p.controller.js';
+import { SharingStatsService } from '../p2p/sharing-stats.service.js';
 import { P2pService } from '../p2p/p2p.service.js';
 import { PlaybackModule } from '../playback/playback.module.js';
 import { DeliveryRouter } from './delivery-router.service.js';
@@ -17,15 +18,21 @@ import { EdgesService } from './edges.service.js';
  */
 @Global()
 @Module({
-  providers: [EdgeRegistry, DeliveryRouter, P2pService],
-  exports: [EdgeRegistry, DeliveryRouter, P2pService],
+  providers: [EdgeRegistry, DeliveryRouter, P2pService, SharingStatsService],
+  exports: [EdgeRegistry, DeliveryRouter, P2pService, SharingStatsService],
 })
 export class DeliveryCoreModule {}
 
 /** Managing edges, and what their agents talk to. Loaded only in the api role. */
 @Module({
   imports: [PlaybackModule, LiveModule],
-  controllers: [EdgesController, EdgeAgentController, PublicDeliveryController, P2pController],
+  controllers: [
+    EdgesController,
+    EdgeAgentController,
+    PublicDeliveryController,
+    P2pController,
+    SharingReportController,
+  ],
   providers: [EdgesService, EdgeAgentGuard],
 })
 export class DeliveryModule {}

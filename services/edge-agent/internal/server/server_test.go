@@ -144,6 +144,10 @@ func TestFetchesAFileOnceAndThenServesTheCopy(t *testing.T) {
 	if fetched := e.origin.fetched("media/" + asset + "/hls/v0/seg1.m4s"); fetched != 1 {
 		t.Errorf("fetched %d times", fetched)
 	}
+	// Sent twice, fetched once: that is what the edge took off the main server.
+	if fetched := e.counters.BytesFetched.Load(); fetched != 10 {
+		t.Errorf("counted %d bytes fetched", fetched)
+	}
 	if e.counters.Hits.Load() != 1 || e.counters.Misses.Load() != 1 || e.counters.BytesSent.Load() != 20 {
 		t.Errorf("counted %d hits, %d misses, %d bytes", e.counters.Hits.Load(), e.counters.Misses.Load(), e.counters.BytesSent.Load())
 	}

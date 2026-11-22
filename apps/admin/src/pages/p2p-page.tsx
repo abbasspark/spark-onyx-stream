@@ -5,6 +5,7 @@ import { useMemo } from 'react';
 import { p2pApi } from '@/api/endpoints';
 import type { TrackerStats } from '@/api/types';
 import { CodeBlock } from '@/components/code-block';
+import { SharingHistory } from '@/components/sharing-history';
 import {
   Badge,
   Card,
@@ -72,6 +73,7 @@ export function P2pPage() {
               </p>
             </div>
           </Card>
+          <SharingHistory />
           <Card>
             <CardHeader title="What to check" />
             <CardContent>
@@ -136,6 +138,8 @@ function Running({ trackerUrl, stats }: { trackerUrl: string; stats: TrackerStat
         />
       </Card>
 
+      <SharingHistory />
+
       <div className="grid grid-cols-[minmax(0,1fr)] gap-4 lg:grid-cols-2">
         <Card>
           <CardHeader
@@ -191,10 +195,11 @@ function Running({ trackerUrl, stats }: { trackerUrl: string; stats: TrackerStat
       </div>
 
       <p className="mt-4 text-xs text-muted-foreground">
-        Viewers can switch sharing off in the settings of the player. A viewer who shares is
-        connected directly to others, who can therefore see that viewer&apos;s network address: say
-        so in your privacy notice. How much of the video viewers get from each other is not counted
-        here yet.
+        Viewers can switch sharing off in the settings of the player, and
+        <span className="font-mono text-[11px] text-foreground"> P2P_VIEWER_DEFAULT=off </span>
+        makes it start switched off for everyone. A viewer who shares is connected directly to
+        others, who can therefore see that viewer&apos;s network address: say so in your privacy
+        notice.
       </p>
     </>
   );

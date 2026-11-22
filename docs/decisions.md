@@ -602,3 +602,15 @@ This replaces the "plain CSS without a component library" part of D-018.
 **Why:** exchanging segments between browsers is a large problem of its own: choosing who to ask, falling back to HTTP in time, checking what arrives. Libraries that do it exist, are in use and are open, and they find peers through WebTorrent trackers. Speaking that protocol gives us the choice among them and nothing to invent in the player. The tracker itself is small, and writing it ourselves lets it check our tokens, keep to our limits and report its figures to the panel, which a public tracker would not. Naming a swarm with a secret answers the question a tracker cannot: whether a viewer may have this video. A viewer who is not let watch never learns the name, and without it there is no swarm to join.
 
 **Consequence:** one external dependency in the tracker, for WebSocket. A viewer who is let watch could hand the name of a swarm to someone else, who would still need a token for the tracker and, for encrypted videos, the key. The tracker keeps everything in memory: a restart empties it, and players announce themselves again within two minutes. One tracker process serves an installation until several are built.
+
+## D-047 What was saved is counted where it happens
+
+**Date:** 2026-11-22
+
+- **An edge counts what it delivered and what it fetched.** The difference is what it took off the main server.
+- **A player counts what it took from servers and from other viewers,** and reports it to the site.
+- **There is no single figure for everything,** and none is made up from the two.
+
+**Why:** only the edge knows what it served from its copies, and only the player knows which part came from another viewer. Counting anywhere else would mean guessing. The two figures answer different questions for different groups of viewers: the edges' covers everyone who was sent to an edge, the players' covers those who can share. Adding them into one percentage would look precise and be wrong.
+
+**Consequence:** the viewers' figure rests on what players say, so it can be skewed by someone who wants to, and it is kept apart from anything that decides or bills. What the main server sent directly to viewers is not counted yet: its gateway serves files without telling anyone.

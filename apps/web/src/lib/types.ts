@@ -104,6 +104,8 @@ export interface P2pInfo {
   swarmId: string;
   /** STUN servers, which tell a player the address others can reach it at. */
   stunUrls: string[];
+  /** Whether the player shares until the viewer chooses. */
+  sharingDefault: boolean;
 }
 
 /** Signed, short-lived addresses for playing one video. */

@@ -22,6 +22,8 @@ export interface EdgeCounters {
   refused: number;
   /** Fetches from the main server that failed. */
   originErrors: number;
+  /** Bytes fetched from the main server. An agent older than this figure sends none. */
+  bytesFetched: number;
 }
 
 /** What an agent says about itself in a heartbeat. */
@@ -81,6 +83,8 @@ export interface EdgeDelta {
   requests: number;
   hits: number;
   misses: number;
+  /** Bytes the edge fetched from the main server. */
+  fetched: number;
 }
 
 /**
@@ -96,12 +100,19 @@ export function deltaOf(previous: EdgeReport | null, current: EdgeReport): EdgeD
     now.bytesSent < before.bytesSent ||
     now.requests < before.requests;
   return restarted
-    ? { bytes: now.bytesSent, requests: now.requests, hits: now.hits, misses: now.misses }
+    ? {
+        bytes: now.bytesSent,
+        requests: now.requests,
+        hits: now.hits,
+        misses: now.misses,
+        fetched: now.bytesFetched,
+      }
     : {
         bytes: now.bytesSent - before.bytesSent,
         requests: now.requests - before.requests,
         hits: Math.max(0, now.hits - before.hits),
         misses: Math.max(0, now.misses - before.misses),
+        fetched: Math.max(0, now.bytesFetched - before.bytesFetched),
       };
 }
 

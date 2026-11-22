@@ -303,6 +303,11 @@ export const envSchema = z
       .refine((urls) => urls.every((url) => /^stuns?:[A-Za-z0-9.-]+(:\d{1,5})?$/.test(url)), {
         message: 'P2P_STUN_URLS takes addresses of the form stun:host:port, separated by commas',
       }),
+    /**
+     * Whether the players of viewers share until the viewer says otherwise.
+     * With "off", a viewer has to switch sharing on in the player.
+     */
+    P2P_VIEWER_DEFAULT: z.enum(['on', 'off']).default('on'),
     /** Shared with the tracker (its ONYX_TRACKER_SECRET), which lets in only players with a token signed with it. */
     P2P_TRACKER_SECRET: z.string().default(''),
     /** Control API of the ingest server (MediaMTX), as the API and the live processes reach it. */

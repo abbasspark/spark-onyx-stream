@@ -50,12 +50,16 @@ export function describeSharing(figures: SharingFigures, on: boolean): string {
     : `Connected to ${viewers}. ${Math.round(ratio * 100)}% came from them.`;
 }
 
-/** Whether the viewer wants to share. On unless switched off in the player. */
-export function sharingPreference(): boolean {
+/**
+ * Whether the viewer wants to share: what they chose in the player, and
+ * until they did, what the site decided for everyone.
+ */
+export function sharingPreference(siteDefault = true): boolean {
   try {
-    return window.localStorage.getItem(PREFERENCE_KEY) !== 'off';
+    const chosen = window.localStorage.getItem(PREFERENCE_KEY);
+    return chosen === 'on' ? true : chosen === 'off' ? false : siteDefault;
   } catch {
-    return true;
+    return siteDefault;
   }
 }
 
@@ -80,6 +84,37 @@ export function canShare(): boolean {
     navigator as Navigator & { connection?: { saveData?: boolean; type?: string } }
   ).connection;
   return !(connection?.saveData === true || connection?.type === 'cellular');
+}
+
+const REPORT_PATH = '/v1/catalog/delivery/report';
+const REPORT_EVERY_MS = 30_000;
+/** The API takes no more than this per figure in one report. */
+const MAX_BYTES_PER_REPORT = 4 * 1024 ** 3;
+
+/**
+ * What a player tells the site since its last report. Null when nothing moved.
+ */
+export function reportOf(
+  now: SharingFigures,
+  before: SharingFigures,
+  kind: 'video' | 'live',
+  token: string,
+): {
+  token: string;
+  kind: 'video' | 'live';
+  fromServers: number;
+  fromViewers: number;
+  toViewers: number;
+} | null {
+  const since = (pick: (figures: SharingFigures) => number) =>
+    Math.min(MAX_BYTES_PER_REPORT, Math.max(0, Math.round(pick(now) - pick(before))));
+  const fromServers = since((figures) => figures.fromServers);
+  const fromViewers = since((figures) => figures.fromViewers);
+  const toViewers = since((figures) => figures.toViewers);
+  if (token === '' || fromServers + fromViewers + toViewers === 0) {
+    return null;
+  }
+  return { token, kind, fromServers, fromViewers, toViewers };
 }
 
 let Engine: typeof HlsJsP2PEngine | null = null;
@@ -133,7 +168,7 @@ export function createSharing(
       announceTrackers: [info.trackerUrl],
       swarmId: info.swarmId,
       rtcConfig: { iceServers: info.stunUrls.map((urls) => ({ urls })) },
-      isP2PDisabled: !sharingPreference(),
+      isP2PDisabled: !sharingPreference(info.sharingDefault),
       // What plays within these seconds is always fetched from a server, so
       // waiting for another viewer never holds the picture up. A live
       // channel has little ahead of it, so it leaves less to chance.
@@ -175,6 +210,30 @@ export function createSharing(
     changed();
   });
 
+  // The site adds up what its players took from servers and from each other.
+  const token = new URL(info.trackerUrl).searchParams.get('token') ?? '';
+  let reported: SharingFigures = { ...NO_SHARING };
+  const report = () => {
+    const body = reportOf(figures, reported, kind, token);
+    reported = { ...figures };
+    if (body) {
+      // "keepalive" lets the last report of a page that is being left arrive.
+      void fetch(REPORT_PATH, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+        keepalive: true,
+      }).catch(() => undefined);
+    }
+  };
+  const reporting = window.setInterval(report, REPORT_EVERY_MS);
+  const onHide = () => {
+    if (document.visibilityState === 'hidden') {
+      report();
+    }
+  };
+  document.addEventListener('visibilitychange', onHide);
+
   return {
     hlsConfig: engine.getConfigForHlsJs() as Partial<HlsConfig>,
     bind: (hls) => engine.bindHls(hls),
@@ -182,6 +241,9 @@ export function createSharing(
     figures: () => ({ ...figures, peers: peers.size }),
     destroy: () => {
       window.clearTimeout(timer);
+      window.clearInterval(reporting);
+      document.removeEventListener('visibilitychange', onHide);
+      report();
       engine.destroy();
     },
   };

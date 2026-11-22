@@ -8,7 +8,7 @@ The project is built in phases. Each phase ends with something that works end to
 | 2. Catalog and viewer website | Titles, series, metadata import, viewer accounts and profiles, player with resume   | Done                |
 | 3. Billing                    | Plans, payments, entitlements, coupons. First complete VOD service                  | Done, coupons later |
 | 4. Live                       | Ingest, copy and transcode channels, DVR, EPG, channels in the catalog              | Done                |
-| 5. Edges and P2P              | Edge agent, tracker, P2P in the player, offload statistics                          | In progress         |
+| 5. Edges and P2P              | Edge agent, tracker, P2P in the player, offload statistics                          | Done                |
 | 6. Operations                 | Installer, updates with rollback, backup and restore, diagnostics                   | Starts in phase 1   |
 | 7. Apps                       | Android mobile and Android TV                                                       | Planned             |
 | 8. Advanced                   | DRM, ads, analytics dashboards, further apps                                        | Planned             |
@@ -45,6 +45,6 @@ See [phase-4-live.md](phase-4-live.md) for the design.
 2. Edges in daily use: players that move to another server by themselves when theirs goes away, emptying the copies of an edge from the panel, and the history of what each edge delivered. **Done.** Routing by country and filling an edge ahead of a premiere are left for later: the first needs a source for the country of a viewer.
 3. The tracker: the service viewers find each other through, tokens for it from the main server, and the P2P page in the panel. **Done.**
 4. P2P in the player: viewers of the same video or channel exchange segments, with HTTP as the fallback. **Done.**
-5. Offload statistics: how much edges and viewers took off the main server.
+5. Offload statistics: how much edges and viewers took off the main server. **Done.**
 
 See [phase-5-edges.md](phase-5-edges.md) for the design.

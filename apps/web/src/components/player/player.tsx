@@ -165,7 +165,8 @@ export function Player({
   const sharingRef = useRef<Sharing | null>(null);
   const [sharingOn, setSharingOn] = useState(true);
   const [shared, setShared] = useState<SharingFigures>(NO_SHARING);
-  useEffect(() => setSharingOn(sharingPreference()), []);
+  const sharingDefault = playback.p2p?.sharingDefault ?? true;
+  useEffect(() => setSharingOn(sharingPreference(sharingDefault)), [sharingDefault]);
   const chooseSharing = useCallback((value: number) => {
     const on = value === 1;
     setSharingPreference(on);
@@ -383,6 +384,9 @@ export function Player({
     };
     const handlers: [string, () => void][] = [
       ['timeupdate', onTimeUpdate],
+      // A jump counts from the moment it is asked for: if the video cannot be
+      // loaded there, another server goes on from the new place and not the old.
+      ['seeking', onTimeUpdate],
       ['progress', onProgress],
       [
         'durationchange',
