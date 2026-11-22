@@ -31,6 +31,10 @@ x-app: &app
     P2P_TRACKER_SECRET: ${P2P_TRACKER_SECRET:-}
     P2P_STUN_URLS: ${P2P_STUN_URLS:-stun:stun.l.google.com:19302,stun:global.stun.twilio.com:3478}
     P2P_VIEWER_DEFAULT: ${P2P_VIEWER_DEFAULT:-on}
+    P2P_TURN_URLS: ${P2P_TURN_URLS:-}
+    P2P_TURN_SECRET: ${P2P_TURN_SECRET:-}
+    # Where the API reads what the gateway sent to viewers itself.
+    GATEWAY_INTERNAL_URL: http://gateway:8080
     INGEST_PUBLIC_RTMP_URL: ${INGEST_PUBLIC_RTMP_URL:-}
     INGEST_PUBLIC_SRT_URL: ${INGEST_PUBLIC_SRT_URL:-}
     GUIDE_REFRESH_HOURS: ${GUIDE_REFRESH_HOURS:-6}
@@ -105,6 +109,8 @@ services:
     volumes:
       - storage:/var/lib/onyx/storage
       - uploads:/var/lib/onyx/uploads
+      # Read by the API for edge servers, which fetch live channels through it.
+      - live:/var/lib/onyx/live:ro
     depends_on:
       migrate:
         condition: service_completed_successfully
@@ -150,6 +156,8 @@ services:
       LIVE_TRANSCODE_PRESET: ${LIVE_TRANSCODE_PRESET:-veryfast}
     volumes:
       - live:/var/lib/onyx/live
+      # A finished recording is written into the library from here.
+      - storage:/var/lib/onyx/storage
     depends_on:
       migrate:
         condition: service_completed_successfully

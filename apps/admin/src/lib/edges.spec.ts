@@ -1,6 +1,12 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 import { describe, expect, it } from 'vitest';
-import type { EdgeSample, EdgeServer, EdgeTraffic, SharingTraffic } from '@/api/types';
+import type {
+  DeliveryOverview,
+  EdgeSample,
+  EdgeServer,
+  EdgeTraffic,
+  SharingTraffic,
+} from '@/api/types';
 import {
   agentDockerCommand,
   answerRatio,
@@ -16,6 +22,7 @@ import {
   MAX_CHART_SERIES,
   niceCeiling,
   offloadOf,
+  overviewChartOf,
   sharingChartOf,
   publicUrlProblem,
   summarize,
@@ -359,5 +366,55 @@ describe('what edges and viewers took off the main server', () => {
     });
     expect(sharingChartOf(traffic, 'live', now).ratio).toBeCloseTo(1100 / 1400, 5);
     expect(sharingChartOf({ ...traffic, video: [], live: [] }, 'all', now).ratio).toBeNull();
+  });
+});
+
+describe('who delivered what', () => {
+  const HOUR = 3_600_000;
+  const now = new Date(2026, 10, 22, 14, 30).getTime();
+  const thisHour = new Date(2026, 10, 22, 14).getTime();
+  const seconds = (at: number) => Math.round(at / 1000);
+  const data: DeliveryOverview = {
+    range: '24h',
+    from: new Date(thisHour - 23 * HOUR).toISOString(),
+    hours: 24,
+    gatewayCounted: true,
+    points: [
+      // direct, by edges, fetched by edges, between viewers
+      [seconds(thisHour - HOUR), 1000, 8000, 2000, 1000],
+      [seconds(thisHour), 0, 500, 900, 0],
+    ],
+  };
+
+  it('counts what an edge fetched for the main server, and the rest for the edge', () => {
+    const chart = overviewChartOf(data, now);
+    expect(chart.buckets.at(-2)).toMatchObject({
+      fromMain: 3000,
+      fromEdges: 6000,
+      fromViewers: 1000,
+      bytes: 10_000,
+      parts: [3000, 6000, 1000],
+    });
+    // An edge that was filling up delivered nothing of its own in that hour.
+    expect(chart.buckets.at(-1)).toMatchObject({ fromMain: 500, fromEdges: 0, bytes: 500 });
+    expect(chart).toMatchObject({
+      bytes: 10_500,
+      fromMain: 3500,
+      fromEdges: 6000,
+      fromViewers: 1000,
+    });
+    expect(chart.offload).toBeCloseTo(7000 / 10_500, 5);
+    expect(chart.series.map((series) => series.name)).toEqual([
+      'Main server',
+      'Edges, from their copies',
+      'Other viewers',
+    ]);
+  });
+
+  it('has no figure before anything was delivered', () => {
+    expect(overviewChartOf({ ...data, points: [] }, now)).toMatchObject({
+      bytes: 0,
+      offload: null,
+    });
   });
 });

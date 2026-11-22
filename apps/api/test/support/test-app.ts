@@ -312,6 +312,7 @@ export async function createTestApp(
       await prisma.recording.deleteMany();
       await prisma.edgeServer.deleteMany();
       await prisma.sharingHour.deleteMany();
+      await prisma.originTrafficHour.deleteMany();
       await prisma.channel.deleteMany();
       await prisma.guideSource.deleteMany();
       // Catalog rows point to assets, pictures and pools, so they go first.

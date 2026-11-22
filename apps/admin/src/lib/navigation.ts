@@ -12,6 +12,7 @@ import {
   type LucideIcon,
   CalendarClock,
   Disc,
+  Gauge,
   Network,
   Share2,
   Mail,
@@ -131,6 +132,13 @@ export const NAVIGATION: NavGroup[] = [
   {
     label: 'Delivery',
     items: [
+      {
+        to: '/delivery',
+        label: 'Overview',
+        icon: Gauge,
+        permission: 'delivery:read',
+        keywords: 'delivery offload bandwidth traffic saved main server edges viewers statistics',
+      },
       {
         to: '/edges',
         label: 'Edge servers',

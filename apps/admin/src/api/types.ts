@@ -1304,3 +1304,20 @@ export interface SharingTraffic {
   video: SharingPoint[];
   live: SharingPoint[];
 }
+
+/**
+ * One hour of delivery, in bytes: [start in seconds, sent by the gateway to
+ * viewers, delivered by edges, fetched by edges from the main server, passed
+ * between viewers].
+ */
+export type OverviewPoint = [number, number, number, number, number];
+
+/** Who delivered what: the main server, the edges, the viewers. */
+export interface DeliveryOverview {
+  range: TrafficRange;
+  from: string;
+  hours: number;
+  /** Whether what the gateway itself sends is counted. Without it there is no overall figure. */
+  gatewayCounted: boolean;
+  points: OverviewPoint[];
+}

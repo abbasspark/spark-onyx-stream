@@ -102,8 +102,11 @@ export interface P2pInfo {
   trackerUrl: string;
   /** Names the group of viewers who watch the same files. */
   swarmId: string;
-  /** STUN servers, which tell a player the address others can reach it at. */
-  stunUrls: string[];
+  /**
+   * Servers that help two players connect, in the form the browser takes
+   * them: STUN servers, and TURN servers with a name and a password.
+   */
+  iceServers: { urls: string[]; username?: string; credential?: string }[];
   /** Whether the player shares until the viewer chooses. */
   sharingDefault: boolean;
 }

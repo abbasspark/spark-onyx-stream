@@ -5,6 +5,7 @@
 // A small HTTP server stands in for the tracker.
 //
 // Skipped unless TEST_DATABASE_URL is set.
+import { createHmac } from 'node:crypto';
 import { createServer, type Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { AdminsModule } from '../src/admins/admins.module.js';
@@ -55,7 +56,11 @@ describe.skipIf(!TEST_DATABASE_URL)('P2P between viewers (e2e)', () => {
   const watch = async (slug: string) =>
     (await http().post(`/v1/catalog/channels/${slug}/playback`).expect(200)).body as {
       url: string;
-      p2p: { trackerUrl: string; swarmId: string; stunUrls: string[] } | null;
+      p2p: {
+        trackerUrl: string;
+        swarmId: string;
+        iceServers: { urls: string[]; username?: string; credential?: string }[];
+      } | null;
     };
 
   beforeAll(async () => {
@@ -125,8 +130,11 @@ describe.skipIf(!TEST_DATABASE_URL)('P2P between viewers (e2e)', () => {
 
       // Everyone who watches the same channel is in the same swarm.
       expect(first.p2p?.swarmId).toMatch(/^[0-9a-f]{40}$/);
+      // Help for connecting: public STUN servers unless told otherwise, and no relay.
       expect(first.p2p).toMatchObject({
-        stunUrls: ['stun:stun.l.google.com:19302', 'stun:global.stun.twilio.com:3478'],
+        iceServers: [
+          { urls: ['stun:stun.l.google.com:19302', 'stun:global.stun.twilio.com:3478'] },
+        ],
       });
       // And the website learns where its pages have to be allowed to connect to.
       expect((await http().get('/v1/catalog/delivery').expect(200)).body.tracker).toBe(
@@ -233,9 +241,27 @@ describe.skipIf(!TEST_DATABASE_URL)('P2P between viewers (e2e)', () => {
         P2P_TRACKER_INTERNAL_URL: 'http://127.0.0.1:1',
         P2P_TRACKER_SECRET: SECRET,
         P2P_VIEWER_DEFAULT: 'off',
+        P2P_STUN_URLS: '',
+        P2P_TURN_URLS: 'turn:turn.example.com:3478, turns:turn.example.com:5349?transport=tcp',
+        P2P_TURN_SECRET: 'the-secret-of-the-turn-server',
       }),
     );
     afterAll(() => testApp.close());
+
+    it('gives players a relay with a password that runs out with the video', async () => {
+      const channel = await channelOnAir('Sport 1');
+      const playback = await watch(channel.slug);
+      const expiry = playback.url.split('/')[4]?.split('.')[0] as string;
+      expect(playback.p2p?.iceServers).toEqual([
+        {
+          urls: ['turn:turn.example.com:3478', 'turns:turn.example.com:5349?transport=tcp'],
+          username: expiry,
+          credential: createHmac('sha1', 'the-secret-of-the-turn-server')
+            .update(expiry)
+            .digest('base64'),
+        },
+      ]);
+    });
 
     it('still lets viewers watch, and tells the panel', async () => {
       const channel = await channelOnAir('News 24');
