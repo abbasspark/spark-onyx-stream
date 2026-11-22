@@ -2,7 +2,7 @@
 import { type NextRequest, NextResponse } from 'next/server';
 import { siteConfig } from '@/lib/config';
 import { buildCsp, mediaOrigins } from '@/lib/csp';
-import { knownEdgeOrigins, MEDIA_ORIGINS_HEADER } from '@/lib/delivery';
+import { knownDelivery, MEDIA_ORIGINS_HEADER } from '@/lib/delivery';
 
 /**
  * Runs before every request the website answers.
@@ -11,8 +11,9 @@ import { knownEdgeOrigins, MEDIA_ORIGINS_HEADER } from '@/lib/delivery';
  * them there itself and they never get here. Without a gateway, as in
  * development, this makes the browser talk to one origin either way.
  *
- * Video may come from edge servers, which are added in the admin panel. The
- * API tells which, and the policy of every page allows them.
+ * Video may come from edge servers, which are added in the admin panel, and
+ * players find each other through the tracker. The API tells where those
+ * are, and the policy of every page allows them.
  *
  * Pages get a content security policy with a nonce that is new for each
  * response. Next.js reads the policy from the request and puts the nonce on
@@ -36,12 +37,13 @@ export async function proxy(request: NextRequest): Promise<NextResponse> {
   }
 
   const nonce = Buffer.from(crypto.randomUUID()).toString('base64');
-  const edgeOrigins = await knownEdgeOrigins();
+  const { origins: edgeOrigins, tracker } = await knownDelivery();
   const policy = buildCsp({
     nonce,
     development: process.env.NODE_ENV === 'development',
     mediaOrigin: process.env.WEB_MEDIA_ORIGIN,
     edgeOrigins,
+    trackerOrigin: tracker,
   });
 
   const headers = new Headers(request.headers);

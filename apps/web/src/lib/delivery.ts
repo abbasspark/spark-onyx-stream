@@ -10,19 +10,25 @@ export const MEDIA_ORIGINS_META = 'onyx-media-origins';
 const FRESH_FOR_MS = 10_000;
 const TIMEOUT_MS = 2000;
 
-let known: { origins: string[]; at: number } = { origins: [], at: 0 };
+let known: { origins: string[]; tracker: string | null; at: number } = {
+  origins: [],
+  tracker: null,
+  at: 0,
+};
 let asking: Promise<void> | null = null;
 
 /**
- * Addresses of the edge servers, as the API tells them.
+ * Addresses of the edge servers and of the tracker, as the API tells them.
  *
  * Asked at most every few seconds, however many pages are served. When the
  * API cannot be reached, the last answer stays in use: a page must never fail
  * because of this.
  */
-export async function knownEdgeOrigins(now: number = Date.now()): Promise<string[]> {
+export async function knownDelivery(
+  now: number = Date.now(),
+): Promise<{ origins: string[]; tracker: string | null }> {
   if (now - known.at < FRESH_FOR_MS) {
-    return known.origins;
+    return known;
   }
   asking ??= refresh(now).finally(() => {
     asking = null;
@@ -32,7 +38,7 @@ export async function knownEdgeOrigins(now: number = Date.now()): Promise<string
   if (known.at === 0) {
     await asking;
   }
-  return known.origins;
+  return known;
 }
 
 async function refresh(now: number): Promise<void> {
@@ -44,14 +50,14 @@ async function refresh(now: number): Promise<void> {
     if (!response.ok) {
       throw new Error(`The API answered ${response.status}`);
     }
-    const body = (await response.json()) as { origins?: unknown };
+    const body = (await response.json()) as { origins?: unknown; tracker?: unknown };
     const origins = Array.isArray(body.origins)
       ? body.origins.filter((origin): origin is string => typeof origin === 'string')
       : [];
-    known = { origins, at: now };
+    known = { origins, tracker: typeof body.tracker === 'string' ? body.tracker : null, at: now };
   } catch {
     // Try again soon, with what was known before.
-    known = { origins: known.origins, at: now - FRESH_FOR_MS + 3000 };
+    known = { ...known, at: now - FRESH_FOR_MS + 3000 };
   }
 }
 

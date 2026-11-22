@@ -20,6 +20,7 @@ import { CurrentPrincipal, Public, RequirePermissions } from '../auth/auth.decor
 import type { Principal } from '../auth/principal.js';
 import { requestInfo } from '../auth/request-info.js';
 import { ZodValidationPipe } from '../common/zod-validation.pipe.js';
+import { P2pService } from '../p2p/p2p.service.js';
 import {
   type CreateEdgeInput,
   createEdgeSchema,
@@ -153,15 +154,18 @@ export class EdgesController {
 
 /**
  * What the viewer website needs to know about delivery: the addresses video
- * may come from, which its content policy has to allow.
+ * may come from and that of the tracker, which its content policy has to allow.
  */
 @Public()
 @Controller('catalog/delivery')
 export class PublicDeliveryController {
-  constructor(@Inject(EdgesService) private readonly edges: EdgesService) {}
+  constructor(
+    @Inject(EdgesService) private readonly edges: EdgesService,
+    @Inject(P2pService) private readonly p2p: P2pService,
+  ) {}
 
   @Get()
-  async get(): Promise<{ origins: string[] }> {
-    return { origins: await this.edges.origins() };
+  async get(): Promise<{ origins: string[]; tracker: string | null }> {
+    return { origins: await this.edges.origins(), tracker: this.p2p.trackerOrigin() };
   }
 }

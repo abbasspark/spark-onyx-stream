@@ -286,6 +286,23 @@ export const envSchema = z
       .refine((value) => /^https?:\/\/[^/]+$/.test(value), {
         message: 'P2P_TRACKER_INTERNAL_URL must be an address of the form http://host:port',
       }),
+    /**
+     * STUN servers players ask for their own public address, which two viewers
+     * behind home routers need to reach each other. Separated by commas. Empty
+     * uses none, and then only viewers in the same network connect.
+     */
+    P2P_STUN_URLS: z
+      .string()
+      .default('stun:stun.l.google.com:19302,stun:global.stun.twilio.com:3478')
+      .transform((value) =>
+        value
+          .split(',')
+          .map((url) => url.trim())
+          .filter((url) => url !== ''),
+      )
+      .refine((urls) => urls.every((url) => /^stuns?:[A-Za-z0-9.-]+(:\d{1,5})?$/.test(url)), {
+        message: 'P2P_STUN_URLS takes addresses of the form stun:host:port, separated by commas',
+      }),
     /** Shared with the tracker (its ONYX_TRACKER_SECRET), which lets in only players with a token signed with it. */
     P2P_TRACKER_SECRET: z.string().default(''),
     /** Control API of the ingest server (MediaMTX), as the API and the live processes reach it. */

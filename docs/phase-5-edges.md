@@ -134,13 +134,13 @@ The website's content policy must allow every address video comes from. It asks 
 
 ## P2P between viewers: the tracker
 
-Viewers who watch the same video or channel can pass parts of it to each other over direct connections (WebRTC). They find each other through the tracker, a small program that runs beside the main server. This step builds the tracker and what the main server tells players about it. The player of the website starts using it with the next step.
+Viewers who watch the same video or channel can pass parts of it to each other over direct connections (WebRTC). They find each other through the tracker, a small program that runs beside the main server. The main server tells players where it is and lets them in.
 
 - **What the tracker does:** a player connects, says which swarm it is in, and sends offers for direct connections along. The tracker hands each offer to another player of the same swarm and carries the answer back. After that the two talk to each other. No video passes through the tracker.
 - **A swarm** is the group of viewers who watch the same files: one per processing of a video, one per live channel. Its name is made by the main server from a secret, so it cannot be worked out from the video. Only a viewer who is let watch learns it, which keeps others out of the swarm.
 - **Who is let in:** the main server gives every viewer it lets watch a token for the tracker, valid as long as the address of the video. The tracker refuses connections without one. It can also be limited to pages of your website (`ONYX_TRACKER_ALLOWED_ORIGINS`).
 - **Admins get neither:** a preview in the panel shares nothing.
-- **The protocol** is that of WebTorrent trackers over WebSocket, which the P2P library planned for the player speaks.
+- **The protocol** is that of WebTorrent trackers over WebSocket, which the P2P library in the player speaks.
 - **Limits per connection:** ten offers per announce, eight swarms, thirty messages at once and two a second after that. A connection that floods or sends what makes no sense is closed.
 - **When the tracker is away,** viewers notice nothing: players get everything from the servers.
 
@@ -158,6 +158,32 @@ Both sides need the same secret of 32 characters or more.
 With Compose, `init-env.sh` makes the secret and the tracker runs as a service of its own. The gateway passes `/tracker` on to it. Set `P2P_TRACKER_URL` in `.env` to switch P2P on. The other settings of the tracker are in [services/tracker](../services/tracker/README.md).
 
 **Delivery → P2P** in the panel shows whether the tracker runs, how many viewers are connected, how many swarms there are and how large the largest are, and how many of the offers passed on were answered. Switched off, it shows the settings for both sides with a fresh secret.
+
+## P2P in the player
+
+When P2P is switched on, the players of the website share what they play.
+
+- **What is shared:** the segments of films, episodes and live channels. Playlists and content keys always come from a server.
+- **Every part can come from a server.** What plays within the next seconds (15 for a film, 8 for a channel) is fetched over HTTP without waiting for anyone. Parts further ahead are asked of other viewers first. A viewer alone in a swarm plays exactly as without P2P.
+- **Who shares with whom:** viewers of the same processing of a video in the same quality, and viewers of the same channel. It does not matter which server each of them was sent to: an edge, another edge or the main server.
+- **The viewer decides.** The settings of the player have "Share with viewers", on by default, with a line that says how many others the player is connected to and how much came from them. The choice is kept in the browser. Switched off, the player neither takes from nor gives to others.
+- **Not on mobile data:** a browser that reports a mobile network, or that the viewer asked to save data, does not share.
+- **Where it does not work:** iPhones, where the browser plays HLS by itself, and previews in the panel. There, everything comes from the servers.
+- **The code for sharing is loaded only when a video that can be shared is about to play.** If it cannot be loaded, the video plays without it.
+
+In a test with three viewers in three browsers on one machine, the three got 48 to 80 percent of a film from each other, and two of three got over 60 percent of a live channel from the others.
+
+### What to know before switching it on
+
+- **Viewers see each other's network addresses.** A direct connection cannot be had without. Tell your viewers in your privacy notice, and decide whether the default suits your audience.
+- **STUN servers:** players ask a STUN server for the address others can reach them at. The default is two public ones, of Google and Twilio, which then learn the addresses of your viewers. Set `P2P_STUN_URLS` to your own, or to nothing, with which only viewers in the same network connect.
+- **No relay:** two viewers who are both behind strict routers cannot connect directly, and there is no TURN server to pass their data on. Those viewers get everything from the servers.
+- **What comes from another viewer is not checked against the original.** A viewer who went to the trouble could send wrong data to others, whose players would show a broken picture or an error until they fetch from a server again. Encrypted videos cannot be read by someone who has no key, but they are not protected against this either.
+- **Sharing uses the viewer's upload** and memory: up to 512 MB of a film and 256 MB of a channel are kept to give to others.
+
+| Setting         | Default                 | Meaning                                       |
+| --------------- | ----------------------- | --------------------------------------------- |
+| `P2P_STUN_URLS` | two public STUN servers | STUN servers for players, separated by commas |
 
 ## API
 
@@ -188,5 +214,7 @@ With Compose, `init-env.sh` makes the secret and the tracker runs as a service o
 - Edges that fetch from other edges, and edges for pictures
 - Sending the first bytes of a new file to the viewer while it is still being fetched
 - Updating agents from the panel
-- P2P in the player, and how much viewers took off the servers, which are the next steps of this phase
+- How much viewers took off the servers, which is the next step of this phase
+- A TURN server for viewers who cannot connect directly, checking what comes from other viewers, and a default for sharing that the operator sets
+- P2P in apps, and on iPhones
 - Several trackers behind one address, and names of videos and channels beside the swarms in the panel

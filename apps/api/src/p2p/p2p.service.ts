@@ -20,6 +20,8 @@ export interface P2pInfo {
    * out without being let watch, so it also keeps others out of the group.
    */
   swarmId: string;
+  /** STUN servers, which tell a player the address others can reach it at. */
+  stunUrls: string[];
 }
 
 /** What the tracker says about itself. */
@@ -71,7 +73,17 @@ export class P2pService {
         .update(`swarm:${content}`)
         .digest('hex')
         .slice(0, 40),
+      stunUrls: p2p.stunUrls,
     };
+  }
+
+  /**
+   * Scheme, host and port of the tracker, which pages of the website have to
+   * be allowed to connect to. Null when P2P is off.
+   */
+  trackerOrigin(): string | null {
+    const p2p = this.config.p2p;
+    return p2p ? new URL(p2p.trackerUrl).origin.replace(/^http/, 'ws') : null;
   }
 
   /** Asks the tracker how it is doing, for the admin panel. */

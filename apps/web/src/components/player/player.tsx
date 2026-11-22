@@ -2,6 +2,16 @@
 'use client';
 
 import { ensureMediaAllowed, FAILED_LOADS_BEFORE_MOVING } from '@/lib/delivery';
+import {
+  canShare,
+  createSharing,
+  describeSharing,
+  NO_SHARING,
+  setSharingPreference,
+  type Sharing,
+  type SharingFigures,
+  sharingPreference,
+} from '@/lib/p2p';
 import Hls from 'hls.js';
 import {
   ArrowLeft,
@@ -151,6 +161,18 @@ export function Player({
   const [buffered, setBuffered] = useState(0);
   const [volume, setVolume] = useState(1);
   const [muted, setMuted] = useState(false);
+  // Sharing with other viewers: the viewer's choice, and how it goes.
+  const sharingRef = useRef<Sharing | null>(null);
+  const [sharingOn, setSharingOn] = useState(true);
+  const [shared, setShared] = useState<SharingFigures>(NO_SHARING);
+  useEffect(() => setSharingOn(sharingPreference()), []);
+  const chooseSharing = useCallback((value: number) => {
+    const on = value === 1;
+    setSharingPreference(on);
+    setSharingOn(on);
+    sharingRef.current?.setOn(on);
+  }, []);
+  const canShareThis = playback.p2p !== null && playback.p2p !== undefined && canShare();
   const [rate, setRate] = useState(1);
   const [qualities, setQualities] = useState<Quality[]>([]);
   const [quality, setQuality] = useState(NONE);
@@ -191,11 +213,17 @@ export function Player({
     };
 
     if (Hls.isSupported()) {
+      // Parts of the video may come from other viewers. Null where they cannot.
+      const sharing = createSharing(playback.p2p, 'video', setShared);
+      sharingRef.current = sharing;
+      setShared(NO_SHARING);
       const hls = new Hls({
         startPosition: startAt > 0 ? startAt : -1,
         // No point in loading 1080p into a small window.
         capLevelToPlayerSize: true,
+        ...sharing?.hlsConfig,
       });
+      sharing?.bind(hls);
       hlsRef.current = hls;
       let recovered = false;
 
@@ -261,7 +289,9 @@ export function Player({
 
       return () => {
         hlsRef.current = null;
+        sharingRef.current = null;
         hls.destroy();
+        sharing?.destroy();
       };
     }
 
@@ -601,8 +631,24 @@ export function Player({
           label: speed === 1 ? 'Normal' : `${speed}×`,
         })),
       },
+      {
+        name: 'Share with viewers',
+        selected: sharingOn ? 1 : 0,
+        onChoose: chooseSharing,
+        choices: canShareThis
+          ? [
+              { value: 1, label: 'On' },
+              { value: 0, label: 'Off' },
+            ]
+          : [],
+        note: describeSharing(shared, sharingOn),
+      },
     ],
     [
+      sharingOn,
+      shared,
+      canShareThis,
+      chooseSharing,
       quality,
       qualities,
       playingHeight,
