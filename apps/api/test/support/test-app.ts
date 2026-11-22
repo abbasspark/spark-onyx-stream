@@ -257,6 +257,7 @@ export async function createTestApp(
       queue.clear();
       await prisma.auditLog.deleteMany();
       await prisma.payment.deleteMany();
+      await prisma.recording.deleteMany();
       await prisma.channel.deleteMany();
       await prisma.guideSource.deleteMany();
       // Catalog rows point to assets, pictures and pools, so they go first.

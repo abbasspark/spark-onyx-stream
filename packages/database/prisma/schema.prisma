@@ -28,16 +28,17 @@ enum AdminRole {
 }
 
 model AdminUser {
-  id           String    @id @default(uuid(7)) @db.Uuid
-  email        String    @unique
+  recordings   Recording[]
+  id           String      @id @default(uuid(7)) @db.Uuid
+  email        String      @unique
   passwordHash String
   displayName  String
-  role         AdminRole @default(EDITOR)
+  role         AdminRole   @default(EDITOR)
   totpSecret   String?
-  isActive     Boolean   @default(true)
+  isActive     Boolean     @default(true)
   lastLoginAt  DateTime?
-  createdAt    DateTime  @default(now())
-  updatedAt    DateTime  @updatedAt
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
 
   sessions             AdminSession[]
   apiKeys              ApiKey[]
@@ -236,9 +237,11 @@ enum EncryptionMode {
 }
 
 model Asset {
-  id     String      @id @default(uuid(7)) @db.Uuid
-  title  String
-  status AssetStatus @default(UPLOADING)
+  /// The recording this asset was made from, if any.
+  recording Recording?
+  id        String      @id @default(uuid(7)) @db.Uuid
+  title     String
+  status    AssetStatus @default(UPLOADING)
 
   storagePoolId String      @db.Uuid
   storagePool   StoragePool @relation(fields: [storagePoolId], references: [id])
@@ -1124,6 +1127,8 @@ model Channel {
   /// Minutes viewers can go back in time on the channel. 0 means only the present.
   dvrMinutes Int @default(0)
 
+  recordings Recording[]
+
   /// The id of this channel in guide sources (XMLTV), to file imported programmes under it.
   guideId    String?
   programmes Programme[]
@@ -1225,4 +1230,55 @@ model Programme {
   @@index([channelId, endsAt])
   @@index([sourceId])
   @@map("programmes")
+}
+
+// ── Recordings ───────────────────────────────────────────────────────
+
+enum RecordingStatus {
+  /// Waiting for its start.
+  SCHEDULED
+  /// A live process is writing it.
+  RECORDING
+  /// Recorded. The file is being put into the library.
+  FINISHING
+  /// In the library as an asset.
+  DONE
+  FAILED
+  /// Called off before it started.
+  CANCELLED
+}
+
+/// A stretch of a live channel kept as a file, which becomes an asset in the library.
+model Recording {
+  id    String @id @default(uuid(7)) @db.Uuid
+  title String
+
+  /// The channel it is recorded from. Null once that channel is deleted.
+  channelId   String?  @db.Uuid
+  channel     Channel? @relation(fields: [channelId], references: [id], onDelete: SetNull)
+  /// The name of the channel when the recording was made, kept for the list.
+  channelName String
+
+  startsAt DateTime
+  endsAt   DateTime
+
+  status          RecordingStatus @default(SCHEDULED)
+  statusMessage   String?
+  /// How much was really recorded, which is less when the channel was off air for a while.
+  recordedSeconds Int?
+  bytes           BigInt?
+
+  /// What the recording became in the library.
+  assetId String? @unique @db.Uuid
+  asset   Asset?  @relation(fields: [assetId], references: [id], onDelete: SetNull)
+
+  createdById String?    @db.Uuid
+  createdBy   AdminUser? @relation(fields: [createdById], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([status, startsAt])
+  @@index([channelId])
+  @@map("recordings")
 }

@@ -18,6 +18,7 @@ type LiveEvent =
     }
   | { type: 'job-progress'; jobId: string; progress: number }
   | { type: 'asset'; assetId: string; change: 'created' | 'updated' | 'uploaded' | 'deleted' }
+  | { type: 'recording'; recordingId: string }
   | { type: 'channel'; channelId: string; change: 'created' | 'updated' | 'deleted' | 'status' };
 
 export type LiveState = 'connecting' | 'live' | 'offline';
@@ -97,6 +98,10 @@ export function LiveProvider({ children }: { children: ReactNode }) {
           // A job that starts or ends usually changes its asset as well.
           refresh(['assets'], ['asset', event.assetId], ['asset-media', event.assetId]);
         }
+        return;
+      }
+      if (event.type === 'recording') {
+        refresh(['recordings']);
         return;
       }
       if (event.type === 'channel') {

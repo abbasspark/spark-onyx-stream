@@ -152,6 +152,30 @@ A channel can keep what it sent for a while, so viewers can pause, rewind and st
 
 On the website the player of such a channel has a bar for the kept time, shows how far behind the present the viewer is, and takes the left and right arrow keys for ten seconds back and forth. The preview in the panel can be scrubbed the same way.
 
+## Recording
+
+A stretch of a channel can be kept as a video in the library: a programme of the guide, or any time range on a channel.
+
+- **What a recording is:** a channel, a title, a start and an end. It waits until its start, records while the channel is on air, and ends as an asset in the library, which is processed like an upload and can be attached to a title.
+- **No second encode:** the recording is cut from the files the channel already makes for viewers. On a channel with several qualities the best one is recorded, and processing makes the other qualities of the video from it.
+- **A start in the past** works as far back as the channel keeps (see going back in time), at most four hours. On a channel that keeps nothing, recording starts from the present.
+- **Interruptions:** when the source drops, the recording waits and goes on when the channel is back. The pieces are joined, so the video is shorter than planned by what was missed. If the channel was not on air at all, the recording fails two minutes after its end and says so.
+- **Limits:** eight hours per recording. The same title at the same time on the same channel is planned once.
+- **Stopping** a running recording keeps what was recorded. Calling a planned one off makes nothing. Removing a recording from the list leaves its video in the library, and deleting a channel keeps its recordings.
+- **Changes to the guide do not move a planned recording.** It keeps the times the programme had when it was planned.
+- **Disk space:** while it runs and is joined, a recording lies under `LIVE_PATH/recordings` and can take up to twice its size there. Then it is written to the default storage pool and removed.
+- **Who records:** the live process that runs the channel. A lock makes sure one process holds a recording, and after a restart of that process the recording goes on with the pieces it already has.
+
+| Method and path                  | Permission   | Purpose                                              |
+| -------------------------------- | ------------ | ---------------------------------------------------- |
+| `GET /v1/recordings`             | `live:read`  | Recordings, all, open or finished                    |
+| `POST /v1/recordings`            | `live:write` | Plan a recording by channel and time                 |
+| `POST /v1/programmes/:id/record` | `live:write` | Record a programme of the guide                      |
+| `POST /v1/recordings/:id/stop`   | `live:write` | Call a planned one off, or stop a running one        |
+| `DELETE /v1/recordings/:id`      | `live:write` | Remove from the list. The video in the library stays |
+
+In the panel, **Live → Recordings** lists them with their state and a link to the video, and the guide has a record button beside every programme that is not over.
+
 ## The programme guide
 
 The guide says what each channel shows and when. Viewers meet it in three places: "now" and "next" in the lineup, the name of the running programme in the player, and the guide of the day as a timetable.
@@ -268,7 +292,8 @@ With several servers, the live processes and the gateway need the same `LIVE_PAT
 
 - Encoding on graphics cards, and qualities with bitrates of your own
 - Pushing from a browser (WebRTC), and RTMPS
-- Recording programmes into the library, and keeping what was sent across restarts of a stream
+- Keeping what was sent across restarts of a stream
+- Recording every episode of a series, recordings by viewers, and attaching a recording to a title in one step
 - Pictures and age ratings of programmes, reminders, and uploading a guide file instead of an address
 - Channels on the home page and in search, and how many people are watching
 - Audio-only channels, several audio languages and subtitles

@@ -33,6 +33,11 @@ export type LiveEvent =
       change: 'created' | 'updated' | 'uploaded' | 'deleted';
     }
   | {
+      /** A recording was planned, started, finished or removed. */
+      type: 'recording';
+      recordingId: string;
+    }
+  | {
       type: 'channel';
       channelId: string;
       /** "status" is sent by the live process when a channel starts, stops or reconnects. */
@@ -45,6 +50,7 @@ export const EVENT_PERMISSIONS: Record<LiveEvent['type'], Permission> = {
   'job-progress': 'jobs:read',
   asset: 'assets:read',
   channel: 'live:read',
+  recording: 'live:read',
 };
 
 /** Reads an event from its channel message. Null when the message is not a valid event. */

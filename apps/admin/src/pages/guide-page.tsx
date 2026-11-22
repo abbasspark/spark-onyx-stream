@@ -6,6 +6,7 @@ import {
   ChevronRight,
   CircleAlert,
   CircleCheck,
+  Disc,
   Download,
   Link2,
   MoreHorizontal,
@@ -16,7 +17,7 @@ import {
 import { type FormEvent, useEffect, useState } from 'react';
 import { Link } from 'react-router';
 import { toast } from 'sonner';
-import { channelsApi, guideApi } from '@/api/endpoints';
+import { channelsApi, guideApi, recordingsApi } from '@/api/endpoints';
 import type { Channel, GuideSource, Programme, ProgrammeInput } from '@/api/types';
 import { useSession } from '@/auth/session';
 import { useConfirm } from '@/components/confirm';
@@ -42,11 +43,13 @@ import {
   DropdownMenuItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
+  Tooltip,
 } from '@/components/ui/overlay';
 import { useAddressParams } from '@/lib/address-params';
 import { cn } from '@/lib/cn';
 import { formatRelative } from '@/lib/format';
 import {
+  canRecord,
   dayBounds,
   dayKey,
   dayLabel,
@@ -138,12 +141,32 @@ function Schedule({ channels, channel, day, mayWrite, onChannel, onDay }: Schedu
     queryKey: ['programmes', channel.id, from],
     queryFn: ({ signal }) => guideApi.programmes(channel.id, from, to, signal),
   });
+  // What is planned or being recorded, to mark those programmes.
+  const planned = useQuery({
+    queryKey: ['recordings', 'open', 1],
+    queryFn: ({ signal }) => recordingsApi.list('open', 1, signal),
+  });
+  const recordingOf = (programme: Programme) =>
+    planned.data?.items.find(
+      (item) =>
+        item.channel.id === channel.id &&
+        item.startsAt === programme.startsAt &&
+        item.title === programme.title,
+    );
   const refresh = () => void queryClient.invalidateQueries({ queryKey: ['programmes'] });
   const remove = useMutation({
     mutationFn: (programme: Programme) => guideApi.removeProgramme(programme.id),
     onSuccess: (_result, programme) => {
       toast.success(`${programme.title} deleted`);
       refresh();
+    },
+    onError: (error: Error) => toast.error(error.message),
+  });
+  const record = useMutation({
+    mutationFn: (programme: Programme) => recordingsApi.recordProgramme(programme.id),
+    onSuccess: (recording) => {
+      toast.success(`${recording.title} will be recorded. It appears under Recordings.`);
+      void queryClient.invalidateQueries({ queryKey: ['recordings'] });
     },
     onError: (error: Error) => toast.error(error.message),
   });
@@ -230,6 +253,7 @@ function Schedule({ channels, channel, day, mayWrite, onChannel, onDay }: Schedu
           <ol className="divide-y rounded-lg border">
             {items.map((programme) => {
               const current = isOnNow(programme, now);
+              const recording = recordingOf(programme);
               return (
                 <li
                   key={programme.id}
@@ -252,6 +276,14 @@ function Schedule({ channels, channel, day, mayWrite, onChannel, onDay }: Schedu
                           On now
                         </Badge>
                       ) : null}
+                      {recording ? (
+                        <Badge
+                          tone={recording.status === 'SCHEDULED' ? 'info' : 'danger'}
+                          dot={recording.status === 'SCHEDULED' ? true : 'live'}
+                        >
+                          {recording.status === 'SCHEDULED' ? 'Will be recorded' : 'Recording'}
+                        </Badge>
+                      ) : null}
                     </p>
                     {programme.subtitle ? (
                       <p className="text-sm text-muted-foreground">{programme.subtitle}</p>
@@ -266,32 +298,45 @@ function Schedule({ channels, channel, day, mayWrite, onChannel, onDay }: Schedu
                       {programme.category ? <Badge>{programme.category}</Badge> : null}
                     </p>
                   </div>
-                  {mayWrite && programme.source === null ? (
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
+                  <div className="flex items-center gap-1">
+                    {mayWrite && !recording && canRecord(programme, now) ? (
+                      <Tooltip content="Record this programme into the library">
                         <Button
                           size="icon-sm"
                           variant="ghost"
-                          aria-label={`More for ${programme.title}`}
+                          aria-label={`Record ${programme.title}`}
+                          disabled={record.isPending && record.variables?.id === programme.id}
+                          onClick={() => record.mutate(programme)}
                         >
-                          <MoreHorizontal />
+                          <Disc />
                         </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuItem onSelect={() => setEditing(programme)}>
-                          <Pencil />
-                          Edit
-                        </DropdownMenuItem>
-                        <DropdownMenuSeparator />
-                        <DropdownMenuItem destructive onSelect={() => void askRemove(programme)}>
-                          <Trash2 />
-                          Delete
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  ) : (
-                    <span />
-                  )}
+                      </Tooltip>
+                    ) : null}
+                    {mayWrite && programme.source === null ? (
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button
+                            size="icon-sm"
+                            variant="ghost"
+                            aria-label={`More for ${programme.title}`}
+                          >
+                            <MoreHorizontal />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem onSelect={() => setEditing(programme)}>
+                            <Pencil />
+                            Edit
+                          </DropdownMenuItem>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem destructive onSelect={() => void askRemove(programme)}>
+                            <Trash2 />
+                            Delete
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    ) : null}
+                  </div>
                 </li>
               );
             })}

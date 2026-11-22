@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 import { download, request, uploadFile } from './client';
 import type {
+  Recording,
+  RecordingInput,
   GuideImportResult,
   GuideSource,
   KnownGuideChannel,
@@ -432,4 +434,16 @@ export const guideApi = {
   updateProgramme: (id: string, body: Partial<ProgrammeInput>) =>
     request<Programme>(`/v1/programmes/${id}`, { method: 'PATCH', body }),
   removeProgramme: (id: string) => request<void>(`/v1/programmes/${id}`, { method: 'DELETE' }),
+};
+
+export const recordingsApi = {
+  list: (show: 'all' | 'open' | 'finished', page: number, signal?: AbortSignal) =>
+    request<Page<Recording>>(`/v1/recordings?show=${show}&page=${page}&pageSize=25`, { signal }),
+  create: (body: RecordingInput) => request<Recording>('/v1/recordings', { method: 'POST', body }),
+  /** Records a programme of the guide. */
+  recordProgramme: (programmeId: string) =>
+    request<Recording>(`/v1/programmes/${programmeId}/record`, { method: 'POST' }),
+  /** Calls a waiting recording off, or stops a running one and keeps what it has. */
+  stop: (id: string) => request<Recording>(`/v1/recordings/${id}/stop`, { method: 'POST' }),
+  remove: (id: string) => request<void>(`/v1/recordings/${id}`, { method: 'DELETE' }),
 };

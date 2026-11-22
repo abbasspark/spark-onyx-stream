@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 import { describe, expect, it } from 'vitest';
 import {
+  canRecord,
   dayBounds,
   dayKey,
   dayLabel,
@@ -71,6 +72,12 @@ describe('programmes', () => {
     expect(formatLength(programme.startsAt, programme.endsAt)).toBe('1 h 30 min');
     expect(formatLength(programme.startsAt, '2026-11-22T19:45:00.000Z')).toBe('45 min');
     expect(formatLength(programme.startsAt, '2026-11-22T21:00:00.000Z')).toBe('2 h');
+  });
+
+  it('can be recorded until they are over', () => {
+    expect(canRecord(programme, Date.parse('2026-11-22T12:00:00.000Z'))).toBe(true);
+    expect(canRecord(programme, Date.parse('2026-11-22T20:00:00.000Z'))).toBe(true);
+    expect(canRecord(programme, Date.parse('2026-11-22T20:30:00.000Z'))).toBe(false);
   });
 
   it('are on from their start until just before their end', () => {

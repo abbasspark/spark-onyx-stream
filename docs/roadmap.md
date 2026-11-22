@@ -7,7 +7,7 @@ The project is built in phases. Each phase ends with something that works end to
 | 1. Media engine core          | Upload, probe, copy or transcode, HLS packaging, signed playback, basic admin panel | Done                |
 | 2. Catalog and viewer website | Titles, series, metadata import, viewer accounts and profiles, player with resume   | Done                |
 | 3. Billing                    | Plans, payments, entitlements, coupons. First complete VOD service                  | Done, coupons later |
-| 4. Live                       | Ingest, copy and transcode channels, DVR, EPG, channels in the catalog              | In progress         |
+| 4. Live                       | Ingest, copy and transcode channels, DVR, EPG, channels in the catalog              | Done                |
 | 5. Edges and P2P              | Edge agent, tracker, P2P in the player, offload statistics                          | Planned             |
 | 6. Operations                 | Installer, updates with rollback, backup and restore, diagnostics                   | Starts in phase 1   |
 | 7. Apps                       | Android mobile and Android TV                                                       | Planned             |
@@ -33,7 +33,7 @@ See [phase-1-media-engine.md](phase-1-media-engine.md) for the design.
 1. Channels pulled from an address: sources over HTTP, RTMP, SRT, UDP and RTP, a live process that keeps them running, repackaging to HLS without re-encoding, signed delivery, and the Channels page with a live preview. **Done.**
 2. Transcoding to several qualities that players switch between, for any source the server can read. **Done.**
 3. Channels pushed by an encoder over RTMP or SRT, with a stream key per channel and an ingest server. **Done.**
-4. Going back in time: a window of up to four hours per channel, with pause, rewind and starting the running programme over. **Done.** Recording programmes into the library is the part that is left.
+4. Going back in time: a window of up to four hours per channel, with pause, rewind and starting the running programme over. **Done.** Recording a programme or a time range into the library, where it becomes a video like any upload. **Done.**
 5. A programme guide: import from XMLTV sources, programmes by hand, now and next in the lineup and a timetable for viewers. **Done.**
 6. Channels in the catalog, in packages and on the viewer website. **Done.** Built before steps 4 and 5, so that viewers can watch channels at all.
 
