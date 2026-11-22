@@ -55,7 +55,7 @@ describe.skipIf(!TEST_DATABASE_URL)('P2P between viewers (e2e)', () => {
   const watch = async (slug: string) =>
     (await http().post(`/v1/catalog/channels/${slug}/playback`).expect(200)).body as {
       url: string;
-      p2p: { trackerUrl: string; swarmId: string } | null;
+      p2p: { trackerUrl: string; swarmId: string; stunUrls: string[] } | null;
     };
 
   beforeAll(async () => {
@@ -120,6 +120,13 @@ describe.skipIf(!TEST_DATABASE_URL)('P2P between viewers (e2e)', () => {
 
       // Everyone who watches the same channel is in the same swarm.
       expect(first.p2p?.swarmId).toMatch(/^[0-9a-f]{40}$/);
+      expect(first.p2p).toMatchObject({
+        stunUrls: ['stun:stun.l.google.com:19302', 'stun:global.stun.twilio.com:3478'],
+      });
+      // And the website learns where its pages have to be allowed to connect to.
+      expect((await http().get('/v1/catalog/delivery').expect(200)).body.tracker).toBe(
+        'wss://stream.example.com',
+      );
       expect((await watch(news.slug)).p2p?.swarmId).toBe(first.p2p?.swarmId);
       expect((await watch(sport.slug)).p2p?.swarmId).not.toBe(first.p2p?.swarmId);
       // And nobody can tell the swarm from the channel.

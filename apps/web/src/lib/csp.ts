@@ -13,6 +13,11 @@ export interface CspOptions {
   mediaOrigin?: string;
   /** Addresses of the edge servers, as the API tells them. */
   edgeOrigins?: readonly string[];
+  /**
+   * Address of the tracker players find each other through, such as
+   * "wss://stream.example.com". Pages may open a connection to it.
+   */
+  trackerOrigin?: string | null;
 }
 
 /** Keeps only the scheme, host and port of an address. Empty when it is not one. */
@@ -23,6 +28,19 @@ export function originOf(value: string | undefined): string {
   try {
     const url = new URL(value);
     return url.protocol === 'http:' || url.protocol === 'https:' ? url.origin : '';
+  } catch {
+    return '';
+  }
+}
+
+/** Keeps only the scheme, host and port of a WebSocket address. Empty when it is not one. */
+export function socketOriginOf(value: string | null | undefined): string {
+  if (!value) {
+    return '';
+  }
+  try {
+    const url = new URL(value);
+    return url.protocol === 'ws:' || url.protocol === 'wss:' ? `${url.protocol}//${url.host}` : '';
   } catch {
     return '';
   }
@@ -51,9 +69,11 @@ export function buildCsp({
   development,
   mediaOrigin,
   edgeOrigins = [],
+  trackerOrigin,
 }: CspOptions): string {
   const media = mediaOrigins(mediaOrigin, edgeOrigins).join(' ');
   const withMedia = (sources: string) => (media ? `${sources} ${media}` : sources);
+  const tracker = socketOriginOf(trackerOrigin);
 
   return [
     "default-src 'self'",
@@ -64,7 +84,7 @@ export function buildCsp({
     // track, which works around a fault in Chrome's captions menu.
     `media-src ${withMedia("'self' blob: data:")}`,
     // Development also talks to the dev server over a websocket.
-    `connect-src ${withMedia("'self'")}${development ? ' ws: wss:' : ''}`,
+    `connect-src ${withMedia("'self'")}${tracker ? ` ${tracker}` : ''}${development ? ' ws: wss:' : ''}`,
     "font-src 'self'",
     "worker-src 'self' blob:",
     "object-src 'none'",

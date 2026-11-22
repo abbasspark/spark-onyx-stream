@@ -2,6 +2,17 @@
 'use client';
 
 import { ensureMediaAllowed, otherServerOf, withAvoid } from '@/lib/delivery';
+import {
+  canShare,
+  createSharing,
+  describeSharing,
+  loadSharing,
+  NO_SHARING,
+  setSharingPreference,
+  type Sharing,
+  type SharingFigures,
+  sharingPreference,
+} from '@/lib/p2p';
 import Hls from 'hls.js';
 import {
   ArrowLeft,
@@ -31,6 +42,7 @@ import {
 import type { Channel, LivePlayback } from '@/lib/types';
 import { authHref } from '@/lib/viewer-api';
 import { ChannelLineup } from './channel-lineup';
+import { type ChoiceGroup, SettingsMenu } from './player/settings-menu';
 import { useViewerSession } from './viewer-session';
 
 /** How often a channel that is off air is asked for again. */
@@ -87,7 +99,13 @@ export function LiveScreen({ channel, channels }: LiveScreenProps) {
           return;
         }
         if (response.ok) {
-          setLoaded({ state: 'ready', playback: (await response.json()) as LivePlayback });
+          const playback = (await response.json()) as LivePlayback;
+          if (playback.p2p) {
+            await loadSharing();
+          }
+          if (!controller.signal.aborted) {
+            setLoaded({ state: 'ready', playback });
+          }
           return;
         }
         const body = (await response.json().catch(() => null)) as { code?: string } | null;
@@ -274,6 +292,33 @@ function LivePlayer({ channel, channels, playback, onBroken, onZap }: LivePlayer
   const [playing, setPlaying] = useState(false);
   const [waiting, setWaiting] = useState(true);
   const [muted, setMuted] = useState(false);
+  // Sharing with other viewers: the viewer's choice, and how it goes.
+  const sharingRef = useRef<Sharing | null>(null);
+  const [sharingOn, setSharingOn] = useState(true);
+  const [shared, setShared] = useState<SharingFigures>(NO_SHARING);
+  const [menuOpen, setMenuOpen] = useState(false);
+  useEffect(() => setSharingOn(sharingPreference()), []);
+  const chooseSharing = useCallback((value: number) => {
+    const on = value === 1;
+    setSharingPreference(on);
+    setSharingOn(on);
+    sharingRef.current?.setOn(on);
+  }, []);
+  const groups: ChoiceGroup[] = [
+    {
+      name: 'Share with viewers',
+      selected: sharingOn ? 1 : 0,
+      onChoose: chooseSharing,
+      choices:
+        playback.p2p && canShare()
+          ? [
+              { value: 1, label: 'On' },
+              { value: 0, label: 'Off' },
+            ]
+          : [],
+      note: describeSharing(shared, sharingOn),
+    },
+  ];
   const [volume, setVolume] = useState(1);
   const [behind, setBehind] = useState(false);
   // For a channel that lets viewers go back: the stretch that is kept, and where the viewer is in it.
@@ -313,6 +358,7 @@ function LivePlayer({ channel, channels, playback, onBroken, onZap }: LivePlayer
     // A server that goes away without a word leaves the player waiting for
     // ever. When the picture has stood still this long, ask for the channel
     // again, which may come from another server then.
+    let sharing: Sharing | null = null;
     let lastTime = video.currentTime;
     let movedAt = Date.now();
     let gaveUp = false;
@@ -332,7 +378,15 @@ function LivePlayer({ channel, channels, playback, onBroken, onZap }: LivePlayer
 
     if (Hls.isSupported()) {
       // What was watched is dropped from memory after a minute. Going back loads it again.
-      const hls = new Hls({ liveSyncDurationCount: 3, backBufferLength: 60 });
+      sharing = createSharing(playback.p2p, 'live', setShared);
+      sharingRef.current = sharing;
+      setShared(NO_SHARING);
+      const hls = new Hls({
+        liveSyncDurationCount: 3,
+        backBufferLength: 60,
+        ...sharing?.hlsConfig,
+      });
+      sharing?.bind(hls);
       hlsRef.current = hls;
       hls.on(Hls.Events.MANIFEST_PARSED, start);
       hls.on(Hls.Events.ERROR, (_event, data) => {
@@ -357,6 +411,8 @@ function LivePlayer({ channel, channels, playback, onBroken, onZap }: LivePlayer
       window.clearInterval(watchdog);
       hlsRef.current?.destroy();
       hlsRef.current = null;
+      sharingRef.current = null;
+      sharing?.destroy();
       video.removeAttribute('src');
       video.load();
     };
@@ -545,7 +601,7 @@ function LivePlayer({ channel, channels, playback, onBroken, onZap }: LivePlayer
       : null;
   const behindSeconds = range ? Math.max(0, range.end - range.current) : 0;
 
-  const shown = controls || !playing || lineup;
+  const shown = controls || !playing || lineup || menuOpen;
   const button =
     'flex size-11 items-center justify-center rounded-[3px] text-vein hover:bg-vein/15 focus-visible:bg-vein/15';
 
@@ -696,6 +752,7 @@ function LivePlayer({ channel, channels, playback, onBroken, onZap }: LivePlayer
                 <List className="size-6" />
               </button>
             ) : null}
+            <SettingsMenu open={menuOpen} onOpenChange={setMenuOpen} groups={groups} />
             <button
               type="button"
               className={button}

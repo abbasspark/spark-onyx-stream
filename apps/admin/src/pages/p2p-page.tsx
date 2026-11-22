@@ -191,9 +191,10 @@ function Running({ trackerUrl, stats }: { trackerUrl: string; stats: TrackerStat
       </div>
 
       <p className="mt-4 text-xs text-muted-foreground">
-        The tracker is ready, and every viewer&apos;s player is given its address with a token. The
-        player of the website starts sharing with the next step of the build, so until then these
-        figures only move when you connect a player yourself.
+        Viewers can switch sharing off in the settings of the player. A viewer who shares is
+        connected directly to others, who can therefore see that viewer&apos;s network address: say
+        so in your privacy notice. How much of the video viewers get from each other is not counted
+        here yet.
       </p>
     </>
   );

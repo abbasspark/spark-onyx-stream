@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-only
-import { buildCsp, mediaOrigins, originOf } from './csp';
+import { buildCsp, mediaOrigins, originOf, socketOriginOf } from './csp';
 
 describe('buildCsp', () => {
   it('lets scripts run only with the nonce', () => {
@@ -59,6 +59,27 @@ describe('mediaOrigins', () => {
       "connect-src 'self' https://edge1.example.net https://edge2.example.net;",
     );
     expect(policy).not.toMatch(/script-src[^;]*edge1/);
+  });
+});
+
+describe('the tracker', () => {
+  it('may be connected to, and nothing else is opened by it', () => {
+    const policy = buildCsp({
+      nonce: 'n',
+      development: false,
+      trackerOrigin: 'wss://stream.example.com/tracker?token=abc',
+    });
+    expect(policy).toContain("connect-src 'self' wss://stream.example.com;");
+    expect(policy).toContain("media-src 'self' blob: data:;");
+  });
+
+  it('is left out when it is not the address of one', () => {
+    expect(socketOriginOf('https://stream.example.com')).toBe('');
+    expect(socketOriginOf('wss://x; script-src *')).toBe('');
+    expect(socketOriginOf(null)).toBe('');
+    expect(buildCsp({ nonce: 'n', development: false, trackerOrigin: null })).toContain(
+      "connect-src 'self';",
+    );
   });
 });
 

@@ -102,6 +102,8 @@ export interface P2pInfo {
   trackerUrl: string;
   /** Names the group of viewers who watch the same files. */
   swarmId: string;
+  /** STUN servers, which tell a player the address others can reach it at. */
+  stunUrls: string[];
 }
 
 /** Signed, short-lived addresses for playing one video. */

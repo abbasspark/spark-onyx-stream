@@ -616,7 +616,10 @@ describe.skipIf(!TEST_DATABASE_URL)('Delivery through edges (e2e)', () => {
     });
 
     it('tells the website which addresses video may come from', async () => {
-      expect((await http().get('/v1/catalog/delivery').expect(200)).body).toEqual({ origins: [] });
+      expect((await http().get('/v1/catalog/delivery').expect(200)).body).toEqual({
+        origins: [],
+        tracker: null,
+      });
       await createEdge();
       await createEdge({ name: 'Paris', publicUrl: 'https://edge2.example.com', enabled: false });
 
@@ -624,6 +627,7 @@ describe.skipIf(!TEST_DATABASE_URL)('Delivery through edges (e2e)', () => {
       // The paused one too: it may take viewers before a page is loaded again.
       expect(told.body).toEqual({
         origins: ['https://edge1.example.com', 'https://edge2.example.com'],
+        tracker: null,
       });
     });
   });

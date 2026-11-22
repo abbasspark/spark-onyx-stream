@@ -31,7 +31,12 @@ export class AppConfig {
   /** Absolute path of the directory for working files of processing jobs. */
   readonly processingTempPath: string;
   /** The tracker viewers find each other through. Null when P2P is switched off. */
-  readonly p2p: { trackerUrl: string; internalUrl: string; secret: string } | null;
+  readonly p2p: {
+    trackerUrl: string;
+    internalUrl: string;
+    secret: string;
+    stunUrls: string[];
+  } | null;
   /** The ingest server, which receives streams pushed by encoders. */
   readonly ingest: {
     readonly apiUrl: string;
@@ -118,6 +123,7 @@ export class AppConfig {
             trackerUrl: env.P2P_TRACKER_URL,
             internalUrl: env.P2P_TRACKER_INTERNAL_URL,
             secret: env.P2P_TRACKER_SECRET,
+            stunUrls: env.P2P_STUN_URLS,
           };
     this.ingest = {
       apiUrl: env.INGEST_API_URL.replace(/\/+$/, ''),

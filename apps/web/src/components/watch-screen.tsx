@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 'use client';
 
+import { loadSharing } from '@/lib/p2p';
 import { MAX_FAILOVERS, otherServerOf, withAvoid } from '@/lib/delivery';
 import { Loader2, Lock, Mail, Play, RotateCcw, SkipForward } from 'lucide-react';
 import Link from 'next/link';
@@ -148,7 +149,14 @@ export function WatchScreen({
           setLoaded({ state: 'failed', ...refusal(response.status) });
           return;
         }
-        setLoaded({ state: 'ready', playback: (await response.json()) as Playback, startAt });
+        const playback = (await response.json()) as Playback;
+        if (playback.p2p) {
+          await loadSharing();
+        }
+        if (controller.signal.aborted) {
+          return;
+        }
+        setLoaded({ state: 'ready', playback, startAt });
         if (attempt === 0 && startAt > 0) {
           setResumedAt(startAt);
         }

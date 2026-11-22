@@ -14,6 +14,8 @@ export interface ChoiceGroup {
   choices: Choice[];
   selected: number;
   onChoose: (value: number) => void;
+  /** A line under the choices that says more, such as how sharing goes. */
+  note?: string;
 }
 
 interface SettingsMenuProps {
@@ -99,6 +101,11 @@ export function SettingsMenu({ open, onOpenChange, groups }: SettingsMenuProps) 
                   );
                 })}
               </div>
+              {group.note ? (
+                <p className="mt-2 max-w-44 text-xs leading-snug text-smoke" aria-live="polite">
+                  {group.note}
+                </p>
+              ) : null}
             </fieldset>
           ))}
         </div>

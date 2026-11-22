@@ -596,7 +596,7 @@ This replaces the "plain CSS without a component library" part of D-018.
 **Date:** 2026-11-22
 
 - **The tracker is our own Go program that speaks the protocol of WebTorrent trackers over WebSocket.**
-- **The P2P layer in the player will be an existing open-source library that speaks it,** not one of our own.
+- **The P2P layer in the player is an existing open-source library that speaks it,** P2P Media Loader (Apache-2.0), not one of our own.
 - **Players need a token of the main server to connect,** and the name of a swarm is made from a secret.
 
 **Why:** exchanging segments between browsers is a large problem of its own: choosing who to ask, falling back to HTTP in time, checking what arrives. Libraries that do it exist, are in use and are open, and they find peers through WebTorrent trackers. Speaking that protocol gives us the choice among them and nothing to invent in the player. The tracker itself is small, and writing it ourselves lets it check our tokens, keep to our limits and report its figures to the panel, which a public tracker would not. Naming a swarm with a secret answers the question a tracker cannot: whether a viewer may have this video. A viewer who is not let watch never learns the name, and without it there is no swarm to join.
