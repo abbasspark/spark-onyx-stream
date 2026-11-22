@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 import { download, request, uploadFile } from './client';
 import type {
+  DeliveryOverview,
   P2pStatus,
   EdgeInput,
   EdgeServer,
@@ -468,6 +469,9 @@ export const edgesApi = {
     request<EdgeServer>(`/v1/edges/${id}/purge`, { method: 'POST', body: { scope } }),
   traffic: (range: TrafficRange, signal?: AbortSignal) =>
     request<EdgeTraffic>(`/v1/edges/traffic?range=${range}`, { signal }),
+  /** Who delivered what: main server, edges and viewers together. */
+  overview: (range: TrafficRange, signal?: AbortSignal) =>
+    request<DeliveryOverview>(`/v1/edges/overview?range=${range}`, { signal }),
   remove: (id: string) => request<void>(`/v1/edges/${id}`, { method: 'DELETE' }),
 };
 

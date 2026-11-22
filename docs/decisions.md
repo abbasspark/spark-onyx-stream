@@ -609,8 +609,9 @@ This replaces the "plain CSS without a component library" part of D-018.
 
 - **An edge counts what it delivered and what it fetched.** The difference is what it took off the main server.
 - **A player counts what it took from servers and from other viewers,** and reports it to the site.
-- **There is no single figure for everything,** and none is made up from the two.
+- **The gateway counts what the main server sends to viewers itself,** and the API reads that count.
+- **The overall figure is made of these three,** each counted at its source.
 
-**Why:** only the edge knows what it served from its copies, and only the player knows which part came from another viewer. Counting anywhere else would mean guessing. The two figures answer different questions for different groups of viewers: the edges' covers everyone who was sent to an edge, the players' covers those who can share. Adding them into one percentage would look precise and be wrong.
+**Why:** only the edge knows what it served from its copies, only the player knows which part came from another viewer, and only the gateway knows what it sent without the API hearing of it. Counting anywhere else would mean guessing. With all three, what reached viewers is their sum, and what the main server carried is its own part plus what edges fetched from it. The gateway counts while it writes its log line, in a table in shared memory, which costs a request nothing and needs no log files to be read.
 
-**Consequence:** the viewers' figure rests on what players say, so it can be skewed by someone who wants to, and it is kept apart from anything that decides or bills. What the main server sent directly to viewers is not counted yet: its gateway serves files without telling anyone.
+**Consequence:** the part of the viewers rests on what players say, so it can be skewed by someone who wants to, and the figures are kept apart from anything that decides or bills. An installation without the gateway has no figure for the main server's own part, and is told so.

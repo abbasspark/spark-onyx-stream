@@ -167,7 +167,7 @@ export function createSharing(
     core: {
       announceTrackers: [info.trackerUrl],
       swarmId: info.swarmId,
-      rtcConfig: { iceServers: info.stunUrls.map((urls) => ({ urls })) },
+      rtcConfig: { iceServers: info.iceServers },
       isP2PDisabled: !sharingPreference(info.sharingDefault),
       // What plays within these seconds is always fetched from a server, so
       // waiting for another viewer never holds the picture up. A live

@@ -177,7 +177,7 @@ In a test with three viewers in three browsers on one machine, the three got 48 
 
 - **Viewers see each other's network addresses.** A direct connection cannot be had without. Tell your viewers in your privacy notice, and decide whether the default suits your audience.
 - **STUN servers:** players ask a STUN server for the address others can reach them at. The default is two public ones, of Google and Twilio, which then learn the addresses of your viewers. Set `P2P_STUN_URLS` to your own, or to nothing, with which only viewers in the same network connect.
-- **No relay:** two viewers who are both behind strict routers cannot connect directly, and there is no TURN server to pass their data on. Those viewers get everything from the servers.
+- **Viewers behind strict routers** cannot connect to each other directly. Without a relay they get everything from the servers. With a TURN server (below) their data is passed on by it.
 - **What comes from another viewer is not checked against the original.** A viewer who went to the trouble could send wrong data to others, whose players would show a broken picture or an error until they fetch from a server again. Encrypted videos cannot be read by someone who has no key, but they are not protected against this either.
 - **Sharing uses the viewer's upload** and memory: up to 512 MB of a film and 256 MB of a channel are kept to give to others.
 
@@ -186,20 +186,40 @@ In a test with three viewers in three browsers on one machine, the three got 48 
 | `P2P_STUN_URLS`      | two public STUN servers | STUN servers for players, separated by commas                 |
 | `P2P_VIEWER_DEFAULT` | `on`                    | Whether players share until the viewer chooses: `on` or `off` |
 
+### A relay for viewers who cannot connect directly
+
+A TURN server passes the data on between two viewers when no direct way is found. It carries video, so it needs bandwidth of its own, and what goes through it is not saved traffic for you: it only helps where it relieves a server that is harder pressed than the relay.
+
+| Setting           | Meaning                                                                                 |
+| ----------------- | --------------------------------------------------------------------------------------- |
+| `P2P_TURN_URLS`   | Addresses of the TURN server, such as `turn:turn.example.com:3478`, separated by commas |
+| `P2P_TURN_SECRET` | The secret the TURN server makes short-lived passwords from, 16 characters or more      |
+
+Every player gets a name and a password for the relay that run out with its video. This is the scheme of coturn's `use-auth-secret`:
+
+```bash
+docker run -d --network host coturn/coturn \
+  -n --use-auth-secret --static-auth-secret=<the secret> --realm=turn.example.com
+```
+
 ## What was taken off the main server
 
-Two figures say what edges and viewers save, and each is counted where it happens.
+**Delivery → Overview** answers the question in one figure: of everything that reached your viewers, how much did the main server not have to send. It shows who delivered, hour by hour or day by day: the main server, the edges from their copies, and viewers among themselves.
 
-- **Edges:** an agent counts what it delivers and what it had to fetch from the main server to do so. The difference is what the edge took off the main server. **Delivery → Edge servers** shows it for the chosen time: "The main server sent 11 GB of that: the edges took 88% off it."
-- **Viewers:** every player that can share counts what it took from servers and what it took from other viewers, and tells the site about twice a minute. **Delivery → P2P** shows it for the last 24 hours, 7 days or 30 days, for films, for live channels or both, as a chart and as a table.
+Each part is counted where it happens.
+
+- **The main server:** its gateway counts the bytes of every media file it sends to a viewer, in memory, and the API reads the count every half minute. This needs `GATEWAY_INTERNAL_URL` of the API to point at the gateway, which the Compose setup does. What edges fetch from the main server is added to the main server's part.
+- **Edges:** an agent counts what it delivers and what it had to fetch from the main server to do so. The difference is the edges' own part. **Delivery → Edge servers** shows it per edge.
+- **Viewers:** every player that can share counts what it took from other viewers, and tells the site about twice a minute. **Delivery → P2P** shows it for films, for live channels or both.
 
 What these figures are, and are not:
 
-- **The viewers' figure is what players say.** A report is taken only from a player that was let watch, and no report may claim more than 4 GB, but a viewer who wants to can send wrong numbers. They are statistics and decide nothing.
-- **It covers sharing players only.** Viewers on iPhones, on mobile data or with sharing switched off do not report, so what they took from your servers is not in it. The share that came from viewers is the share among those who can share, not among all viewers.
-- **"From servers" in the viewers' figure means edges and the main server together.** A player cannot tell them apart.
-- **Reports are added up in memory and written every half minute.** A process that is killed loses what it had not written. The hours are kept for 90 days.
-- **An agent older than this step** reports nothing about what it fetched, and the panel then leaves the sentence out.
+- **The viewers' part is what players say.** A report is taken only from a player that was let watch, and no report may claim more than 4 GB, but a viewer who wants to can send wrong numbers. The figures are statistics and decide nothing.
+- **Without a gateway the main server's own part is missing,** as in development, and the page says so. The figure is then too high.
+- **A restart of the gateway loses what it counted since the API last asked,** at most half a minute.
+- **Reports of players are added up in memory and written every half minute.** A process that is killed loses what it had not written. All hours are kept for 90 days.
+- **Pictures, pages and the API are not counted.** They are small beside video.
+- **An agent older than this step** reports nothing about what it fetched. Everything it delivered then counts as its own.
 
 ### The default for sharing
 
@@ -217,6 +237,7 @@ What these figures are, and are not:
 | `DELETE /v1/edges/:id`              | `delivery:write` | Remove an edge and lock its agent out                            |
 | `POST /v1/edges/:id/purge`          | `delivery:write` | Ask the agent to drop its copies: `all`, `video` or `live`       |
 | `GET /v1/edges/traffic?range=`      | `delivery:read`  | What each edge delivered per hour: `24h`, `7d` or `30d`          |
+| `GET /v1/edges/overview?range=`     | `delivery:read`  | Main server, edges and viewers together, per hour                |
 | `GET /v1/p2p`                       | `delivery:read`  | Whether P2P is on, and the figures of the tracker                |
 | `GET /v1/p2p/traffic?range=`        | `delivery:read`  | What players reported per hour: `24h`, `7d` or `30d`             |
 | `POST /v1/catalog/delivery/report`  | a player         | What it took from servers and from viewers since its last report |
@@ -236,8 +257,7 @@ What these figures are, and are not:
 - Edges that fetch from other edges, and edges for pictures
 - Sending the first bytes of a new file to the viewer while it is still being fetched
 - Updating agents from the panel
-- One figure for everything the main server itself sent, which needs counting in the gateway
 - Figures per title, per channel and per country
-- A TURN server for viewers who cannot connect directly, and checking what comes from other viewers
+- Checking what comes from other viewers
 - P2P in apps, and on iPhones
 - Several trackers behind one address, and names of videos and channels beside the swarms in the panel

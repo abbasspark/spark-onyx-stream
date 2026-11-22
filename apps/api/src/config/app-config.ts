@@ -36,6 +36,8 @@ export class AppConfig {
     internalUrl: string;
     secret: string;
     stunUrls: string[];
+    turnUrls: string[];
+    turnSecret: string;
     sharingDefault: boolean;
   } | null;
   /** The ingest server, which receives streams pushed by encoders. */
@@ -62,6 +64,8 @@ export class AppConfig {
   readonly viewerRegistrationOpen: boolean;
   /** Origin that serves media files. Empty when the API serves them itself. */
   readonly mediaBaseUrl: string;
+  /** Where the API reads what the gateway delivered. Null without a gateway. */
+  readonly gatewayInternalUrl: string | null;
   /** Currency of all prices, such as "EUR". */
   readonly billingCurrency: string;
   /** Where viewers ask for a subscription. Empty when not set. */
@@ -125,6 +129,8 @@ export class AppConfig {
             internalUrl: env.P2P_TRACKER_INTERNAL_URL,
             secret: env.P2P_TRACKER_SECRET,
             stunUrls: env.P2P_STUN_URLS,
+            turnUrls: env.P2P_TURN_URLS,
+            turnSecret: env.P2P_TURN_SECRET,
             sharingDefault: env.P2P_VIEWER_DEFAULT === 'on',
           };
     this.ingest = {
@@ -145,6 +151,7 @@ export class AppConfig {
     this.catalogPlayback = env.CATALOG_PLAYBACK;
     this.viewerRegistrationOpen = env.VIEWER_REGISTRATION === 'open';
     this.mediaBaseUrl = env.MEDIA_BASE_URL;
+    this.gatewayInternalUrl = env.GATEWAY_INTERNAL_URL || null;
     this.billingCurrency = env.BILLING_CURRENCY;
     this.billingContactUrl = env.BILLING_CONTACT_URL;
     this.rental = { startDays: env.RENTAL_START_DAYS, watchHours: env.RENTAL_WATCH_HOURS };

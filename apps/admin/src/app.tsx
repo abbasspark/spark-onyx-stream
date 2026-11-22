@@ -15,6 +15,7 @@ import { LiveProvider } from './live/live';
 import { AccountPage } from './pages/account-page';
 import { EmailPage } from './pages/email-page';
 import { ChannelsPage } from './pages/channels-page';
+import { DeliveryPage } from './pages/delivery-page';
 import { EdgesPage } from './pages/edges-page';
 import { GuidePage } from './pages/guide-page';
 import { RecordingsPage } from './pages/recordings-page';
@@ -95,6 +96,7 @@ function Pages() {
             <Route path="channels" element={<ChannelsPage />} />
             <Route path="guide" element={<GuidePage />} />
             <Route path="recordings" element={<RecordingsPage />} />
+            <Route path="delivery" element={<DeliveryPage />} />
             <Route path="edges" element={<EdgesPage />} />
             <Route path="p2p" element={<P2pPage />} />
             <Route path="revenue" element={<RevenuePage />} />

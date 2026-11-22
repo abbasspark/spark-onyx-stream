@@ -85,6 +85,17 @@ describe('validateEnv', () => {
       expect(env.P2P_TRACKER_URL).toBe('wss://stream.example.com/tracker');
     });
 
+    it('needs the secret of the TURN server with its address', () => {
+      const turn = { P2P_TURN_URLS: 'turn:turn.example.com:3478' };
+      expect(() => validateEnv({ ...validEnv, ...turn })).toThrow(/P2P_TURN_SECRET/);
+      expect(() => validateEnv({ ...validEnv, P2P_TURN_URLS: 'https://turn.example.com' })).toThrow(
+        /P2P_TURN_URLS/,
+      );
+      const env = validateEnv({ ...validEnv, ...turn, P2P_TURN_SECRET: 's'.repeat(16) });
+      expect(env.P2P_TURN_URLS).toEqual(['turn:turn.example.com:3478']);
+      expect(validateEnv(validEnv).P2P_TURN_URLS).toEqual([]);
+    });
+
     it('takes only addresses a player can connect to', () => {
       for (const url of ['https://stream.example.com/tracker', 'stream.example.com', 'wss://']) {
         expect(() =>

@@ -23,7 +23,7 @@ player  ───▶│  /v1/media/…  media files, token checked by Nginx   �
 ```bash
 cd deploy/compose
 ./init-env.sh                 # once: writes .env with fresh secrets
-docker compose up -d --build  # builds the three images and starts everything
+docker compose up -d --build  # builds the images and starts everything
 ```
 
 Open `http://<server>:8080/admin` and create the first admin. The site for viewers is at `http://<server>:8080`. It stays empty until you publish a title.
@@ -50,6 +50,8 @@ Only the gateway is reachable from outside, and the ingest server on the two por
 ### Coming from an earlier version
 
 The admin panel moved from `/` to `/admin`, because the root now belongs to the viewer website. Bookmarks of the panel need `/admin` in front. Signed-in admins stay signed in.
+
+Newer versions bring secrets an older `.env` does not have. Run `./init-env.sh` again after an update: it adds the ones that are missing and leaves everything else in the file as it is.
 
 ## How media is served
 

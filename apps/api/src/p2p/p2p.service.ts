@@ -11,6 +11,28 @@ const SUBJECT_STATS = 'tracker-stats';
 /** How long the tracker is given to answer when the panel asks for its figures. */
 const STATUS_TIMEOUT_MS = 2500;
 
+export interface IceServer {
+  urls: string[];
+  username?: string;
+  credential?: string;
+}
+
+/**
+ * The name and password a player signs in to the TURN server with.
+ *
+ * This is the scheme TURN servers call "REST API" or "time-limited
+ * credentials": the name is the time the password runs out, and the password
+ * is an HMAC-SHA1 over the name with the secret the TURN server shares with
+ * us. The server checks it without asking anyone.
+ */
+export function turnCredentials(
+  secret: string,
+  expiresAtSeconds: number,
+): { username: string; credential: string } {
+  const username = String(expiresAtSeconds);
+  return { username, credential: createHmac('sha1', secret).update(username).digest('base64') };
+}
+
 /** What a player needs to share what it plays with other viewers. */
 export interface P2pInfo {
   /** Address of the tracker, with the token that lets this viewer in. */
@@ -20,8 +42,13 @@ export interface P2pInfo {
    * out without being let watch, so it also keeps others out of the group.
    */
   swarmId: string;
-  /** STUN servers, which tell a player the address others can reach it at. */
-  stunUrls: string[];
+  /**
+   * Servers that help two players connect: STUN servers tell a player the
+   * address others can reach it at, TURN servers pass the data on when no
+   * direct way is found. A TURN server comes with a name and a password that
+   * run out with the video.
+   */
+  iceServers: IceServer[];
   /** Whether the player shares until the viewer chooses. */
   sharingDefault: boolean;
 }
@@ -75,7 +102,12 @@ export class P2pService {
         .update(`swarm:${content}`)
         .digest('hex')
         .slice(0, 40),
-      stunUrls: p2p.stunUrls,
+      iceServers: [
+        ...(p2p.stunUrls.length > 0 ? [{ urls: p2p.stunUrls }] : []),
+        ...(p2p.turnUrls.length > 0
+          ? [{ urls: p2p.turnUrls, ...turnCredentials(p2p.turnSecret, expiresAtSeconds) }]
+          : []),
+      ],
       sharingDefault: p2p.sharingDefault,
     };
   }

@@ -247,6 +247,19 @@ export const envSchema = z
         message: 'MEDIA_BASE_URL must be an origin of the form https://host or http://host:port',
       }),
 
+    /**
+     * Where the API reaches the gateway in front of it, such as
+     * "http://gateway:8080", to read what the gateway sent to viewers itself.
+     * Empty where there is no gateway: that share is then not counted.
+     */
+    GATEWAY_INTERNAL_URL: z
+      .string()
+      .default('')
+      .transform((value) => value.trim().replace(/\/+$/, ''))
+      .refine((value) => value === '' || /^https?:\/\/[^/]+$/.test(value), {
+        message: 'GATEWAY_INTERNAL_URL must be an address of the form http://host:port',
+      }),
+
     /** Programs used for media processing. A name is looked up on the PATH. */
     FFMPEG_PATH: z.string().min(1).default('ffmpeg'),
     FFPROBE_PATH: z.string().min(1).default('ffprobe'),
@@ -303,6 +316,34 @@ export const envSchema = z
       .refine((urls) => urls.every((url) => /^stuns?:[A-Za-z0-9.-]+(:\d{1,5})?$/.test(url)), {
         message: 'P2P_STUN_URLS takes addresses of the form stun:host:port, separated by commas',
       }),
+    /**
+     * TURN servers, which pass data on between two viewers who cannot reach
+     * each other directly: "turn:turn.example.com:3478", several separated by
+     * commas. Empty uses none, and such viewers get everything from servers.
+     */
+    P2P_TURN_URLS: z
+      .string()
+      .default('')
+      .transform((value) =>
+        value
+          .split(',')
+          .map((url) => url.trim())
+          .filter((url) => url !== ''),
+      )
+      .refine(
+        (urls) =>
+          urls.every((url) =>
+            /^turns?:[A-Za-z0-9.-]+(:\d{1,5})?(\?transport=(udp|tcp))?$/.test(url),
+          ),
+        {
+          message: 'P2P_TURN_URLS takes addresses of the form turn:host:port, separated by commas',
+        },
+      ),
+    /**
+     * The secret the TURN server makes short-lived passwords from (coturn:
+     * "static-auth-secret"). Players get a password that runs out with their video.
+     */
+    P2P_TURN_SECRET: z.string().default(''),
     /**
      * Whether the players of viewers share until the viewer says otherwise.
      * With "off", a viewer has to switch sharing on in the player.
@@ -418,6 +459,14 @@ export const envSchema = z
         path: ['P2P_TRACKER_SECRET'],
         message:
           'P2P_TRACKER_URL needs P2P_TRACKER_SECRET with at least 32 characters, the same value the tracker has',
+      });
+    }
+    if (env.P2P_TURN_URLS.length > 0 && env.P2P_TURN_SECRET.length < 16) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['P2P_TURN_SECRET'],
+        message:
+          'P2P_TURN_URLS needs P2P_TURN_SECRET with at least 16 characters, the static-auth-secret of the TURN server',
       });
     }
     if (env.VIEWER_EMAIL_VERIFICATION === 'required' && env.SMTP_URL === '') {

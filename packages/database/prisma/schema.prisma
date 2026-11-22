@@ -1363,3 +1363,18 @@ model SharingHour {
   @@id([hour, kind])
   @@map("sharing_hours")
 }
+
+/// What the gateway of the main server sent to viewers itself in one hour,
+/// as counted by the gateway.
+model OriginTrafficHour {
+  /// The start of the hour, in UTC.
+  hour DateTime
+  /// "video" or "live".
+  kind String
+
+  bytes    BigInt @default(0)
+  requests BigInt @default(0)
+
+  @@id([hour, kind])
+  @@map("origin_traffic_hours")
+}

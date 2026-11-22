@@ -21,6 +21,7 @@ import type { Principal } from '../auth/principal.js';
 import { requestInfo } from '../auth/request-info.js';
 import { ZodValidationPipe } from '../common/zod-validation.pipe.js';
 import { P2pService } from '../p2p/p2p.service.js';
+import { type DeliveryOverview, DeliveryOverviewService } from './delivery-overview.service.js';
 import {
   type CreateEdgeInput,
   createEdgeSchema,
@@ -44,6 +45,7 @@ export class EdgesController {
   constructor(
     @Inject(EdgesService) private readonly edges: EdgesService,
     @Inject(AuditService) private readonly audit: AuditService,
+    @Inject(DeliveryOverviewService) private readonly delivery: DeliveryOverviewService,
   ) {}
 
   @Get()
@@ -59,6 +61,15 @@ export class EdgesController {
     @Query(new ZodValidationPipe(trafficQuerySchema)) query: TrafficQuery,
   ): Promise<TrafficView> {
     return this.edges.traffic(query.range);
+  }
+
+  /** Who delivered what over the last day, week or month: main server, edges, viewers. */
+  @Get('overview')
+  @RequirePermissions('delivery:read')
+  overview(
+    @Query(new ZodValidationPipe(trafficQuerySchema)) query: TrafficQuery,
+  ): Promise<DeliveryOverview> {
+    return this.delivery.overview(query.range);
   }
 
   @Get(':id')

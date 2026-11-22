@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 import type { BadgeTone } from '@/components/ui/display';
 import type {
+  DeliveryOverview,
   EdgeSample,
   EdgeServer,
   EdgeStatus,
@@ -559,5 +560,99 @@ export function sharingChartOf(
     fromViewers,
     fromServers,
     ratio: fromViewers + fromServers > 0 ? fromViewers / (fromViewers + fromServers) : null,
+  };
+}
+
+export interface OverviewBucket {
+  start: number;
+  label: string;
+  title: string;
+  /** Everything that reached viewers. */
+  bytes: number;
+  /** What the main server sent: to viewers itself, and to edges. */
+  fromMain: number;
+  /** What edges served from their copies. */
+  fromEdges: number;
+  fromViewers: number;
+  /** [main server, edges, viewers], the order of the series. */
+  parts: number[];
+}
+
+export interface OverviewChart {
+  series: TrafficSeries[];
+  buckets: OverviewBucket[];
+  peak: number;
+  bytes: number;
+  fromMain: number;
+  fromEdges: number;
+  fromViewers: number;
+  /** Share of everything that the main server did not have to send, 0 to 1. Null without traffic. */
+  offload: number | null;
+}
+
+/**
+ * Turns the hours of the overview into bars split by who delivered.
+ *
+ * What an edge fetched from the main server counts for the main server: the
+ * edge delivered it, but the main server sent it. Only what an edge served
+ * from its copies is the edge's own.
+ */
+export function overviewChartOf(data: DeliveryOverview, now: number = Date.now()): OverviewChart {
+  const frame = trafficChartOf(
+    { range: data.range, from: data.from, hours: data.hours, edges: [] },
+    now,
+  );
+  const daily = data.range !== '24h';
+  const startOf = (at: number) => {
+    const date = new Date(at);
+    return daily
+      ? new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime()
+      : Math.floor(at / 3_600_000) * 3_600_000;
+  };
+  const buckets: OverviewBucket[] = frame.buckets.map((bucket) => ({
+    start: bucket.start,
+    label: bucket.label,
+    title: bucket.title,
+    bytes: 0,
+    fromMain: 0,
+    fromEdges: 0,
+    fromViewers: 0,
+    parts: [0, 0, 0],
+  }));
+  const bucketAt = new Map(buckets.map((bucket) => [bucket.start, bucket]));
+  for (const [seconds, direct, byEdges, fetched, betweenViewers] of data.points) {
+    const bucket = bucketAt.get(startOf(seconds * 1000));
+    if (!bucket) {
+      continue;
+    }
+    // An edge that fetched more than it delivered in an hour was filling up.
+    const fromCopies = Math.max(0, byEdges - fetched);
+    bucket.fromMain += direct + Math.min(fetched, byEdges);
+    bucket.fromEdges += fromCopies;
+    bucket.fromViewers += betweenViewers;
+    bucket.bytes = bucket.fromMain + bucket.fromEdges + bucket.fromViewers;
+    bucket.parts = [bucket.fromMain, bucket.fromEdges, bucket.fromViewers];
+  }
+
+  const sum = (pick: (bucket: OverviewBucket) => number) =>
+    buckets.reduce((total, bucket) => total + pick(bucket), 0);
+  const fromMain = sum((bucket) => bucket.fromMain);
+  const fromEdges = sum((bucket) => bucket.fromEdges);
+  const fromViewers = sum((bucket) => bucket.fromViewers);
+  const bytes = fromMain + fromEdges + fromViewers;
+  return {
+    series: [
+      // The main server is what the others are measured against: the quiet colour.
+      { id: 'main', name: 'Main server', slot: -1, bytes: fromMain },
+      { id: 'edges', name: 'Edges, from their copies', slot: 0, bytes: fromEdges },
+      { id: 'viewers', name: 'Other viewers', slot: 1, bytes: fromViewers },
+    ],
+    buckets,
+    peak: Math.max(0, ...buckets.map((bucket) => bucket.bytes)),
+    bytes,
+    fromMain,
+    fromEdges,
+    fromViewers,
+    offload: bytes > 0 ? (fromEdges + fromViewers) / bytes : null,
   };
 }
