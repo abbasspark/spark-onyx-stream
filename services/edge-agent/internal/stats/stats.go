@@ -13,6 +13,8 @@ type Counters struct {
 	Misses       atomic.Int64
 	Refused      atomic.Int64
 	OriginErrors atomic.Int64
+	// Bytes fetched from the main server.
+	BytesFetched atomic.Int64
 	Active       atomic.Int64
 }
 
@@ -24,6 +26,7 @@ type Snapshot struct {
 	Misses       int64 `json:"misses"`
 	Refused      int64 `json:"refused"`
 	OriginErrors int64 `json:"originErrors"`
+	BytesFetched int64 `json:"bytesFetched"`
 }
 
 func (c *Counters) Snapshot() Snapshot {
@@ -34,5 +37,6 @@ func (c *Counters) Snapshot() Snapshot {
 		Misses:       c.Misses.Load(),
 		Refused:      c.Refused.Load(),
 		OriginErrors: c.OriginErrors.Load(),
+		BytesFetched: c.BytesFetched.Load(),
 	}
 }

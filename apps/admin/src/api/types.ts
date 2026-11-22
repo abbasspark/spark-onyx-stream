@@ -1253,8 +1253,11 @@ export type PurgeScope = 'all' | 'video' | 'live';
 
 export type TrafficRange = '24h' | '7d' | '30d';
 
-/** One hour of an edge: [start in seconds, bytes, requests, from copies, fetched first]. */
-export type TrafficPoint = [number, number, number, number, number];
+/**
+ * One hour of an edge: [start in seconds, bytes delivered, requests, from
+ * copies, fetched first, bytes fetched from the main server].
+ */
+export type TrafficPoint = [number, number, number, number, number, number];
 
 /** What the edges delivered, hour by hour. Hours without traffic are left out. */
 export interface EdgeTraffic {
@@ -1289,3 +1292,15 @@ export type P2pStatus =
   | { state: 'off' }
   | { state: 'unreachable'; trackerUrl: string; message: string }
   | { state: 'running'; trackerUrl: string; stats: TrackerStats };
+
+/** One hour of sharing: [start in seconds, from servers, from viewers, to viewers, reports]. */
+export type SharingPoint = [number, number, number, number, number];
+
+/** What the players of viewers reported, hour by hour, for films and for live channels. */
+export interface SharingTraffic {
+  range: TrafficRange;
+  from: string;
+  hours: number;
+  video: SharingPoint[];
+  live: SharingPoint[];
+}

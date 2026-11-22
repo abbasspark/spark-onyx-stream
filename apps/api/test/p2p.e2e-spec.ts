@@ -93,6 +93,11 @@ describe.skipIf(!TEST_DATABASE_URL)('P2P between viewers (e2e)', () => {
       expect((await watch(channel.slug)).p2p).toBeNull();
       expect((await http().get('/v1/p2p').set(admin()).expect(200)).body).toEqual({ state: 'off' });
       expect(bearers).toEqual([]);
+      // And there is nobody whose reports would count.
+      await http()
+        .post('/v1/catalog/delivery/report')
+        .send({ token: 'x', kind: 'live', fromServers: 1, fromViewers: 1, toViewers: 0 })
+        .expect(403);
     });
   });
 
@@ -167,6 +172,55 @@ describe.skipIf(!TEST_DATABASE_URL)('P2P between viewers (e2e)', () => {
       expect(broken.message).toMatch(/it answered 500/);
     });
 
+    it('adds up what players report, for those who were let watch', async () => {
+      const channel = await channelOnAir('News 24');
+      const token = ((await watch(channel.slug)).p2p?.trackerUrl ?? '').split('?token=')[1];
+      const report = (body: Record<string, unknown>) =>
+        http()
+          .post('/v1/catalog/delivery/report')
+          .send({ token, kind: 'live', fromServers: 0, fromViewers: 0, toViewers: 0, ...body });
+
+      await report({ fromServers: 6000, fromViewers: 4000, toViewers: 1500 }).expect(204);
+      await report({ fromServers: 1000, fromViewers: 3000 }).expect(204);
+      await report({ kind: 'video', fromServers: 500 }).expect(204);
+      // A report of nothing is not counted.
+      await report({}).expect(204);
+
+      const traffic = (await http().get('/v1/p2p/traffic').set(admin()).expect(200)).body;
+      expect(traffic).toMatchObject({ range: '24h', hours: 24 });
+      const sum = (points: number[][], at: number) =>
+        points.reduce((total, point) => total + (point[at] as number), 0);
+      expect([1, 2, 3, 4].map((at) => sum(traffic.live, at))).toEqual([7000, 7000, 1500, 2]);
+      expect([1, 2, 3, 4].map((at) => sum(traffic.video, at))).toEqual([500, 0, 0, 1]);
+      expect((await testApp.prisma.sharingHour.findMany()).length).toBeGreaterThanOrEqual(2);
+    });
+
+    it('takes no reports from strangers, and none that cannot be true', async () => {
+      const channel = await channelOnAir('News 24');
+      const token = ((await watch(channel.slug)).p2p?.trackerUrl ?? '').split('?token=')[1];
+      const body = { token, kind: 'live', fromServers: 1, fromViewers: 1, toViewers: 1 };
+      const post = (change: Record<string, unknown>) =>
+        http()
+          .post('/v1/catalog/delivery/report')
+          .send({ ...body, ...change });
+
+      await post({ token: '4102444800.' + 'A'.repeat(43) }).expect(403);
+      await post({ token: 'nonsense' }).expect(403);
+      await post({ fromViewers: 5 * 1024 ** 3 }).expect(400);
+      await post({ fromServers: -1 }).expect(400);
+      await post({ kind: 'radio' }).expect(400);
+      await http().post('/v1/catalog/delivery/report').send({}).expect(400);
+
+      const traffic = (await http().get('/v1/p2p/traffic').set(admin()).expect(200)).body;
+      expect(traffic.live).toEqual([]);
+      await http().get('/v1/p2p/traffic').expect(401);
+    });
+
+    it('lets players share until the viewer says otherwise', async () => {
+      const channel = await channelOnAir('News 24');
+      expect((await watch(channel.slug)).p2p).toMatchObject({ sharingDefault: true });
+    });
+
     it('is closed to those who have nothing to do with delivery', async () => {
       await http().get('/v1/p2p').expect(401);
     });
@@ -178,6 +232,7 @@ describe.skipIf(!TEST_DATABASE_URL)('P2P between viewers (e2e)', () => {
         P2P_TRACKER_URL: 'wss://stream.example.com/tracker',
         P2P_TRACKER_INTERNAL_URL: 'http://127.0.0.1:1',
         P2P_TRACKER_SECRET: SECRET,
+        P2P_VIEWER_DEFAULT: 'off',
       }),
     );
     afterAll(() => testApp.close());
@@ -185,7 +240,8 @@ describe.skipIf(!TEST_DATABASE_URL)('P2P between viewers (e2e)', () => {
     it('still lets viewers watch, and tells the panel', async () => {
       const channel = await channelOnAir('News 24');
       // Players are told about the tracker anyway: they play without it when it is away.
-      expect((await watch(channel.slug)).p2p).not.toBeNull();
+      // Here the operator decided that viewers switch sharing on themselves.
+      expect((await watch(channel.slug)).p2p).toMatchObject({ sharingDefault: false });
       const shown = (await http().get('/v1/p2p').set(admin()).expect(200)).body;
       expect(shown.state).toBe('unreachable');
       expect(shown.message).toMatch(/cannot be reached/);

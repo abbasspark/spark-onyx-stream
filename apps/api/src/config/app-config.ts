@@ -36,6 +36,7 @@ export class AppConfig {
     internalUrl: string;
     secret: string;
     stunUrls: string[];
+    sharingDefault: boolean;
   } | null;
   /** The ingest server, which receives streams pushed by encoders. */
   readonly ingest: {
@@ -124,6 +125,7 @@ export class AppConfig {
             internalUrl: env.P2P_TRACKER_INTERNAL_URL,
             secret: env.P2P_TRACKER_SECRET,
             stunUrls: env.P2P_STUN_URLS,
+            sharingDefault: env.P2P_VIEWER_DEFAULT === 'on',
           };
     this.ingest = {
       apiUrl: env.INGEST_API_URL.replace(/\/+$/, ''),

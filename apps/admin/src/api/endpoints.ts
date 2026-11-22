@@ -7,6 +7,7 @@ import type {
   EdgeTraffic,
   EdgeWithToken,
   PurgeScope,
+  SharingTraffic,
   TrafficRange,
   Recording,
   RecordingInput,
@@ -473,4 +474,7 @@ export const edgesApi = {
 export const p2pApi = {
   /** Whether P2P is on, and how the tracker is doing. */
   status: (signal?: AbortSignal) => request<P2pStatus>('/v1/p2p', { signal }),
+  /** How much of what viewers played came from other viewers. */
+  traffic: (range: TrafficRange, signal?: AbortSignal) =>
+    request<SharingTraffic>(`/v1/p2p/traffic?range=${range}`, { signal }),
 };

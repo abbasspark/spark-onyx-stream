@@ -6,11 +6,10 @@ import { edgesApi } from '@/api/endpoints';
 import type { TrafficRange } from '@/api/types';
 import { Button } from '@/components/ui/button';
 import { Card, ErrorNote, Skeleton } from '@/components/ui/display';
+import { colorOf, PLOT_HEIGHT, StackedBars } from '@/components/stacked-bars';
 import { cn } from '@/lib/cn';
 import {
   formatRatio,
-  labelEvery,
-  niceCeiling,
   OTHER_SERIES,
   TRAFFIC_RANGES,
   type TrafficBucket,
@@ -18,11 +17,6 @@ import {
   trafficChartOf,
 } from '@/lib/edges';
 import { formatBytes } from '@/lib/format';
-
-/** The colour of a series, by its fixed place in the order. */
-const colorOf = (slot: number) => (slot < 7 ? `var(--series-${slot + 1})` : 'var(--series-rest)');
-
-const PLOT_HEIGHT = 168;
 
 /** What the edges delivered over the last day, week or month, edge by edge. */
 export function EdgeTrafficHistory() {
@@ -46,7 +40,11 @@ export function EdgeTrafficHistory() {
           <p className="text-xs text-muted-foreground">
             {chart
               ? chart.bytes > 0
-                ? `${formatBytes(chart.bytes)} in ${chart.requests.toLocaleString()} requests, ${formatRatio(chart.hitRatio)} of them from copies`
+                ? `${formatBytes(chart.bytes)} in ${chart.requests.toLocaleString()} requests, ${formatRatio(chart.hitRatio)} of them from copies.${
+                    chart.offload === null
+                      ? ''
+                      : ` The main server sent ${formatBytes(chart.fetched)} of that: the edges took ${formatRatio(chart.offload)} off it.`
+                  }`
                 : 'Nothing was delivered in this time.'
               : 'Loading'}
           </p>
@@ -88,127 +86,17 @@ export function EdgeTrafficHistory() {
       ) : asTable ? (
         <TrafficTable chart={chart} />
       ) : (
-        <TrafficBars chart={chart} />
+        <StackedBars
+          series={chart.series.map((series) =>
+            series.id === OTHER_SERIES ? { ...series, name: `${series.name} edges` } : series,
+          )}
+          buckets={chart.buckets}
+          peak={chart.peak}
+          label="Bar chart of what the edges delivered. The table view lists every value."
+          details={(bucket) => <BucketDetails chart={chart} bucket={bucket} />}
+        />
       )}
     </Card>
-  );
-}
-
-function TrafficBars({ chart }: { chart: TrafficChart }) {
-  const [hovered, setHovered] = useState<number | null>(null);
-  const top = niceCeiling(chart.peak);
-  const every = labelEvery(chart.buckets.length, 8);
-  const active = hovered === null ? null : (chart.buckets[hovered] ?? null);
-  // The tooltip stays inside the plot: it hangs to the left of bars on the right half.
-  const onRight = hovered !== null && hovered > chart.buckets.length / 2;
-
-  return (
-    <div>
-      <div className="grid grid-cols-[auto_minmax(0,1fr)] gap-x-3">
-        {/* The scale: three quiet lines with their values. */}
-        <div
-          className="flex flex-col justify-between text-right text-[11px] text-muted-foreground tabular-nums"
-          style={{ height: PLOT_HEIGHT }}
-          aria-hidden="true"
-        >
-          <span className="-translate-y-1/2">{formatBytes(top)}</span>
-          <span>{formatBytes(top / 2)}</span>
-          <span className="translate-y-1/2">0</span>
-        </div>
-
-        <div className="relative" style={{ height: PLOT_HEIGHT }}>
-          <div className="pointer-events-none absolute inset-0 flex flex-col justify-between">
-            <div className="border-t border-dashed border-border" />
-            <div className="border-t border-dashed border-border" />
-            <div className="border-t border-border" />
-          </div>
-
-          <div
-            className="absolute inset-0 flex items-end"
-            onMouseLeave={() => setHovered(null)}
-            role="img"
-            aria-label={`Bar chart of what the edges delivered. The highest bar is ${formatBytes(chart.peak)}. The table view lists every value.`}
-          >
-            {chart.buckets.map((bucket, index) => (
-              // The whole column answers to the pointer, not only the bar in it.
-              <div
-                key={bucket.start}
-                className={cn(
-                  'flex h-full min-w-0 flex-1 flex-col justify-end px-[1px]',
-                  hovered === index && 'bg-accent/60',
-                )}
-                onMouseEnter={() => setHovered(index)}
-              >
-                <div
-                  className="flex flex-col-reverse gap-[2px] overflow-hidden rounded-t-[4px]"
-                  style={{ height: `${(bucket.bytes / top) * 100}%` }}
-                >
-                  {bucket.parts.map((bytes, part) =>
-                    bytes > 0 ? (
-                      <div
-                        key={chart.series[part]?.id}
-                        style={{
-                          flexGrow: bytes,
-                          flexBasis: 0,
-                          minHeight: 1,
-                          background: colorOf(chart.series[part]?.slot ?? 7),
-                        }}
-                      />
-                    ) : null,
-                  )}
-                </div>
-              </div>
-            ))}
-          </div>
-
-          {active && hovered !== null ? (
-            <div
-              className={cn(
-                'pointer-events-none absolute top-0 z-10 w-60 rounded-lg border bg-popover p-3 text-xs text-popover-foreground shadow-lg',
-              )}
-              style={
-                onRight
-                  ? { right: `${((chart.buckets.length - hovered) / chart.buckets.length) * 100}%` }
-                  : { left: `${((hovered + 1) / chart.buckets.length) * 100}%` }
-              }
-            >
-              <BucketDetails chart={chart} bucket={active} />
-            </div>
-          ) : null}
-        </div>
-
-        <div />
-        <div className="mt-1.5 flex text-[11px] text-muted-foreground" aria-hidden="true">
-          {chart.buckets.map((bucket, index) => (
-            <div key={bucket.start} className="relative h-4 min-w-0 flex-1">
-              {index % every === 0 ? (
-                <span className="absolute left-1/2 -translate-x-1/2 whitespace-nowrap">
-                  {bucket.label}
-                </span>
-              ) : null}
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {chart.series.length > 1 ? (
-        <ul className="mt-4 flex flex-wrap gap-x-5 gap-y-1.5 text-xs">
-          {chart.series.map((series) => (
-            <li key={series.id} className="flex items-center gap-2">
-              <span
-                className="size-2.5 shrink-0 rounded-[3px]"
-                style={{ background: colorOf(series.slot) }}
-                aria-hidden="true"
-              />
-              <span>{series.id === OTHER_SERIES ? `${series.name} edges` : series.name}</span>
-              <span className="text-muted-foreground tabular-nums">
-                {formatBytes(series.bytes)}
-              </span>
-            </li>
-          ))}
-        </ul>
-      ) : null}
-    </div>
   );
 }
 
@@ -244,6 +132,7 @@ function BucketDetails({ chart, bucket }: { chart: TrafficChart; bucket: Traffic
         {answered > 0
           ? `${formatRatio(bucket.hits / answered)} served from copies`
           : 'Nothing was asked for'}
+        {bucket.fetched > 0 ? `, ${formatBytes(bucket.fetched)} fetched from the main server` : ''}
       </p>
     </>
   );

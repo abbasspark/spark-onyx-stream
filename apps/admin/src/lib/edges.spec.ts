@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 import { describe, expect, it } from 'vitest';
-import type { EdgeSample, EdgeServer, EdgeTraffic } from '@/api/types';
+import type { EdgeSample, EdgeServer, EdgeTraffic, SharingTraffic } from '@/api/types';
 import {
   agentDockerCommand,
   answerRatio,
@@ -15,6 +15,8 @@ import {
   loadPercent,
   MAX_CHART_SERIES,
   niceCeiling,
+  offloadOf,
+  sharingChartOf,
   publicUrlProblem,
   summarize,
   trafficChartOf,
@@ -186,13 +188,13 @@ describe('the history of what was delivered', () => {
       from: new Date(thisHour - 23 * HOUR).toISOString(),
       hours: 24,
       edges: [
-        { id: 'b', name: 'Paris', points: [[seconds(thisHour), 300, 3, 2, 1]] },
+        { id: 'b', name: 'Paris', points: [[seconds(thisHour), 300, 3, 2, 1, 100]] },
         {
           id: 'a',
           name: 'Frankfurt',
           points: [
-            [seconds(thisHour - HOUR), 1000, 10, 9, 1],
-            [seconds(thisHour), 700, 7, 7, 0],
+            [seconds(thisHour - HOUR), 1000, 10, 9, 1, 150],
+            [seconds(thisHour), 700, 7, 7, 0, 50],
           ],
         },
       ],
@@ -209,6 +211,10 @@ describe('the history of what was delivered', () => {
     expect(chart.buckets.at(-2)).toMatchObject({ bytes: 1000, parts: [1000, 0] });
     expect(chart.buckets[0]).toMatchObject({ bytes: 0, parts: [0, 0] });
     expect(chart).toMatchObject({ peak: 1000, bytes: 2000, requests: 20 });
+    // 300 of 2000 bytes had to come from the main server.
+    expect(chart.fetched).toBe(300);
+    expect(chart.offload).toBeCloseTo(0.85, 5);
+    expect(chart.buckets.at(-1)?.fetched).toBe(150);
     expect(chart.hitRatio).toBeCloseTo(0.9, 5);
   });
 
@@ -223,9 +229,9 @@ describe('the history of what was delivered', () => {
           id: 'a',
           name: 'Frankfurt',
           points: [
-            [seconds(today - 2 * HOUR), 100, 1, 1, 0],
-            [seconds(today + HOUR), 200, 1, 1, 0],
-            [seconds(today + 9 * HOUR), 300, 1, 0, 1],
+            [seconds(today - 2 * HOUR), 100, 1, 1, 0, 0],
+            [seconds(today + HOUR), 200, 1, 1, 0, 0],
+            [seconds(today + 9 * HOUR), 300, 1, 0, 1, 0],
           ],
         },
       ],
@@ -243,7 +249,7 @@ describe('the history of what was delivered', () => {
     const edges = Array.from({ length: MAX_CHART_SERIES + 2 }, (_value, index) => ({
       id: `edge-${String(index).padStart(2, '0')}`,
       name: `Edge ${index}`,
-      points: [[seconds(thisHour), 10, 1, 1, 0]] as EdgeTraffic['edges'][number]['points'],
+      points: [[seconds(thisHour), 10, 1, 1, 0, 0]] as EdgeTraffic['edges'][number]['points'],
     }));
     const chart = trafficChartOf(
       { range: '24h', from: new Date(thisHour).toISOString(), hours: 1, edges },
@@ -301,5 +307,57 @@ describe('P2P', () => {
     expect(settings.tracker).toContain('ONYX_TRACKER_SECRET=the-secret');
     expect(settings.tracker).toContain('ONYX_TRACKER_ALLOWED_ORIGINS=stream.example.com');
     expect(p2pSettings('http://localhost:8080', 's').api).toContain('ws://localhost:8080/tracker');
+  });
+});
+
+describe('what edges and viewers took off the main server', () => {
+  it('is the share an edge did not have to fetch', () => {
+    expect(offloadOf(1000, 250)).toBe(0.75);
+    expect(offloadOf(1000, 1200)).toBe(0);
+    // Nothing delivered, or an agent that does not say what it fetched.
+    expect(offloadOf(0, 0)).toBeNull();
+    expect(offloadOf(1000, 0)).toBeNull();
+  });
+
+  const HOUR = 3_600_000;
+  const now = new Date(2026, 10, 22, 14, 30).getTime();
+  const thisHour = new Date(2026, 10, 22, 14).getTime();
+  const seconds = (at: number) => Math.round(at / 1000);
+  const traffic: SharingTraffic = {
+    range: '24h',
+    from: new Date(thisHour - 23 * HOUR).toISOString(),
+    hours: 24,
+    video: [[seconds(thisHour), 600, 400, 380, 12]],
+    live: [
+      [seconds(thisHour - HOUR), 100, 300, 300, 4],
+      [seconds(thisHour), 200, 800, 790, 9],
+    ],
+  };
+
+  it('adds films and live up, with the share that came from viewers', () => {
+    const chart = sharingChartOf(traffic, 'all', now);
+    expect(chart.buckets).toHaveLength(24);
+    expect(chart.buckets.at(-1)).toMatchObject({
+      bytes: 2000,
+      fromViewers: 1200,
+      fromServers: 800,
+      reports: 21,
+      parts: [1200, 800],
+    });
+    expect(chart).toMatchObject({ fromViewers: 1500, fromServers: 900, peak: 2000 });
+    expect(chart.ratio).toBeCloseTo(0.625, 5);
+    expect(chart.series.map((series) => [series.name, series.bytes])).toEqual([
+      ['From other viewers', 1500],
+      ['From servers', 900],
+    ]);
+  });
+
+  it('can show films or live alone', () => {
+    expect(sharingChartOf(traffic, 'video', now)).toMatchObject({
+      fromViewers: 400,
+      fromServers: 600,
+    });
+    expect(sharingChartOf(traffic, 'live', now).ratio).toBeCloseTo(1100 / 1400, 5);
+    expect(sharingChartOf({ ...traffic, video: [], live: [] }, 'all', now).ratio).toBeNull();
   });
 });

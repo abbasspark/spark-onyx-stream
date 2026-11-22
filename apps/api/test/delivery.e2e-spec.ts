@@ -470,7 +470,9 @@ describe.skipIf(!TEST_DATABASE_URL)('Delivery through edges (e2e)', () => {
       const first = await createEdge();
       const second = await createEdge({ name: 'Paris', publicUrl: 'https://edge2.example.com' });
       await beat(first.token, counters(1000, 10, 8, 2)).expect(200);
-      await beat(first.token, counters(4000, 30, 25, 5)).expect(200);
+      await beat(first.token, {
+        counters: { ...counters(4000, 30, 25, 5).counters, bytesFetched: 900 },
+      }).expect(200);
       await beat(second.token, counters(0, 0, 0, 0)).expect(200);
 
       const traffic = (await http().get('/v1/edges/traffic').set(admin()).expect(200)).body;
@@ -488,6 +490,10 @@ describe.skipIf(!TEST_DATABASE_URL)('Delivery through edges (e2e)', () => {
         0,
       );
       expect(total).toBe(4000);
+      // What the edge fetched from the main server to deliver that.
+      expect(
+        (byName['Frankfurt 1'] as number[][]).reduce((sum, point) => sum + (point[5] as number), 0),
+      ).toBe(900);
       expect((byName['Frankfurt 1'] as number[][]).at(-1)?.[0]).toBeGreaterThanOrEqual(hour - 3600);
       // Nothing delivered, nothing stored.
       expect(byName.Paris).toEqual([]);

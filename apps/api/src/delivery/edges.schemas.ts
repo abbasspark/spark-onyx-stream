@@ -64,6 +64,7 @@ export const edgeReportSchema = z.object({
     misses: count,
     refused: count,
     originErrors: count,
+    bytesFetched: count.default(0),
   }),
   activeRequests: count,
   cache: z.object({ bytes: count, files: count, limitBytes: count }),

@@ -297,7 +297,8 @@ function LivePlayer({ channel, channels, playback, onBroken, onZap }: LivePlayer
   const [sharingOn, setSharingOn] = useState(true);
   const [shared, setShared] = useState<SharingFigures>(NO_SHARING);
   const [menuOpen, setMenuOpen] = useState(false);
-  useEffect(() => setSharingOn(sharingPreference()), []);
+  const sharingDefault = playback.p2p?.sharingDefault ?? true;
+  useEffect(() => setSharingOn(sharingPreference(sharingDefault)), [sharingDefault]);
   const chooseSharing = useCallback((value: number) => {
     const on = value === 1;
     setSharingPreference(on);

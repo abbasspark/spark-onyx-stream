@@ -378,6 +378,7 @@ func (s *Server) fetch(ctx context.Context, cacheKey, originPath string) (cache.
 		_ = os.Remove(temp.Name())
 		return cache.Entry{}, err
 	}
+	s.counters.BytesFetched.Add(written)
 	entry, err := s.cache.Put(cacheKey, temp.Name())
 	if err != nil {
 		_ = os.Remove(temp.Name())
@@ -461,6 +462,7 @@ func (s *Server) smallFile(ctx context.Context, memoryKey, originPath string, ke
 			return nil, errors.New("the file is larger than expected")
 		}
 
+		s.counters.BytesFetched.Add(int64(len(body)))
 		file := &memoryFile{body: body, storedAt: s.now()}
 		// A playlist of a channel that keeps hours is long, and packs to a tenth.
 		if strings.HasSuffix(originPath, ".m3u8") && len(body) > 1024 {

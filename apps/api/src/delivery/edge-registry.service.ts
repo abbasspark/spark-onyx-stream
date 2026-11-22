@@ -153,6 +153,7 @@ export class EdgeRegistry {
         requests: BigInt(delta.requests),
         hits: BigInt(delta.hits),
         misses: BigInt(delta.misses),
+        fetchedBytes: BigInt(delta.fetched),
       };
       await this.prisma.edgeTrafficHour.upsert({
         where: { edgeId_hour: { edgeId: edge.id, hour: hourOf(now) } },
@@ -162,6 +163,7 @@ export class EdgeRegistry {
           requests: { increment: amounts.requests },
           hits: { increment: amounts.hits },
           misses: { increment: amounts.misses },
+          fetchedBytes: { increment: amounts.fetchedBytes },
         },
       });
     }

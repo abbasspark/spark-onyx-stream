@@ -61,8 +61,11 @@ export interface EdgeView {
   createdAt: Date;
 }
 
-/** One hour of an edge: [start in seconds, bytes, requests, from copies, fetched first]. */
-export type TrafficPoint = [number, number, number, number, number];
+/**
+ * One hour of an edge: [start in seconds, bytes delivered, requests, from
+ * copies, fetched first, bytes fetched from the main server].
+ */
+export type TrafficPoint = [number, number, number, number, number, number];
 
 export interface TrafficView {
   range: TrafficRange;
@@ -199,6 +202,7 @@ export class EdgesService {
             Number(row.requests),
             Number(row.hits),
             Number(row.misses),
+            Number(row.fetchedBytes),
           ]),
       })),
     };

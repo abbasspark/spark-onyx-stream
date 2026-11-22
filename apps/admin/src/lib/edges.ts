@@ -6,6 +6,7 @@ import type {
   EdgeStatus,
   EdgeTraffic,
   PurgeScope,
+  SharingTraffic,
   TrafficRange,
 } from '@/api/types';
 
@@ -251,6 +252,8 @@ export interface TrafficBucket {
   requests: number;
   hits: number;
   misses: number;
+  /** Bytes the edges fetched from the main server to deliver this. */
+  fetched: number;
   /** Bytes per series, in the order of the series. */
   parts: number[];
 }
@@ -264,6 +267,13 @@ export interface TrafficChart {
   requests: number;
   /** Share answered from copies over the whole range. Null without requests. */
   hitRatio: number | null;
+  /** Bytes the edges fetched from the main server over the whole range. */
+  fetched: number;
+  /**
+   * Share of what the edges delivered that the main server did not have to
+   * send, 0 to 1. Null when nothing was delivered, or the agents do not report it.
+   */
+  offload: number | null;
 }
 
 /**
@@ -317,6 +327,7 @@ export function trafficChartOf(traffic: EdgeTraffic, now: number = Date.now()): 
       requests: 0,
       hits: 0,
       misses: 0,
+      fetched: 0,
       parts: series.map(() => 0),
     };
     buckets.push(bucket);
@@ -325,7 +336,7 @@ export function trafficChartOf(traffic: EdgeTraffic, now: number = Date.now()): 
 
   for (const edge of traffic.edges) {
     const index = seriesIndex.get(edge.id) as number;
-    for (const [seconds, bytes, requests, hits, misses] of edge.points) {
+    for (const [seconds, bytes, requests, hits, misses, fetched = 0] of edge.points) {
       const bucket = bucketAt.get(startOf(seconds * 1000));
       if (!bucket) {
         continue;
@@ -334,6 +345,7 @@ export function trafficChartOf(traffic: EdgeTraffic, now: number = Date.now()): 
       bucket.requests += requests;
       bucket.hits += hits;
       bucket.misses += misses;
+      bucket.fetched += fetched;
       bucket.parts[index] = (bucket.parts[index] ?? 0) + bytes;
       (series[index] as TrafficSeries).bytes += bytes;
     }
@@ -342,6 +354,8 @@ export function trafficChartOf(traffic: EdgeTraffic, now: number = Date.now()): 
   const sum = (pick: (bucket: TrafficBucket) => number) =>
     buckets.reduce((total, bucket) => total + pick(bucket), 0);
   const answered = sum((bucket) => bucket.hits + bucket.misses);
+  const delivered = sum((bucket) => bucket.bytes);
+  const fetched = sum((bucket) => bucket.fetched);
   return {
     series,
     buckets,
@@ -349,6 +363,8 @@ export function trafficChartOf(traffic: EdgeTraffic, now: number = Date.now()): 
     bytes: sum((bucket) => bucket.bytes),
     requests: sum((bucket) => bucket.requests),
     hitRatio: answered > 0 ? sum((bucket) => bucket.hits) / answered : null,
+    fetched,
+    offload: offloadOf(delivered, fetched),
   };
 }
 
@@ -438,5 +454,110 @@ export function p2pSettings(origin: string, secret: string): { api: string; trac
       `ONYX_TRACKER_ALLOWED_ORIGINS=${url.host}`,
       'ONYX_TRACKER_TRUST_PROXY=true',
     ].join('\n'),
+  };
+}
+
+/**
+ * Share of what edges delivered that they did not have to fetch from the
+ * main server, 0 to 1. Null when nothing was delivered, and when nothing was
+ * fetched at all, which is what an agent that does not report it looks like.
+ */
+export function offloadOf(delivered: number, fetched: number): number | null {
+  if (delivered <= 0 || fetched <= 0) {
+    return null;
+  }
+  return Math.max(0, 1 - fetched / delivered);
+}
+
+export type SharingKind = 'all' | 'video' | 'live';
+
+export const SHARING_KINDS: { value: SharingKind; label: string }[] = [
+  { value: 'all', label: 'Everything' },
+  { value: 'video', label: 'Films' },
+  { value: 'live', label: 'Live' },
+];
+
+export interface SharingBucket {
+  start: number;
+  label: string;
+  title: string;
+  /** Everything the reporting players took in. */
+  bytes: number;
+  fromViewers: number;
+  fromServers: number;
+  reports: number;
+  /** [from viewers, from servers], the order of the series. */
+  parts: number[];
+}
+
+export interface SharingChart {
+  series: TrafficSeries[];
+  buckets: SharingBucket[];
+  peak: number;
+  fromViewers: number;
+  fromServers: number;
+  /** Share that came from other viewers, 0 to 1. Null before any report. */
+  ratio: number | null;
+}
+
+/** Turns what players reported into the bars of the sharing history. */
+export function sharingChartOf(
+  traffic: SharingTraffic,
+  kind: SharingKind,
+  now: number = Date.now(),
+): SharingChart {
+  // The same hours and days as the edges' history, so the two read alike.
+  const frame = trafficChartOf(
+    { range: traffic.range, from: traffic.from, hours: traffic.hours, edges: [] },
+    now,
+  );
+  const daily = traffic.range !== '24h';
+  const startOf = (at: number) => {
+    const date = new Date(at);
+    return daily
+      ? new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime()
+      : Math.floor(at / 3_600_000) * 3_600_000;
+  };
+
+  const buckets: SharingBucket[] = frame.buckets.map((bucket) => ({
+    start: bucket.start,
+    label: bucket.label,
+    title: bucket.title,
+    bytes: 0,
+    fromViewers: 0,
+    fromServers: 0,
+    reports: 0,
+    parts: [0, 0],
+  }));
+  const bucketAt = new Map(buckets.map((bucket) => [bucket.start, bucket]));
+  const points = [
+    ...(kind === 'live' ? [] : traffic.video),
+    ...(kind === 'video' ? [] : traffic.live),
+  ];
+  for (const [seconds, fromServers, fromViewers, , reports] of points) {
+    const bucket = bucketAt.get(startOf(seconds * 1000));
+    if (!bucket) {
+      continue;
+    }
+    bucket.fromServers += fromServers;
+    bucket.fromViewers += fromViewers;
+    bucket.reports += reports;
+    bucket.bytes = bucket.fromServers + bucket.fromViewers;
+    bucket.parts = [bucket.fromViewers, bucket.fromServers];
+  }
+
+  const fromViewers = buckets.reduce((total, bucket) => total + bucket.fromViewers, 0);
+  const fromServers = buckets.reduce((total, bucket) => total + bucket.fromServers, 0);
+  return {
+    series: [
+      { id: 'viewers', name: 'From other viewers', slot: 0, bytes: fromViewers },
+      // Not a series among others but the rest of the whole: the quiet colour.
+      { id: 'servers', name: 'From servers', slot: -1, bytes: fromServers },
+    ],
+    buckets,
+    peak: Math.max(0, ...buckets.map((bucket) => bucket.bytes)),
+    fromViewers,
+    fromServers,
+    ratio: fromViewers + fromServers > 0 ? fromViewers / (fromViewers + fromServers) : null,
   };
 }

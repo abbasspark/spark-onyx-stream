@@ -181,28 +181,50 @@ In a test with three viewers in three browsers on one machine, the three got 48 
 - **What comes from another viewer is not checked against the original.** A viewer who went to the trouble could send wrong data to others, whose players would show a broken picture or an error until they fetch from a server again. Encrypted videos cannot be read by someone who has no key, but they are not protected against this either.
 - **Sharing uses the viewer's upload** and memory: up to 512 MB of a film and 256 MB of a channel are kept to give to others.
 
-| Setting         | Default                 | Meaning                                       |
-| --------------- | ----------------------- | --------------------------------------------- |
-| `P2P_STUN_URLS` | two public STUN servers | STUN servers for players, separated by commas |
+| Setting              | Default                 | Meaning                                                       |
+| -------------------- | ----------------------- | ------------------------------------------------------------- |
+| `P2P_STUN_URLS`      | two public STUN servers | STUN servers for players, separated by commas                 |
+| `P2P_VIEWER_DEFAULT` | `on`                    | Whether players share until the viewer chooses: `on` or `off` |
+
+## What was taken off the main server
+
+Two figures say what edges and viewers save, and each is counted where it happens.
+
+- **Edges:** an agent counts what it delivers and what it had to fetch from the main server to do so. The difference is what the edge took off the main server. **Delivery → Edge servers** shows it for the chosen time: "The main server sent 11 GB of that: the edges took 88% off it."
+- **Viewers:** every player that can share counts what it took from servers and what it took from other viewers, and tells the site about twice a minute. **Delivery → P2P** shows it for the last 24 hours, 7 days or 30 days, for films, for live channels or both, as a chart and as a table.
+
+What these figures are, and are not:
+
+- **The viewers' figure is what players say.** A report is taken only from a player that was let watch, and no report may claim more than 4 GB, but a viewer who wants to can send wrong numbers. They are statistics and decide nothing.
+- **It covers sharing players only.** Viewers on iPhones, on mobile data or with sharing switched off do not report, so what they took from your servers is not in it. The share that came from viewers is the share among those who can share, not among all viewers.
+- **"From servers" in the viewers' figure means edges and the main server together.** A player cannot tell them apart.
+- **Reports are added up in memory and written every half minute.** A process that is killed loses what it had not written. The hours are kept for 90 days.
+- **An agent older than this step** reports nothing about what it fetched, and the panel then leaves the sentence out.
+
+### The default for sharing
+
+`P2P_VIEWER_DEFAULT` of the main server decides whether players share until the viewer says otherwise: `on` (the default) or `off`. A viewer's own choice in the player always wins and is kept in the browser.
 
 ## API
 
-| Method and path                     | Who              | Purpose                                                    |
-| ----------------------------------- | ---------------- | ---------------------------------------------------------- |
-| `GET /v1/edges`                     | `delivery:read`  | All edges with state, figures and traffic history          |
-| `GET /v1/edges/:id`                 | `delivery:read`  | One edge                                                   |
-| `POST /v1/edges`                    | `delivery:write` | Add an edge. The answer carries its token, once            |
-| `PATCH /v1/edges/:id`               | `delivery:write` | Change an edge, pause it or switch it on                   |
-| `POST /v1/edges/:id/token`          | `delivery:write` | Replace the token                                          |
-| `DELETE /v1/edges/:id`              | `delivery:write` | Remove an edge and lock its agent out                      |
-| `POST /v1/edges/:id/purge`          | `delivery:write` | Ask the agent to drop its copies: `all`, `video` or `live` |
-| `GET /v1/edges/traffic?range=`      | `delivery:read`  | What each edge delivered per hour: `24h`, `7d` or `30d`    |
-| `GET /v1/p2p`                       | `delivery:read`  | Whether P2P is on, and the figures of the tracker          |
-| `GET /v1/catalog/delivery`          | everyone         | The addresses of the edges, for the website                |
-| `POST /v1/edge-agent/heartbeat`     | the agent        | Report, and get the key for checking tokens                |
-| `GET /v1/edge-agent/assets/:id`     | the agent        | Whether a video can be played, and its current processing  |
-| `GET /v1/edge-agent/media/:id/…`    | the agent        | A file of a video, or its content key                      |
-| `GET /v1/edge-agent/live/:id/:file` | the agent        | A playlist or segment of a channel                         |
+| Method and path                     | Who              | Purpose                                                          |
+| ----------------------------------- | ---------------- | ---------------------------------------------------------------- |
+| `GET /v1/edges`                     | `delivery:read`  | All edges with state, figures and traffic history                |
+| `GET /v1/edges/:id`                 | `delivery:read`  | One edge                                                         |
+| `POST /v1/edges`                    | `delivery:write` | Add an edge. The answer carries its token, once                  |
+| `PATCH /v1/edges/:id`               | `delivery:write` | Change an edge, pause it or switch it on                         |
+| `POST /v1/edges/:id/token`          | `delivery:write` | Replace the token                                                |
+| `DELETE /v1/edges/:id`              | `delivery:write` | Remove an edge and lock its agent out                            |
+| `POST /v1/edges/:id/purge`          | `delivery:write` | Ask the agent to drop its copies: `all`, `video` or `live`       |
+| `GET /v1/edges/traffic?range=`      | `delivery:read`  | What each edge delivered per hour: `24h`, `7d` or `30d`          |
+| `GET /v1/p2p`                       | `delivery:read`  | Whether P2P is on, and the figures of the tracker                |
+| `GET /v1/p2p/traffic?range=`        | `delivery:read`  | What players reported per hour: `24h`, `7d` or `30d`             |
+| `POST /v1/catalog/delivery/report`  | a player         | What it took from servers and from viewers since its last report |
+| `GET /v1/catalog/delivery`          | everyone         | The addresses of the edges, for the website                      |
+| `POST /v1/edge-agent/heartbeat`     | the agent        | Report, and get the key for checking tokens                      |
+| `GET /v1/edge-agent/assets/:id`     | the agent        | Whether a video can be played, and its current processing        |
+| `GET /v1/edge-agent/media/:id/…`    | the agent        | A file of a video, or its content key                            |
+| `GET /v1/edge-agent/live/:id/:file` | the agent        | A playlist or segment of a channel                               |
 
 `delivery:read` and `delivery:write` are held by owners and admins. Changes are written to the audit log. An agent that speaks an older version of this conversation than the main server is refused and stays offline.
 
@@ -214,7 +236,8 @@ In a test with three viewers in three browsers on one machine, the three got 48 
 - Edges that fetch from other edges, and edges for pictures
 - Sending the first bytes of a new file to the viewer while it is still being fetched
 - Updating agents from the panel
-- How much viewers took off the servers, which is the next step of this phase
-- A TURN server for viewers who cannot connect directly, checking what comes from other viewers, and a default for sharing that the operator sets
+- One figure for everything the main server itself sent, which needs counting in the gateway
+- Figures per title, per channel and per country
+- A TURN server for viewers who cannot connect directly, and checking what comes from other viewers
 - P2P in apps, and on iPhones
 - Several trackers behind one address, and names of videos and channels beside the swarms in the panel
