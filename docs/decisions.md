@@ -628,3 +628,16 @@ This replaces the "plain CSS without a component library" part of D-018.
 **Why:** the installations this is built for are run by one person, and a backup that has to be set up by hand is one that is set up after the first loss. On by default costs a few megabytes a night. `pg_dump` is the tool PostgreSQL itself stands behind, across versions, and its archive can be loaded by anyone with `pg_restore`, with or without us. Storage pools already know disks and buckets, so backups can leave the server without a second mechanism. The file is encrypted because it holds every viewer's address and password hash and will be copied to places that are less guarded than the database. Reading it back is the only test that says anything: most backups that fail, fail on the day they are needed. A restore replaces the database under the running application, panel included, so the panel cannot be the thing that does it. A tool that needs only the database and the key also works on the day nothing else does.
 
 **Consequence:** the API image carries the PostgreSQL client tools, which must be no older than the database server. The key is not in the backup, so losing `.env` loses every backup with it. The panel says so where backups are set up. Video files are outside of this and stay the operator's task. Every backup is written twice over the network when the pool is a bucket: once out, once back to check.
+
+## D-049 The installer is a script around the Compose installation, and builds on the server
+
+**Date:** 2026-11-22
+
+- **The installer is one shell script that sets up the Docker Compose installation of `deploy/compose`.** It does what the README describes by hand, and nothing that cannot be done by hand.
+- **It can be run again at any time and never replaces settings or secrets.**
+- **HTTPS is a second Compose file with a proxy that fetches certificates,** switched on by a line in `.env`.
+- **The images are built on the server.** There is no registry with published images yet.
+
+**Why:** a second way of installing would be a second thing to keep working, and the one fewer people use would rot. With the installer on top of the Compose files, every installation looks the same inside, the documentation of one is the documentation of both, and someone who outgrows the installer loses nothing. A shell script runs on a bare server before anything else is there. Being safe to run again matters more than anything it does the first time: a build runs out of memory, a connection drops, and the answer must always be "run it again". Secrets are the one thing that cannot be made again, so the installer writes them once and stops rather than guess when data exists without them. A proxy that gets its own certificates takes away the step people skip, and as a separate file it stays out of the way of those who have a proxy already. Building on the server needs no registry, no release process and no trust in images someone else built.
+
+**Consequence:** the first installation takes minutes and 2 GB of memory, which small servers have only with swap. Published images would take both away, and belong with releases. The project name in Compose is fixed, so a server holds one installation. The installer leans on Docker's own install script for Docker, and on the package manager of the system for three small tools.

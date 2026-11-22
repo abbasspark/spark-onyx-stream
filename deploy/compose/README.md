@@ -20,6 +20,14 @@ player  ───▶│  /v1/media/…  media files, token checked by Nginx   �
 
 ## Install
 
+On a server, the [installer](../installer/README.md) does everything below in one command, with HTTPS when you give it a domain:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/abbasspark/spark-onyx-stream/main/deploy/installer/install.sh | sudo bash
+```
+
+By hand, or on your own computer:
+
 ```bash
 cd deploy/compose
 ./init-env.sh                 # once: writes .env with fresh secrets
@@ -34,16 +42,17 @@ Before you publish anything, set `SITE_NAME` and `SITE_URL` in `.env`. Read the 
 
 ## What runs
 
-| Service    | Image                 | Job                                                   |
-| ---------- | --------------------- | ----------------------------------------------------- |
-| `gateway`  | `onyx-stream/gateway` | Nginx: admin panel, media files, passes the rest on   |
-| `web`      | `onyx-stream/web`     | Viewer website (Next.js)                              |
-| `api`      | `onyx-stream/api`     | REST API and uploads (`APP_ROLE=api,scheduler`)       |
-| `worker`   | `onyx-stream/api`     | Processing with FFmpeg (`APP_ROLE=worker`)            |
-| `migrate`  | `onyx-stream/api`     | Brings the database to the current version, then ends |
-| `postgres` | `postgres:17-alpine`  | Database                                              |
-| `redis`    | `redis:7-alpine`      | Job queue                                             |
-| `tracker`  | `onyx-stream/tracker` | Lets the players of viewers find each other, for P2P  |
+| Service    | Image                 | Job                                                       |
+| ---------- | --------------------- | --------------------------------------------------------- |
+| `gateway`  | `onyx-stream/gateway` | Nginx: admin panel, media files, passes the rest on       |
+| `web`      | `onyx-stream/web`     | Viewer website (Next.js)                                  |
+| `api`      | `onyx-stream/api`     | REST API and uploads (`APP_ROLE=api,scheduler`)           |
+| `worker`   | `onyx-stream/api`     | Processing with FFmpeg (`APP_ROLE=worker`)                |
+| `migrate`  | `onyx-stream/api`     | Brings the database to the current version, then ends     |
+| `postgres` | `postgres:17-alpine`  | Database                                                  |
+| `redis`    | `redis:7-alpine`      | Job queue                                                 |
+| `tracker`  | `onyx-stream/tracker` | Lets the players of viewers find each other, for P2P      |
+| `tls`      | `caddy:2-alpine`      | HTTPS for your domain. Only with `docker-compose.tls.yml` |
 
 Only the gateway is reachable from outside, and the ingest server on the two ports encoders push live channels to: 1935 (TCP, RTMP) and 8890 (UDP, SRT). Open those in the firewall if you use pushed channels. The API, the website, the database and Redis have no published ports.
 
@@ -59,17 +68,42 @@ The gateway checks the playback token of every media request itself, with a smal
 
 The gateway does not ask the database. When an asset is deleted, a cleanup job removes its files, usually within seconds, and from then on the gateway answers its playback URLs with 404.
 
-## TLS
+## HTTPS
 
-The gateway speaks plain HTTP. Put a TLS proxy in front of it, for example Caddy, Traefik or the load balancer of your hosting provider, and:
+The gateway speaks plain HTTP. Do not put the installation on the public internet without HTTPS: sign-in passwords and session tokens would travel unprotected.
+
+### With the proxy that comes with it
+
+`docker-compose.tls.yml` adds a proxy (Caddy) in front of the gateway. It gets a certificate for your domain from Let's Encrypt and renews it by itself. The installer sets this up when it is given `--domain`. By hand:
+
+1. Point the domain at the server with an A record, and make sure the ports 80 and 443 are reachable.
+2. Set in `.env`:
+
+   ```bash
+   COMPOSE_FILE=docker-compose.yml:docker-compose.tls.yml
+   ONYX_DOMAIN=watch.example.com
+   SITE_URL=https://watch.example.com
+   P2P_TRACKER_URL=wss://watch.example.com/tracker
+   HTTP_BIND=127.0.0.1
+   TRUST_PROXY_HOPS=2
+   ```
+
+3. Run `docker compose up -d`.
+
+`COMPOSE_FILE` makes every `docker compose` command in this folder include the proxy. `HTTP_BIND=127.0.0.1` closes port 8080 to the outside, so the proxy is the only way in.
+
+### With a proxy of your own
+
+Traefik, the load balancer of your hosting provider, or any other TLS proxy works as well:
 
 - send its traffic to port 8080 of this server
 - make it set `X-Forwarded-Proto` and `X-Forwarded-For`
 - set `TRUST_PROXY_HOPS=2` in `.env`, so the audit log shows the real client address
-
-Do not put the installation on the public internet without TLS: sign-in passwords and session tokens would travel unprotected.
+- set `SITE_URL` and `P2P_TRACKER_URL` to the public address, with `https://` and `wss://`
 
 ## Everyday tasks
+
+An installation made by the installer has the `onyx` command for these: `onyx status`, `onyx logs`, `onyx backup`, `onyx restore`. See [the installer](../installer/README.md#the-onyx-command).
 
 ```bash
 docker compose ps                         # state of the services

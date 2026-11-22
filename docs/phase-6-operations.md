@@ -125,8 +125,25 @@ A download is handed out through a link that works for one minute and for one ba
 - Video files are not backed up by this. See above.
 - Nobody is told by email when a backup fails. The panel shows it. Diagnostics, later in this phase, are where alerts will come from.
 
+## The installer
+
+One command sets up a server:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/abbasspark/spark-onyx-stream/main/deploy/installer/install.sh \
+  | sudo bash -s -- --domain watch.example.com
+```
+
+It checks the server, installs Docker when it is missing, fetches the code into `/opt/onyx-stream`, writes the settings with fresh secrets, builds and starts everything, and waits until the site answers. What it sets up is the Docker Compose installation of `deploy/compose`, the same one that can be made by hand. [deploy/installer/README.md](../deploy/installer/README.md) has the options and the details.
+
+- **It can always be run again.** It carries on where it stopped, and on an installed server it changes no setting and no secret.
+- **It never writes new secrets over old data.** When the database of an earlier installation is on the server but its `.env` is gone, it stops and says how to bring the file back.
+- **HTTPS is a second Compose file.** `docker-compose.tls.yml` puts a proxy in front of the gateway that gets and renews the certificate for the domain. The plain port is then closed to the outside. Without a domain the site is reached by address and port, which is for trying things out.
+- **It brings the `onyx` command:** `onyx status`, `onyx logs`, `onyx backup`, `onyx restore <file>` and a few more. `onyx restore` is the restore procedure above in one command, with a question before anything is replaced.
+
+The images are built on the server, from the code that was fetched. That needs about 2 GB of memory and 5 to 15 minutes, once.
+
 ## Still to come in this phase
 
-- The installer: one command that sets up a server.
 - Updates with rollback, which make a backup first.
 - Diagnostics: one page that says what is wrong with an installation.

@@ -229,7 +229,9 @@ services:
     environment:
       PLAYBACK_SIGNING_SECRET: ${PLAYBACK_SIGNING_SECRET:?Run ./init-env.sh first}
     ports:
-      - '${HTTP_PORT:-8080}:8080'
+      # HTTP_BIND=127.0.0.1 keeps the port to this server, for when a TLS
+      # proxy in front is the only way in. See docker-compose.tls.yml.
+      - '${HTTP_BIND:-0.0.0.0}:${HTTP_PORT:-8080}:8080'
     volumes:
       # Read-only: the gateway sends media files and never changes them.
       - storage:/var/lib/onyx/storage:ro

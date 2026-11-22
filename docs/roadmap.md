@@ -52,7 +52,7 @@ See [phase-5-edges.md](phase-5-edges.md) for the design.
 ## Phase 6 in steps
 
 1. Backup and restore: scheduled, encrypted backups of the database in a storage pool, each proven to open, the Backups page in the panel, and a command line tool that restores one. **Done.**
-2. The installer: one command that sets up a server.
+2. The installer: one command that sets up a server, with HTTPS for a domain, and the `onyx` command for the days after. **Done.**
 3. Updates with rollback.
 4. Diagnostics: one page that says what is wrong with an installation.
 

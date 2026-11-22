@@ -89,7 +89,18 @@ cd deploy/compose
 docker compose up -d --build
 ```
 
-Then open http://localhost:8080. See the [Compose README](deploy/compose/README.md) for updates, backups and TLS.
+Then open http://localhost:8080. See the [Compose README](deploy/compose/README.md) for updates, backups and HTTPS.
+
+### Install on a server
+
+One command sets up a Linux server, with HTTPS when you give it a domain that points there:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/abbasspark/spark-onyx-stream/main/deploy/installer/install.sh \
+  | sudo bash -s -- --domain watch.example.com
+```
+
+See the [installer README](deploy/installer/README.md) for what it does and for the `onyx` command it brings.
 
 The viewer website is at the root and the admin panel at `/admin/`. See the [roadmap](docs/roadmap.md) for what comes next.
 
