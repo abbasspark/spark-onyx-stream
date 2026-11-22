@@ -1321,3 +1321,56 @@ export interface DeliveryOverview {
   gatewayCounted: boolean;
   points: OverviewPoint[];
 }
+
+// --- Backups ---------------------------------------------------------------------
+
+export type BackupStatus = 'PENDING' | 'RUNNING' | 'COMPLETED' | 'FAILED';
+export type BackupSchedule = 'off' | 'daily' | 'weekly';
+/** How well the installation is protected, going by its newest good backup. */
+export type BackupProtection = 'protected' | 'late' | 'none' | 'off';
+
+export interface BackupSettings {
+  schedule: BackupSchedule;
+  /** The hour of the day a scheduled backup is made, in UTC. */
+  hour: number;
+  /** For weekly backups: the day in UTC, with 0 for Sunday. */
+  weekday: number;
+  /** How many finished backups are kept. */
+  keep: number;
+  /** Where backups are written. Null is the default storage pool. */
+  storagePoolId: string | null;
+}
+
+export interface Backup {
+  id: string;
+  status: BackupStatus;
+  trigger: 'MANUAL' | 'SCHEDULED';
+  pool: { id: string; name: string };
+  fileName: string | null;
+  sizeBytes: number | null;
+  sha256: string | null;
+  /** How many database objects the file holds. */
+  entries: number | null;
+  appVersion: string;
+  migration: string | null;
+  error: string | null;
+  createdBy: { id: string; displayName: string } | null;
+  createdAt: string;
+  startedAt: string | null;
+  finishedAt: string | null;
+}
+
+export interface BackupOverview {
+  settings: BackupSettings;
+  protection: BackupProtection;
+  lastGoodAt: string | null;
+  nextRunAt: string | null;
+  /** The process that makes the backups. Null when none has been heard of lately. */
+  runner: { pgDump: string | null; server: string | null; problem: string | null } | null;
+  appVersion: string;
+  totalBytes: number;
+  /** The last thirty days, oldest first. */
+  days: { date: string; good: number; failed: number }[];
+  pools: { id: string; name: string; driver: string; isDefault: boolean; isActive: boolean }[];
+  backups: Backup[];
+}

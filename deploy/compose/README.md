@@ -90,11 +90,35 @@ The `migrate` service updates the database before the new API starts.
 
 Three things hold your data: the database, the storage volume and `.env`.
 
+**The database** is backed up by the installation itself, every night, into the folder `backups` of the storage volume. The files are encrypted. The schedule, the number of backups kept and where they go are set in the panel under **Settings → Backups**, and so is downloading one. A backup right now, from the terminal:
+
 ```bash
-docker compose exec -T postgres pg_dump -U onyx onyx | gzip > onyx-$(date +%F).sql.gz
+docker compose run --rm api node dist/cli/backup.js create \
+  /var/lib/onyx/storage/backups/by-hand.onyxbackup
+```
+
+**The storage volume** holds the videos, and those backups. Copy it somewhere else:
+
+```bash
 docker run --rm -v onyx_storage:/data -v "$PWD":/backup alpine \
   tar czf /backup/onyx-storage-$(date +%F).tar.gz -C /data .
 ```
+
+**`.env`** holds `MASTER_KEY`. The database backups are encrypted under it and none of them opens without it. Keep a copy of the file somewhere other than this server.
+
+### Restore
+
+```bash
+# Check that the backup opens. Changes nothing.
+docker compose run --rm api node dist/cli/backup.js verify /var/lib/onyx/storage/backups/<file>
+
+docker compose stop api worker live
+docker compose run --rm api node dist/cli/backup.js restore /var/lib/onyx/storage/backups/<file> \
+  --yes --save-current /var/lib/onyx/storage/backups/before-restore.onyxbackup
+docker compose up -d
+```
+
+The panel shows the same commands with the file name filled in: **Settings → Backups → How to restore**. What a restore does and does not bring back is described in [docs/phase-6-operations.md](../../docs/phase-6-operations.md#restoring).
 
 ### Remove
 

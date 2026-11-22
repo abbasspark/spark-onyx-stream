@@ -70,8 +70,10 @@ ENV NODE_ENV=production \
     LIVE_PATH=/var/lib/onyx/live
 
 # FFmpeg does the media work. tini passes stop signals on, so jobs end cleanly.
+# The PostgreSQL client brings pg_dump and pg_restore, which backups are made
+# and restored with. It must be no older than the database server.
 RUN apt-get update \
- && apt-get install --yes --no-install-recommends ffmpeg tini \
+ && apt-get install --yes --no-install-recommends ffmpeg tini postgresql-client \
  && rm -rf /var/lib/apt/lists/* \
  && npm install --global pnpm@${PNPM_VERSION} && npm cache clean --force \
  && mkdir -p /var/lib/onyx/storage /var/lib/onyx/uploads /var/lib/onyx/processing /var/lib/onyx/live \

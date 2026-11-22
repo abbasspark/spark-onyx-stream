@@ -19,6 +19,7 @@ import { DeliveryPage } from './pages/delivery-page';
 import { EdgesPage } from './pages/edges-page';
 import { GuidePage } from './pages/guide-page';
 import { RecordingsPage } from './pages/recordings-page';
+import { BackupsPage } from './pages/backups-page';
 import { P2pPage } from './pages/p2p-page';
 import { PackagesPage } from './pages/packages-page';
 import { PlansPage } from './pages/plans-page';
@@ -101,6 +102,7 @@ function Pages() {
             <Route path="p2p" element={<P2pPage />} />
             <Route path="revenue" element={<RevenuePage />} />
             <Route path="email" element={<EmailPage />} />
+            <Route path="backups" element={<BackupsPage />} />
             <Route path="admins" element={<AdminsPage />} />
             <Route path="api-keys" element={<ApiKeysPage />} />
             <Route path="audit" element={<AuditPage />} />

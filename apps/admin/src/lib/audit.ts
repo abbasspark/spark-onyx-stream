@@ -2,6 +2,10 @@
 
 /** What each action code of the audit log means, in words. */
 const ACTION_LABELS: Record<string, string> = {
+  'backup.create': 'Asked for a backup',
+  'backup.settings': 'Changed the backup schedule',
+  'backup.download': 'Downloaded a backup',
+  'backup.delete': 'Deleted a backup',
   'guide-source.create': 'Added a guide source',
   'guide-source.update': 'Changed a guide source',
   'guide-source.delete': 'Deleted a guide source',
