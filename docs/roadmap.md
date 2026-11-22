@@ -53,7 +53,7 @@ See [phase-5-edges.md](phase-5-edges.md) for the design.
 
 1. Backup and restore: scheduled, encrypted backups of the database in a storage pool, each proven to open, the Backups page in the panel, and a command line tool that restores one. **Done.**
 2. The installer: one command that sets up a server, with HTTPS for a domain, and the `onyx` command for the days after. **Done.**
-3. Updates with rollback.
+3. Updates with rollback: `onyx update` builds the new version beside the running one, copies the database at the last moment, switches, and goes back by itself when the new version does not answer. `onyx rollback` undoes an update later. **Done.**
 4. Diagnostics: one page that says what is wrong with an installation.
 
 See [phase-6-operations.md](phase-6-operations.md) for the design.

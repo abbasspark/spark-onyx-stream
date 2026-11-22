@@ -268,5 +268,91 @@ equals 'onyx env names the settings file' "$(cd "$HERE/../../compose" && pwd)/.e
 stops 'onyx without an installation' 'No installation found' env ONYX_COMPOSE_DIR="$WORK/none" "$ONYX" status
 yes 'onyx works through a link' bash -c "ln -sf '$ONYX' '$WORK/onyx' && '$WORK/onyx' env | head -n 1 | grep -q 'deploy/compose/.env'"
 
+# --- Updates ------------------------------------------------------------------
+
+# A small installation of its own: a repository with two versions, and the
+# place it was fetched from.
+git_quiet() { git -c user.name=Test -c user.email=test@example.com -c init.defaultBranch=main "$@" >/dev/null 2>&1; }
+SOURCE="$WORK/source"
+INSTALLED="$WORK/installed"
+mkdir -p "$SOURCE/deploy/installer" "$SOURCE/deploy/compose" "$SOURCE/packages/database/prisma/migrations/2026_first"
+cp "$ONYX" "$SOURCE/deploy/installer/onyx"
+echo 'services: {}' >"$SOURCE/deploy/compose/docker-compose.yml"
+echo 'CREATE TABLE a();' >"$SOURCE/packages/database/prisma/migrations/2026_first/migration.sql"
+git_quiet -C "$SOURCE" init && git_quiet -C "$SOURCE" add -A && git_quiet -C "$SOURCE" commit -m 'first version'
+FIRST=$(git -C "$SOURCE" rev-parse HEAD)
+git_quiet clone "$SOURCE" "$INSTALLED"
+echo 'HTTP_PORT=8080' >"$INSTALLED/deploy/compose/.env"
+
+mkdir -p "$SOURCE/packages/database/prisma/migrations/2026_second" "$SOURCE/packages/database/prisma/migrations/2026_third"
+echo 'CREATE TABLE b();' >"$SOURCE/packages/database/prisma/migrations/2026_second/migration.sql"
+echo 'CREATE TABLE c();' >"$SOURCE/packages/database/prisma/migrations/2026_third/migration.sql"
+echo '-- a comment' >>"$SOURCE/packages/database/prisma/migrations/2026_first/migration.sql"
+echo 'new' >"$SOURCE/README.md"
+git_quiet -C "$SOURCE" add -A && git_quiet -C "$SOURCE" commit -m 'second version'
+SECOND=$(git -C "$SOURCE" rev-parse HEAD)
+git_quiet -C "$SOURCE" tag v2
+echo 'newer' >"$SOURCE/README.md"
+git_quiet -C "$SOURCE" add -A && git_quiet -C "$SOURCE" commit -m 'third version'
+THIRD=$(git -C "$SOURCE" rev-parse HEAD)
+
+# Runs a piece of the command inside that installation, with Docker played by a stand-in.
+in_installation() {
+  ONYX_LIB=1 ONYX_STATE_DIR="$WORK/state" bash -c "
+    source '$INSTALLED/deploy/installer/onyx'
+    docker() { return 0; }
+    $1"
+}
+
+equals 'the note of an update starts empty' '' "$(in_installation 'state_get STATUS')"
+in_installation 'state_set STATUS building; state_set FROM abc; state_set STATUS updated; state_set BRANCH ""'
+equals 'a value is kept' 'abc' "$(in_installation 'state_get FROM')"
+equals 'a value is replaced, not added twice' 'updated' "$(in_installation 'state_get STATUS')"
+equals 'the note has one line per key' '3' "$(wc -l <"$WORK/state/update" | tr -d ' ')"
+equals 'an empty value is kept as empty' '' "$(in_installation 'state_get BRANCH')"
+equals 'the folder is for its owner only' '700' "$(stat -c %a "$WORK/state")"
+
+equals 'finds the newest version of the branch installed' "$THIRD" "$(in_installation 'fetch_target ""')"
+equals 'finds a version by its tag' "$SECOND" "$(in_installation 'fetch_target v2')"
+stops 'a version that does not exist' 'could not be fetched' in_installation 'fetch_target v99'
+equals 'counts the migrations a version adds, not the ones it edits' '2' "$(in_installation "fetch_target '' >/dev/null; migrations_between $FIRST $THIRD")"
+equals 'counts none between the same version' '0' "$(in_installation "migrations_between $FIRST $FIRST")"
+equals 'counts none going to a version without new ones' '0' "$(in_installation "fetch_target '' >/dev/null; migrations_between $SECOND $THIRD")"
+
+equals 'no changes by hand at first' '' "$(in_installation 'local_changes')"
+echo 'services: {changed: true}' >"$INSTALLED/deploy/compose/docker-compose.yml"
+yes 'notices a file changed by hand' grep -q 'docker-compose.yml' <<<"$(in_installation 'local_changes')"
+equals 'the settings file is not a change' '1' "$(in_installation 'local_changes' | wc -l | tr -d ' ')"
+stops 'an update over files changed by hand' 'changed by hand' in_installation 'need_installation() { :; }; cmd_update --yes'
+git_quiet -C "$INSTALLED" checkout -- deploy/compose/docker-compose.yml
+
+yes 'says when there is a newer version' grep -q 'A newer version is there' <<<"$(in_installation 'cmd_update --check')"
+yes 'and how much of it touches the database' grep -q '2 changes, with 2 to the structure of the database' <<<"$(in_installation 'cmd_update --check')"
+equals 'checking changes nothing' "$FIRST" "$(git -C "$INSTALLED" rev-parse HEAD)"
+stops 'an update nobody confirmed' 'Not confirmed' in_installation 'has_terminal() { return 1; }; cmd_update'
+stops 'an unknown option of update' 'Unknown option' in_installation 'cmd_update --fast'
+
+in_installation "checkout $SECOND main"
+equals 'moves the files and keeps the branch' "main $SECOND" "$(git -C "$INSTALLED" symbolic-ref --short HEAD) $(git -C "$INSTALLED" rev-parse HEAD)"
+in_installation "checkout $FIRST ''"
+equals 'or stays at an exact version' "$FIRST" "$(git -C "$INSTALLED" rev-parse HEAD)"
+no 'which is on no branch' git -C "$INSTALLED" symbolic-ref --quiet HEAD
+stops 'updating a fixed version without saying where to' 'at a fixed version' in_installation 'fetch_target ""'
+in_installation "checkout $THIRD main"
+yes 'says when nothing is newer' grep -q 'This is the newest version' <<<"$(in_installation 'cmd_update')"
+
+rm -r "$WORK/state"
+stops 'a rollback without an update before it' 'nothing to go back to' in_installation 'cmd_rollback --yes'
+in_installation "state_set FROM $FIRST; state_set TO $THIRD; state_set STATUS rolled-back; touch \"\$ROLLBACK_DUMP\""
+stops 'a rollback that was done already' 'from before the last update already' in_installation 'cmd_rollback --yes'
+in_installation 'state_set STATUS updated'
+stops 'a rollback nobody confirmed' 'Not confirmed' in_installation 'has_terminal() { return 1; }; cmd_rollback'
+stops 'a rollback whose images are gone' 'rollback is gone' in_installation 'docker() { return 1; }; cmd_rollback --yes'
+yes 'the status names the way back' grep -q 'To undo it: onyx rollback' <<<"$(in_installation 'update_note')"
+in_installation 'state_set STATUS switching'
+yes 'and an update that was cut off' grep -q 'was cut off' <<<"$(in_installation 'update_note')"
+in_installation 'mkdir "$STATE_DIR/lock"'
+stops 'two updates at once' 'running already' in_installation 'take_lock'
+
 printf '%d passed, %d failed\n' "$PASSED" "$FAILED"
 [[ "$FAILED" -eq 0 ]]

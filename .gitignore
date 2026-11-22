@@ -72,3 +72,6 @@ next-env.d.ts
 
 # Redis writes this where it is started
 dump.rdb
+
+# What "onyx update" keeps on a server to be able to go back
+/.onyx/

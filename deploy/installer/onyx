@@ -19,11 +19,22 @@ BACKUPS="/var/lib/onyx/storage/backups"
 BACKUP_TOOL=(node dist/cli/backup.js)
 # What holds connections to the database.
 DATABASE_USERS=(api worker live)
+# What an update leaves behind, so that it can be undone: the database as it
+# was, a copy of the settings, and a note of which version it came from.
+STATE_DIR="${ONYX_STATE_DIR:-$ROOT/.onyx}"
+STATE_FILE="$STATE_DIR/update"
+ROLLBACK_DUMP="$STATE_DIR/database-before-update.dump"
+ROLLBACK_ENV="$STATE_DIR/env-before-update"
+FAILURE_LOG="$STATE_DIR/failed-update.log"
+# The images the installation builds. Before an update each is also tagged
+# "rollback", which is what going back starts from.
+IMAGES=(onyx-stream/api onyx-stream/web onyx-stream/gateway onyx-stream/tracker)
+UPDATE_WAIT_SECONDS="${ONYX_UPDATE_WAIT_SECONDS:-300}"
 
 if [[ -t 1 && -z "${NO_COLOR:-}" ]]; then
-  BOLD=$'\033[1m' RED=$'\033[31m' GREEN=$'\033[32m' YELLOW=$'\033[33m' RESET=$'\033[0m'
+  BOLD=$'\033[1m' DIM=$'\033[2m' RED=$'\033[31m' GREEN=$'\033[32m' YELLOW=$'\033[33m' RESET=$'\033[0m'
 else
-  BOLD="" RED="" GREEN="" YELLOW="" RESET=""
+  BOLD="" DIM="" RED="" GREEN="" YELLOW="" RESET=""
 fi
 
 die() {
@@ -50,6 +61,10 @@ ${BOLD}onyx${RESET}: day-to-day commands for Spark Onyx Stream
   onyx backups                List the backup files
   onyx verify <file>          Prove that a backup opens. Changes nothing
   onyx restore <file>         Replace the database with a backup
+
+  onyx update                 Move to the newest version. Goes back by itself if it does not come up
+  onyx update --check         Only say whether there is a newer version
+  onyx rollback               Go back to the version before the last update
 
   onyx env                    Show where the settings are
   onyx compose <...>          Run any "docker compose" command for the installation
@@ -140,12 +155,13 @@ cmd_status() {
   local free
   free=$(df -Ph "$(docker info --format '{{.DockerRootDir}}' 2>/dev/null || echo /)" | awk 'NR == 2 {print $4 " free of " $2}')
   printf '  Disk: %s\n' "$free"
+  update_note
 }
 
 cmd_version() {
   local version
-  version=$(git -C "$ROOT" describe --tags --always 2>/dev/null || echo unknown)
-  printf '%s (%s)' "$version" "$(git -C "$ROOT" log -1 --format=%cs 2>/dev/null || echo 'date unknown')"
+  version=$(repo describe --tags --always 2>/dev/null || echo unknown)
+  printf '%s (%s)' "$version" "$(repo log -1 --format=%cs 2>/dev/null || echo 'date unknown')"
 }
 
 cmd_backup() {
@@ -208,6 +224,406 @@ cmd_restore() {
   fi
 }
 
+# --- Updates ------------------------------------------------------------------
+
+say() { printf '      %s\n' "$*"; }
+ok() { printf '   %s✓%s  %s\n' "$GREEN" "$RESET" "$*"; }
+warn() { printf '   %s!%s  %s\n' "$YELLOW" "$RESET" "$*" >&2; }
+step() { printf '\n%s%s%s\n' "$BOLD" "$1" "$RESET"; }
+
+# git for the installation, whoever owns its files.
+repo() {
+  git -c safe.directory="$ROOT" -C "$ROOT" "$@"
+}
+
+short() { printf '%s' "${1:0:7}"; }
+
+# state_get <key>: a value of the note the last update left, or nothing.
+state_get() {
+  [[ -f "$STATE_FILE" ]] || return 0
+  local line
+  while IFS= read -r line || [[ -n "$line" ]]; do
+    if [[ "$line" == "$1="* ]]; then
+      printf '%s' "${line#*=}"
+      return 0
+    fi
+  done <"$STATE_FILE"
+  return 0
+}
+
+# state_set <key> <value>
+state_set() {
+  mkdir -p "$STATE_DIR"
+  chmod 700 "$STATE_DIR"
+  local line tmp found=0
+  tmp=$(mktemp "$STATE_DIR/update.XXXXXX")
+  if [[ -f "$STATE_FILE" ]]; then
+    while IFS= read -r line || [[ -n "$line" ]]; do
+      if [[ "$line" == "$1="* ]]; then
+        printf '%s=%s\n' "$1" "$2"
+        found=1
+      else
+        printf '%s\n' "$line"
+      fi
+    done <"$STATE_FILE" >"$tmp"
+  fi
+  if [[ "$found" -eq 0 ]]; then
+    printf '%s=%s\n' "$1" "$2" >>"$tmp"
+  fi
+  mv "$tmp" "$STATE_FILE"
+}
+
+# Tracked files that were changed by hand. An update would have to overwrite them.
+local_changes() {
+  repo status --porcelain --untracked-files=no
+}
+
+# migrations_between <old> <new>: how many database migrations the new version adds.
+migrations_between() {
+  repo diff --name-only --diff-filter=A "$1" "$2" -- packages/database/prisma/migrations |
+    grep -c '/migration\.sql$' || true
+}
+
+# Fetches what to update to and prints its commit.
+# With a name: that branch or tag. Without: the newest of the branch installed.
+fetch_target() {
+  local ref="$1"
+  if [[ -z "$ref" ]]; then
+    ref=$(repo symbolic-ref --quiet --short HEAD || true)
+    [[ -n "$ref" ]] ||
+      die "This installation is at a fixed version, not on a branch." "Say which version to move to: onyx update --ref <branch or tag>"
+  fi
+  repo fetch --quiet --tags origin "$ref" 2>/dev/null ||
+    die "\"$ref\" could not be fetched." "Check the connection of this server to the internet, and the name."
+  repo rev-parse FETCH_HEAD
+}
+
+# Moves the files of the installation to a commit. On a branch, the branch moves along.
+checkout() {
+  local commit="$1" branch="$2"
+  if [[ -n "$branch" ]]; then
+    repo checkout --quiet -B "$branch" "$commit"
+  else
+    repo checkout --quiet --detach "$commit"
+  fi
+}
+
+site_answers() {
+  local port
+  port=$(get_env HTTP_PORT)
+  curl -fsS -o /dev/null --max-time 5 "http://127.0.0.1:${port:-8080}/v1/health/live" 2>/dev/null &&
+    curl -fsS -o /dev/null --max-time 10 "http://127.0.0.1:${port:-8080}/" 2>/dev/null
+}
+
+# Starts what the files say and waits until the API and the website answer.
+bring_up() {
+  compose --progress plain up -d --no-build --remove-orphans >"$STATE_DIR/up.log" 2>&1 || return 1
+  local waited=0
+  until site_answers; do
+    ((waited >= UPDATE_WAIT_SECONDS)) && return 1
+    sleep 3
+    waited=$((waited + 3))
+  done
+}
+
+postgres_do() {
+  compose exec -T postgres sh -c "$1"
+}
+
+# The database as it is now, written out by the tools of the database server
+# itself. They fit the server whatever version of the application runs.
+dump_database() {
+  compose --progress quiet up -d postgres >/dev/null 2>&1 || true
+  local waited=0
+  until postgres_do 'pg_isready -q -U "$POSTGRES_USER" -d "$POSTGRES_DB"' >/dev/null 2>&1; do
+    ((waited >= 60)) && return 1
+    sleep 2
+    waited=$((waited + 2))
+  done
+  local tmp="$ROLLBACK_DUMP.new"
+  (umask 077 && postgres_do 'pg_dump -U "$POSTGRES_USER" --format=custom "$POSTGRES_DB"' >"$tmp") || return 1
+  # Proven to be a dump before it is relied on.
+  [[ -s "$tmp" ]] && postgres_do 'pg_restore --list >/dev/null' <"$tmp" || return 1
+  mv "$tmp" "$ROLLBACK_DUMP"
+}
+
+restore_database() {
+  # Without the list of everything that is dropped.
+  postgres_do 'PGOPTIONS="-c client_min_messages=warning" psql -q -v ON_ERROR_STOP=1 -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c "DROP SCHEMA IF EXISTS public CASCADE; CREATE SCHEMA public;"' >/dev/null &&
+    postgres_do 'pg_restore -U "$POSTGRES_USER" -d "$POSTGRES_DB" --no-owner --no-privileges --exit-on-error --single-transaction' <"$ROLLBACK_DUMP"
+}
+
+tag_images() {
+  local from="$1" to="$2" image
+  for image in "${IMAGES[@]}"; do
+    if docker image inspect "$image:$from" >/dev/null 2>&1; then
+      docker tag "$image:$from" "$image:$to"
+    fi
+  done
+}
+
+# Keeps what the logs say about a failed start, and shows the end of it.
+keep_failure() {
+  {
+    printf '# %s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+    cat "$STATE_DIR/up.log" 2>/dev/null
+    compose logs --no-color --tail 60 migrate api web gateway 2>&1
+  } >"$FAILURE_LOG" 2>/dev/null || true
+  printf '%s' "$DIM" >&2
+  grep -v '^#' "$FAILURE_LOG" | grep -iE 'error|fail|exception|cannot|refused|exit' | tail -n 8 >&2 || true
+  printf '%s' "$RESET" >&2
+  say "All of it: $FAILURE_LOG"
+}
+
+# One update or rollback at a time.
+take_lock() {
+  mkdir -p "$STATE_DIR"
+  chmod 700 "$STATE_DIR"
+  mkdir "$STATE_DIR/lock" 2>/dev/null ||
+    die "An update or a rollback is running already." "If none is, a run was cut off: remove $STATE_DIR/lock and look at: onyx status"
+  trap 'rmdir "$STATE_DIR/lock" 2>/dev/null || true' EXIT
+}
+
+# Returns the installation to where the last update started: files, images,
+# and the database when the update changed its structure.
+# go_back <why it is shown as> ; reads the note of the update.
+go_back() {
+  local commit branch migrations
+  commit=$(state_get FROM)
+  branch=$(state_get BRANCH)
+  migrations=$(state_get MIGRATIONS)
+
+  compose --progress quiet stop "${DATABASE_USERS[@]}" web gateway >/dev/null 2>&1 || true
+  checkout "$commit" "$branch"
+  tag_images rollback local
+  # The settings stay as they are: an update only ever adds to them, and the
+  # older version does not mind what was added.
+  ok "Files and images are those of $(short "$commit") again"
+
+  if [[ "${migrations:-0}" -gt 0 ]]; then
+    # The older version does not know the database the newer one left.
+    if restore_database; then
+      ok "The database is as it was before the update"
+    else
+      state_set STATUS broken
+      die "The database could not be put back." "The application is stopped. The database from before the update is in $ROLLBACK_DUMP" "and can be loaded with pg_restore. Nothing else on the server was changed."
+    fi
+  else
+    ok "The database was not changed by the update and is kept as it is"
+  fi
+
+  if bring_up; then
+    state_set STATUS "$1"
+    return 0
+  fi
+  state_set STATUS broken
+  keep_failure
+  die "The version from before the update does not come up either." "See: onyx logs api    The database from before the update is in $ROLLBACK_DUMP"
+}
+
+cmd_update() {
+  local ref="" check=0 assume_yes=0 force=0
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --ref)
+        [[ $# -ge 2 ]] || die "--ref needs a branch or a tag."
+        ref="$2"
+        shift
+        ;;
+      --check) check=1 ;;
+      --yes | -y) assume_yes=1 ;;
+      --force) force=1 ;;
+      *) die "Unknown option: $1" "onyx update [--check] [--ref <branch or tag>] [--yes]" ;;
+    esac
+    shift
+  done
+
+  local from to branch
+  from=$(repo rev-parse HEAD)
+  branch=$(repo symbolic-ref --quiet --short HEAD || true)
+  to=$(fetch_target "$ref")
+  if [[ -n "$ref" && "$ref" != "$branch" ]]; then
+    # A tag or another branch was asked for: the installation stays at that exact version.
+    branch=""
+  fi
+
+  if [[ "$from" == "$to" && "$force" -eq 0 ]]; then
+    printf 'This is the newest version: %s\n' "$(cmd_version)"
+    return 0
+  fi
+
+  local commits migrations
+  commits=$(repo rev-list --count "$from..$to" 2>/dev/null || echo 0)
+  migrations=$(migrations_between "$from" "$to")
+  printf '%sA newer version is there.%s\n' "$BOLD" "$RESET"
+  printf '  Installed: %s  %s\n' "$(short "$from")" "$(repo log -1 --format='%cs  %s' "$from")"
+  printf '  Newest:    %s  %s\n' "$(short "$to")" "$(repo log -1 --format='%cs  %s' "$to")"
+  if [[ "$commits" -gt 0 ]]; then
+    printf '  %s change%s' "$commits" "$([[ "$commits" -eq 1 ]] || printf s)"
+    [[ "$migrations" -gt 0 ]] && printf ', with %s to the structure of the database' "$migrations"
+    printf '\n'
+  elif ! repo merge-base --is-ancestor "$from" "$to" 2>/dev/null; then
+    printf '  %sIt is not a later version of the one installed, but another line or an older one.%s\n' "$YELLOW" "$RESET"
+  fi
+  if [[ "$check" -eq 1 ]]; then
+    printf 'Install it with: onyx update\n'
+    return 0
+  fi
+
+  local changed
+  changed=$(local_changes)
+  if [[ -n "$changed" ]]; then
+    die "Files of the installation were changed by hand, and the update would overwrite them:" "$changed" "Put them aside with: git -C $ROOT stash     and run the update again."
+  fi
+
+  printf '\nThe new version is built while the site keeps running. Then the site is down\n'
+  printf 'for a minute or two: the database is put aside and the new version started.\n'
+  printf 'If it does not come up, the installation goes back to the version it has now,\n'
+  printf 'with its database, and nothing is lost.\n'
+  if [[ "$assume_yes" -eq 0 ]]; then
+    has_terminal || die "Not confirmed, because there is no terminal to ask on. Nothing was changed." "Run it again with --yes to update without being asked."
+    local answer=""
+    printf 'Update now? (y/n) ' >/dev/tty
+    IFS= read -r answer </dev/tty || true
+    [[ "$answer" =~ ^[Yy] ]] || die "Not confirmed. Nothing was changed."
+  fi
+
+  take_lock
+
+  step "1. Building $(short "$to")"
+  say "The site keeps running on the version it has."
+  # The images of the version that runs get a second name, which survives the build.
+  tag_images local rollback
+  cp -p "$ENV_FILE" "$ROLLBACK_ENV"
+  state_set FROM "$from"
+  state_set TO "$to"
+  state_set BRANCH "$branch"
+  state_set MIGRATIONS "$migrations"
+  state_set AT "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+  state_set STATUS building
+  checkout "$to" "$branch"
+  # Secrets a newer version needs are added. Nothing that exists is changed.
+  (cd "$COMPOSE_DIR" && ./init-env.sh >/dev/null 2>&1) || true
+  if ! compose build; then
+    checkout "$from" "$branch"
+    tag_images rollback local
+    state_set STATUS build-failed
+    die "The new version could not be built. The site was not touched and runs as before." "The lines above say where the build stopped. A build that is \"Killed\" ran out of memory."
+  fi
+  ok "Built"
+
+  step "2. Putting the database aside"
+  say "The site is down from here until the new version answers."
+  # Stopped first, so the copy holds everything up to the last moment and
+  # going back loses nothing.
+  compose --progress quiet stop "${DATABASE_USERS[@]}" >/dev/null 2>&1 || true
+  if ! dump_database; then
+    checkout "$from" "$branch"
+    tag_images rollback local
+    state_set STATUS build-failed
+    bring_up || true
+    die "The database could not be written out, so there would be no way back." "The update was not made, and the version from before was started again. See: onyx logs postgres"
+  fi
+  state_set AT "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+  ok "In $ROLLBACK_DUMP"
+
+  step "3. Switching to $(short "$to")"
+  state_set STATUS switching
+  if bring_up; then
+    state_set STATUS updated
+    ok "The site answers"
+    printf '\n%s%sUpdated to %s.%s\n' "$GREEN" "$BOLD" "$(cmd_version)" "$RESET"
+    printf 'Look around the panel and the site. If something is wrong: onyx rollback\n'
+    if [[ "$migrations" -gt 0 ]]; then
+      printf 'A rollback returns the database to how it was a moment ago. What happens\n'
+      printf 'from now on would be lost with it, so decide soon.\n'
+    fi
+    return 0
+  fi
+
+  warn "The new version did not come up."
+  keep_failure
+
+  step "4. Going back to $(short "$from")"
+  go_back rolled-back-after-failure
+  ok "The site answers"
+  printf '\n%s%sThe update failed, and the installation is back at %s.%s\n' "$YELLOW" "$BOLD" "$(cmd_version)" "$RESET"
+  printf 'Nothing was lost. What the new version said before it gave up is in:\n  %s\n' "$FAILURE_LOG"
+  exit 1
+}
+
+cmd_rollback() {
+  local assume_yes=0
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --yes | -y) assume_yes=1 ;;
+      *) die "Unknown option: $1" "onyx rollback [--yes]" ;;
+    esac
+    shift
+  done
+
+  local from to status migrations at
+  from=$(state_get FROM)
+  to=$(state_get TO)
+  status=$(state_get STATUS)
+  migrations=$(state_get MIGRATIONS)
+  at=$(state_get AT)
+  [[ -n "$from" && -f "$ROLLBACK_DUMP" ]] ||
+    die "There is nothing to go back to: no update was made with this command yet."
+  case "$status" in
+    updated | building | switching | broken) ;;
+    *) die "The installation is at the version from before the last update already ($(short "$from"))." ;;
+  esac
+  local image
+  for image in "${IMAGES[@]}"; do
+    docker image inspect "$image:rollback" >/dev/null 2>&1 ||
+      die "The image $image:rollback is gone, so the version before cannot be started." "It may have been removed by a cleanup of Docker."
+  done
+
+  printf '%sGo back to the version before the update of %s.%s\n' "$BOLD" "$at" "$RESET"
+  printf '  Now:    %s\n  Before: %s  %s\n\n' "$(short "$to")" "$(short "$from")" "$(repo log -1 --format='%cs  %s' "$from" 2>/dev/null || true)"
+  if [[ "${migrations:-0}" -gt 0 ]]; then
+    printf '%sThe update changed the structure of the database, so the database goes back\n' "$YELLOW"
+    printf 'too, to how it was at %s. Everything that changed since then is lost:%s\n' "$at" "$RESET"
+    printf 'new viewers, payments, titles. Video files are not touched.\n'
+  else
+    printf 'The update did not change the structure of the database. It is kept as it is,\n'
+    printf 'and nothing is lost.\n'
+  fi
+  printf 'The site is down for about a minute.\n'
+  if [[ "$assume_yes" -eq 0 ]]; then
+    has_terminal || die "Not confirmed, because there is no terminal to ask on. Nothing was changed." "Run it again with --yes to go back without being asked."
+    local answer=""
+    printf 'Type "rollback" to go on: ' >/dev/tty
+    IFS= read -r answer </dev/tty || true
+    [[ "$answer" == "rollback" ]] || die "Not confirmed. Nothing was changed."
+  fi
+
+  take_lock
+  step "Going back to $(short "$from")"
+  go_back rolled-back
+  ok "The site answers"
+  printf '\n%s%sBack at %s.%s\n' "$GREEN" "$BOLD" "$(cmd_version)" "$RESET"
+}
+
+# What the last update left, in a line for "onyx status".
+update_note() {
+  local status from to at
+  status=$(state_get STATUS)
+  [[ -n "$status" ]] || return 0
+  from=$(short "$(state_get FROM)")
+  to=$(short "$(state_get TO)")
+  at=$(state_get AT)
+  case "$status" in
+    updated) printf '  Last update: %s, from %s to %s. To undo it: onyx rollback\n' "$at" "$from" "$to" ;;
+    rolled-back) printf '  Last update: %s, to %s. It was rolled back to %s\n' "$at" "$to" "$from" ;;
+    rolled-back-after-failure) printf '%s!%s The update of %s to %s failed and was rolled back. See %s\n' "$YELLOW" "$RESET" "$at" "$to" "$FAILURE_LOG" ;;
+    build-failed) printf '%s!%s The update of %s to %s could not be built. The site was not touched\n' "$YELLOW" "$RESET" "$at" "$to" ;;
+    building | switching) printf '%s!%s An update to %s was cut off (%s). To return to %s: onyx rollback   To try again: onyx update\n' "$RED" "$RESET" "$to" "$at" "$from" ;;
+    broken) printf '%s✗%s The update of %s left the installation in a state that needs a look. See %s\n' "$RED" "$RESET" "$at" "$FAILURE_LOG" ;;
+  esac
+}
+
 main() {
   local command="${1:-help}"
   [[ $# -gt 0 ]] && shift
@@ -245,9 +661,16 @@ main() {
     backups) cmd_backups ;;
     verify) cmd_verify "$@" ;;
     restore) cmd_restore "$@" ;;
+    update) cmd_update "$@" ;;
+    rollback) cmd_rollback "$@" ;;
     compose) compose "$@" ;;
     *) die "Unknown command: $command" "See: onyx help" ;;
   esac
 }
 
-main "$@"
+# An update replaces this file while it runs. Everything above is read by now,
+# and the "exit" on the same line keeps bash from reading on in the new file.
+# Tests load the functions without running a command.
+if [[ -z "${ONYX_LIB:-}" ]]; then
+  main "$@"; exit $?
+fi

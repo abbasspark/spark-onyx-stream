@@ -72,12 +72,52 @@ onyx backups                List the backup files
 onyx verify <file>          Prove that a backup opens. Changes nothing
 onyx restore <file>         Replace the database with a backup
 
+onyx update                 Move to the newest version. Goes back by itself if it does not come up
+onyx update --check         Only say whether there is a newer version
+onyx rollback               Go back to the version before the last update
+
 onyx env                    Show where the settings are
 onyx compose <...>          Run any "docker compose" command for the installation
 onyx version                Which version is installed
 ```
 
 `onyx restore` does the whole procedure of [restoring a backup](../../docs/phase-6-operations.md#restoring): it proves that the backup opens, asks you to type `restore`, stops what uses the database, puts the database as it is aside, restores, and starts everything again. A backup is named by its file name in the backups folder, or by the path of a file on the server, such as one you downloaded from the panel.
+
+## Updating
+
+```bash
+onyx update
+```
+
+It says what would change and asks before it starts. Then:
+
+1. **Builds the new version** while the site keeps running on the old one. A version that does not build changes nothing.
+2. **Puts the database aside.** The application is stopped first, so the copy holds everything up to the last moment. The site is down from here on.
+3. **Switches** to the new version, lets it bring the database up to date, and waits until the API and the website answer.
+4. **Goes back by itself** when they do not: to the files, the images and the database from before. Nothing is lost, and what the new version said before it gave up is kept in `.onyx/failed-update.log`.
+
+The site is down for a minute or two, between steps 2 and 3.
+
+`onyx update --check` only says whether there is a newer version, and how much of it touches the database. `onyx update --ref <branch or tag>` moves to a version you name. `--yes` skips the question.
+
+### Going back later
+
+An update can come up and still be wrong. Until the next update, there is a way back:
+
+```bash
+onyx rollback
+```
+
+It returns the files and the images of the version before. What happens to the database depends on the update:
+
+- **The update did not change the structure of the database:** the database is kept as it is, and nothing is lost.
+- **It did:** the older version cannot read the newer database, so the database goes back too, to the moment of the update. Everything that changed since then is lost. `onyx rollback` says which of the two it is and asks before it does anything, so decide soon after an update.
+
+### What an update keeps
+
+In the folder `.onyx` of the installation, readable by root only: the database from before the last update, a copy of the settings, and a note of the versions. The images of the version before stay on the server under the tag `rollback`. All of it is replaced by the next update. Images that no version uses any more pile up over time; `docker image prune` removes them.
+
+Files of the installation that were changed by hand stop an update, because it would overwrite them. `.env` is not one of them: an update only ever adds to it.
 
 ## After the installation
 
@@ -92,4 +132,4 @@ onyx version                Which version is installed
 pnpm test:installer
 ```
 
-They cover the installer's own logic: its options, what it accepts as a domain, a port and a site name, and how it writes the settings. They change nothing on the machine and need neither root nor Docker.
+They cover the logic of the installer and of `onyx`: options, what is accepted as a domain, a port and a site name, how the settings are written, and how an update finds its target, counts database changes and keeps its notes. They change nothing on the machine and need neither root nor Docker.
