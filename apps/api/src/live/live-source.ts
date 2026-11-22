@@ -15,8 +15,14 @@ export const SOURCE_PROTOCOLS = {
 
 export type SourceProtocol = keyof typeof SOURCE_PROTOCOLS;
 
-/** Microseconds a network read may take before FFmpeg gives up on the connection. */
-const READ_TIMEOUT_US = '15000000';
+/**
+ * Microseconds a network read may take before FFmpeg gives up on the connection.
+ *
+ * Longer than the fifteen seconds a source gets to answer when it is probed,
+ * so a silent source is reported as silent and not with whatever FFmpeg says
+ * when its own patience ends first.
+ */
+const READ_TIMEOUT_US = '20000000';
 
 export class InvalidSourceError extends Error {
   constructor(message: string) {
