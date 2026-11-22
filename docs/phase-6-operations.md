@@ -139,11 +139,39 @@ It checks the server, installs Docker when it is missing, fetches the code into 
 - **It can always be run again.** It carries on where it stopped, and on an installed server it changes no setting and no secret.
 - **It never writes new secrets over old data.** When the database of an earlier installation is on the server but its `.env` is gone, it stops and says how to bring the file back.
 - **HTTPS is a second Compose file.** `docker-compose.tls.yml` puts a proxy in front of the gateway that gets and renews the certificate for the domain. The plain port is then closed to the outside. Without a domain the site is reached by address and port, which is for trying things out.
-- **It brings the `onyx` command:** `onyx status`, `onyx logs`, `onyx backup`, `onyx restore <file>` and a few more. `onyx restore` is the restore procedure above in one command, with a question before anything is replaced.
+- **It brings the `onyx` command:** `onyx status`, `onyx logs`, `onyx backup`, `onyx restore <file>`, `onyx update` and a few more. `onyx restore` is the restore procedure above in one command, with a question before anything is replaced.
 
 The images are built on the server, from the code that was fetched. That needs about 2 GB of memory and 5 to 15 minutes, once.
 
+## Updates with rollback
+
+```bash
+onyx update
+```
+
+An update must never leave an installation worse off than it was. So the order is: build first, and touch the running site only when there is something to switch to.
+
+```
+build the new version          the site runs on the old one; a failed build changes nothing
+stop the application           from here the site is down
+copy the database              pg_dump by the database server's own tools
+start the new version          its migrations run, then the API, then the website
+does it answer?  ── yes ──▶    done; "onyx rollback" stays possible until the next update
+                 ── no  ──▶    old files, old images, the copied database, start again
+```
+
+- **The copy of the database is taken at the last moment,** with the application stopped. Whatever was written while the new version was building is in it, so going back loses nothing.
+- **The database goes back only when it has to.** An update that added no migration leaves the database alone on a rollback. One that did takes the database back with it, because the older version does not know the newer structure.
+- **"Does it answer" means the API and the website,** through the gateway, the way a viewer reaches them. A migration that fails and an API that does not start both end there.
+- **The version before stays on the server:** its images under the tag `rollback`, its commit in a note, the database in `.onyx/`. That is what `onyx rollback` uses, for an update that came up but turned out wrong.
+- **The updater that runs is the one of the installed version.** It is read into memory in full before it replaces its own file.
+
+The copy of the database for a rollback is a plain `pg_dump` archive, not one of the encrypted backups. It is made and loaded by the tools inside the database container, which fit the server whatever version of the application is installed, and it lies on the same disk as the database itself, readable by root only.
+
+### The gateway follows the API
+
+Updates brought a fault to light that was there before them. Nginx looks a name up once, when it starts. A container that is made anew, as the API is on every update, can come back with another address, and the gateway went on sending requests to the old one: every page answered with an error until the gateway was restarted. The gateway now asks Docker's name service again every few seconds and follows the API and the website wherever they come back.
+
 ## Still to come in this phase
 
-- Updates with rollback, which make a backup first.
 - Diagnostics: one page that says what is wrong with an installation.

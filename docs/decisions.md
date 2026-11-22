@@ -641,3 +641,17 @@ This replaces the "plain CSS without a component library" part of D-018.
 **Why:** a second way of installing would be a second thing to keep working, and the one fewer people use would rot. With the installer on top of the Compose files, every installation looks the same inside, the documentation of one is the documentation of both, and someone who outgrows the installer loses nothing. A shell script runs on a bare server before anything else is there. Being safe to run again matters more than anything it does the first time: a build runs out of memory, a connection drops, and the answer must always be "run it again". Secrets are the one thing that cannot be made again, so the installer writes them once and stops rather than guess when data exists without them. A proxy that gets its own certificates takes away the step people skip, and as a separate file it stays out of the way of those who have a proxy already. Building on the server needs no registry, no release process and no trust in images someone else built.
 
 **Consequence:** the first installation takes minutes and 2 GB of memory, which small servers have only with swap. Published images would take both away, and belong with releases. The project name in Compose is fixed, so a server holds one installation. The installer leans on Docker's own install script for Docker, and on the package manager of the system for three small tools.
+
+## D-050 An update builds first, copies the database last, and goes back by itself
+
+**Date:** 2026-11-22
+
+- **The new version is built while the old one runs.** The site is touched only when there is something to switch to.
+- **The database is copied after the application is stopped,** right before the switch.
+- **An update that does not answer is undone without a question:** old files, old images, the copied database.
+- **A rollback returns the database only when the update changed its structure.**
+- **The copy for a rollback is made by the database server's own tools,** not by the application's backup tool.
+
+**Why:** the person updating is often alone and not a database administrator, and the moment an update fails is the worst one to ask them anything. So the failure that is cheapest to handle has to be the common one: a build that fails costs nothing because nothing was switched. Copying the database last closes the gap an earlier copy would leave: with the copy taken before the build, minutes of sign-ups and payments would be lost on a rollback, and "nothing is lost" would be a lie. Taking the database back only when migrations ran keeps the far more common rollback, of an update that changed code alone, free of any loss. The tools in the database container fit the server by definition, where the application's own backup tool belongs to one version of the application, and a rollback is exactly the moment two versions are in play.
+
+**Consequence:** the site is down for a minute or two per update, while the database is copied and the new version starts. There is one step back, not a history: the next update replaces what the last one kept. A rollback after an update with migrations loses what happened in between, and says so before it starts. The version before stays on disk as images until the next update. Releases with published images would make the build step a download, and are the natural next thing here.

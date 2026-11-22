@@ -113,12 +113,21 @@ docker compose up -d --scale worker=2     # a second worker for parallel jobs
 
 ### Update
 
+With the `onyx` command of the installer, which goes back by itself when the new version does not come up:
+
+```bash
+onyx update
+```
+
+By hand:
+
 ```bash
 git pull
+./init-env.sh                 # adds secrets a newer version needs, changes nothing else
 docker compose up -d --build
 ```
 
-The `migrate` service updates the database before the new API starts.
+The `migrate` service updates the database before the new API starts. By hand there is no way back but a backup: make one first, with the command below.
 
 ### Back up
 
