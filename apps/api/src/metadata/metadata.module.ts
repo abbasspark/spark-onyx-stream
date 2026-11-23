@@ -10,5 +10,6 @@ import { TmdbClient } from './tmdb.client.js';
   imports: [CatalogModule],
   controllers: [MetadataController],
   providers: [TmdbClient, MetadataService],
+  exports: [MetadataService],
 })
 export class MetadataModule {}

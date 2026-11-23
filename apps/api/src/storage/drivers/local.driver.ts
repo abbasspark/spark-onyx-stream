@@ -109,6 +109,10 @@ export class LocalStorageDriver implements StorageDriver {
     yield* this.walk(this.localPath(normalized), normalized);
   }
 
+  async *listAll(): AsyncIterable<StorageListEntry> {
+    yield* this.walk(this.basePath, '');
+  }
+
   private async *walk(directory: string, keyPrefix: string): AsyncIterable<StorageListEntry> {
     let entries;
     try {
@@ -121,7 +125,7 @@ export class LocalStorageDriver implements StorageDriver {
     }
 
     for (const entry of entries.sort((a, b) => a.name.localeCompare(b.name))) {
-      const key = `${keyPrefix}/${entry.name}`;
+      const key = keyPrefix ? `${keyPrefix}/${entry.name}` : entry.name;
       const fullPath = path.join(directory, entry.name);
 
       if (entry.isDirectory()) {

@@ -49,6 +49,13 @@ import type {
   Extra,
   ExtraKind,
   SourceTranslation,
+  WatchedFile,
+  WatchedFileState,
+  WatchLocation,
+  WatchLocationSettings,
+  WatchPlaceInput,
+  WatchPlaceTest,
+  WatchSummary,
   Translation,
   TranslationInput,
   Category,
@@ -489,6 +496,44 @@ export const translationsApi = {
     request<SourceTranslation>(`/v1/titles/${titleId}/translations/${language}/source`),
   languages: (signal?: AbortSignal) =>
     request<{ language: string; titles: number }[]>('/v1/translations/languages', { signal }),
+};
+
+export interface WatchFilesQuery {
+  page: number;
+  pageSize: number;
+  locationId?: string;
+  state?: WatchedFileState;
+  q?: string;
+}
+
+export const watchApi = {
+  summary: (signal?: AbortSignal) => request<WatchSummary>('/v1/watch/summary', { signal }),
+  locations: (signal?: AbortSignal) => request<WatchLocation[]>('/v1/watch/locations', { signal }),
+  test: (place: WatchPlaceInput) =>
+    request<WatchPlaceTest>('/v1/watch/locations/test', { method: 'POST', body: place }),
+  createLocation: (body: WatchPlaceInput & Partial<WatchLocationSettings> & { name: string }) =>
+    request<WatchLocation>('/v1/watch/locations', { method: 'POST', body }),
+  updateLocation: (
+    id: string,
+    body: Partial<WatchLocationSettings> & { config?: Record<string, unknown> },
+  ) => request<WatchLocation>(`/v1/watch/locations/${id}`, { method: 'PATCH', body }),
+  removeLocation: (id: string) => request<void>(`/v1/watch/locations/${id}`, { method: 'DELETE' }),
+  scan: (id: string) =>
+    request<WatchLocation>(`/v1/watch/locations/${id}/scan`, { method: 'POST' }),
+  files: (query: WatchFilesQuery, signal?: AbortSignal) =>
+    request<Page<WatchedFile>>('/v1/watch/files', { query: { ...query }, signal }),
+  match: (
+    id: string,
+    body: { kind: TitleType; tmdbId: number; seasonNumber?: number; episodeNumber?: number },
+  ) => request<WatchedFile>(`/v1/watch/files/${id}/match`, { method: 'POST', body }),
+  retry: (id: string, replace = false) =>
+    request<WatchedFile>(`/v1/watch/files/${id}/retry`, { method: 'POST', body: { replace } }),
+  retryAll: (locationId?: string) =>
+    request<{ queued: number }>('/v1/watch/files/retry', {
+      method: 'POST',
+      body: locationId ? { locationId } : {},
+    }),
+  ignore: (id: string) => request<WatchedFile>(`/v1/watch/files/${id}/ignore`, { method: 'POST' }),
 };
 
 export const extrasApi = {

@@ -41,6 +41,7 @@ import { TitleEditorPage } from './pages/title-editor-page';
 import { MoviesPage, SeriesPage } from './pages/titles-page';
 import { CollectionEditorPage, CollectionsPage } from './pages/collections-page';
 import { GenresPage } from './pages/genres-page';
+import { ImportsPage } from './pages/imports-page';
 import { PeoplePage } from './pages/people-page';
 import { ViewersPage } from './pages/viewers-page';
 import { ThemeProvider, useTheme } from './theme/theme';
@@ -119,6 +120,7 @@ function Pages() {
             <Route path="collections/:id" element={<CollectionEditorPage />} />
             <Route path="people" element={<PeoplePage />} />
             <Route path="genres" element={<GenresPage />} />
+            <Route path="imports" element={<ImportsPage />} />
             {/* Addresses from before movies and series had sections of their own. */}
             <Route path="titles" element={<OldTitlesAddress />} />
             <Route path="titles/:id" element={<OldTitleAddress />} />

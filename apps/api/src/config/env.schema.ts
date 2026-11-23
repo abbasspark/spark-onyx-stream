@@ -58,6 +58,12 @@ export const envSchema = z
       .min(1)
       .default(50 * 1024 ** 3),
 
+    /**
+     * How long a file in a watched folder must have been left alone before it is
+     * imported, in seconds. Keeps a file that is still being copied from being picked up.
+     */
+    WATCH_SETTLE_SECONDS: z.coerce.number().int().min(0).max(3600).default(60),
+
     /** How long a playback URL stays valid, in seconds. Long videos get more time automatically. */
     PLAYBACK_URL_TTL_SECONDS: z.coerce
       .number()

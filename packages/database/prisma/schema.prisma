@@ -198,11 +198,124 @@ model StoragePool {
   createdAt  DateTime      @default(now())
   updatedAt  DateTime      @updatedAt
 
-  assets  Asset[]
-  images  Image[]
-  backups Backup[]
+  assets         Asset[]
+  images         Image[]
+  backups        Backup[]
+  watchLocations WatchLocation[]
 
   @@map("storage_pools")
+}
+
+// ---------------------------------------------------------------------------
+// Watched locations
+// ---------------------------------------------------------------------------
+
+/// What happens to a file of a watched location once it is imported.
+enum WatchAfterImport {
+  /// Moved into the folder "imported" of the location.
+  MOVE
+  /// Left where it is.
+  KEEP
+  /// Deleted.
+  DELETE
+}
+
+/// A folder or a bucket that is looked through for new videos, which are
+/// imported by the name of their file: "603_the-matrix.mkv" is the movie 603
+/// of TMDB, "1399_S01E05_x.mkv" an episode of the series 1399.
+model WatchLocation {
+  id       String        @id @default(uuid(7)) @db.Uuid
+  name     String        @unique
+  driver   StorageDriver
+  /// As for a storage pool: a base path, or the settings of a bucket with
+  /// its credentials encrypted.
+  config   Json
+  isActive Boolean       @default(true)
+
+  /// How often the location is looked through.
+  scanIntervalMinutes Int @default(5)
+
+  /// Where imported videos are stored. Empty: the default pool.
+  storagePoolId     String?          @db.Uuid
+  storagePool       StoragePool?     @relation(fields: [storagePoolId], references: [id], onDelete: SetNull)
+  processingMode    ProcessingMode?
+  encodingProfileId String?          @db.Uuid
+  encodingProfile   EncodingProfile? @relation(fields: [encodingProfileId], references: [id], onDelete: SetNull)
+
+  /// Publishes what was imported as soon as its video plays. Off, imports stay drafts.
+  autoPublish Boolean          @default(false)
+  afterImport WatchAfterImport @default(MOVE)
+
+  lastScanAt      DateTime?
+  /// Why the last look failed, in words for an admin. Empty when it went well.
+  lastScanError   String?
+  /// Set when an admin asks for a look now.
+  scanRequestedAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  files WatchedFile[]
+
+  @@map("watch_locations")
+}
+
+enum WatchedFileState {
+  /// Seen, and still growing or too fresh to be touched.
+  WAITING
+  /// Its name does not say what it is. An admin has to.
+  UNRECOGNISED
+  /// Known what it is, waiting for its turn.
+  QUEUED
+  IMPORTING
+  IMPORTED
+  /// The title or episode has a video already. An admin decides.
+  CONFLICT
+  FAILED
+  /// Set aside by an admin.
+  IGNORED
+}
+
+/// One video file found in a watched location, and what became of it.
+model WatchedFile {
+  id         String           @id @default(uuid(7)) @db.Uuid
+  locationId String           @db.Uuid
+  location   WatchLocation    @relation(fields: [locationId], references: [id], onDelete: Cascade)
+  /// Path inside the location, with forward slashes.
+  path       String
+  size       BigInt
+  modifiedAt DateTime
+  state      WatchedFileState @default(WAITING)
+
+  /// What the file is, from its name or from an admin: "movie:603" or "tv:1399".
+  metadataId    String?
+  seasonNumber  Int?
+  episodeNumber Int?
+  /// Whether an admin said what it is.
+  matchedByHand Boolean @default(false)
+  /// The video of the title or episode may be replaced by this file.
+  replace       Boolean @default(false)
+
+  titleId   String?  @db.Uuid
+  title     Title?   @relation(fields: [titleId], references: [id], onDelete: SetNull)
+  episodeId String?  @db.Uuid
+  episode   Episode? @relation(fields: [episodeId], references: [id], onDelete: SetNull)
+  assetId   String?  @db.Uuid
+  asset     Asset?   @relation(fields: [assetId], references: [id], onDelete: SetNull)
+
+  /// Still to be published once its video plays.
+  publishPending Boolean @default(false)
+  /// Why it failed or waits for an admin, in words.
+  note           String?
+
+  firstSeenAt DateTime  @default(now())
+  importedAt  DateTime?
+  updatedAt   DateTime  @updatedAt
+
+  @@unique([locationId, path])
+  @@index([state])
+  @@index([locationId, state])
+  @@map("watched_files")
 }
 
 // ---------------------------------------------------------------------------
@@ -293,10 +406,11 @@ model Asset {
   jobs           Job[]
 
   // Catalog entries that play this asset. The asset itself does not depend on them.
-  titles        Title[]      @relation("TitleMainAsset")
-  trailerTitles Title[]      @relation("TitleTrailerAsset")
+  titles        Title[]       @relation("TitleMainAsset")
+  trailerTitles Title[]       @relation("TitleTrailerAsset")
   extras        TitleExtra[]
   episodes      Episode[]
+  watchedFiles  WatchedFile[]
 
   @@index([status])
   @@index([storagePoolId])
@@ -422,8 +536,9 @@ model EncodingProfile {
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 
-  renditions EncodingProfileRendition[]
-  assets     Asset[]
+  renditions     EncodingProfileRendition[]
+  watchLocations WatchLocation[]
+  assets         Asset[]
 
   @@map("encoding_profiles")
 }
@@ -663,6 +778,7 @@ model Title {
   payments     Payment[]
   seasons      Season[]
   watching     WatchProgress[]
+  watchedFiles WatchedFile[]
 
   @@index([type, status])
   @@index([type, releaseDate])
@@ -939,6 +1055,7 @@ model Episode {
   watching WatchProgress[]
 
   translations EpisodeTranslation[]
+  watchedFiles WatchedFile[]
 
   @@unique([seasonId, number])
   @@index([assetId])

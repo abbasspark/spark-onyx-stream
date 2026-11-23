@@ -1647,3 +1647,114 @@ export interface SourceTranslation extends TranslationInput {
   language: string;
   warnings: string[];
 }
+
+export type WatchedFileState =
+  | 'WAITING'
+  | 'UNRECOGNISED'
+  | 'QUEUED'
+  | 'IMPORTING'
+  | 'IMPORTED'
+  | 'CONFLICT'
+  | 'FAILED'
+  | 'IGNORED';
+export type WatchAfterImport = 'MOVE' | 'KEEP' | 'DELETE';
+export type WatchProcessingMode = 'COPY' | 'TRANSCODE' | 'PASSTHROUGH';
+
+export interface WatchLocalConfig {
+  basePath: string;
+}
+export interface WatchS3Config {
+  bucket: string;
+  region: string;
+  endpoint?: string;
+  forcePathStyle: boolean;
+  keyPrefix?: string;
+  accessKeyId: string;
+  secretAccessKeySet: true;
+}
+
+/** A folder or a bucket that is looked through for new videos. */
+export interface WatchLocation {
+  id: string;
+  name: string;
+  driver: 'LOCAL' | 'S3';
+  config: WatchLocalConfig | WatchS3Config;
+  isActive: boolean;
+  scanIntervalMinutes: number;
+  storagePool: { id: string; name: string } | null;
+  processingMode: WatchProcessingMode | null;
+  encodingProfile: { id: string; name: string } | null;
+  autoPublish: boolean;
+  afterImport: WatchAfterImport;
+  lastScanAt: string | null;
+  lastScanError: string | null;
+  scanRequested: boolean;
+  counts: Partial<Record<WatchedFileState, number>>;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/** Where a location is, as the forms send it. */
+export type WatchPlaceInput =
+  | { driver: 'LOCAL'; config: { basePath: string } }
+  | {
+      driver: 'S3';
+      config: {
+        bucket: string;
+        region?: string;
+        endpoint?: string;
+        forcePathStyle?: boolean;
+        keyPrefix?: string;
+        accessKeyId: string;
+        secretAccessKey: string;
+      };
+    };
+
+export interface WatchLocationSettings {
+  name: string;
+  isActive: boolean;
+  scanIntervalMinutes: number;
+  storagePoolId: string | null;
+  processingMode: WatchProcessingMode | null;
+  encodingProfileId: string | null;
+  autoPublish: boolean;
+  afterImport: WatchAfterImport;
+}
+
+export interface WatchPlaceTest {
+  files: number;
+  videos: number;
+  recognised: number;
+  capped: boolean;
+  /** False when the API can read the folder but not move or delete files in it. */
+  writable: boolean;
+  samples: { path: string; recognisedAs: string | null }[];
+}
+
+/** One video file found in a watched location, and what became of it. */
+export interface WatchedFile {
+  id: string;
+  location: { id: string; name: string };
+  path: string;
+  /** Bytes, as a string. */
+  size: string;
+  modifiedAt: string;
+  state: WatchedFileState;
+  metadataId: string | null;
+  seasonNumber: number | null;
+  episodeNumber: number | null;
+  matchedByHand: boolean;
+  title: { id: string; type: TitleType; name: string } | null;
+  episode: { id: string; name: string } | null;
+  asset: { id: string; status: string } | null;
+  publishPending: boolean;
+  note: string | null;
+  firstSeenAt: string;
+  importedAt: string | null;
+}
+
+export interface WatchSummary {
+  locations: number;
+  counts: Partial<Record<WatchedFileState, number>>;
+  attention: number;
+}

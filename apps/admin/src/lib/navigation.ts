@@ -4,6 +4,7 @@ import {
   Database,
   DatabaseBackup,
   Film,
+  FolderSearch,
   KeyRound,
   Library,
   LayoutDashboard,
@@ -197,6 +198,13 @@ export const NAVIGATION: NavGroup[] = [
         icon: Film,
         permission: 'assets:read',
         keywords: 'videos assets media upload',
+      },
+      {
+        to: '/imports',
+        label: 'Imports',
+        icon: FolderSearch,
+        permission: 'catalog:read',
+        keywords: 'watch folder watched bucket s3 automatic scan tmdb incoming drop',
       },
       {
         to: '/jobs',

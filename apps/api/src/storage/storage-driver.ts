@@ -69,6 +69,13 @@ export interface StorageDriver {
   list(prefix: string): AsyncIterable<StorageListEntry>;
 
   /**
+   * Lists every object the driver can see. For places that are looked through
+   * as a whole, such as a watched folder. Folders of zero bytes that some S3
+   * tools create are left out.
+   */
+  listAll(): AsyncIterable<StorageListEntry>;
+
+  /**
    * Absolute path of the object on this machine, for drivers that store files
    * on a local disk. FFmpeg can then read and write the file directly.
    * Drivers without local files do not implement this method.

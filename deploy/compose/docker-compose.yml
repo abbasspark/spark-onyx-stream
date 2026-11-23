@@ -56,6 +56,7 @@ x-app: &app
     STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET:-}
     STRIPE_AUTOMATIC_TAX: ${STRIPE_AUTOMATIC_TAX:-false}
     TMDB_API_TOKEN: ${TMDB_API_TOKEN:-}
+    WATCH_SETTLE_SECONDS: ${WATCH_SETTLE_SECONDS:-60}
     METADATA_LANGUAGE: ${METADATA_LANGUAGE:-en-US}
     METADATA_REGION: ${METADATA_REGION:-US}
     MAIL_FROM: ${MAIL_FROM:-}
@@ -114,6 +115,9 @@ services:
     volumes:
       - storage:/var/lib/onyx/storage
       - uploads:/var/lib/onyx/uploads
+      # A folder of the host to drop videos into. Add it in the panel under Imports as /watch.
+      # The API runs as the user 1000 and moves imported files, so the folder must be writable for it.
+      - ${WATCH_PATH:-./watch}:/watch
       # Read by the API for edge servers, which fetch live channels through it.
       - live:/var/lib/onyx/live:ro
     depends_on:

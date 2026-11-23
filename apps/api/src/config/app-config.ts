@@ -23,6 +23,8 @@ export class AppConfig {
   /** Absolute path of the directory where uploads are collected. */
   readonly uploadTempPath: string;
   readonly uploadMaxBytes: number;
+  /** How long a file in a watched folder must have been left alone before it is imported. */
+  readonly watchSettleSeconds: number;
   readonly corsOrigins: readonly string[];
   /** Reverse proxies in front of the API whose X-Forwarded-For entry is trusted. */
   readonly trustProxyHops: number;
@@ -120,6 +122,7 @@ export class AppConfig {
     this.storageLocalPath = path.resolve(baseDirectory, env.STORAGE_LOCAL_PATH);
     this.uploadTempPath = path.resolve(baseDirectory, env.UPLOAD_TEMP_PATH);
     this.uploadMaxBytes = env.UPLOAD_MAX_BYTES;
+    this.watchSettleSeconds = env.WATCH_SETTLE_SECONDS;
     this.corsOrigins = env.CORS_ORIGINS;
     this.trustProxyHops = env.TRUST_PROXY_HOPS;
     this.ffmpegPath = env.FFMPEG_PATH;

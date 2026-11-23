@@ -66,4 +66,4 @@ Before the apps, the panel becomes a fuller catalog system. This work is outside
 2. Pages for all people and all genres, collections, extras (several trailers and clips per title), and dates between which a title is shown. **Done.**
 3. Texts of titles, seasons and episodes in more languages, filled by hand or from TMDB, and served by the public catalog. **Done.**
 4. Genres, facts, people, extras and collections on the viewer website. Planned.
-5. Watched folders and buckets that import files named by their TMDB id by themselves. Planned.
+5. Watched folders and buckets that import files named by their TMDB id by themselves, with a page for what became of each file. **Done.** See [watched-locations.md](watched-locations.md).

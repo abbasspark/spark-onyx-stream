@@ -24,6 +24,7 @@ import { DiagnosticsModule } from './diagnostics/diagnostics.module.js';
 import { ProcessBeaconModule } from './diagnostics/process-beacon.service.js';
 import { BillingModule } from './billing/billing.module.js';
 import { MailModule } from './mail/mail.module.js';
+import { WatchModule } from './watch/watch.module.js';
 import { MetadataModule } from './metadata/metadata.module.js';
 import { ViewersModule } from './viewers/viewers.module.js';
 import { WatchingModule } from './watching/watching.module.js';
@@ -49,6 +50,7 @@ const ROLE_MODULES: Record<AppRole, Type[]> = {
     MailModule,
     BillingModule,
     MetadataModule,
+    WatchModule,
     ViewersModule,
     WatchingModule,
     LiveModule,
