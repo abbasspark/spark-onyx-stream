@@ -11,6 +11,7 @@ import {
 import { PrismaClient, type Viewer, type ViewerTokenKind } from '@onyx/database';
 import { hashPassword } from '../auth/password-hasher.js';
 import { generateMailToken, hashToken, MAIL_TOKEN_PREFIX } from '../auth/tokens.js';
+import { BrandingService } from '../branding/branding.service.js';
 import { AppConfig } from '../config/app-config.js';
 import { MailService } from '../mail/mail.service.js';
 import {
@@ -55,6 +56,7 @@ export class ViewerEmailService {
     @Inject(MailService) private readonly mail: MailService,
     @Inject(ViewerSessionService) private readonly sessions: ViewerSessionService,
     @Inject(AppConfig) private readonly config: AppConfig,
+    @Inject(BrandingService) private readonly branding: BrandingService,
   ) {}
 
   get enabled(): boolean {
@@ -111,7 +113,7 @@ export class ViewerEmailService {
       this.mail.send({
         to: viewer.email,
         ...passwordChangedMail({
-          siteName: this.config.siteName,
+          siteName: await this.branding.siteName(),
           displayName: viewer.displayName,
         }),
       });
@@ -216,7 +218,7 @@ export class ViewerEmailService {
 
     // In the fragment, which browsers send to no server and put in no log.
     const link = {
-      siteName: this.config.siteName,
+      siteName: await this.branding.siteName(),
       displayName: viewer.displayName,
       url: `${this.config.siteUrl}${PAGES[kind]}#token=${token}`,
       validMinutes,

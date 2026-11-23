@@ -53,6 +53,8 @@ const ACTION_LABELS: Record<string, string> = {
   'terms.translation.delete': 'Removed a language from names',
   'title.duplicate': 'Duplicated a title',
   'title.restore': 'Brought back an earlier version of a title',
+  'branding.update': 'Changed the branding of the site',
+  'branding.reset': 'Put the branding back as it ships',
   'role.create': 'Made a role',
   'role.update': 'Changed a role',
   'role.delete': 'Deleted a role',

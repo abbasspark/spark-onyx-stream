@@ -2,6 +2,8 @@
 import type { DuplicateParts } from '@/lib/duplicate';
 import { download, request, requestText, uploadFile } from './client';
 import type {
+  Branding,
+  BrandingSettings,
   ChangeGroup,
   TitleChange,
   TitleRevision,
@@ -683,6 +685,13 @@ export const collectionsApi = {
   reorder: (ids: string[]) =>
     request<Collection[]>('/v1/collections/order', { method: 'PUT', body: { ids } }),
   remove: (id: string) => request<void>(`/v1/collections/${id}`, { method: 'DELETE' }),
+};
+
+export const brandingApi = {
+  get: (signal?: AbortSignal) => request<Branding>('/v1/branding', { signal }),
+  save: (body: BrandingSettings) => request<Branding>('/v1/branding', { method: 'PUT', body }),
+  /** Back to how the site ships. */
+  reset: () => request<Branding>('/v1/branding', { method: 'DELETE' }),
 };
 
 export const titleHistoryApi = {

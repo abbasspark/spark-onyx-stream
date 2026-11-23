@@ -2,7 +2,7 @@
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import { PosterCard } from '@/components/poster-card';
-import { getPerson } from '@/lib/api';
+import { getPerson, getSite } from '@/lib/api';
 import { absoluteUrl, siteConfig } from '@/lib/config';
 import { truncate } from '@/lib/format';
 
@@ -12,13 +12,13 @@ interface PersonPageProps {
 
 export async function generateMetadata({ params }: PersonPageProps): Promise<Metadata> {
   const { slug } = await params;
-  const person = await getPerson(slug);
+  const [person, site] = await Promise.all([getPerson(slug), getSite()]);
   if (!person) {
     return { title: 'Not found' };
   }
   const description = truncate(
     person.biography ??
-      `${person.titles.length} ${person.titles.length === 1 ? 'title' : 'titles'} with ${person.name} on ${siteConfig.name}.`,
+      `${person.titles.length} ${person.titles.length === 1 ? 'title' : 'titles'} with ${person.name} on ${site.name}.`,
     160,
   );
   return {

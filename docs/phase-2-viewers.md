@@ -47,7 +47,7 @@ Nothing else. The audit log names a viewer by id and never stores an email addre
 | `SMTP_URL`                  | empty (default), `smtp://…`, `smtps://…` | The mail server. Empty turns email off                                                                     |
 | `MAIL_FROM`                 | `Name <address>`                         | Sender of the emails. Needed with `SMTP_URL`                                                               |
 | `SITE_URL`                  | `https://host`                           | Address of the viewer website, for the links in emails. Needed with `SMTP_URL`                             |
-| `SITE_NAME`                 | `Onyx Stream` (default)                  | Name of the site, as emails call it                                                                        |
+| `SITE_NAME`                 | `Onyx Stream` (default)                  | Name of the site, until one is set under Branding                                                          |
 | `STREAM_LIMIT`              | `0` (default) to `20`                    | On how many devices one account plays at the same time. `0`: no limit. See [Stream limits](#stream-limits) |
 
 A private service for invited people is `VIEWER_REGISTRATION=closed` with `CATALOG_PLAYBACK=viewers`.

@@ -20,6 +20,7 @@ import { PlaysModule } from '../../src/analytics/analytics.module.js';
 import { TitleHistoryCoreModule } from '../../src/history/title-history.module.js';
 import { StreamsCoreModule } from '../../src/streams/streams.module.js';
 import { PROCESSING_QUEUE } from '../../src/queue/queue.constants.js';
+import { BrandingModule } from '../../src/branding/branding.module.js';
 import { MailModule } from '../../src/mail/mail.module.js';
 import { MailService } from '../../src/mail/mail.service.js';
 import { MAIL_TRANSPORT, MemoryTransport } from '../../src/mail/mail.transport.js';
@@ -302,6 +303,7 @@ export async function createTestApp(
       StreamsCoreModule,
       DeliveryCoreModule,
       MailModule,
+      BrandingModule,
       ...featureModules,
     ],
   })

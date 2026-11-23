@@ -7,10 +7,13 @@ import { usePathname, useSearchParams } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
 import type { Category } from '@/lib/types';
 import { AccountMenu } from './account-menu';
-import { BandMark } from './brand';
+import { SiteBrand } from './brand';
 
 interface SiteHeaderProps {
   siteName: string;
+  /** The logo set in the panel, if any. */
+  logo?: { url: string; width: number; height: number } | null;
+  logoShowsName?: boolean;
   categories: Category[];
   /** Whether the site offers plans, which puts a link to them in the menu. */
   hasPlans?: boolean;
@@ -30,6 +33,8 @@ const LINKS = [
  */
 export function SiteHeader({
   siteName,
+  logo = null,
+  logoShowsName = false,
   categories,
   hasPlans = false,
   hasLive = false,
@@ -111,8 +116,7 @@ export function SiteHeader({
           className="flex shrink-0 items-center gap-2.5"
           aria-label={`${siteName}, home`}
         >
-          <BandMark className="size-7" />
-          <span className="heading text-lg">{siteName}</span>
+          <SiteBrand name={siteName} logo={logo} showName={logoShowsName} />
         </Link>
 
         <nav aria-label="Main" className="hidden items-center gap-7 md:flex">

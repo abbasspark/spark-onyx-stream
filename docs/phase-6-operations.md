@@ -264,6 +264,40 @@ The tool works on the database directly and needs only `DATABASE_URL`, not a run
 
 Signing in at the API directly: `POST /auth/login` takes `code` beside `email` and `password`. Without it, an account with two-factor sign-in answers `401` with the code `two_factor_required`; a wrong one answers `401` with `two_factor_invalid`.
 
+## Branding
+
+**Settings > Branding** in the panel is where the site gets its own face. Nothing here needs a restart or a new build: the website shows a change within about a minute.
+
+- **Name and a sentence about the site.** The name is in the header, the browser tab and link previews, signs every email, and is what an authenticator app shows beside an admin's sign-in code. Left empty, it is the `SITE_NAME` of the installation.
+- **Logo.** A picture in place of the built-in mark, in the header and the footer. It can stand for the name or sit next to it. Wide, on a transparent background and light enough for a black page works best.
+- **Icon.** A square PNG of at least 64 pixels, better 512, for the browser tab and home screens.
+- **Colour.** The website has one colour: it marks what can be played, links, progress and focus. Choose one of eight ready-made colours or type your own.
+- **Footer.** A line of your own and up to eight links: the imprint, the privacy notice, a contact address. A link leads to a page of the site (`/imprint`), to another site (`https://…`) or to an email address (`mailto:…`).
+
+The page shows a sketch of the site beside the form, with what is typed, before it is saved.
+
+### The colour has to be readable
+
+The website is black. Its accent is used two ways: as text on the black page, and as buttons with black text on them. Both are the same pair of colours, so one number decides both: the accent needs a contrast of at least 4.5 to 1 against black, which is what the accessibility guidelines ask of text. A darker colour is refused, and the panel offers the nearest lighter shade of the same colour that passes, so a dark brand colour keeps its hue.
+
+### What it does not do
+
+- It does not change the layout, the typeface or the black background. The look of the website is a design, not a theme; the accent, the logo and the name are the parts that are yours.
+- The footer links lead to pages, they do not make them. An imprint or privacy page is written elsewhere and linked here.
+- The admin panel keeps its own look.
+- The line "Runs on Spark Onyx Stream" with the link to the source stays. The licence asks for the source to be offered to the people who use the site.
+
+### API
+
+| Method and path     | Purpose                                                                              |
+| ------------------- | ------------------------------------------------------------------------------------ |
+| `GET /catalog/site` | Public. The name, sentence, logo, icon, accent and footer, as the website reads them |
+| `GET /branding`     | What is set, the pictures, and what shows where a setting is empty                   |
+| `PUT /branding`     | Set all of it. `422` with `code: accent_too_dark` names a `suggestion`               |
+| `DELETE /branding`  | Back to how the site ships                                                           |
+
+Reading needs `settings:read`, changing `settings:write`. A picture the branding shows cannot be deleted from under it.
+
 ## What phase 6 leaves for later
 
 - Published images and releases, which would turn the build step of an installation and of an update into a download.

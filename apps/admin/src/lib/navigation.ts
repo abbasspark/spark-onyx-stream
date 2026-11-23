@@ -27,6 +27,7 @@ import {
   Network,
   Share2,
   Mail,
+  Palette,
   Radio,
   ScrollText,
   ShieldHalf,
@@ -298,6 +299,13 @@ export const NAVIGATION: NavGroup[] = [
   {
     label: 'Settings',
     items: [
+      {
+        to: '/branding',
+        label: 'Branding',
+        icon: Palette,
+        permission: 'settings:read',
+        keywords: 'logo name colour color accent icon favicon footer imprint site look theme',
+      },
       {
         to: '/encoding-profiles',
         label: 'Encoding profiles',
