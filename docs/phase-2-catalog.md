@@ -63,6 +63,27 @@ What a viewer bought or rented is not extended by this: a title outside its date
 
 **Collections** hold titles in an order. A title can be in several. A collection has a name, a synopsis, a poster and a backdrop, and a switch that hides it from viewers while it is being put together. Without a poster of its own, the panel shows the posters of its first titles. A movie imported from TMDB joins the collection TMDB puts it in ("The Matrix Collection"), which is created on the first import and found again by its id there. Deleting a collection leaves its titles in the catalog.
 
+## Translations
+
+The texts of a title are written in one language, the language of the catalog. A title can have them in more languages.
+
+- **What is translated:** the name, tagline and synopsis of a title, and the name and synopsis of each season and episode. Facts, artwork, the address (slug) and publishing are the same in every language.
+- **A translation is optional, field by field.** An empty field is shown in the language of the catalog. A title can have German for its name alone.
+- **Languages are tags** such as `de`, `pt-BR` or `zh-Hant`. There is no list to maintain: a language exists when a title uses it, and the panel offers the ones in use first.
+- **Viewers ask for a language** with `?language=` on the public catalog. A tag with a country falls back to its language (`de-AT` gets `de`), never to another country, and what is not translated comes in the language of the catalog. A tag that is not one is ignored. The search also matches names in the language asked for.
+- **The source helps.** For an imported title, "Fill from TMDB" reads the texts in that language and puts them into the empty fields of the form. Nothing is saved until the admin saves. Where TMDB has no translation it answers in its own language; texts equal to the title's own, and placeholder names such as "Folge 3", are left out.
+- **The panel shows the original beside every field,** and how much of a title is translated: of every text the title has in its own language, how many have one in the other.
+
+| Method and path                                   | Purpose                                                                  |
+| ------------------------------------------------- | ------------------------------------------------------------------------ |
+| `GET /titles/{id}/translations`                   | The translations of a title, by language, with how much is filled        |
+| `PUT /titles/{id}/translations/{language}`        | Write the whole translation into one language. Empty fields are not kept |
+| `DELETE /titles/{id}/translations/{language}`     | Remove a language from a title                                           |
+| `GET /titles/{id}/translations/{language}/source` | What TMDB says in that language. Changes nothing                         |
+| `GET /translations/languages`                     | The languages in use, with their number of titles                        |
+
+On the public side, `language` is accepted by `GET /catalog/home`, `/catalog/titles`, `/catalog/titles/{slug}` and `/catalog/collections/{slug}`.
+
 ## Artwork
 
 - Pictures are JPEG, PNG or WebP, up to 10 MB and 8192 pixels per side.
@@ -196,7 +217,8 @@ All need `catalog:write`, except the first, which needs `catalog:read`.
 
 - Renting or buying a single title. Subscriptions are in `phase-3-billing.md`
 - Genres, facts, people, extras and collections on the viewer website. The public catalog API has extras and collections; genres, facts and people are not in it yet
-- Texts of a title in more than one language
+- A language switch on the viewer website, and translated names of categories, genres and collections
+- Translated names in what a viewer is watching (the "continue watching" row)
 - Extras from the source: an import brings no trailers
 - Collections and rows for the home page
 - Other sources than TMDB, and importing many titles at once

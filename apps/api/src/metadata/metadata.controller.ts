@@ -27,9 +27,11 @@ import {
   type SearchMetadataInput,
   searchMetadataSchema,
 } from './metadata.schemas.js';
+import { TranslationsService } from '../catalog/translations.service.js';
 import { MetadataService } from './metadata.service.js';
 import type {
   ImportResult,
+  SourceTranslation,
   MetadataPreview,
   MetadataSearchResult,
   MetadataStatus,
@@ -45,6 +47,7 @@ const IMPORTS = { name: 'metadata-import', limit: 30, windowSeconds: 60 };
 export class MetadataController {
   constructor(
     @Inject(MetadataService) private readonly metadata: MetadataService,
+    @Inject(TranslationsService) private readonly translations: TranslationsService,
     @Inject(AuditService) private readonly audit: AuditService,
   ) {}
 
@@ -103,6 +106,17 @@ export class MetadataController {
       overwrite: body.overwrite,
     });
     return result;
+  }
+
+  /** What the source says about an imported title in another language. Changes nothing. */
+  @Get('titles/:id/translations/:language/source')
+  @RequirePermissions('catalog:write')
+  @RateLimit(LOOKUPS)
+  sourceTranslation(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Param('language') language: string,
+  ): Promise<SourceTranslation> {
+    return this.metadata.sourceTranslation(id, this.translations.language(language));
   }
 
   private record(

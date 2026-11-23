@@ -52,6 +52,7 @@ const title: TitleDetail = {
   availableFrom: null,
   availableUntil: null,
   extras: [],
+  translations: [],
   collections: [],
   releaseDate: null,
   runtimeMinutes: null,

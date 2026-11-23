@@ -141,6 +141,19 @@ export interface ImportReport {
   warnings: string[];
 }
 
+/** What the source says in one language about a title of the catalog, part by part. */
+export interface SourceTranslation {
+  language: string;
+  name: string | null;
+  tagline: string | null;
+  synopsis: string | null;
+  /** By the ids of the catalog's own seasons and episodes. Only those the source has texts for. */
+  seasons: { id: string; name: string | null; synopsis: string | null }[];
+  episodes: { id: string; name: string | null; synopsis: string | null }[];
+  /** What could not be read, in words for the admin. */
+  warnings: string[];
+}
+
 export interface ImportResult {
   title: TitleDetail;
   report: ImportReport;

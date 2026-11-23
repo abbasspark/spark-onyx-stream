@@ -268,6 +268,8 @@ export interface TitleDetail extends TitleSummary {
   extras: ExtraView[];
   /** The collections the title is in, by name. */
   collections: { id: string; name: string }[];
+  /** The languages the title is translated into, as tags such as "de". */
+  translations: string[];
   /** Where the details were imported from. Null for a title typed by hand. */
   metadata: TitleMetadataRef | null;
   seasons: SeasonView[];
@@ -338,6 +340,7 @@ export type TitleDetailRecord = Title & {
   credits: CreditRecord[];
   extras: ExtraRecord[];
   collections: { collection: { id: string; name: string } }[];
+  translations: { language: string }[];
   packages: PackageLink[];
   seasons: SeasonRecord[];
 };
@@ -583,6 +586,7 @@ export function toTitleDetail(title: TitleDetailRecord, mediaBaseUrl: string): T
     asset: title.type === 'MOVIE' ? toAssetRef(title.asset) : null,
     trailerAsset: toAssetRef(title.trailerAsset),
     extras: toExtraViews(title.extras),
+    translations: title.translations.map((translation) => translation.language).sort(),
     collections: title.collections
       .map(({ collection }) => ({ id: collection.id, name: collection.name }))
       .sort((a, b) => a.name.localeCompare(b.name)),

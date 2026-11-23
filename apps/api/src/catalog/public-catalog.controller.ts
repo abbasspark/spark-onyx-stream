@@ -22,6 +22,8 @@ import type { PlaybackInfo } from '../playback/playback.service.js';
 import { RateLimit } from '../rate-limit/rate-limit.guard.js';
 import { ViewerSessionService } from '../viewers/viewer-session.service.js';
 import {
+  type LanguageQuery,
+  languageQuerySchema,
   type ListPublicTitlesInput,
   listPublicTitlesSchema,
   slugParamSchema,
@@ -65,8 +67,10 @@ export class PublicCatalogController {
   @Get('home')
   @RateLimit(READS)
   @Header('Cache-Control', CACHE_READS)
-  home(): Promise<PublicHome> {
-    return this.catalog.home();
+  home(
+    @Query(new ZodValidationPipe(languageQuerySchema)) query: LanguageQuery,
+  ): Promise<PublicHome> {
+    return this.catalog.home(query.language);
   }
 
   @Get('collections')
@@ -79,8 +83,11 @@ export class PublicCatalogController {
   @Get('collections/:slug')
   @RateLimit(READS)
   @Header('Cache-Control', CACHE_READS)
-  collection(@Param('slug', slugPipe) slug: string): Promise<PublicCollectionDetail> {
-    return this.catalog.collection(slug);
+  collection(
+    @Param('slug', slugPipe) slug: string,
+    @Query(new ZodValidationPipe(languageQuerySchema)) query: LanguageQuery,
+  ): Promise<PublicCollectionDetail> {
+    return this.catalog.collection(slug, query.language);
   }
 
   @Get('categories')
@@ -102,8 +109,11 @@ export class PublicCatalogController {
   @Get('titles/:slug')
   @RateLimit(READS)
   @Header('Cache-Control', CACHE_READS)
-  get(@Param('slug', slugPipe) slug: string): Promise<PublicTitleDetail> {
-    return this.catalog.get(slug);
+  get(
+    @Param('slug', slugPipe) slug: string,
+    @Query(new ZodValidationPipe(languageQuerySchema)) query: LanguageQuery,
+  ): Promise<PublicTitleDetail> {
+    return this.catalog.get(slug, query.language);
   }
 
   /** Signed, short-lived addresses for playing a movie. Never cached. */

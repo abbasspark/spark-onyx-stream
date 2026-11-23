@@ -46,6 +46,7 @@ import { TitleAvailability } from '@/components/title-availability';
 import { TitleCredits } from '@/components/title-credits';
 import { TitleExtras } from '@/components/title-extras';
 import { TitleEpisodes } from '@/components/title-episodes';
+import { TitleTranslations } from '@/components/title-translations';
 import { TitleMedia } from '@/components/title-media';
 import { Button } from '@/components/ui/button';
 import {
@@ -429,6 +430,10 @@ export function TitleEditorPage() {
               {title.credits.length > 0 ? <Badge>{title.credits.length}</Badge> : null}
             </TabsTrigger>
             <TabsTrigger value="media">Media and artwork</TabsTrigger>
+            <TabsTrigger value="translations">
+              Translations
+              {title.translations.length > 0 ? <Badge>{title.translations.length}</Badge> : null}
+            </TabsTrigger>
           </TabsList>
           {title.type === 'SERIES' ? (
             <TabsContent value="episodes">
@@ -447,6 +452,16 @@ export function TitleEditorPage() {
                 queryClient.setQueryData(['titles', 'detail', id], { ...title, credits });
                 void queryClient.invalidateQueries({ queryKey: ['people'] });
               }}
+            />
+          </TabsContent>
+          <TabsContent value="translations">
+            <TitleTranslations
+              key={title.id}
+              title={title}
+              disabled={!mayWrite}
+              onLanguagesChange={() =>
+                void queryClient.invalidateQueries({ queryKey: ['titles', 'detail', id] })
+              }
             />
           </TabsContent>
           <TabsContent value="media">

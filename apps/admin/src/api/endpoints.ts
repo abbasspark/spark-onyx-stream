@@ -48,6 +48,9 @@ import type {
   CollectionDetail,
   Extra,
   ExtraKind,
+  SourceTranslation,
+  Translation,
+  TranslationInput,
   Category,
   CreateAdminInput,
   CreateApiKeyInput,
@@ -469,6 +472,23 @@ export const collectionsApi = {
   reorder: (ids: string[]) =>
     request<Collection[]>('/v1/collections/order', { method: 'PUT', body: { ids } }),
   remove: (id: string) => request<void>(`/v1/collections/${id}`, { method: 'DELETE' }),
+};
+
+export const translationsApi = {
+  list: (titleId: string, signal?: AbortSignal) =>
+    request<Translation[]>(`/v1/titles/${titleId}/translations`, { signal }),
+  save: (titleId: string, language: string, body: TranslationInput) =>
+    request<Translation[]>(`/v1/titles/${titleId}/translations/${language}`, {
+      method: 'PUT',
+      body,
+    }),
+  remove: (titleId: string, language: string) =>
+    request<void>(`/v1/titles/${titleId}/translations/${language}`, { method: 'DELETE' }),
+  /** What the source says in this language. Changes nothing. */
+  source: (titleId: string, language: string) =>
+    request<SourceTranslation>(`/v1/titles/${titleId}/translations/${language}/source`),
+  languages: (signal?: AbortSignal) =>
+    request<{ language: string; titles: number }[]>('/v1/translations/languages', { signal }),
 };
 
 export const extrasApi = {
