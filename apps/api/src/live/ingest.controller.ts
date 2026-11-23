@@ -28,6 +28,7 @@ const text = (value: unknown): string => (typeof value === 'string' ? value : ''
 export class IngestController {
   constructor(@Inject(IngestService) private readonly ingest: IngestService) {}
 
+  /** The ingest server asks whether a stream key may publish. */
   @Post('auth')
   @HttpCode(HttpStatus.NO_CONTENT)
   async auth(@Body() body: unknown): Promise<void> {

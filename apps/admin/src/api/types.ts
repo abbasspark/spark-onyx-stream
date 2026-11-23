@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 //
 // Shapes of the API's JSON answers. Dates arrive as ISO 8601 text.
+import type { BodyOf, Schemas } from '@onyx/api-client';
 
 /** The four roles that ship with the software. */
 export type BuiltInRole = 'OWNER' | 'ADMIN' | 'EDITOR' | 'VIEWER';
@@ -2378,81 +2379,25 @@ export interface Branding {
 }
 
 // --- Webhooks ------------------------------------------------------------------------
-
-export type WebhookDeliveryStatus = 'PENDING' | 'DELIVERED' | 'FAILED';
+//
+// These come from the description of the API, which is produced from the
+// server's own source. New types should be taken from there the same way,
+// and the hand-written ones above move over as they are touched.
 
 /** A webhook: an address of another system that is told when something happens. */
-export interface Webhook {
-  id: string;
-  name: string;
-  url: string;
-  /** Names of events, or "*" alone for all of them. */
-  events: string[];
-  isActive: boolean;
-  /** Since when nothing got through. Null while the last delivery did. */
-  failingSince: string | null;
-  /** Why the system switched it off, when it did. */
-  disabledReason: string | null;
-  createdAt: string;
-  updatedAt: string;
-  lastDelivery: { status: WebhookDeliveryStatus; at: string; event: string } | null;
-  /** Deliveries of the last 24 hours, by what became of them. */
-  recent: { delivered: number; failed: number; pending: number };
-}
-
+export type Webhook = Schemas['WebhookView'];
 /** A webhook with its signing secret: shown once. */
-export interface WebhookWithSecret extends Webhook {
-  secret: string;
-}
+export type WebhookWithSecret = Schemas['WebhookWithSecret'];
+export type WebhookInput = BodyOf<'Webhooks_create'>;
+export type WebhookDeliveryStatus = Schemas['WebhookDeliveryStatus'];
+export type WebhookDelivery = Schemas['DeliveryView'];
+export type WebhookDeliveryDetail = Schemas['DeliveryDetail'];
+export type WebhookActivityHour = Schemas['WebhookActivityHour'];
+export type WebhookEventInfo = Schemas['WebhookEventInfo'];
+export type WebhookReference = Schemas['WebhookReference'];
 
-export interface WebhookInput {
-  name: string;
-  url: string;
-  events: string[];
-}
+// --- Apps and the description of the API ------------------------------------------------
 
-export interface WebhookDelivery {
-  id: string;
-  event: string;
-  status: WebhookDeliveryStatus;
-  attempts: number;
-  maxAttempts: number;
-  nextAttemptAt: string | null;
-  responseStatus: number | null;
-  error: string | null;
-  durationMs: number | null;
-  createdAt: string;
-  attemptedAt: string | null;
-  deliveredAt: string | null;
-}
-
-export interface WebhookDeliveryDetail extends WebhookDelivery {
-  /** The body as it is sent and signed. */
-  payload: { id: string; event: string; createdAt: string; data: Record<string, unknown> };
-  responseBody: string | null;
-}
-
-export interface WebhookActivityHour {
-  start: string;
-  delivered: number;
-  failed: number;
-  pending: number;
-}
-
-export interface WebhookEventInfo {
-  name: string;
-  group: string;
-  label: string;
-  description: string;
-  /** An example of the "data" of the event. */
-  sample: Record<string, unknown>;
-}
-
-export interface WebhookReference {
-  events: WebhookEventInfo[];
-  retryDelaysSeconds: number[];
-  signatureToleranceSeconds: number;
-  /** Whether webhooks may go to private and local addresses. */
-  targets: 'any' | 'public';
-  maxWebhooks: number;
-}
+/** The oldest version of one app that may still use the installation. */
+export type AppVersionRule = Schemas['AppVersionRule'];
+export type AppVersions = Schemas['AppVersionsView'];

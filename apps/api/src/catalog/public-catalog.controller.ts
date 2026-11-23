@@ -75,6 +75,7 @@ export class PublicCatalogController {
     @Inject(ViewerSessionService) private readonly viewerSessions: ViewerSessionService,
   ) {}
 
+  /** The rows of a page, as they are arranged in the panel. */
   @Get('home')
   @RateLimit(READS)
   @Header('Cache-Control', CACHE_READS)
@@ -130,6 +131,7 @@ export class PublicCatalogController {
     return this.catalog.subjectPage('genre', slug, query.language);
   }
 
+  /** The genres of the catalog. */
   @Get('genres')
   @RateLimit(READS)
   @Header('Cache-Control', CACHE_READS)
@@ -139,6 +141,7 @@ export class PublicCatalogController {
     return this.catalog.genres(query.language);
   }
 
+  /** The languages the catalog can be read in. */
   @Get('languages')
   @RateLimit(READS)
   @Header('Cache-Control', CACHE_READS)
@@ -146,6 +149,7 @@ export class PublicCatalogController {
     return this.catalog.languages();
   }
 
+  /** One person with the titles they are part of. */
   @Get('people/:slug')
   @RateLimit(READS)
   @Header('Cache-Control', CACHE_READS)
@@ -156,6 +160,7 @@ export class PublicCatalogController {
     return this.catalog.person(slug, query.language);
   }
 
+  /** The collections of the catalog. */
   @Get('collections')
   @RateLimit(READS)
   @Header('Cache-Control', CACHE_READS)
@@ -165,6 +170,7 @@ export class PublicCatalogController {
     return this.catalog.collections(query.language);
   }
 
+  /** One collection with its titles. */
   @Get('collections/:slug')
   @RateLimit(READS)
   @Header('Cache-Control', CACHE_READS)
@@ -175,6 +181,7 @@ export class PublicCatalogController {
     return this.catalog.collection(slug, query.language);
   }
 
+  /** The categories of the catalog. */
   @Get('categories')
   @RateLimit(READS)
   @Header('Cache-Control', CACHE_READS)
@@ -184,6 +191,7 @@ export class PublicCatalogController {
     return this.catalog.categories(query.language);
   }
 
+  /** Published titles: filtered, searched and in pages. */
   @Get('titles')
   @RateLimit(READS)
   @Header('Cache-Control', CACHE_READS)
@@ -193,6 +201,7 @@ export class PublicCatalogController {
     return this.catalog.list(query);
   }
 
+  /** One title with everything a detail page shows. */
   @Get('titles/:slug')
   @RateLimit(READS)
   @Header('Cache-Control', CACHE_READS)
@@ -216,6 +225,7 @@ export class PublicCatalogController {
     return this.catalog.playTitle(slug, await this.watcher(request), requestInfo(request));
   }
 
+  /** Asks to play an extra of a title. */
   @Post('titles/:slug/extras/:id/playback')
   @UseInterceptors(DeliveryHintInterceptor)
   @RateLimit(PLAYBACK)
@@ -229,6 +239,7 @@ export class PublicCatalogController {
     return this.catalog.playExtra(slug, id, await this.watcher(request), requestInfo(request));
   }
 
+  /** Asks to play the trailer of a title. */
   @Post('titles/:slug/trailer/playback')
   @UseInterceptors(DeliveryHintInterceptor)
   @RateLimit(PLAYBACK)
@@ -241,6 +252,7 @@ export class PublicCatalogController {
     return this.catalog.playTrailer(slug, await this.watcher(request), requestInfo(request));
   }
 
+  /** Asks to play an episode. The answer holds a signed address, or says what is missing. */
   @Post('episodes/:id/playback')
   @UseInterceptors(DeliveryHintInterceptor)
   @RateLimit(PLAYBACK)

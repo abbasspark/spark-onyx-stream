@@ -28,6 +28,7 @@ const CONTENT_TYPES: Record<string, string> = {
 export class LiveMediaController {
   constructor(@Inject(LivePlaybackService) private readonly playback: LivePlaybackService) {}
 
+  /** The playlists and segments of a live channel. The token in the address is the permission. */
   @Get(':channelId/:token/:fileName')
   get(
     @Param('channelId') channelId: string,

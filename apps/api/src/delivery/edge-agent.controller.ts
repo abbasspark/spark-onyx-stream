@@ -70,6 +70,7 @@ export class EdgeAgentController {
     @Inject(StorageService) private readonly storage: StorageService,
   ) {}
 
+  /** An edge server reports in and is told what to do. Only the key of that edge opens it. */
   @Post('heartbeat')
   @HttpCode(HttpStatus.OK)
   async heartbeat(

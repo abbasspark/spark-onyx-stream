@@ -165,7 +165,10 @@ import type {
   WebhookInput,
   WebhookReference,
   WebhookWithSecret,
+  AppVersionRule,
+  AppVersions,
 } from './types';
+import type { OpenApiDocument } from '@/lib/openapi';
 
 export const authApi = {
   setupStatus: () => request<{ required: boolean }>('/v1/auth/setup'),
@@ -966,4 +969,16 @@ export const webhooksApi = {
     request<WebhookDelivery>(`/v1/webhooks/${id}/deliveries/${deliveryId}/redeliver`, {
       method: 'POST',
     }),
+};
+
+export const referenceApi = {
+  /** The description the server gives of its own API. */
+  document: (signal?: AbortSignal) => request<OpenApiDocument>('/v1/openapi.json', { signal }),
+};
+
+export const appVersionsApi = {
+  get: (signal?: AbortSignal) => request<AppVersions>('/v1/app-versions', { signal }),
+  /** Sets all rules at once. */
+  save: (rules: AppVersionRule[]) =>
+    request<AppVersions>('/v1/app-versions', { method: 'PUT', body: { rules } }),
 };

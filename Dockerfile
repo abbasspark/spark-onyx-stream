@@ -33,11 +33,14 @@ COPY pnpm-lock.yaml pnpm-workspace.yaml package.json ./
 COPY apps/api/package.json apps/api/
 COPY apps/admin/package.json apps/admin/
 COPY packages/database/package.json packages/database/
+COPY packages/api-client/package.json packages/api-client/
 RUN --mount=type=cache,id=pnpm-store,target=/pnpm/store \
     pnpm install --frozen-lockfile
 
 COPY tsconfig.base.json ./
 COPY packages/database packages/database
+# The types of the API, which the panel is written against.
+COPY packages/api-client packages/api-client
 COPY apps/api apps/api
 COPY apps/admin apps/admin
 # Generating the database client reads the configuration, which asks for a

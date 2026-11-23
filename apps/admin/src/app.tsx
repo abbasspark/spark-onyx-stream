@@ -31,6 +31,8 @@ import { PackagesPage } from './pages/packages-page';
 import { PlansPage } from './pages/plans-page';
 import { RevenuePage } from './pages/revenue-page';
 import { AdminsPage } from './pages/admins-page';
+import { ApiReferencePage } from './pages/api-reference-page';
+import { AppsPage } from './pages/apps-page';
 import { BrandingPage } from './pages/branding-page';
 import { WebhookPage } from './pages/webhook-page';
 import { WebhooksPage } from './pages/webhooks-page';
@@ -163,6 +165,8 @@ function Pages() {
             <Route path="admins" element={<AdminsPage />} />
             <Route path="roles" element={<RolesPage />} />
             <Route path="branding" element={<BrandingPage />} />
+            <Route path="api-reference" element={<ApiReferencePage />} />
+            <Route path="apps" element={<AppsPage />} />
             <Route path="webhooks" element={<WebhooksPage />} />
             <Route path="webhooks/:id" element={<WebhookPage />} />
             <Route path="translations" element={<TranslationsPage />} />

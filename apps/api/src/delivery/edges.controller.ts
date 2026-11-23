@@ -175,6 +175,7 @@ export class PublicDeliveryController {
     @Inject(P2pService) private readonly p2p: P2pService,
   ) {}
 
+  /** Where video comes from besides the site itself: the edge servers and the tracker. */
   @Get()
   async get(): Promise<{ origins: string[]; tracker: string | null }> {
     return { origins: await this.edges.origins(), tracker: this.p2p.trackerOrigin() };

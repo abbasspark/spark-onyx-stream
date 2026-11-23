@@ -42,6 +42,7 @@ import type { PaymentAdminView, RevenueReport, ViewerPaymentView } from './payme
 export class ViewerPaymentsController {
   constructor(@Inject(PaymentsService) private readonly payments: PaymentsService) {}
 
+  /** The viewer's own payments. */
   @ViewerOnly()
   @Get('viewer/payments')
   @Header('Cache-Control', 'no-store')

@@ -30,6 +30,7 @@
     "test": "pnpm -r test",
     "test:e2e": "pnpm --filter @onyx/api test:e2e",
     "test:installer": "bash deploy/installer/tests/run.sh",
+    "openapi": "pnpm --filter @onyx/api openapi",
     "format": "prettier --write .",
     "format:check": "prettier --check ."
   },

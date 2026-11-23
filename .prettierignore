@@ -7,3 +7,5 @@ pnpm-lock.yaml
 packages/database/src/generated
 packages/database/prisma/migrations
 LICENSE
+apps/api/src/openapi/openapi.json
+packages/api-client/src/schema.d.ts

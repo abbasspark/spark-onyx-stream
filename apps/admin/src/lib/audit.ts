@@ -55,6 +55,7 @@ const ACTION_LABELS: Record<string, string> = {
   'title.restore': 'Brought back an earlier version of a title',
   'branding.update': 'Changed the branding of the site',
   'branding.reset': 'Put the branding back as it ships',
+  'app-versions.update': 'Changed which app versions may connect',
   'webhook.create': 'Added a webhook',
   'webhook.update': 'Changed a webhook',
   'webhook.delete': 'Deleted a webhook',

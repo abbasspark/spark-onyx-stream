@@ -281,6 +281,9 @@ Status shows what exists today.
 | `POST`                  | `/titles/{id}/duplicate`                | A copy of a title as a draft, with a choice of what comes along                                                 | Built  |
 | `GET` `PUT` `DELETE`    | `/branding`                             | The name, logo, icon, colour and footer of the site. See [operations](phase-6-operations.md#branding)           | Built  |
 | `GET` `POST`            | `/webhooks`                             | Addresses that are told when something happens. See [operations](phase-6-operations.md#webhooks)                | Built  |
+| `GET`                   | `/openapi.json`                         | Public. The API described as OpenAPI 3.1. See [the API, described](api.md)                                      | Built  |
+| `GET`                   | `/meta`                                 | Public. What an app asks first: the site, the server version, whether the app is supported                      | Built  |
+| `GET` `PUT`             | `/app-versions`                         | The oldest version of each app that may connect                                                                 | Built  |
 | `GET`                   | `/titles/{id}/history`                  | What changed on a title, who changed it and when. See [the catalog](phase-2-catalog.md#the-history-of-a-title)  | Built  |
 | `POST`                  | `/titles/{id}/history/{rev}/restore`    | Bring an earlier version of a title back                                                                        | Built  |
 | `GET`                   | `/translations/terms`                   | Categories, genres, collections and people: what there is to translate and how far each language is             | Built  |

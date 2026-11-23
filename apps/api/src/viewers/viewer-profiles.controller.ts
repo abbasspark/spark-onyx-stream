@@ -49,6 +49,7 @@ export interface ProfilesView {
 export class ViewerProfilesController {
   constructor(@Inject(ViewerProfilesService) private readonly profiles: ViewerProfilesService) {}
 
+  /** The profiles of the account, and which one is in use. */
   @ViewerOnly()
   @Get()
   @Header('Cache-Control', 'no-store')
@@ -65,6 +66,7 @@ export class ViewerProfilesController {
     };
   }
 
+  /** Adds a profile to the account. */
   @ViewerOnly()
   @RateLimit(CHANGES)
   @Post()
@@ -75,6 +77,7 @@ export class ViewerProfilesController {
     return toProfileView(await this.profiles.create(identity.viewer, body));
   }
 
+  /** Changes a profile. */
   @ViewerOnly()
   @RateLimit(CHANGES)
   @Patch(':id')

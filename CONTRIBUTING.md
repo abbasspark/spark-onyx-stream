@@ -18,8 +18,9 @@ Every contributor must agree to the [Contributor License Agreement](CLA.md) befo
 2. Use a descriptive branch name, for example `fix/upload-resume` or `feat/live-dvr`.
 3. Keep each pull request focused on one change.
 4. Add or update tests for the behavior you change.
-5. Make sure linting and tests pass before you open the pull request.
-6. Fill in the pull request template.
+5. After a change to an endpoint of the API, run `pnpm openapi` and commit what it writes. See [docs/api.md](docs/api.md).
+6. Make sure linting and tests pass before you open the pull request.
+7. Fill in the pull request template.
 
 ## Commit messages
 

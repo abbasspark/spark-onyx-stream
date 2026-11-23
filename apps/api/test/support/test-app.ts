@@ -21,6 +21,7 @@ import { TitleHistoryCoreModule } from '../../src/history/title-history.module.j
 import { WebhooksCoreModule } from '../../src/webhooks/webhooks.module.js';
 import { StreamsCoreModule } from '../../src/streams/streams.module.js';
 import { PROCESSING_QUEUE } from '../../src/queue/queue.constants.js';
+import { AppVersionsModule } from '../../src/app-versions/app-versions.module.js';
 import { BrandingModule } from '../../src/branding/branding.module.js';
 import { MailModule } from '../../src/mail/mail.module.js';
 import { MailService } from '../../src/mail/mail.service.js';
@@ -306,6 +307,7 @@ export async function createTestApp(
       DeliveryCoreModule,
       MailModule,
       BrandingModule,
+      AppVersionsModule,
       ...featureModules,
     ],
   })
