@@ -65,6 +65,24 @@ A paid title can carry a price for renting, a price for buying, or both. A viewe
 - Without Stripe, the page of a title shows the prices and where to ask. Titles are then given by an admin.
 - In the books, rentals and purchases are payments of their own kind, beside the subscriptions.
 
+## Coupons
+
+A coupon is a code a viewer enters before paying, for a lower price. Coupons are made in the panel under **Billing → Coupons**.
+
+- **A code takes off a share or a sum:** 1 to 100 percent, or an amount in the currency of the site. A price is never lowered below nothing. A code that would leave less than 50 of the smallest unit to pay is refused for that price, because no card payment can be that small; a code that leaves nothing is fine, and the plan or title is then free.
+- **A code is for everything, for plans, or for renting and buying single titles.** A code for plans can be limited to some of them.
+- **On a subscription it counts for the first payment, for a number of months, or for every payment.** On a title it counts for that one payment. With a free trial, the code counts from the first payment after the trial.
+- **Limits:** a first and a last day, a number of uses in all, once per viewer (the default), and only for viewers who have not paid on the site before.
+- **A coupon can be switched off.** It then takes no more uses and keeps its history. One that was never used can be deleted; one that was used stays in the books.
+- **Where a coupon stands** is worked out from all of this: active, scheduled, ended, used up, or switched off.
+- **The viewer enters the code on the page of plans or on the page of a title.** The page asks the site what the code does and shows the new price before anything is paid: the old price struck through, and what a subscription costs once the code has run out. On the page of plans one request answers for every plan and both ways of paying.
+- **A code that does not exist, is switched off or has not begun gets one and the same answer,** and a viewer may ask ten times in ten minutes. Codes cannot be found by trying them out.
+- **The price is lowered at Stripe.** When a checkout is opened with a code, the site makes sure a coupon with the same terms exists at Stripe and opens the payment page with it. The id of that coupon names the terms, so nothing is stored about it, and a coupon that is changed here gets a new one there. Viewers who subscribed with a code keep the terms they got.
+- **A use is written down when the checkout is completed,** from the viewer's return or from Stripe's message, whichever comes first, and once. Opening the payment page is not a use.
+- **The record of a use** holds the viewer, what was paid for, the price without the code and what the code took off the first payment. It outlives the account, with the email address as it was.
+- **The books hold what was really paid.** Revenue counts payments after the discount.
+- **Limits are checked when the payment page is opened.** Two viewers who open it at the same moment for the last use of a code both get it.
+
 ## Access granted by an admin
 
 For viewers who pay the operator directly, in cash or by bank transfer, through a reseller, or who get access as a gift.
@@ -94,7 +112,7 @@ With a Stripe key set, the page of plans gets a button per plan. Without one, no
 - **A cancelled subscription** runs until the end of what was paid.
 - **The free trial of a plan is given once per viewer,** on the first subscription paid online.
 - **A viewer manages the subscription in Stripe's customer portal,** opened from the account page: the card, the invoices, cancelling and resuming.
-- **Codes for a reduced price** made in Stripe under "Coupons" can be entered on the payment page.
+- **Codes for a reduced price** are made in the panel under Coupons and entered on the website before paying. See [Coupons](#coupons). A checkout that is opened without such a code still shows Stripe's own field, for codes made in Stripe under "Coupons".
 - **A plan is a product at Stripe** with the plan's name. Prices are sent with each payment, so a change of price here applies to new subscribers at once. Viewers who already subscribed keep paying their old price.
 - **An account with a running paid subscription cannot be deleted,** by the viewer or by an admin, because the payments would go on. The subscription is cancelled first.
 
@@ -179,12 +197,15 @@ All under `/v1`.
 | `GET /catalog/plans`              | The plans on offer, the currency, and whether one can pay online. Cached like the catalog      |
 | `GET /viewer/subscription`        | The signed-in viewer's own subscription, and whether paid titles are open to them              |
 | `POST /viewer/checkout`           | Opens Stripe's payment page for a plan and an interval. Answers with the address to go to      |
+| `POST /viewer/coupons/check`      | What a code does: to a plan (`planId`, `interval`), a title (`titleId`, `kind`) or all `plans` |
 | `POST /viewer/checkout/confirm`   | Called on return from the payment page. Records the subscription or the title at once          |
 | `POST /viewer/billing-portal`     | Opens Stripe's customer portal. Answers with the address to go to                              |
 | `POST /billing/stripe/webhook`    | Where Stripe reports to. Trusted by the signature of each message alone                        |
 | `GET /viewer/payments`            | The signed-in viewer's own payments, with the address of each invoice                          |
 | `POST /viewer/purchases/checkout` | Opens Stripe's payment page for renting or buying a title: `titleId`, `kind` (`RENT` or `BUY`) |
 | `GET /viewer/purchases`           | The viewer's rented and bought titles                                                          |
+
+`POST /viewer/checkout` and `POST /viewer/purchases/checkout` take an optional `code`. A code that cannot be used is answered with `404` and `coupon_unknown`, or with `409` and one of `coupon_ended`, `coupon_used_up`, `coupon_already_used`, `coupon_new_customers`, `coupon_not_for_this` and `coupon_too_much`, each with a sentence for the viewer.
 
 `POST /viewer/checkout` answers `409` with the code `already_subscribed` to a viewer with a running subscription, `503` with `checkout_unavailable` when there is no online payment, and `502` with `payment_provider_error` when Stripe cannot be reached.
 
@@ -218,6 +239,9 @@ Permissions `billing:read` and `billing:write`. Owners and admins have them. Edi
 | `POST /viewers/{id}/payments`                   | Write down money received by hand                                                            |
 | `DELETE /payments/{id}`                         | Delete a payment that was written down by hand                                               |
 | `POST /billing/stripe/import-payments`          | Read the paid invoices from Stripe into the books                                            |
+| `GET /coupons`, `POST /coupons`                 | The coupons, each with its state, its uses and what it took off. Make one                    |
+| `GET`, `PATCH`, `DELETE /coupons/{id}`          | One coupon. Change it, or delete it while it was never used                                  |
+| `GET /coupons/{id}/redemptions`                 | Who used the code, the latest first, in pages                                                |
 | `GET /viewers/{id}/purchases`                   | The titles a viewer rented or bought                                                         |
 | `POST /viewers/{id}/purchases`                  | Give a viewer a title by hand: `titleId`, `kind`, optional `amount` and `note`               |
 | `POST /purchases/{id}/revoke`                   | Take a title back                                                                            |
@@ -250,6 +274,7 @@ A title's access is part of the title: `access`, `packageIds`, `rentAmount`, `bu
 
 - Changing from one plan to another while subscribed
 - Emails of this site about payments. Stripe sends receipts and, if turned on there, reminders
-- Gift codes. Codes for a reduced price work through Stripe's coupons
+- Gift codes that open something without a payment page, and batches of single-use codes
+- A code on a payment an admin writes down by hand
 - Payment providers other than Stripe
 - A limit on how many devices play at the same time

@@ -10,11 +10,12 @@ import {
 import { PrismaClient, type StripeEvent } from '@onyx/database';
 import { isUniqueViolation } from '../common/prisma-errors.js';
 import { AppConfig } from '../config/app-config.js';
-import { StripeError } from '../stripe/stripe.client.js';
+import { StripeClient, StripeError } from '../stripe/stripe.client.js';
 import { verifySignature } from '../stripe/stripe.signature.js';
 import { StripeSyncService } from '../stripe/stripe-sync.service.js';
 import { idOf, type StripeCharge, type StripeEventPayload } from '../stripe/stripe.types.js';
 import type { StripeEventView } from './billing.views.js';
+import { CouponsService } from './coupons.service.js';
 
 /** Where Stripe reports to, after the prefix of the API. */
 export const STRIPE_WEBHOOK_ROUTE = 'billing/stripe/webhook';
@@ -52,6 +53,8 @@ export class StripeWebhookService {
     @Inject(PrismaClient) private readonly prisma: PrismaClient,
     @Inject(AppConfig) private readonly config: AppConfig,
     @Inject(StripeSyncService) private readonly sync: StripeSyncService,
+    @Inject(StripeClient) private readonly stripe: StripeClient,
+    @Inject(CouponsService) private readonly coupons: CouponsService,
   ) {}
 
   /**
@@ -179,8 +182,13 @@ export class StripeWebhookService {
       id?: unknown;
       mode?: unknown;
       subscription?: string | { id: string } | null;
+      metadata?: Record<string, unknown> | null;
     };
     if (event.type === 'checkout.session.completed') {
+      if (typeof object.id === 'string' && typeof object.metadata?.couponId === 'string') {
+        // Asked for as it is now: the message could be an old one.
+        await this.coupons.recordRedemption(await this.stripe.retrieveCheckoutSession(object.id));
+      }
       if (object.mode === 'payment' && typeof object.id === 'string') {
         // A title was rented or bought.
         return (await this.sync.recordPurchaseById(object.id)) !== null;

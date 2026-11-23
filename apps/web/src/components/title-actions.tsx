@@ -14,10 +14,12 @@ import {
   opensTitle,
   ownedTitle,
 } from '@/lib/plans';
+import { type CouponQuote, couponsApi, describeOff } from '@/lib/coupons';
 import { authHref, ViewerApiError, viewerApi } from '@/lib/viewer-api';
 import type { TitleDetail } from '@/lib/types';
 import { episodeCode, movieKey, nextUnwatched, watchHref } from '@/lib/watch';
 import { useWatching } from './continue-watching';
+import { CouponField } from './coupon-field';
 import { MyListButton } from './my-list';
 import { useViewerSession } from './viewer-session';
 import { useWatchedVideos } from './watched-videos';
@@ -61,6 +63,13 @@ export function TitleActions({ title, offer }: { title: TitleDetail; offer: Titl
   const [arriving, setArriving] = useState(false);
   const confirmed = useRef(false);
   const viewerId = viewer?.id;
+  // A coupon code the viewer entered: what it does to renting and to buying.
+  const [coupon, setCoupon] = useState<{
+    rent: CouponQuote | null;
+    buy: CouponQuote | null;
+  } | null>(null);
+  // A code belongs to the account it was checked for.
+  useEffect(() => setCoupon(null), [viewerId]);
 
   // Back from Stripe's payment page: the address names the payment. The site
   // is told, which records the title at once, and the name is taken out again.
@@ -110,11 +119,16 @@ export function TitleActions({ title, offer }: { title: TitleDetail; offer: Titl
     setOpening(kind);
     setProblem(null);
     try {
-      const { url } = await viewerApi.purchase(title.id, kind);
+      const quote = kind === 'RENT' ? coupon?.rent : coupon?.buy;
+      const { url } = await viewerApi.purchase(title.id, kind, quote?.code);
       // The payment page is Stripe's. The button stays busy until the browser has left.
       window.location.assign(url);
     } catch (caught) {
       setOpening(null);
+      if (caught instanceof ViewerApiError && [404, 409].includes(caught.status) && coupon) {
+        // The code stopped being valid between entering it and paying.
+        setCoupon(null);
+      }
       setProblem(
         caught instanceof ViewerApiError
           ? caught.message
@@ -125,6 +139,30 @@ export function TitleActions({ title, offer }: { title: TitleDetail; offer: Titl
 
   const rent = title.rentAmount ?? null;
   const buy = title.buyAmount ?? null;
+
+  /**
+   * Asks what a code does to each way this title is sold. It counts as
+   * applied when it lowers one of them, and the reason is passed on when it
+   * lowers neither.
+   */
+  async function checkCoupon(code: string) {
+    const ask = async (kind: 'RENT' | 'BUY', amount: number | null) =>
+      amount === null ? null : couponsApi.forTitle(code, title.id, kind);
+    const [forRent, forBuy] = await Promise.allSettled([ask('RENT', rent), ask('BUY', buy)]);
+    const quotes = {
+      rent: forRent.status === 'fulfilled' ? forRent.value : null,
+      buy: forBuy.status === 'fulfilled' ? forBuy.value : null,
+    };
+    if (!quotes.rent && !quotes.buy) {
+      throw forRent.status === 'rejected'
+        ? forRent.reason
+        : forBuy.status === 'rejected'
+          ? forBuy.reason
+          : new Error('Nothing to apply the code to');
+    }
+    return quotes;
+  }
+  const couponTerms = coupon?.rent ?? coupon?.buy ?? null;
   const sells = rent !== null || buy !== null;
 
   let href: string;
@@ -150,22 +188,35 @@ export function TitleActions({ title, offer }: { title: TitleDetail; offer: Titl
     }
   }
 
-  const payButton = (kind: 'RENT' | 'BUY', amount: number, primary: boolean) => (
-    <button
-      type="button"
-      className={`button ${primary ? 'button-play' : 'button-quiet'}`}
-      disabled={opening !== null}
-      aria-busy={opening === kind}
-      onClick={() => void pay(kind)}
-    >
-      {opening === kind ? (
-        <Loader2 className="animate-[player-spin_0.9s_linear_infinite]" aria-hidden="true" />
-      ) : null}
-      {opening === kind
-        ? 'Opening the payment page'
-        : `${kind === 'RENT' ? 'Rent' : 'Buy'} ${formatMoney(amount, offer.currency)}`}
-    </button>
-  );
+  const payButton = (kind: 'RENT' | 'BUY', amount: number, primary: boolean) => {
+    const quote = kind === 'RENT' ? coupon?.rent : coupon?.buy;
+    const word = kind === 'RENT' ? 'Rent' : 'Buy';
+    return (
+      <button
+        type="button"
+        className={`button ${primary ? 'button-play' : 'button-quiet'}`}
+        disabled={opening !== null}
+        aria-busy={opening === kind}
+        onClick={() => void pay(kind)}
+      >
+        {opening === kind ? (
+          <Loader2 className="animate-[player-spin_0.9s_linear_infinite]" aria-hidden="true" />
+        ) : null}
+        {opening === kind ? (
+          'Opening the payment page'
+        ) : quote && quote.discountAmount > 0 ? (
+          <>
+            {word} <span className="sr-only">instead of </span>
+            <s className="font-normal opacity-60">{formatMoney(amount, offer.currency)}</s>
+            <span className="sr-only"> for </span>
+            {quote.finalAmount === 0 ? 'free' : formatMoney(quote.finalAmount, offer.currency)}
+          </>
+        ) : (
+          `${word} ${formatMoney(amount, offer.currency)}`
+        )}
+      </button>
+    );
+  };
   // The first way on offer is the prominent one.
   const subscribeFirst = locked && offer.subscribable;
   const rentFirst = !subscribeFirst;
@@ -214,6 +265,29 @@ export function TitleActions({ title, offer }: { title: TitleDetail; offer: Titl
         ) : null}
         <MyListButton title={{ id: title.id, slug: title.slug, name: title.name }} />
       </div>
+
+      {locked && !arriving && offer.checkout && sells && viewer ? (
+        <CouponField
+          className="mt-4"
+          applied={
+            couponTerms
+              ? {
+                  code: couponTerms.code,
+                  summary:
+                    coupon?.rent && coupon.buy
+                      ? describeOff(couponTerms)
+                      : `${describeOff(couponTerms)} ${coupon?.rent ? 'renting' : 'buying'}`,
+                }
+              : null
+          }
+          check={checkCoupon}
+          onApplied={(quotes) => {
+            setCoupon(quotes);
+            setProblem(null);
+          }}
+          onRemoved={() => setCoupon(null)}
+        />
+      ) : null}
 
       {problem ? (
         <p role="alert" className="mt-4 max-w-xl border-l-2 border-alarm py-1 pl-4 text-alarm">

@@ -65,9 +65,21 @@ interface FakeSession {
   payment_intent: string | null;
   amount_total: number | null;
   currency: string | null;
+  total_details: { amount_tax: number; amount_discount: number };
   metadata: Record<string, string>;
   created: number;
   form: Record<string, string>;
+}
+
+export interface FakeCoupon {
+  id: string;
+  object: 'coupon';
+  name: string;
+  percent_off: number | null;
+  amount_off: number | null;
+  currency: string | null;
+  duration: string;
+  duration_in_months: number | null;
 }
 
 /**
@@ -83,6 +95,7 @@ export interface FakeStripe {
   requests: FakeStripeRequest[];
   customers: Map<string, { id: string; email: string; name: string; deleted?: boolean }>;
   products: Map<string, { id: string; name: string }>;
+  coupons: Map<string, FakeCoupon>;
   sessions: Map<string, FakeSession>;
   subscriptions: Map<string, FakeSubscription>;
   invoices: Map<string, FakeInvoice>;
@@ -154,6 +167,7 @@ export async function startFakeStripe(): Promise<FakeStripe> {
     requests: [],
     customers: new Map(),
     products: new Map(),
+    coupons: new Map(),
     sessions: new Map(),
     subscriptions: new Map(),
     invoices: new Map(),
@@ -202,8 +216,16 @@ export async function startFakeStripe(): Promise<FakeStripe> {
       fake.subscriptions.set(subscription.id, subscription);
       session.status = 'complete';
       session.subscription = subscription.id;
-      // A trial starts with an invoice over nothing, which is no payment.
-      fake.bill(subscription.id, trialDays > 0 ? { amount: 0 } : {});
+      // A trial starts with an invoice over nothing, which is no payment. A code
+      // lowers the first invoice.
+      fake.bill(
+        subscription.id,
+        trialDays > 0
+          ? { amount: 0 }
+          : session.total_details.amount_discount > 0
+            ? { amount: session.amount_total ?? 0 }
+            : {},
+      );
       return subscription;
     },
     payOnce(sessionId) {
@@ -321,6 +343,7 @@ export async function startFakeStripe(): Promise<FakeStripe> {
       fake.requests.length = 0;
       fake.customers.clear();
       fake.products.clear();
+      fake.coupons.clear();
       fake.sessions.clear();
       fake.subscriptions.clear();
       fake.invoices.clear();
@@ -397,11 +420,70 @@ export async function startFakeStripe(): Promise<FakeStripe> {
       fake.products.set(wanted, product);
       return { status: 200, body: product };
     }
+    if (resource === 'coupons') {
+      if (method === 'GET' && id) {
+        const coupon = fake.coupons.get(id);
+        return coupon ? { status: 200, body: coupon } : missing(`coupon: '${id}'`);
+      }
+      if (method === 'POST' && !id) {
+        const wanted = form.id ?? next('coupon');
+        if (fake.coupons.has(wanted)) {
+          return {
+            status: 400,
+            body: {
+              error: {
+                type: 'invalid_request_error',
+                code: 'resource_already_exists',
+                message: 'Coupon already exists.',
+              },
+            },
+          };
+        }
+        const coupon: FakeCoupon = {
+          id: wanted,
+          object: 'coupon',
+          name: form.name ?? '',
+          percent_off: form.percent_off ? Number(form.percent_off) : null,
+          amount_off: form.amount_off ? Number(form.amount_off) : null,
+          currency: form.currency ?? null,
+          duration: form.duration ?? 'once',
+          duration_in_months: form.duration_in_months ? Number(form.duration_in_months) : null,
+        };
+        fake.coupons.set(wanted, coupon);
+        return { status: 200, body: coupon };
+      }
+    }
     if (resource === 'checkout' && id === 'sessions') {
       if (method === 'POST') {
         if (!form.customer || !fake.customers.has(form.customer)) {
           return missing(`customer: '${form.customer}'`);
         }
+        const wantedCoupon = form['discounts[0][coupon]'];
+        const coupon = wantedCoupon ? fake.coupons.get(wantedCoupon) : undefined;
+        if (wantedCoupon && !coupon) {
+          return missing(`coupon: '${wantedCoupon}'`);
+        }
+        if (wantedCoupon && form.allow_promotion_codes) {
+          return {
+            status: 400,
+            body: {
+              error: {
+                type: 'invalid_request_error',
+                message:
+                  'You may only specify one of these parameters: allow_promotion_codes, discounts.',
+              },
+            },
+          };
+        }
+        const unit = Number(form['line_items[0][price_data][unit_amount]'] ?? 0);
+        const discount = coupon
+          ? Math.min(
+              unit,
+              coupon.percent_off !== null
+                ? Math.round((unit * coupon.percent_off) / 100)
+                : (coupon.amount_off ?? 0),
+            )
+          : 0;
         const sessionId = next('cs_test');
         const session: FakeSession = {
           id: sessionId,
@@ -414,10 +496,9 @@ export async function startFakeStripe(): Promise<FakeStripe> {
           subscription: null,
           payment_status: 'unpaid',
           payment_intent: null,
-          amount_total:
-            form.mode === 'payment'
-              ? Number(form['line_items[0][price_data][unit_amount]'] ?? 0)
-              : null,
+          // Without a code, a subscription's total is left out, as before.
+          amount_total: form.mode === 'payment' || coupon ? unit - discount : null,
+          total_details: { amount_tax: 0, amount_discount: discount },
           currency: form['line_items[0][price_data][currency]'] ?? null,
           metadata: Object.fromEntries(
             Object.entries(form)

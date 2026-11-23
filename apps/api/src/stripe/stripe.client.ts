@@ -42,6 +42,26 @@ export class StripeError extends Error {
   }
 }
 
+/** A coupon of this site as Stripe is to know it. */
+export interface StripeCouponTerms {
+  /** Names the coupon and its terms: see `stripeCouponId`. */
+  id: string;
+  /** What the payment page and the invoice call it: the code. */
+  name: string;
+  percentOff: number | null;
+  amountOff: number | null;
+  currency: string;
+  duration: 'once' | 'repeating' | 'forever';
+  durationMonths: number | null;
+}
+
+/** A code of this site that a checkout is opened with. */
+export interface CheckoutDiscount {
+  stripeCouponId: string;
+  /** Carried on the checkout, so the use can be written down when it is paid. */
+  metadata: Record<string, string>;
+}
+
 export interface CheckoutParams {
   customerId: string;
   viewerId: string;
@@ -53,6 +73,7 @@ export interface CheckoutParams {
   trialDays: number;
   successUrl: string;
   cancelUrl: string;
+  discount?: CheckoutDiscount;
 }
 
 export interface PaymentCheckoutParams {
@@ -65,6 +86,7 @@ export interface PaymentCheckoutParams {
   amount: number;
   successUrl: string;
   cancelUrl: string;
+  discount?: CheckoutDiscount;
 }
 
 /** Talks to Stripe. Knows its addresses and its errors, nothing of viewers or plans. */
@@ -139,6 +161,38 @@ export class StripeClient {
     return id;
   }
 
+  /**
+   * Makes sure a coupon with these terms exists at Stripe. The id names the
+   * terms, so nothing is stored here and a coupon is never made twice.
+   */
+  async ensureCoupon(terms: StripeCouponTerms): Promise<string> {
+    try {
+      await this.request('GET', `/v1/coupons/${encodeURIComponent(terms.id)}`);
+      return terms.id;
+    } catch (error) {
+      if (!(error instanceof StripeError) || !error.missing) {
+        throw error;
+      }
+    }
+    try {
+      await this.request('POST', '/v1/coupons', {
+        id: terms.id,
+        name: terms.name,
+        ...(terms.percentOff !== null
+          ? { percent_off: terms.percentOff }
+          : { amount_off: terms.amountOff, currency: terms.currency.toLowerCase() }),
+        duration: terms.duration,
+        ...(terms.duration === 'repeating' ? { duration_in_months: terms.durationMonths } : {}),
+      });
+    } catch (created) {
+      // Another request made it in the meantime.
+      if (!(created instanceof StripeError) || created.code !== 'resource_already_exists') {
+        throw created;
+      }
+    }
+    return terms.id;
+  }
+
   /** Opens Stripe's payment page for one plan. */
   createCheckoutSession(params: CheckoutParams): Promise<StripeCheckoutSession> {
     const tax = this.setup().automaticTax;
@@ -148,8 +202,12 @@ export class StripeClient {
       client_reference_id: params.viewerId,
       success_url: params.successUrl,
       cancel_url: params.cancelUrl,
-      // Lets a viewer enter a code made in Stripe under "Coupons".
-      allow_promotion_codes: true,
+      // With a code of this site the price is lowered here. Without one, the
+      // payment page lets a viewer enter a code made in Stripe under "Coupons".
+      // Stripe takes one or the other.
+      ...(params.discount
+        ? { discounts: [{ coupon: params.discount.stripeCouponId }] }
+        : { allow_promotion_codes: true }),
       line_items: [
         {
           quantity: 1,
@@ -166,7 +224,11 @@ export class StripeClient {
         metadata: { viewerId: params.viewerId, planId: params.planId },
         ...(params.trialDays > 0 ? { trial_period_days: params.trialDays } : {}),
       },
-      metadata: { viewerId: params.viewerId, planId: params.planId },
+      metadata: {
+        viewerId: params.viewerId,
+        planId: params.planId,
+        ...params.discount?.metadata,
+      },
       ...(tax ? { automatic_tax: { enabled: true }, customer_update: { address: 'auto' } } : {}),
     });
   }
@@ -174,14 +236,21 @@ export class StripeClient {
   /** Opens Stripe's payment page for renting or buying one title: a single payment. */
   createPaymentCheckout(params: PaymentCheckoutParams): Promise<StripeCheckoutSession> {
     const tax = this.setup().automaticTax;
-    const metadata = { viewerId: params.viewerId, titleId: params.titleId, kind: params.kind };
+    const metadata = {
+      viewerId: params.viewerId,
+      titleId: params.titleId,
+      kind: params.kind,
+      ...params.discount?.metadata,
+    };
     return this.request<StripeCheckoutSession>('POST', '/v1/checkout/sessions', {
       mode: 'payment',
       customer: params.customerId,
       client_reference_id: params.viewerId,
       success_url: params.successUrl,
       cancel_url: params.cancelUrl,
-      allow_promotion_codes: true,
+      ...(params.discount
+        ? { discounts: [{ coupon: params.discount.stripeCouponId }] }
+        : { allow_promotion_codes: true }),
       line_items: [
         {
           quantity: 1,

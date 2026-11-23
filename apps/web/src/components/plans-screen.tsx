@@ -20,7 +20,15 @@ import {
   subscribeLabel,
   yearlySaving,
 } from '@/lib/plans';
+import {
+  type CouponPlansQuote,
+  couponsApi,
+  describeAfterwards,
+  describePlanCoupon,
+  planPrice,
+} from '@/lib/coupons';
 import { authHref, safeNextPath, ViewerApiError, viewerApi } from '@/lib/viewer-api';
+import { CouponField } from './coupon-field';
 import { useViewerSession } from './viewer-session';
 
 /**
@@ -74,6 +82,10 @@ export function PlansScreen({ offer }: { offer: Plans }) {
   // The plan whose payment page is being opened, and what went wrong with the last try.
   const [opening, setOpening] = useState<string | null>(null);
   const [problem, setProblem] = useState<string | null>(null);
+  // A coupon code the viewer entered, with what it does to each plan.
+  const [coupon, setCoupon] = useState<CouponPlansQuote | null>(null);
+  // A code belongs to the account it was checked for.
+  useEffect(() => setCoupon(null), [viewerId]);
 
   async function subscribe(plan: Plan) {
     if (!viewer) {
@@ -86,12 +98,21 @@ export function PlansScreen({ offer }: { offer: Plans }) {
     setOpening(plan.id);
     setProblem(null);
     try {
-      const { url } = await viewerApi.checkout(plan.id, interval === 'month' ? 'MONTH' : 'YEAR');
+      const { url } = await viewerApi.checkout(
+        plan.id,
+        interval === 'month' ? 'MONTH' : 'YEAR',
+        // Only for a plan the code is for: the others are sold at their price.
+        planPrice(coupon, plan.id, interval) ? coupon?.code : undefined,
+      );
       rememberAfterCheckout(next);
       // The payment page is Stripe's. The button stays busy until the browser has left.
       window.location.assign(url);
     } catch (caught) {
       setOpening(null);
+      if (caught instanceof ViewerApiError && [404, 409].includes(caught.status) && coupon) {
+        // The code stopped being valid between entering it and paying.
+        setCoupon(null);
+      }
       setProblem(
         caught instanceof ViewerApiError
           ? caught.message
@@ -152,6 +173,19 @@ export function PlansScreen({ offer }: { offer: Plans }) {
         </div>
       ) : null}
 
+      {offer.checkout && viewer && !own ? (
+        <CouponField
+          className="mt-8"
+          applied={coupon ? { code: coupon.code, summary: describePlanCoupon(coupon) } : null}
+          check={couponsApi.forPlans}
+          onApplied={(quote) => {
+            setCoupon(quote);
+            setProblem(null);
+          }}
+          onRemoved={() => setCoupon(null)}
+        />
+      ) : null}
+
       <ul
         className="mt-10 grid gap-px overflow-hidden rounded-[3px] border border-line bg-line"
         style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 17rem), 1fr))' }}
@@ -160,6 +194,9 @@ export function PlansScreen({ offer }: { offer: Plans }) {
           const price = priceOf(plan, interval) as number;
           const planSaving = interval === 'year' ? yearlySaving(plan) : null;
           const isOwn = own?.plan.id === plan.id;
+          const reduced = own ? null : planPrice(coupon, plan.id, interval);
+          const afterwards =
+            coupon && reduced ? describeAfterwards(coupon, reduced, interval) : null;
           return (
             <li key={plan.id} className="relative flex flex-col bg-onyx p-7 sm:p-8">
               {plan.isRecommended ? (
@@ -173,16 +210,29 @@ export function PlansScreen({ offer }: { offer: Plans }) {
                   <span className="text-sm text-sard">Recommended</span>
                 ) : null}
               </div>
-              <p className="mt-6 flex items-baseline gap-2">
-                <span className="display text-5xl">{formatMoney(price, currency)}</span>
+              <p className="mt-6 flex flex-wrap items-baseline gap-x-2">
+                {reduced && reduced.discountAmount > 0 ? (
+                  <>
+                    <span className="sr-only">Instead of </span>
+                    <s className="text-xl text-smoke">{formatMoney(price, currency)}</s>
+                    <span className="sr-only"> now </span>
+                  </>
+                ) : null}
+                <span className="display text-5xl">
+                  {formatMoney(reduced ? reduced.finalAmount : price, currency)}
+                </span>
                 <span className="text-smoke">a {interval}</span>
               </p>
               <p className="mt-1 min-h-5 text-sm text-sard">
-                {planSaving
-                  ? `${planSaving}% less than paying monthly`
-                  : plan.trialDays > 0 && offer.checkout && !trialUsed
-                    ? `First ${plan.trialDays} days free`
-                    : ''}
+                {reduced
+                  ? [`With ${coupon?.code}`, afterwards].filter(Boolean).join(', ')
+                  : coupon && !own
+                    ? 'Your code is not for this plan'
+                    : planSaving
+                      ? `${planSaving}% less than paying monthly`
+                      : plan.trialDays > 0 && offer.checkout && !trialUsed
+                        ? `First ${plan.trialDays} days free`
+                        : ''}
               </p>
               {plan.description ? <p className="mt-5 text-smoke">{plan.description}</p> : null}
               {limited ? (
