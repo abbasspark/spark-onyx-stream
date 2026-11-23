@@ -73,6 +73,7 @@ describe('sectionState', () => {
     expect(sectionState(section({ visibleUntil: '2026-12-01T00:00:00Z' }), now)).toBe('ended');
     expect(sectionState(section({ count: 0 }), now)).toBe('empty');
     expect(sectionState(section({ kind: 'CONTINUE_WATCHING', count: 0 }), now)).toBe('shown');
+    expect(sectionState(section({ kind: 'MY_LIST', count: 0 }), now)).toBe('shown');
   });
 });
 
@@ -112,6 +113,8 @@ describe('formProblem', () => {
       formProblem('TITLES', form({ from: '2026-12-24T00:00', until: '2026-12-01T00:00' })),
     ).toBe('The end must come after the start.');
     expect(formProblem('CONTINUE_WATCHING', form({ source: 'CATEGORY' }))).toBeNull();
+    expect(formProblem('MY_LIST', form({ source: 'CATEGORY' }))).toBeNull();
+    expect(describeSection(section({ kind: 'MY_LIST' }))).toContain('saved to watch later');
   });
 });
 

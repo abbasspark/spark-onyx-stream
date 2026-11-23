@@ -61,6 +61,7 @@ import type {
   TitleAnalytics,
   TitleRanking,
   TitleViewFigures,
+  SavedTitles,
   WatchingNow,
   HomePage,
   HomeSection,
@@ -133,6 +134,7 @@ import type {
   ViewerSortField,
   ViewerStatus,
   ViewerSubscriptions,
+  ViewerSaved,
   ViewerWatching,
 } from './types';
 
@@ -309,6 +311,9 @@ export const viewersApi = {
   get: (id: string, signal?: AbortSignal) => request<ViewerDetail>(`/v1/viewers/${id}`, { signal }),
   watching: (id: string, signal?: AbortSignal) =>
     request<ViewerWatching>(`/v1/viewers/${id}/watching`, { signal }),
+  /** What the profiles of the viewer saved to watch later. */
+  saved: (id: string, signal?: AbortSignal) =>
+    request<ViewerSaved>(`/v1/viewers/${id}/list`, { signal }),
   create: (body: CreateViewerInput) => request<Viewer>('/v1/viewers', { method: 'POST', body }),
   update: (id: string, body: UpdateViewerInput) =>
     request<Viewer>(`/v1/viewers/${id}`, { method: 'PATCH', body }),
@@ -460,6 +465,9 @@ export const analyticsApi = {
   summary: (range: AnalyticsRange, signal?: AbortSignal) =>
     request<AnalyticsSummary>('/v1/analytics/summary', { query: { ...range }, signal }),
   now: (signal?: AbortSignal) => request<WatchingNow>('/v1/analytics/now', { signal }),
+  /** What stands on the lists of viewers. `days`: what counts as added lately. */
+  saved: (days: number, signal?: AbortSignal) =>
+    request<SavedTitles>('/v1/analytics/saved', { query: { days }, signal }),
   titles: (
     range: AnalyticsRange & { sort: TitleRanking; page: number; pageSize: number },
     signal?: AbortSignal,

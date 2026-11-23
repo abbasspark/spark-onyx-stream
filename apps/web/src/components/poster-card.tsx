@@ -3,6 +3,7 @@ import { Lock } from 'lucide-react';
 import Link from 'next/link';
 import { describeLength } from '@/lib/format';
 import type { TitleCard } from '@/lib/types';
+import { MyListButton } from './my-list';
 
 /**
  * A stand-in for a title without a poster: its name, set like poster
@@ -35,39 +36,43 @@ export function PosterCard({ title, eager, className }: PosterCardProps) {
   const facts = [title.releaseYear, describeLength(title)].filter(Boolean);
 
   return (
-    <Link href={`/title/${title.slug}`} className={`group block ${className ?? ''}`}>
-      <div className="@container relative aspect-[2/3] overflow-hidden rounded-[3px] bg-ash outline-2 outline-offset-2 outline-transparent transition-[outline-color] duration-150 group-hover:outline-vein group-focus-visible:outline-sard">
-        {title.poster ? (
-          <img
-            src={title.poster.url}
-            alt=""
-            width={title.poster.width}
-            height={title.poster.height}
-            loading={eager ? 'eager' : 'lazy'}
-            decoding="async"
-            className="size-full object-cover"
-          />
-        ) : (
-          <PosterFallback name={title.name} />
-        )}
-        {title.access === 'PAID' ? (
-          <span className="absolute top-2 left-2 flex h-6 items-center gap-1 rounded-[3px] bg-onyx/80 px-1.5 text-[0.6875rem] font-medium text-sard">
-            <Lock className="size-3" aria-hidden="true" />
-            <span className="sr-only">Needs a subscription. </span>
-            <span aria-hidden="true">Plan</span>
-          </span>
-        ) : null}
-      </div>
-      <p className="mt-2.5 truncate text-sm font-medium" title={title.name}>
-        {title.name}
-      </p>
-      {facts.length > 0 ? (
-        <p className="flex gap-2.5 truncate text-xs text-smoke">
-          {facts.map((fact) => (
-            <span key={fact}>{fact}</span>
-          ))}
+    // The button stands beside the link, not in it: a button inside a link cannot be reached properly.
+    <div className={`group/card relative ${className ?? ''}`}>
+      <Link href={`/title/${title.slug}`} className="group block">
+        <div className="@container relative aspect-[2/3] overflow-hidden rounded-[3px] bg-ash outline-2 outline-offset-2 outline-transparent transition-[outline-color] duration-150 group-hover:outline-vein group-focus-visible:outline-sard">
+          {title.poster ? (
+            <img
+              src={title.poster.url}
+              alt=""
+              width={title.poster.width}
+              height={title.poster.height}
+              loading={eager ? 'eager' : 'lazy'}
+              decoding="async"
+              className="size-full object-cover"
+            />
+          ) : (
+            <PosterFallback name={title.name} />
+          )}
+          {title.access === 'PAID' ? (
+            <span className="absolute top-2 left-2 flex h-6 items-center gap-1 rounded-[3px] bg-onyx/80 px-1.5 text-[0.6875rem] font-medium text-sard">
+              <Lock className="size-3" aria-hidden="true" />
+              <span className="sr-only">Needs a subscription. </span>
+              <span aria-hidden="true">Plan</span>
+            </span>
+          ) : null}
+        </div>
+        <p className="mt-2.5 truncate text-sm font-medium" title={title.name}>
+          {title.name}
         </p>
-      ) : null}
-    </Link>
+        {facts.length > 0 ? (
+          <p className="flex gap-2.5 truncate text-xs text-smoke">
+            {facts.map((fact) => (
+              <span key={fact}>{fact}</span>
+            ))}
+          </p>
+        ) : null}
+      </Link>
+      <MyListButton title={{ id: title.id, slug: title.slug, name: title.name }} look="card" />
+    </div>
   );
 }

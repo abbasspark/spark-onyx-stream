@@ -356,13 +356,14 @@ describe.skipIf(!TEST_DATABASE_URL)('Public catalog (e2e)', () => {
         ]),
       ).toEqual([
         ['continue', 'Continue watching', []],
+        ['list', 'My list', []],
         // One featured title is the opening. A row of one would only repeat it.
         ['latest', 'New', ['Harvest', 'Night Train']],
         ['category:drama', 'Drama', ['Night Train']],
       ]);
       expect(home.body.custom).toBe(false);
       expect(names(home.body.hero.titles)).toEqual(['Harvest']);
-      expect(home.body.rows[2]).toMatchObject({
+      expect(home.body.rows[3]).toMatchObject({
         category: { slug: 'drama', name: 'Drama' },
         kind: 'titles',
         layout: 'poster',

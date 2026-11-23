@@ -14,6 +14,7 @@ import {
   Layers,
   LayoutTemplate,
   ListOrdered,
+  ListPlus,
   MoreHorizontal,
   PanelTop,
   Pencil,
@@ -73,6 +74,7 @@ import { cn } from '@/lib/cn';
 import { formatDateTime } from '@/lib/format';
 import {
   describeSection,
+  isOwnRow,
   formProblem,
   LAYOUT_LABELS,
   MAX_HERO_TITLES,
@@ -95,6 +97,7 @@ import { SITE_URL } from '@/lib/site';
 const KIND_LOOKS: Record<HomeSectionKind, { icon: typeof PanelTop; label: string }> = {
   HERO: { icon: PanelTop, label: 'Opening' },
   CONTINUE_WATCHING: { icon: History, label: 'Continue watching' },
+  MY_LIST: { icon: ListPlus, label: 'My list' },
   TITLES: { icon: GalleryHorizontal, label: 'Row' },
 };
 
@@ -228,6 +231,7 @@ function LayoutBuilder({ page }: { page: LayoutPageSlug }) {
   // The opening always stands first on the page, so it is not part of the order.
   const rows = all.filter((section) => section.kind !== 'HERO');
   const hasContinue = all.some((section) => section.kind === 'CONTINUE_WATCHING');
+  const hasList = all.some((section) => section.kind === 'MY_LIST');
 
   const saveOrder = (next: HomeSection[]) => {
     const ordered = hero ? [hero, ...next] : next;
@@ -247,7 +251,9 @@ function LayoutBuilder({ page }: { page: LayoutPageSlug }) {
       description:
         section.kind === 'CONTINUE_WATCHING'
           ? 'Viewers no longer see what they started on this page. Their progress is kept.'
-          : 'Only the section goes. The titles it shows stay in the catalog.',
+          : section.kind === 'MY_LIST'
+            ? 'Viewers no longer see their list on this page. The lists are kept, and stay on their own page.'
+            : 'Only the section goes. The titles it shows stay in the catalog.',
       confirmLabel: 'Remove',
       destructive: true,
     });
@@ -302,7 +308,7 @@ function LayoutBuilder({ page }: { page: LayoutPageSlug }) {
             </span>
           </DropdownMenuItem>
         ))}
-        {(hasOpening && !hero) || !hasContinue ? <DropdownMenuSeparator /> : null}
+        {(hasOpening && !hero) || !hasContinue || !hasList ? <DropdownMenuSeparator /> : null}
         {hasOpening && !hero ? (
           <DropdownMenuItem
             onSelect={() =>
@@ -323,6 +329,16 @@ function LayoutBuilder({ page }: { page: LayoutPageSlug }) {
               Continue watching
               <span className="text-xs text-muted-foreground">
                 Where each viewer finds what they started
+              </span>
+            </span>
+          </DropdownMenuItem>
+        ) : null}
+        {!hasList ? (
+          <DropdownMenuItem onSelect={() => create.mutate({ kind: 'MY_LIST' })}>
+            <span className="grid">
+              My list
+              <span className="text-xs text-muted-foreground">
+                Where each viewer finds what they saved for later
               </span>
             </span>
           </DropdownMenuItem>
@@ -700,7 +716,7 @@ function SectionCard({
             {dates ? `. Shown ${dates}` : ''}
           </p>
 
-          {section.kind !== 'CONTINUE_WATCHING' ? (
+          {!isOwnRow(section.kind) ? (
             section.preview.length > 0 ? (
               <ul
                 className="mt-3 flex gap-1.5 overflow-hidden"
@@ -899,7 +915,7 @@ function SectionEditor({
   const [form, setForm] = useState<SectionForm>(() => toForm(editing, page));
   const set = (change: Partial<SectionForm>) => setForm((current) => ({ ...current, ...change }));
   const isHero = kind === 'HERO';
-  const isContinue = kind === 'CONTINUE_WATCHING';
+  const isContinue = isOwnRow(kind);
 
   const categories = useQuery({
     queryKey: ['categories'],
@@ -986,7 +1002,9 @@ function SectionEditor({
           isHero
             ? 'The first thing a visitor sees: a title shown as large as its backdrop allows. With several, they take turns every few seconds.'
             : isContinue
-              ? 'The place on the page where a viewer finds what they started.'
+              ? kind === 'MY_LIST'
+                ? 'The place on the page where a viewer finds what they saved to watch later.'
+                : 'The place on the page where a viewer finds what they started.'
               : 'A heading and a strip of titles that scrolls sideways.'
         }
       >

@@ -5,7 +5,7 @@ type Sort = 'CURATED' | 'NEWEST' | 'RELEASED' | 'RATING' | 'NAME';
 type TitleType = 'MOVIE' | 'SERIES' | null;
 
 export interface NamedSection {
-  kind: 'HERO' | 'CONTINUE_WATCHING' | 'TITLES';
+  kind: 'HERO' | 'CONTINUE_WATCHING' | 'MY_LIST' | 'TITLES';
   name: string | null;
   source: Source;
   sort: Sort;
@@ -26,6 +26,9 @@ const KIND_WORD = { MOVIE: 'movies', SERIES: 'series' } as const;
 export function defaultSectionName(section: NamedSection, pageType: TitleType = null): string {
   if (section.kind === 'CONTINUE_WATCHING') {
     return 'Continue watching';
+  }
+  if (section.kind === 'MY_LIST') {
+    return 'My list';
   }
   // On the page for movies, "New" says enough: "New movies" would repeat the page.
   const kind =
@@ -76,6 +79,9 @@ export function browsePath(
   section: NamedSection,
   scope?: { kind: 'category' | 'genre'; slug: string },
 ): string | null {
+  if (section.kind === 'MY_LIST') {
+    return '/my-list';
+  }
   if (section.kind !== 'TITLES' || section.source === 'MANUAL') {
     return null;
   }

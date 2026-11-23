@@ -132,6 +132,7 @@ Three pages of the website are arranged in the panel, in the group **Layout**: t
 - **A row has a look:** upright posters, wide cards with the backdrop, or a numbered top list.
 - **The opening shows one title large, or up to 8 that take turns** every few seconds. Its titles come from a source like those of a row. Titles with a backdrop are preferred; without any, the others are taken rather than leaving the page without an opening. The turn waits while the pointer or the keyboard is on the opening, and does not run for visitors who asked their system for less motion.
 - **"Continue watching" is a section too:** the place where a viewer finds what they started. Without it, a page does not show that row.
+- **So is "My list":** the place where a viewer finds what they saved to watch later. See [My list](phase-2-viewers.md#my-list). A page has one place for each at most. In the answer for clients these rows have the kind `continue` and `list` and carry no titles: the client fills them for the viewer.
 - **A section can be switched off, and can have dates.** With a start and an end, a row for a season appears and leaves by itself.
 - **A heading is optional.** Without one, a section is named after what it shows: "New movies", "Top rated", the name of the category or collection.
 - **Nothing a viewer may not see gets on a page.** Every section goes through the filter of the public catalog, so a draft that was picked by hand is left out, and the panel marks it. A section with nothing to show is not sent, and appears by itself once it has something.

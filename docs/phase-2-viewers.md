@@ -73,6 +73,10 @@ All under `/v1/viewer`. Answers about a person are never cached.
 | `GET /watching/titles/{slug}`               | Progress in the videos of one title, finished ones included                                      |
 | `PUT /watching`                             | Report positions: `{ items: [{ title, episodeId?, position, duration, watchedAt? }] }`, up to 50 |
 | `DELETE /watching/{id}`, `DELETE /watching` | Forget one video, or everything                                                                  |
+| `GET /list`                                 | "My list": the saved titles as cards, the last added first, and how many more it takes           |
+| `GET /list/ids`                             | Only the ids of the saved titles, to mark them on any page                                       |
+| `PUT /list/{slug}`, `DELETE /list/{slug}`   | Put a title on the list, or take it off. Both are safe to repeat                                 |
+| `DELETE /list`                              | Empty the list                                                                                   |
 
 Playback (`POST /v1/catalog/…/playback`) answers 401 with "Sign in to watch" when `CATALOG_PLAYBACK=viewers` and no viewer is signed in.
 
@@ -93,6 +97,8 @@ All under `/v1/viewers`, with the permissions `viewers:read` and `viewers:write`
 | `POST /viewers/{id}/verification-email` | Email the viewer the link to confirm their address                                     |
 | `GET /mail`, `POST /mail/test`          | How email is set up, and sending a test. Permissions `settings:read`, `settings:write` |
 | `GET /viewers/{id}/watching`            | What the viewer watched: totals and the latest 25 videos                               |
+| `GET /viewers/{id}/list`                | What the viewer saved to watch later: the latest 25, with whether each was begun       |
+| `GET /analytics/saved`                  | What stands on lists: totals and the ten titles on the most lists. `days`: 1 to 365    |
 
 ## Admin panel
 
@@ -158,6 +164,18 @@ Each profile of an account remembers where it is in each video, so "Continue wat
 - Entries are deleted with the account, the profile, the title or the episode.
 
 On the website the list is also kept in the browser. For a visitor that is the only place. For a viewer it is a copy of the account's list: pages have it at once, and what was noted without a connection is handed over when the next page opens. Signing in hands over what the device kept as a visitor. Signing out removes the copy from the device.
+
+## My list
+
+A viewer saves titles to watch later. The list goes with the account, per profile, so it is the same on every device.
+
+- **A list holds titles, not episodes.** A series is saved as a whole.
+- **Every title has the button:** on its card, on its page and in the opening of a page. A visitor who presses it is led to sign in and comes back to where they were.
+- **The list has a page of its own,** `/my-list`, linked from the account menu, with the last added first. It can also stand as a row on any arranged page: "My list" is a section in the panel's builder, like "Continue watching". The home page that puts itself together shows it after "Continue watching". The row shows only for viewers who saved something.
+- **A title that is unpublished stays on the list and is not shown.** It returns by itself when it is published again. A deleted title leaves every list.
+- **A list holds 500 titles.** Enough for any person, and an end for a script. The API says so when it is full.
+- **Deleting a profile or an account deletes its list.**
+- **In the panel,** a viewer's sheet shows what they saved and whether they began it since. Analytics has "Saved to watch later": the titles on the most lists, how many were added lately and how many of those who saved a title have begun it. Much saved and little begun is a title that is wanted and not yet watched. These figures name no viewer, and they do not depend on viewing statistics being on: the list is something the viewer asked the site to keep.
 
 ## Viewer website
 

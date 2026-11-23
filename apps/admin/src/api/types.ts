@@ -768,6 +768,44 @@ export interface ViewerWatchingItem {
   watchedAt: string;
 }
 
+/** A title a viewer put on their list to watch later. */
+export interface ViewerSavedItem {
+  /** Who of the account saved it. */
+  profile: { id: string; name: string };
+  title: { id: string; name: string; type: TitleType; status: PublishStatus };
+  addedAt: string;
+  /** Whether this profile has begun the title since. */
+  started: boolean;
+}
+
+export interface ViewerSaved {
+  total: number;
+  /** The latest, newest first. */
+  items: ViewerSavedItem[];
+}
+
+/** How often one title stands on the lists of viewers. */
+export interface SavedTitle {
+  title: AnalyticsTitleRef;
+  saves: number;
+  /** Of them, added within the days asked for. */
+  recent: number;
+  /** Of them, those whose profile has begun the title. */
+  started: number;
+}
+
+/** What viewers put on their lists, in figures. */
+export interface SavedTitles {
+  days: number;
+  saves: number;
+  recent: number;
+  /** Profiles that have a list. */
+  lists: number;
+  /** Titles that stand on a list. */
+  titles: number;
+  top: SavedTitle[];
+}
+
 export interface ViewerWatching {
   total: number;
   completed: number;
@@ -1837,7 +1875,7 @@ export interface AddedSubtitle {
 
 // --- The home page of the website ---------------------------------------------------------
 
-export type HomeSectionKind = 'HERO' | 'CONTINUE_WATCHING' | 'TITLES';
+export type HomeSectionKind = 'HERO' | 'CONTINUE_WATCHING' | 'MY_LIST' | 'TITLES';
 export type HomeSource = 'ALL' | 'FEATURED' | 'CATEGORY' | 'GENRE' | 'COLLECTION' | 'MANUAL';
 export type HomeSort = 'CURATED' | 'NEWEST' | 'RELEASED' | 'RATING' | 'NAME';
 export type HomeLayout = 'POSTER' | 'LANDSCAPE' | 'NUMBERED';

@@ -156,8 +156,11 @@ export interface Languages {
 export interface HomeRow {
   key: string;
   name: string;
-  /** "continue": the place of the viewer's own row of started videos. */
-  kind: 'titles' | 'continue';
+  /**
+   * "continue": the place of the viewer's own row of started videos. "list":
+   * the place of the titles the viewer saved. Both are filled in the browser.
+   */
+  kind: 'titles' | 'continue' | 'list';
   /** Upright posters, wide cards with the backdrop, or a numbered top list. */
   layout: 'poster' | 'landscape' | 'numbered';
   category: CategoryRef | null;

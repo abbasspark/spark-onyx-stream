@@ -343,6 +343,7 @@ export async function createTestApp(
       queue.clear();
       await prisma.translationJob.deleteMany();
       await prisma.homeSection.deleteMany();
+      await prisma.watchlistItem.deleteMany();
       await prisma.play.deleteMany();
       await prisma.auditLog.deleteMany();
       await prisma.backup.deleteMany();

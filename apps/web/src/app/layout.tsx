@@ -2,6 +2,7 @@
 import type { Metadata, Viewport } from 'next';
 import { headers } from 'next/headers';
 import type { ReactNode } from 'react';
+import { MyListSync } from '@/components/my-list';
 import { ViewerSessionProvider } from '@/components/viewer-session';
 import { siteConfig } from '@/lib/config';
 import { MEDIA_ORIGINS_HEADER, MEDIA_ORIGINS_META } from '@/lib/delivery';
@@ -32,7 +33,10 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
         <meta name={MEDIA_ORIGINS_META} content={mediaOrigins} />
       </head>
       <body>
-        <ViewerSessionProvider>{children}</ViewerSessionProvider>
+        <ViewerSessionProvider>
+          {children}
+          <MyListSync />
+        </ViewerSessionProvider>
       </body>
     </html>
   );

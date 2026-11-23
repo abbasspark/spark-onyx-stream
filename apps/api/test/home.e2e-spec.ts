@@ -126,6 +126,7 @@ describe.skipIf(!TEST_DATABASE_URL)('Home page (e2e)', () => {
       expect(names(page.hero?.titles ?? [])).toEqual(['Gamma']);
       expect(page.rows.map((row) => [row.key, row.kind, row.browse, names(row.titles)])).toEqual([
         ['continue', 'continue', null, []],
+        ['list', 'list', '/my-list', []],
         ['featured', 'titles', '/browse?featured=true', ['Gamma', 'Beta']],
         ['latest', 'titles', '/browse', ['Gamma', 'Beta', 'Alpha']],
       ]);
@@ -150,6 +151,7 @@ describe.skipIf(!TEST_DATABASE_URL)('Home page (e2e)', () => {
       ).toEqual([
         ['HERO', 'Featured', 2],
         ['CONTINUE_WATCHING', 'Continue watching', 0],
+        ['MY_LIST', 'My list', 0],
         ['TITLES', 'Featured', 2],
         ['TITLES', 'New', 3],
         ['TITLES', 'Drama', 1],
@@ -352,6 +354,22 @@ describe.skipIf(!TEST_DATABASE_URL)('Home page (e2e)', () => {
       await post('/v1/layout/home/sections', { kind: 'CONTINUE_WATCHING' }).expect(409);
     });
 
+    it('have one place for the list of the viewer, on any page', async () => {
+      await movie('Alpha');
+      const mine = await post('/v1/layout/movies/sections', { kind: 'MY_LIST' }).expect(201);
+      expect(mine.body).toMatchObject({ kind: 'MY_LIST', defaultName: 'My list', shownNow: true });
+      const again = await post('/v1/layout/movies/sections', { kind: 'MY_LIST' }).expect(409);
+      expect(again.body.message).toMatch(/"My list" already/);
+
+      // It carries no titles: a client fills it with what the viewer saved.
+      const movies = (await http().get('/v1/catalog/pages/movies').expect(200)).body as {
+        rows: { name: string; kind: string; browse: string | null; titles: unknown[] }[];
+      };
+      expect(movies.rows.map((row) => [row.name, row.kind, row.browse, row.titles])).toEqual([
+        ['My list', 'list', '/my-list', []],
+      ]);
+    });
+
     it('go with the category, genre or collection they show', async () => {
       await movie('Alpha');
       const drama = await named('categories', 'Drama');
@@ -376,7 +394,11 @@ describe.skipIf(!TEST_DATABASE_URL)('Home page (e2e)', () => {
       expect(await page('movies')).toEqual({ custom: false, hero: null, rows: [] });
       expect(await page('series')).toEqual({ custom: false, hero: null, rows: [] });
       // The home page is a page like the others, under its own name as well.
-      expect((await page('home')).rows.map((row) => row.key)).toEqual(['continue', 'latest']);
+      expect((await page('home')).rows.map((row) => row.key)).toEqual([
+        'continue',
+        'list',
+        'latest',
+      ]);
       await http().get('/v1/catalog/pages/channels').expect(404);
       await http().get('/v1/catalog/pages/MOVIES').expect(404);
 

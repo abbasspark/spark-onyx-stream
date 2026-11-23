@@ -3,6 +3,7 @@ import type { ReactNode } from 'react';
 import type { Home, HomeRow } from '@/lib/types';
 import { rowHref } from '@/lib/home';
 import { ContinueWatching } from './continue-watching';
+import { MyListRow } from './my-list';
 import { HeroStage } from './hero-stage';
 import { LandscapeCard } from './landscape-card';
 import { PosterCard } from './poster-card';
@@ -57,6 +58,8 @@ export function PageRows({ rows }: { rows: HomeRow[] }) {
   return rows.map((row, index) =>
     row.kind === 'continue' ? (
       <ContinueWatching key={row.key} />
+    ) : row.kind === 'list' ? (
+      <MyListRow key={row.key} heading={row.name} />
     ) : (
       <StripRow key={row.key} heading={row.name} href={rowHref(row)}>
         <RowCards row={row} eager={index === firstTitles} />

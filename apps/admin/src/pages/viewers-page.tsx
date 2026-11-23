@@ -967,6 +967,11 @@ function DetailSheet({
     queryFn: ({ signal }) => viewersApi.get((viewer as Viewer).id, signal),
     enabled: viewer !== null,
   });
+  const saved = useQuery({
+    queryKey: ['viewers', 'saved', viewer?.id],
+    queryFn: ({ signal }) => viewersApi.saved((viewer as Viewer).id, signal),
+    enabled: viewer !== null,
+  });
   const watching = useQuery({
     queryKey: ['viewers', 'watching', viewer?.id],
     queryFn: ({ signal }) => viewersApi.watching((viewer as Viewer).id, signal),
@@ -1069,6 +1074,72 @@ function DetailSheet({
                     </li>
                   ))}
                 </ul>
+              ) : null}
+            </div>
+
+            <div>
+              <div className="mb-2 flex items-baseline justify-between gap-3">
+                <h3 className="text-[13px] font-medium">My list</h3>
+                {saved.data && saved.data.total > 0 ? (
+                  <p className="text-xs text-muted-foreground">
+                    {saved.data.total} saved to watch later
+                  </p>
+                ) : null}
+              </div>
+              <ErrorNote error={saved.error} />
+              {saved.isPending ? <Skeleton className="h-14 rounded-lg" /> : null}
+              {saved.data && saved.data.items.length === 0 ? (
+                <p className="rounded-lg border border-dashed p-3 text-sm text-muted-foreground">
+                  Nothing saved for later.
+                </p>
+              ) : null}
+              {saved.data && saved.data.items.length > 0 ? (
+                <>
+                  <ul className="divide-y rounded-lg border">
+                    {saved.data.items.map((item) => {
+                      const Icon = item.title.type === 'SERIES' ? Tv : Film;
+                      return (
+                        <li
+                          key={`${item.profile.id}:${item.title.id}`}
+                          className="flex items-center gap-3 px-3 py-2.5 text-sm"
+                        >
+                          <Icon
+                            className="size-4 shrink-0 text-muted-foreground"
+                            aria-hidden="true"
+                          />
+                          <div className="min-w-0 flex-1">
+                            <Link
+                              to={titlePath(item.title)}
+                              className="block truncate font-medium underline-offset-4 hover:underline"
+                            >
+                              {item.title.name}
+                            </Link>
+                            <p className="truncate text-xs text-muted-foreground">
+                              {[
+                                `Saved ${formatRelative(item.addedAt)}`,
+                                sharedAccount ? `by ${item.profile.name}` : null,
+                              ]
+                                .filter(Boolean)
+                                .join(', ')}
+                            </p>
+                          </div>
+                          {item.title.status !== 'PUBLISHED' ? (
+                            <Badge tone="warning">Not published</Badge>
+                          ) : item.started ? (
+                            <Badge tone="success">Begun</Badge>
+                          ) : (
+                            <Badge>Not begun</Badge>
+                          )}
+                        </li>
+                      );
+                    })}
+                  </ul>
+                  {saved.data.total > saved.data.items.length ? (
+                    <p className="mt-2 text-xs text-muted-foreground">
+                      The latest {saved.data.items.length} of {saved.data.total}.
+                    </p>
+                  ) : null}
+                </>
               ) : null}
             </div>
 
