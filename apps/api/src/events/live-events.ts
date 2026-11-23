@@ -48,6 +48,11 @@ export type LiveEvent =
       backupId: string;
     }
   | {
+      /** A job that translates many titles was queued, moved on or ended. */
+      type: 'translation-job';
+      jobId: string;
+    }
+  | {
       /** A watched location was changed or looked through, or one of its files moved on. */
       type: 'watch';
       /** Null when files of several locations changed. */
@@ -70,6 +75,7 @@ export const EVENT_PERMISSIONS: Record<LiveEvent['type'], Permission> = {
   edge: 'delivery:read',
   backup: 'settings:read',
   watch: 'catalog:read',
+  'translation-job': 'catalog:read',
 };
 
 /** Reads an event from its channel message. Null when the message is not a valid event. */

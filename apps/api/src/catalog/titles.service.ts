@@ -14,6 +14,7 @@ import type {
   CreateSeasonInput,
   CreateTitleInput,
   ListTitlesInput,
+  TitleFilters,
   SetStatusInput,
   UpdateEpisodeInput,
   UpdateSeasonInput,
@@ -123,8 +124,9 @@ export class TitlesService {
 
   // --- Titles ----------------------------------------------------------------
 
-  async list(input: ListTitlesInput): Promise<Page<TitleSummary>> {
-    const where: Prisma.TitleWhereInput = {
+  /** The titles a set of filters means. Shared by the list and by what is done to many titles at once. */
+  where(input: TitleFilters): Prisma.TitleWhereInput {
+    return {
       type: input.type,
       status: input.status,
       access: input.access,
@@ -154,6 +156,29 @@ export class TitlesService {
           }
         : {}),
     };
+  }
+
+  /**
+   * The ids of the titles a set of filters means, oldest first, with their names.
+   *
+   * @param limit Stops there: nothing is done to more titles than that in one go.
+   */
+  async idsOf(input: TitleFilters, limit: number): Promise<{ ids: string[]; total: number }> {
+    const where = this.where(input);
+    const [titles, total] = await Promise.all([
+      this.prisma.title.findMany({
+        where,
+        orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
+        take: limit,
+        select: { id: true },
+      }),
+      this.prisma.title.count({ where }),
+    ]);
+    return { ids: titles.map((title) => title.id), total };
+  }
+
+  async list(input: ListTitlesInput): Promise<Page<TitleSummary>> {
+    const where = this.where(input);
     const orderBy: Prisma.TitleOrderByWithRelationInput = NULLABLE_SORT_FIELDS.includes(input.sort)
       ? { [input.sort]: { sort: input.order, nulls: 'last' } }
       : { [input.sort]: input.order };

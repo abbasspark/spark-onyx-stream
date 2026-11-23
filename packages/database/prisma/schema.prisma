@@ -48,6 +48,7 @@ model AdminUser {
   paymentsRecorded     Payment[]
   purchasesGranted     Purchase[]
   backups              Backup[]
+  translationJobs      TranslationJob[]
 
   @@map("admin_users")
 }
@@ -816,6 +817,51 @@ model TitleCategory {
   @@id([titleId, categoryId])
   @@index([categoryId])
   @@map("title_categories")
+}
+
+enum TranslationJobStatus {
+  QUEUED
+  RUNNING
+  COMPLETED
+  /// Stopped by an admin. What was translated until then stays.
+  CANCELLED
+  /// Could not go on, for a reason that concerns every title: see the note.
+  FAILED
+}
+
+/// Translating many titles into one language from the source of their details,
+/// one after the other in the background.
+model TranslationJob {
+  id         String               @id @default(uuid(7)) @db.Uuid
+  /// A language tag such as "de".
+  language   String
+  /// Replaces texts that are translated already. Off, only empty ones are filled.
+  overwrite  Boolean              @default(false)
+  status     TranslationJobStatus @default(QUEUED)
+  /// The titles to go through, in this order.
+  titleIds   String[]             @db.Uuid
+  /// How many of them were looked at. The next one is titleIds[done].
+  done       Int                  @default(0)
+  /// Titles that got at least one new text.
+  translated Int                  @default(0)
+  /// Titles the source had nothing new for.
+  unchanged  Int                  @default(0)
+  /// Titles that were not imported, so the source has nothing for them.
+  skipped    Int                  @default(0)
+  failed     Int                  @default(0)
+  /// The first failures, as { titleId, name, reason }, for an admin to read.
+  failures   Json                 @default("[]")
+  /// Why the whole job stopped, when it did.
+  note       String?
+
+  createdById String?    @db.Uuid
+  createdBy   AdminUser? @relation(fields: [createdById], references: [id], onDelete: SetNull)
+  createdAt   DateTime   @default(now())
+  startedAt   DateTime?
+  finishedAt  DateTime?
+
+  @@index([status, createdAt])
+  @@map("translation_jobs")
 }
 
 /// The texts of a title in one more language. The title's own fields hold the

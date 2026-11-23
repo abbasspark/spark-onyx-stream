@@ -1758,3 +1758,60 @@ export interface WatchSummary {
   counts: Partial<Record<WatchedFileState, number>>;
   attention: number;
 }
+
+// --- Actions on many titles -------------------------------------------------------------
+
+/** What is done to every title of a selection. */
+export type BulkAction =
+  | { type: 'publish' | 'unpublish' | 'archive' | 'delete' }
+  | { type: 'feature'; value: boolean }
+  | { type: 'categories' | 'genres' | 'collections'; add?: string[]; remove?: string[] }
+  /** A date left out stays as it is, null clears it. */
+  | { type: 'availability'; availableFrom?: string | null; availableUntil?: string | null }
+  | { type: 'translate'; language: string; overwrite?: boolean };
+
+export interface BulkFailure {
+  titleId: string;
+  name: string;
+  reason: string;
+}
+
+export interface BulkResult {
+  action: BulkAction['type'];
+  /** How many titles the selection meant. */
+  matched: number;
+  changed: number;
+  /** Titles that were as asked already. */
+  unchanged: number;
+  failed: number;
+  /** The first failures, with the reason of each. */
+  failures: BulkFailure[];
+  /** Set by "translate": the job that does the work, in the background. */
+  job: TranslationJob | null;
+}
+
+export type TranslationJobStatus = 'QUEUED' | 'RUNNING' | 'COMPLETED' | 'CANCELLED' | 'FAILED';
+
+/** A job that fills in the texts of many titles in a language, from the source of their details. */
+export interface TranslationJob {
+  id: string;
+  language: string;
+  /** Replaces texts that are translated already. */
+  overwrite: boolean;
+  status: TranslationJobStatus;
+  total: number;
+  done: number;
+  translated: number;
+  /** Titles the source had nothing new for. */
+  unchanged: number;
+  /** Titles that were not imported, so the source has nothing for them. */
+  skipped: number;
+  failed: number;
+  failures: BulkFailure[];
+  /** Why the whole job stopped, when it did. */
+  note: string | null;
+  createdBy: { id: string; displayName: string } | null;
+  createdAt: string;
+  startedAt: string | null;
+  finishedAt: string | null;
+}
