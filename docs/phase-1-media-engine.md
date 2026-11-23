@@ -261,65 +261,67 @@ All endpoints are under `/v1`. Every endpoint needs credentials unless marked pu
 
 Status shows what exists today.
 
-| Method                  | Path                                    | Purpose                                                                                                         | Status |
-| ----------------------- | --------------------------------------- | --------------------------------------------------------------------------------------------------------------- | ------ |
-| `GET`                   | `/health`                               | Readiness with dependency status (public)                                                                       | Built  |
-| `GET`                   | `/health/live`                          | Liveness (public)                                                                                               | Built  |
-| `GET`                   | `/auth/setup`                           | Whether first-run setup is still required (public)                                                              | Built  |
-| `POST`                  | `/auth/setup`                           | Create the first owner. Works only while no admin exists (public)                                               | Built  |
-| `POST`                  | `/auth/login`                           | Start an admin session (public)                                                                                 | Built  |
-| `POST`                  | `/auth/logout`                          | End the session                                                                                                 | Built  |
-| `GET`                   | `/auth/me`                              | The authenticated caller and its permissions                                                                    | Built  |
-| `POST`                  | `/auth/password`                        | Change your own password                                                                                        | Built  |
-| `GET`                   | `/auth/two-factor`                      | Where you stand with two-factor sign-in. See [operations](phase-6-operations.md#two-factor-sign-in-for-admins)  | Built  |
-| `POST`                  | `/auth/two-factor/setup`, `/enable`     | Set it up: your password for the secret, then the first code from the app for the recovery codes                | Built  |
-| `POST`                  | `/auth/two-factor/disable`              | Switch it off, with your password and a code                                                                    | Built  |
-| `POST`                  | `/auth/two-factor/recovery-codes`       | Make new recovery codes, with your password and a code                                                          | Built  |
-| `DELETE`                | `/admins/{id}/two-factor`               | Take two-factor sign-in off another admin who is locked out                                                     | Built  |
-| `GET` `POST`            | `/admins`                               | List and create admins                                                                                          | Built  |
-| `GET` `PATCH` `DELETE`  | `/admins/{id}`                          | Read, update and deactivate an admin                                                                            | Built  |
-| `POST`                  | `/titles/{id}/duplicate`                | A copy of a title as a draft, with a choice of what comes along                                                 | Built  |
-| `GET` `PUT` `DELETE`    | `/branding`                             | The name, logo, icon, colour and footer of the site. See [operations](phase-6-operations.md#branding)           | Built  |
-| `GET` `POST`            | `/webhooks`                             | Addresses that are told when something happens. See [operations](phase-6-operations.md#webhooks)                | Built  |
-| `GET`                   | `/openapi.json`                         | Public. The API described as OpenAPI 3.1. See [the API, described](api.md)                                      | Built  |
-| `GET`                   | `/meta`                                 | Public. What an app asks first: the site, the server version, whether the app is supported                      | Built  |
-| `GET` `PUT`             | `/app-versions`                         | The oldest version of each app that may connect                                                                 | Built  |
-| `GET`                   | `/titles/{id}/history`                  | What changed on a title, who changed it and when. See [the catalog](phase-2-catalog.md#the-history-of-a-title)  | Built  |
-| `POST`                  | `/titles/{id}/history/{rev}/restore`    | Bring an earlier version of a title back                                                                        | Built  |
-| `GET`                   | `/translations/terms`                   | Categories, genres, collections and people: what there is to translate and how far each language is             | Built  |
-| `GET`                   | `/translations/terms/{kind}`            | The terms of a kind with their translation into `?language=`, searchable, or only what is `missing`             | Built  |
-| `PUT` `DELETE`          | `/translations/terms/{kind}/{language}` | Save the translations of up to 200 terms at once; take a language away from a kind                              | Built  |
-| `GET` `POST`            | `/roles`                                | The roles, built in and custom, with every permission explained; make a custom role                             | Built  |
-| `GET` `PATCH` `DELETE`  | `/roles/{id}`                           | Read a custom role with its holders, change it, delete it (`?moveTo=` says where its holders go)                | Built  |
-| `GET` `POST`            | `/api-keys`                             | List and create API keys                                                                                        | Built  |
-| `DELETE`                | `/api-keys/{id}`                        | Revoke an API key                                                                                               | Built  |
-| `GET`                   | `/audit-logs`                           | List audit entries with filters                                                                                 | Built  |
-| `GET` `POST`            | `/storage-pools`                        | List and create storage pools                                                                                   | Built  |
-| `GET` `PATCH`           | `/storage-pools/{id}`                   | Read and update a storage pool                                                                                  | Built  |
-| `POST`                  | `/storage-pools/{id}/test`              | Write, read and delete a test file to confirm the pool works                                                    | Built  |
-| `GET`                   | `/encoding-profiles`                    | List encoding profiles                                                                                          | Built  |
-| `GET`                   | `/encoding-profiles/{id}`               | Read an encoding profile                                                                                        | Built  |
-| `POST`                  | `/encoding-profiles`                    | Create an encoding profile                                                                                      | Built  |
-| `PATCH` `DELETE`        | `/encoding-profiles/{id}`               | Update and delete a profile                                                                                     | Built  |
-| `POST`                  | `/assets`                               | Create an asset and get an upload URL                                                                           | Built  |
-| `GET`                   | `/assets`                               | List assets with filters, ordering (`sort`, `order`) and pagination. Ready assets carry a signed `posterUrl`    | Built  |
-| `GET` `PATCH` `DELETE`  | `/assets/{id}`                          | Read, update and soft-delete an asset                                                                           | Built  |
-| `POST`                  | `/uploads`                              | Start a resumable upload for an asset (tus)                                                                     | Built  |
-| `HEAD` `PATCH` `DELETE` | `/uploads/{assetId}`                    | Check progress, send bytes, cancel (tus)                                                                        | Built  |
-| `POST`                  | `/assets/{id}/reprocess`                | Process again, optionally with another mode or profile                                                          | Built  |
-| `POST`                  | `/assets/{id}/playback`                 | Get a signed manifest URL                                                                                       | Built  |
-| `GET` `HEAD`            | `/media/{assetId}/{token}/{file}`       | Generated files of an asset. The signed token is the authorization (public)                                     | Built  |
-| `GET`                   | `/jobs`                                 | List jobs with filters                                                                                          | Built  |
-| `GET`                   | `/jobs/{id}`                            | Read a job                                                                                                      | Built  |
-| `POST`                  | `/jobs/{id}/cancel`                     | Cancel a job                                                                                                    | Built  |
-| `POST`                  | `/jobs/{id}/retry`                      | Retry a failed job                                                                                              | Built  |
-| `GET`                   | `/media/{assetId}/{token}/hls/key`      | AES-128 content key of an encrypted asset (signed token in the path)                                            | Built  |
-| `GET`                   | `/stats/overview`                       | Figures for the dashboard: assets, jobs, storage, uploads per day, recent failures                              | Built  |
-| `GET`                   | `/assets/{id}/media`                    | Qualities, subtitle tracks and pictures of an asset, with signed addresses                                      | Built  |
-| `POST`                  | `/assets/{id}/subtitles`                | Add a subtitle file. The body is the file; `language`, `label`, `forced`, `filename`, `encoding` in the address | Built  |
-| `PATCH`, `DELETE`       | `/assets/{id}/subtitles/{trackId}`      | Rename a track, change its language or make it forced; remove it                                                | Built  |
-| `GET`                   | `/assets/{id}/subtitles/{trackId}/file` | The WebVTT file of a track                                                                                      | Built  |
-| `GET`                   | `/events`                               | Stream of live events for the admin panel (server-sent events)                                                  | Built  |
+| Method                  | Path                                    | Purpose                                                                                                            | Status |
+| ----------------------- | --------------------------------------- | ------------------------------------------------------------------------------------------------------------------ | ------ |
+| `GET`                   | `/health`                               | Readiness with dependency status (public)                                                                          | Built  |
+| `GET`                   | `/health/live`                          | Liveness (public)                                                                                                  | Built  |
+| `GET`                   | `/auth/setup`                           | Whether first-run setup is still required (public)                                                                 | Built  |
+| `POST`                  | `/auth/setup`                           | Create the first owner. Works only while no admin exists (public)                                                  | Built  |
+| `POST`                  | `/auth/login`                           | Start an admin session (public)                                                                                    | Built  |
+| `POST`                  | `/auth/logout`                          | End the session                                                                                                    | Built  |
+| `GET`                   | `/auth/me`                              | The authenticated caller and its permissions                                                                       | Built  |
+| `POST`                  | `/auth/password`                        | Change your own password                                                                                           | Built  |
+| `GET`                   | `/auth/two-factor`                      | Where you stand with two-factor sign-in. See [operations](phase-6-operations.md#two-factor-sign-in-for-admins)     | Built  |
+| `POST`                  | `/auth/two-factor/setup`, `/enable`     | Set it up: your password for the secret, then the first code from the app for the recovery codes                   | Built  |
+| `POST`                  | `/auth/two-factor/disable`              | Switch it off, with your password and a code                                                                       | Built  |
+| `POST`                  | `/auth/two-factor/recovery-codes`       | Make new recovery codes, with your password and a code                                                             | Built  |
+| `DELETE`                | `/admins/{id}/two-factor`               | Take two-factor sign-in off another admin who is locked out                                                        | Built  |
+| `GET` `POST`            | `/admins`                               | List and create admins                                                                                             | Built  |
+| `GET` `PATCH` `DELETE`  | `/admins/{id}`                          | Read, update and deactivate an admin                                                                               | Built  |
+| `POST`                  | `/titles/{id}/duplicate`                | A copy of a title as a draft, with a choice of what comes along                                                    | Built  |
+| `GET` `PUT` `DELETE`    | `/branding`                             | The name, logo, icon, colour and footer of the site. See [operations](phase-6-operations.md#branding)              | Built  |
+| `GET` `POST`            | `/webhooks`                             | Addresses that are told when something happens. See [operations](phase-6-operations.md#webhooks)                   | Built  |
+| `GET`                   | `/openapi.json`                         | Public. The API described as OpenAPI 3.1. See [the API, described](api.md)                                         | Built  |
+| `GET`                   | `/meta`                                 | Public. What an app asks first: the site, the server version, whether the app is supported                         | Built  |
+| `GET` `PUT`             | `/app-versions`                         | The oldest version of each app that may connect                                                                    | Built  |
+| `POST`                  | `/viewer/device-codes`                  | A television asks for a code to sign in with. See [viewers](phase-2-viewers.md#devices-and-signing-in-with-a-code) | Built  |
+| `GET` `PATCH` `DELETE`  | `/viewer/devices`                       | The apps a viewer is signed in on                                                                                  | Built  |
+| `GET`                   | `/titles/{id}/history`                  | What changed on a title, who changed it and when. See [the catalog](phase-2-catalog.md#the-history-of-a-title)     | Built  |
+| `POST`                  | `/titles/{id}/history/{rev}/restore`    | Bring an earlier version of a title back                                                                           | Built  |
+| `GET`                   | `/translations/terms`                   | Categories, genres, collections and people: what there is to translate and how far each language is                | Built  |
+| `GET`                   | `/translations/terms/{kind}`            | The terms of a kind with their translation into `?language=`, searchable, or only what is `missing`                | Built  |
+| `PUT` `DELETE`          | `/translations/terms/{kind}/{language}` | Save the translations of up to 200 terms at once; take a language away from a kind                                 | Built  |
+| `GET` `POST`            | `/roles`                                | The roles, built in and custom, with every permission explained; make a custom role                                | Built  |
+| `GET` `PATCH` `DELETE`  | `/roles/{id}`                           | Read a custom role with its holders, change it, delete it (`?moveTo=` says where its holders go)                   | Built  |
+| `GET` `POST`            | `/api-keys`                             | List and create API keys                                                                                           | Built  |
+| `DELETE`                | `/api-keys/{id}`                        | Revoke an API key                                                                                                  | Built  |
+| `GET`                   | `/audit-logs`                           | List audit entries with filters                                                                                    | Built  |
+| `GET` `POST`            | `/storage-pools`                        | List and create storage pools                                                                                      | Built  |
+| `GET` `PATCH`           | `/storage-pools/{id}`                   | Read and update a storage pool                                                                                     | Built  |
+| `POST`                  | `/storage-pools/{id}/test`              | Write, read and delete a test file to confirm the pool works                                                       | Built  |
+| `GET`                   | `/encoding-profiles`                    | List encoding profiles                                                                                             | Built  |
+| `GET`                   | `/encoding-profiles/{id}`               | Read an encoding profile                                                                                           | Built  |
+| `POST`                  | `/encoding-profiles`                    | Create an encoding profile                                                                                         | Built  |
+| `PATCH` `DELETE`        | `/encoding-profiles/{id}`               | Update and delete a profile                                                                                        | Built  |
+| `POST`                  | `/assets`                               | Create an asset and get an upload URL                                                                              | Built  |
+| `GET`                   | `/assets`                               | List assets with filters, ordering (`sort`, `order`) and pagination. Ready assets carry a signed `posterUrl`       | Built  |
+| `GET` `PATCH` `DELETE`  | `/assets/{id}`                          | Read, update and soft-delete an asset                                                                              | Built  |
+| `POST`                  | `/uploads`                              | Start a resumable upload for an asset (tus)                                                                        | Built  |
+| `HEAD` `PATCH` `DELETE` | `/uploads/{assetId}`                    | Check progress, send bytes, cancel (tus)                                                                           | Built  |
+| `POST`                  | `/assets/{id}/reprocess`                | Process again, optionally with another mode or profile                                                             | Built  |
+| `POST`                  | `/assets/{id}/playback`                 | Get a signed manifest URL                                                                                          | Built  |
+| `GET` `HEAD`            | `/media/{assetId}/{token}/{file}`       | Generated files of an asset. The signed token is the authorization (public)                                        | Built  |
+| `GET`                   | `/jobs`                                 | List jobs with filters                                                                                             | Built  |
+| `GET`                   | `/jobs/{id}`                            | Read a job                                                                                                         | Built  |
+| `POST`                  | `/jobs/{id}/cancel`                     | Cancel a job                                                                                                       | Built  |
+| `POST`                  | `/jobs/{id}/retry`                      | Retry a failed job                                                                                                 | Built  |
+| `GET`                   | `/media/{assetId}/{token}/hls/key`      | AES-128 content key of an encrypted asset (signed token in the path)                                               | Built  |
+| `GET`                   | `/stats/overview`                       | Figures for the dashboard: assets, jobs, storage, uploads per day, recent failures                                 | Built  |
+| `GET`                   | `/assets/{id}/media`                    | Qualities, subtitle tracks and pictures of an asset, with signed addresses                                         | Built  |
+| `POST`                  | `/assets/{id}/subtitles`                | Add a subtitle file. The body is the file; `language`, `label`, `forced`, `filename`, `encoding` in the address    | Built  |
+| `PATCH`, `DELETE`       | `/assets/{id}/subtitles/{trackId}`      | Rename a track, change its language or make it forced; remove it                                                   | Built  |
+| `GET`                   | `/assets/{id}/subtitles/{trackId}/file` | The WebVTT file of a track                                                                                         | Built  |
+| `GET`                   | `/events`                               | Stream of live events for the admin panel (server-sent events)                                                     | Built  |
 
 ## Authentication and access control
 

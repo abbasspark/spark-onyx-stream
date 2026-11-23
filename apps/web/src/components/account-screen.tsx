@@ -1,7 +1,20 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 'use client';
 
-import { Check, History, Loader2, LogOut, Mail, MonitorSmartphone, UsersRound } from 'lucide-react';
+import {
+  Check,
+  History,
+  Loader2,
+  LogOut,
+  type LucideIcon,
+  Mail,
+  Monitor,
+  MonitorSmartphone,
+  Smartphone,
+  Tablet,
+  Tv,
+  UsersRound,
+} from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { type FormEvent, type ReactNode, useCallback, useEffect, useState } from 'react';
@@ -25,6 +38,7 @@ import {
   type Plans,
 } from '@/lib/plans';
 import { type Profile, profilesApi } from '@/lib/profiles';
+import { describeKind, type DeviceRef, devicesApi } from '@/lib/devices';
 import { clearHistory } from '@/lib/watch-sync';
 import { FormField } from './form-field';
 import { ProfileAvatar } from './profile-avatar';
@@ -38,6 +52,13 @@ import {
 import { useViewerSession } from './viewer-session';
 
 const MIN_PASSWORD_LENGTH = 8;
+
+const DEVICE_ICONS: Record<string, LucideIcon> = {
+  TV: Tv,
+  MOBILE: Smartphone,
+  TABLET: Tablet,
+  DESKTOP: Monitor,
+};
 
 function asError(caught: unknown): ViewerApiError {
   return caught instanceof ViewerApiError
@@ -373,6 +394,26 @@ function DevicesSection() {
     void load();
   }, [load]);
 
+  /** The device whose name is being changed, with what is typed. */
+  const [renaming, setRenaming] = useState<{ id: string; name: string } | null>(null);
+
+  const rename = async (event: FormEvent) => {
+    event.preventDefault();
+    if (!renaming || !renaming.name.trim()) {
+      return;
+    }
+    setBusyId(renaming.id);
+    try {
+      await devicesApi.rename(renaming.id, renaming.name);
+      setRenaming(null);
+      await load();
+    } catch (caught) {
+      setError(asError(caught).message);
+    } finally {
+      setBusyId(null);
+    }
+  };
+
   const signOutDevice = async (device: ViewerDevice) => {
     setBusyId(device.id);
     try {
@@ -398,37 +439,96 @@ function DevicesSection() {
       {devices === null && !error ? <Spinner /> : null}
       {devices ? (
         <ul className="border-t border-line">
-          {devices.map((device) => (
-            <li key={device.id} className="flex items-center gap-4 border-b border-line py-4">
-              <MonitorSmartphone className="size-5 shrink-0 text-smoke" aria-hidden="true" />
-              <div className="min-w-0 flex-1">
-                <p className="font-medium">
-                  {describeDevice(device.userAgent)}
-                  {device.current ? (
-                    <span className="ml-2 rounded-[2px] bg-sard px-1.5 py-0.5 text-xs font-semibold text-onyx">
-                      This device
-                    </span>
-                  ) : null}
-                </p>
-                <p className="text-sm text-smoke">
-                  Last used {formatDay(device.lastUsedAt)}, signed in {formatDay(device.createdAt)}
-                </p>
-              </div>
-              {device.current ? null : (
-                <button
-                  type="button"
-                  className="text-sm text-smoke underline underline-offset-4 hover:text-vein disabled:opacity-50"
-                  disabled={busyId === device.id}
-                  aria-label={`Sign out ${describeDevice(device.userAgent)}`}
-                  onClick={() => void signOutDevice(device)}
-                >
-                  Sign out
-                </button>
-              )}
-            </li>
-          ))}
+          {devices.map((device) => {
+            const app = device.device ?? null;
+            const name = app?.name ?? describeDevice(device.userAgent);
+            const Icon = app ? (DEVICE_ICONS[app.kind] ?? MonitorSmartphone) : MonitorSmartphone;
+            const editing = app && renaming?.id === app.id ? renaming : null;
+            return (
+              <li key={device.id} className="flex items-center gap-4 border-b border-line py-4">
+                <Icon className="size-5 shrink-0 text-smoke" aria-hidden="true" />
+                {editing ? (
+                  <form
+                    onSubmit={(event) => void rename(event)}
+                    className="flex min-w-0 flex-1 flex-wrap items-center gap-2"
+                  >
+                    <input
+                      className="input h-10 min-w-0 flex-1"
+                      aria-label={`New name for ${name}`}
+                      autoFocus
+                      required
+                      maxLength={40}
+                      value={editing.name}
+                      onChange={(event) =>
+                        setRenaming({ id: editing.id, name: event.target.value })
+                      }
+                    />
+                    <button
+                      type="submit"
+                      className="text-sm text-vein underline underline-offset-4 disabled:opacity-50"
+                      disabled={busyId === editing.id}
+                    >
+                      Save
+                    </button>
+                    <button
+                      type="button"
+                      className="text-sm text-smoke underline underline-offset-4 hover:text-vein"
+                      onClick={() => setRenaming(null)}
+                    >
+                      Cancel
+                    </button>
+                  </form>
+                ) : (
+                  <>
+                    <div className="min-w-0 flex-1">
+                      <p className="font-medium">
+                        {name}
+                        {device.current ? (
+                          <span className="ml-2 rounded-[2px] bg-sard px-1.5 py-0.5 text-xs font-semibold text-onyx">
+                            This device
+                          </span>
+                        ) : null}
+                      </p>
+                      <p className="text-sm text-smoke">
+                        {app ? `${describeKind(app as DeviceRef)}. ` : ''}
+                        Last used {formatDay(device.lastUsedAt)}, signed in{' '}
+                        {formatDay(device.createdAt)}
+                      </p>
+                    </div>
+                    {app ? (
+                      <button
+                        type="button"
+                        className="text-sm text-smoke underline underline-offset-4 hover:text-vein"
+                        aria-label={`Rename ${name}`}
+                        onClick={() => setRenaming({ id: app.id, name: app.name })}
+                      >
+                        Rename
+                      </button>
+                    ) : null}
+                    {device.current ? null : (
+                      <button
+                        type="button"
+                        className="text-sm text-smoke underline underline-offset-4 hover:text-vein disabled:opacity-50"
+                        disabled={busyId === device.id}
+                        aria-label={`Sign out ${name}`}
+                        onClick={() => void signOutDevice(device)}
+                      >
+                        Sign out
+                      </button>
+                    )}
+                  </>
+                )}
+              </li>
+            );
+          })}
         </ul>
       ) : null}
+      <p className="mt-5 text-smoke">
+        A television shows a code instead of asking for your password.{' '}
+        <Link href="/activate" className="text-vein underline underline-offset-4">
+          Enter a code
+        </Link>
+      </p>
     </Section>
   );
 }

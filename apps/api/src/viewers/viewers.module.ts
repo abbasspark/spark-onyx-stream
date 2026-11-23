@@ -1,8 +1,11 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 import { Module } from '@nestjs/common';
+import { DeviceCodesService } from './device-codes.service.js';
 import { ViewerAuthController } from './viewer-auth.controller.js';
 import { ViewerAuthGuard } from './viewer-auth.guard.js';
 import { ViewerAuthService } from './viewer-auth.service.js';
+import { ViewerDevicesController } from './viewer-devices.controller.js';
+import { ViewerDevicesService } from './viewer-devices.service.js';
 import { ViewerEmailService } from './viewer-email.service.js';
 import { ViewerProfilesController } from './viewer-profiles.controller.js';
 import { ViewerProfilesService } from './viewer-profiles.service.js';
@@ -16,10 +19,17 @@ import { ViewersAdminService } from './viewers-admin.service.js';
  * is watching.
  */
 @Module({
-  controllers: [ViewerAuthController, ViewersAdminController, ViewerProfilesController],
+  controllers: [
+    ViewerAuthController,
+    ViewersAdminController,
+    ViewerProfilesController,
+    ViewerDevicesController,
+  ],
   providers: [
     ViewerSessionService,
     ViewerProfilesService,
+    ViewerDevicesService,
+    DeviceCodesService,
     ViewerEmailService,
     ViewerAuthService,
     ViewerAuthGuard,

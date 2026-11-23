@@ -417,6 +417,9 @@ export const viewersApi = {
     request<void>(`/v1/viewers/${id}/verification-email`, { method: 'POST' }),
   signOut: (id: string) =>
     request<{ sessionsEnded: number }>(`/v1/viewers/${id}/sign-out`, { method: 'POST' }),
+  /** Signs one device out and forgets it. */
+  removeDevice: (id: string, deviceId: string) =>
+    request<void>(`/v1/viewers/${id}/devices/${deviceId}`, { method: 'DELETE' }),
   remove: (id: string) => request<void>(`/v1/viewers/${id}`, { method: 'DELETE' }),
   /** What is open to the public. Needs no permission. */
   access: (signal?: AbortSignal) => request<ViewerAccessConfig>('/v1/viewer/config', { signal }),
