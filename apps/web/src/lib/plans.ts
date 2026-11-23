@@ -19,6 +19,17 @@ export interface Plan {
   includesAll?: boolean;
   /** The packages the plan opens when it does not open everything. */
   packages?: { id: string; name: string }[];
+  /** Devices a subscriber plays on at the same time. Null or left out: no limit. */
+  maxStreams?: number | null;
+}
+
+/** "Watch on 2 devices at the same time", for the list under the price. Null without a limit. */
+export function describeStreams(plan: Pick<Plan, 'maxStreams'>): string | null {
+  const limit = plan.maxStreams ?? null;
+  if (limit === null) {
+    return null;
+  }
+  return limit === 1 ? 'Watch on 1 device at a time' : `Watch on ${limit} devices at the same time`;
 }
 
 /**

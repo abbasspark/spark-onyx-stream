@@ -8,6 +8,7 @@ import {
   Eye,
   EyeOff,
   Lock,
+  MonitorSmartphone,
   MoreHorizontal,
   Pencil,
   Plus,
@@ -48,6 +49,7 @@ import {
 } from '@/components/ui/overlay';
 import { formatMoney, parsePrice, toPriceText, yearlySaving } from '@/lib/billing';
 import { cn } from '@/lib/cn';
+import { parseStreamLimit } from '@/lib/viewers';
 
 /** The plans viewers can subscribe to, and how billing is doing. */
 export function PlansPage() {
@@ -154,6 +156,7 @@ export function PlansPage() {
               <PlanCard
                 plan={plan}
                 currency={currency}
+                siteStreamLimit={overview.data?.streamLimit ?? 0}
                 mayWrite={mayWrite}
                 isFirst={index === 0}
                 isLast={index === items.length - 1}
@@ -173,6 +176,7 @@ export function PlansPage() {
         plan={editing === 'new' ? null : editing}
         open={editing !== null}
         currency={currency}
+        siteStreamLimit={overview.data?.streamLimit ?? 0}
         onOpenChange={(open) => {
           if (!open) {
             setEditing(null);
@@ -257,6 +261,7 @@ function Overview({ overview }: { overview: BillingOverview }) {
 interface PlanCardProps {
   plan: Plan;
   currency: string;
+  siteStreamLimit: number;
   mayWrite: boolean;
   isFirst: boolean;
   isLast: boolean;
@@ -271,6 +276,7 @@ interface PlanCardProps {
 function PlanCard({
   plan,
   currency,
+  siteStreamLimit,
   mayWrite,
   isFirst,
   isLast,
@@ -391,6 +397,14 @@ function PlanCard({
         ) : null}
 
         <div className="mt-auto grid gap-3 border-t pt-4 text-sm">
+          <div className="flex items-start gap-2 text-muted-foreground">
+            <MonitorSmartphone className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
+            {plan.maxStreams
+              ? `Plays on ${plan.maxStreams} ${plan.maxStreams === 1 ? 'device' : 'devices'} at once`
+              : siteStreamLimit > 0
+                ? `Plays on ${siteStreamLimit} ${siteStreamLimit === 1 ? 'device' : 'devices'} at once, as the installation`
+                : 'Plays on any number of devices at once'}
+          </div>
           <div className="flex items-start gap-2">
             <Lock className="mt-0.5 size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
             {plan.includesAll ? (
@@ -429,16 +443,26 @@ interface PlanDialogProps {
   plan: Plan | null;
   open: boolean;
   currency: string;
+  /** Devices an account plays on at once where a plan says nothing. 0: no limit. */
+  siteStreamLimit: number;
   onOpenChange: (open: boolean) => void;
   onSaved: (plan: Plan, created: boolean) => void;
 }
 
-function PlanDialog({ plan, open, currency, onOpenChange, onSaved }: PlanDialogProps) {
+function PlanDialog({
+  plan,
+  open,
+  currency,
+  siteStreamLimit,
+  onOpenChange,
+  onSaved,
+}: PlanDialogProps) {
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [monthly, setMonthly] = useState('');
   const [yearly, setYearly] = useState('');
   const [trialDays, setTrialDays] = useState('0');
+  const [streams, setStreams] = useState('');
   const [features, setFeatures] = useState('');
   const [isOffered, setOffered] = useState(true);
   const [isRecommended, setRecommended] = useState(false);
@@ -459,6 +483,7 @@ function PlanDialog({ plan, open, currency, onOpenChange, onSaved }: PlanDialogP
       setMonthly(toPriceText(plan?.monthlyAmount ?? null, currency));
       setYearly(toPriceText(plan?.yearlyAmount ?? null, currency));
       setTrialDays(String(plan?.trialDays ?? 0));
+      setStreams(plan?.maxStreams ? String(plan.maxStreams) : '');
       setFeatures((plan?.features ?? []).join('\n'));
       setOffered(plan?.isOffered ?? true);
       setRecommended(plan?.isRecommended ?? false);
@@ -501,6 +526,11 @@ function PlanDialog({ plan, open, currency, onOpenChange, onSaved }: PlanDialogP
       setProblem('Choose at least one package, or let the plan open every paid title.');
       return;
     }
+    const maxStreams = parseStreamLimit(streams);
+    if (maxStreams === 'invalid') {
+      setProblem('Devices at the same time is a number from 1 to 20, or empty.');
+      return;
+    }
     setProblem(null);
     save.mutate({
       name: name.trim(),
@@ -512,6 +542,7 @@ function PlanDialog({ plan, open, currency, onOpenChange, onSaved }: PlanDialogP
       monthlyAmount,
       yearlyAmount,
       trialDays: Number(trialDays) || 0,
+      maxStreams,
       isOffered,
       isRecommended,
       includesAll,
@@ -585,6 +616,25 @@ function PlanDialog({ plan, open, currency, onOpenChange, onSaved }: PlanDialogP
                 )}
               </Field>
             </div>
+            <Field
+              label="Devices at the same time"
+              hint={
+                siteStreamLimit > 0
+                  ? `On how many devices a subscriber plays at once. Empty: ${siteStreamLimit}, the limit of the installation (STREAM_LIMIT).`
+                  : 'On how many devices a subscriber plays at once. Empty: no limit, as the installation is set (STREAM_LIMIT).'
+              }
+            >
+              {(id) => (
+                <Input
+                  id={id}
+                  className="sm:max-w-40"
+                  inputMode="numeric"
+                  placeholder={siteStreamLimit > 0 ? String(siteStreamLimit) : 'No limit'}
+                  value={streams}
+                  onChange={(event) => setStreams(event.target.value)}
+                />
+              )}
+            </Field>
             <Field label="Description" hint="One or two sentences under the name.">
               {(id) => (
                 <Textarea

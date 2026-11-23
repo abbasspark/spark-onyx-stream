@@ -14,7 +14,14 @@ import { opensTitle } from '../billing/entitlement.js';
 import { SubscriptionsService } from '../billing/subscriptions.service.js';
 import type { Watcher } from '../catalog/public-catalog.service.js';
 import { AppConfig } from '../config/app-config.js';
+import { StreamsService, type StreamTicket } from '../streams/streams.service.js';
 import { type LivePlaybackInfo, LivePlaybackService } from './live-playback.service.js';
+
+/** The address for watching a channel, and the place the device holds while it does. */
+export type LiveAnswer = LivePlaybackInfo & {
+  /** For `POST /viewer/streams/{id}/beat`. Null for a visitor. */
+  stream: StreamTicket | null;
+};
 
 /** A channel as viewers see it. Nothing about where its video comes from. */
 export interface PublicChannel {
@@ -106,6 +113,7 @@ export class PublicChannelsService {
     @Inject(AppConfig) private readonly config: AppConfig,
     @Inject(SubscriptionsService) private readonly subscriptions: SubscriptionsService,
     @Inject(LivePlaybackService) private readonly playback: LivePlaybackService,
+    @Inject(StreamsService) private readonly streams: StreamsService,
   ) {}
 
   async list(): Promise<PublicChannel[]> {
@@ -193,7 +201,7 @@ export class PublicChannelsService {
    *
    * @throws ConflictException with code "off_air" when the channel is not sending.
    */
-  async play(slug: string, watcher: Watcher): Promise<LivePlaybackInfo> {
+  async play(slug: string, watcher: Watcher, userAgent: string | null = null): Promise<LiveAnswer> {
     const channel = await this.find(slug);
     await this.assertMayWatch(watcher, channel);
     if (!isOnAir(channel)) {
@@ -205,7 +213,11 @@ export class PublicChannelsService {
         code: 'off_air',
       });
     }
-    return this.playback.createPlayback(channel.id, 'viewer');
+    // Watching a channel takes a place among the streams of the account, like a video.
+    const stream = watcher
+      ? await this.streams.open(watcher, { kind: 'LIVE', subject: channel.name, userAgent })
+      : null;
+    return { ...(await this.playback.createPlayback(channel.id, 'viewer')), stream };
   }
 
   private async find(slug: string): Promise<PublicRecord> {

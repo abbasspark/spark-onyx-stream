@@ -22,6 +22,12 @@ export interface PublicPlan {
   /** Whether the plan opens every paid title. Otherwise it opens its packages. */
   includesAll: boolean;
   packages: { id: string; name: string }[];
+  /**
+   * On how many devices a subscriber plays at the same time. For viewers this
+   * is what applies: the plan's own limit, or that of the installation. Null:
+   * no limit.
+   */
+  maxStreams: number | null;
 }
 
 type PlanWithPackages = Plan & {
@@ -46,8 +52,12 @@ export interface PublicPlans {
   plans: PublicPlan[];
 }
 
-export function toPublicPlan(plan: PlanWithPackages): PublicPlan {
+/**
+ * @param siteLimit The limit of the installation, which a plan without one of its own follows. 0: none.
+ */
+export function toPublicPlan(plan: PlanWithPackages, siteLimit = 0): PublicPlan {
   return {
+    maxStreams: plan.maxStreams ?? (siteLimit > 0 ? siteLimit : null),
     id: plan.id,
     name: plan.name,
     description: plan.description,
@@ -79,6 +89,8 @@ export interface PlanAdminView extends PublicPlan {
 export function toPlanAdminView(plan: PlanWithPackages, subscribers: number): PlanAdminView {
   return {
     ...toPublicPlan(plan),
+    // For admins the plan's own value: empty means it follows the installation.
+    maxStreams: plan.maxStreams,
     isOffered: plan.isOffered,
     position: plan.position,
     subscribers,
@@ -164,6 +176,8 @@ export function toSubscriptionAdminView(
 
 /** How billing is set up and how it is doing, for the panel. */
 export interface BillingOverview {
+  /** Devices one account plays on at once where a plan says nothing. 0: no limit. */
+  streamLimit: number;
   currency: string;
   checkout: boolean;
   contactUrl: string | null;

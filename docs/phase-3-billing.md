@@ -113,6 +113,7 @@ With a Stripe key set, the page of plans gets a button per plan. Without one, no
 - **The free trial of a plan is given once per viewer,** on the first subscription paid online.
 - **A viewer manages the subscription in Stripe's customer portal,** opened from the account page: the card, the invoices, cancelling and resuming.
 - **Codes for a reduced price** are made in the panel under Coupons and entered on the website before paying. See [Coupons](#coupons). A checkout that is opened without such a code still shows Stripe's own field, for codes made in Stripe under "Coupons".
+- **A plan can say on how many devices its subscribers play at the same time.** See [Stream limits](phase-2-viewers.md#stream-limits).
 - **A plan is a product at Stripe** with the plan's name. Prices are sent with each payment, so a change of price here applies to new subscribers at once. Viewers who already subscribed keep paying their old price.
 - **An account with a running paid subscription cannot be deleted,** by the viewer or by an admin, because the payments would go on. The subscription is cancelled first.
 
@@ -277,4 +278,3 @@ A title's access is part of the title: `access`, `packageIds`, `rentAmount`, `bu
 - Gift codes that open something without a payment page, and batches of single-use codes
 - A code on a payment an admin writes down by hand
 - Payment providers other than Stripe
-- A limit on how many devices play at the same time

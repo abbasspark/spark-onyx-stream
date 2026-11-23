@@ -255,6 +255,7 @@ export class SubscriptionsService {
       }),
     ]);
     return {
+      streamLimit: this.config.streamLimit,
       currency: this.config.billingCurrency,
       checkout: stripe !== null,
       contactUrl: this.config.billingContactUrl || null,

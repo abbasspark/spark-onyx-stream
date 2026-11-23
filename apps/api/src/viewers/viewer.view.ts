@@ -55,6 +55,8 @@ export interface ViewerAdminView extends ViewerView {
   updatedAt: Date;
   /** Devices signed in right now. */
   activeSessions: number;
+  /** Devices that may play at once, when an admin set it for this viewer. Null: not set. */
+  maxStreams: number | null;
   /** The plan the viewer watches through right now, if any. */
   plan: ViewerPlanRef | null;
 }
@@ -78,6 +80,7 @@ export function toViewerAdminView(
     lastLoginAt: viewer.lastLoginAt,
     updatedAt: viewer.updatedAt,
     activeSessions,
+    maxStreams: viewer.maxStreams,
     plan,
   };
 }

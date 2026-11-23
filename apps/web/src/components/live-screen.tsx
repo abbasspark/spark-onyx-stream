@@ -40,7 +40,9 @@ import {
   startOverPosition,
 } from '@/lib/live';
 import type { Channel, LivePlayback } from '@/lib/types';
+import { readStreamLimit, type StreamLimitRefusal } from '@/lib/streams';
 import { authHref } from '@/lib/viewer-api';
+import { StreamLimitGate, StreamStoppedGate, useStreamPlace } from './stream-gates';
 import { ChannelLineup } from './channel-lineup';
 import { type ChoiceGroup, SettingsMenu } from './player/settings-menu';
 import { useViewerSession } from './viewer-session';
@@ -59,7 +61,11 @@ const BEHIND_SECONDS = 25;
 type Loaded =
   | { state: 'loading' }
   | { state: 'ready'; playback: LivePlayback }
-  | { state: 'refused'; reason: LiveRefusal };
+  | { state: 'refused'; reason: LiveRefusal }
+  /** The account plays on as many devices as it may. */
+  | { state: 'limit'; refusal: StreamLimitRefusal }
+  /** The place of this device was taken away while it played. */
+  | { state: 'stopped' };
 
 interface LiveScreenProps {
   channel: Channel;
@@ -109,6 +115,12 @@ export function LiveScreen({ channel, channels }: LiveScreenProps) {
           return;
         }
         const body = (await response.json().catch(() => null)) as { code?: string } | null;
+        // Asked first: the same status also says that a channel is off air.
+        const limit = readStreamLimit(response.status, body);
+        if (limit) {
+          setLoaded({ state: 'limit', refusal: limit });
+          return;
+        }
         const reason = refusalOf(response.status, body?.code);
         setLoaded({ state: 'refused', reason });
         if (reason === 'off-air') {
@@ -138,6 +150,17 @@ export function LiveScreen({ channel, channels }: LiveScreenProps) {
     [channels, channel.slug, router],
   );
 
+  const stoppedElsewhere = useStreamPlace(
+    loaded.state === 'ready' ? loaded.playback.stream : null,
+    retry,
+  );
+  useEffect(() => {
+    if (stoppedElsewhere) {
+      // The player goes away with this, and with it the picture and the sound.
+      setLoaded((current) => (current.state === 'ready' ? { state: 'stopped' } : current));
+    }
+  }, [stoppedElsewhere]);
+
   if (loaded.state === 'ready') {
     return (
       <LivePlayer
@@ -166,7 +189,11 @@ export function LiveScreen({ channel, channels }: LiveScreenProps) {
         </Link>
       </div>
       <div className="flex flex-1 flex-col items-center justify-center gap-6 px-6 pb-16 text-center">
-        {refusal === null ? (
+        {loaded.state === 'limit' ? (
+          <StreamLimitGate refusal={loaded.refusal} heading={channel.name} onRetry={retry} />
+        ) : loaded.state === 'stopped' ? (
+          <StreamStoppedGate heading={channel.name} onRetry={retry} />
+        ) : refusal === null ? (
           <p role="status" className="text-smoke">
             Tuning in to {channel.name}
           </p>

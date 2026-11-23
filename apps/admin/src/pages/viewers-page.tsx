@@ -78,8 +78,11 @@ import { cn } from '@/lib/cn';
 import { formatDateTime, formatRelative, humanize } from '@/lib/format';
 import {
   describeDevice,
+  describeStreamDevice,
+  describeStreamLimit,
   generatePassword,
   initialsOf,
+  parseStreamLimit,
   profileColor,
   summarizeWatching,
 } from '@/lib/viewers';
@@ -780,11 +783,17 @@ function ViewerFormDialog({ target, onClose, onSaved }: ViewerFormDialogProps) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [vouched, setVouched] = useState(true);
+  const [streams, setStreams] = useState('');
+  const maxStreams = parseStreamLimit(streams);
 
   const save = useMutation({
     mutationFn: () =>
       viewer
-        ? viewersApi.update(viewer.id, { displayName: displayName.trim(), email: email.trim() })
+        ? viewersApi.update(viewer.id, {
+            displayName: displayName.trim(),
+            email: email.trim(),
+            ...(maxStreams === 'invalid' ? {} : { maxStreams }),
+          })
         : viewersApi.create({
             displayName: displayName.trim(),
             email: email.trim(),
@@ -804,12 +813,16 @@ function ViewerFormDialog({ target, onClose, onSaved }: ViewerFormDialogProps) {
       setEmail(viewer?.email ?? '');
       setPassword(viewer ? '' : generatePassword());
       setVouched(true);
+      setStreams(viewer?.maxStreams ? String(viewer.maxStreams) : '');
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [target]);
 
   const submit = (event: FormEvent) => {
     event.preventDefault();
+    if (maxStreams === 'invalid') {
+      return;
+    }
     save.mutate();
   };
 
@@ -857,6 +870,28 @@ function ViewerFormDialog({ target, onClose, onSaved }: ViewerFormDialogProps) {
                 />
               )}
             </Field>
+            {viewer ? (
+              <Field
+                label="Devices at the same time"
+                hint={
+                  maxStreams === 'invalid'
+                    ? 'A number from 1 to 20, or empty.'
+                    : 'On how many devices this account plays at once, whatever its plan says. Empty: as the plan or the installation says.'
+                }
+              >
+                {(id) => (
+                  <Input
+                    id={id}
+                    className="sm:max-w-40"
+                    inputMode="numeric"
+                    placeholder="As the plan"
+                    aria-invalid={maxStreams === 'invalid'}
+                    value={streams}
+                    onChange={(event) => setStreams(event.target.value)}
+                  />
+                )}
+              </Field>
+            ) : null}
             {viewer ? null : (
               <>
                 <PasswordField label="Password" value={password} onChange={setPassword} />
@@ -967,6 +1002,21 @@ function DetailSheet({
     queryFn: ({ signal }) => viewersApi.get((viewer as Viewer).id, signal),
     enabled: viewer !== null,
   });
+  const queryClient = useQueryClient();
+  const streams = useQuery({
+    queryKey: ['viewers', 'streams', viewer?.id],
+    queryFn: ({ signal }) => viewersApi.streams((viewer as Viewer).id, signal),
+    enabled: viewer !== null,
+    // What plays changes by itself: a stream ends, another device starts.
+    refetchInterval: 15_000,
+  });
+  const stopStream = useMutation({
+    mutationFn: (streamId: string) => viewersApi.stopStream((viewer as Viewer).id, streamId),
+    onSuccess: () => {
+      toast.success('Stopped. The player goes dark within half a minute.');
+      void queryClient.invalidateQueries({ queryKey: ['viewers', 'streams', viewer?.id] });
+    },
+  });
   const saved = useQuery({
     queryKey: ['viewers', 'saved', viewer?.id],
     queryFn: ({ signal }) => viewersApi.saved((viewer as Viewer).id, signal),
@@ -1071,6 +1121,62 @@ function DetailSheet({
                           {session.ipAddress ? ` from ${session.ipAddress}` : ''}
                         </p>
                       </div>
+                    </li>
+                  ))}
+                </ul>
+              ) : null}
+            </div>
+
+            <div>
+              <div className="mb-2 flex items-baseline justify-between gap-3">
+                <h3 className="text-[13px] font-medium">Playing now</h3>
+                {streams.data ? (
+                  <p className="text-xs text-muted-foreground">
+                    {describeStreamLimit(streams.data)}
+                  </p>
+                ) : null}
+              </div>
+              <ErrorNote error={streams.error ?? stopStream.error} />
+              {streams.isPending ? <Skeleton className="h-14 rounded-lg" /> : null}
+              {streams.data && streams.data.streams.length === 0 ? (
+                <p className="rounded-lg border border-dashed p-3 text-sm text-muted-foreground">
+                  Nothing is playing on this account.
+                </p>
+              ) : null}
+              {streams.data && streams.data.streams.length > 0 ? (
+                <ul className="divide-y rounded-lg border">
+                  {streams.data.streams.map((stream) => (
+                    <li key={stream.id} className="flex items-center gap-3 px-3 py-2.5 text-sm">
+                      <span className="relative flex size-2 shrink-0" aria-hidden="true">
+                        <span className="absolute inline-flex size-full animate-ping rounded-full bg-success opacity-60" />
+                        <span className="relative inline-flex size-2 rounded-full bg-success" />
+                      </span>
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate font-medium">
+                          {stream.kind === 'LIVE' ? 'Watching' : 'Playing'} {stream.subject}
+                        </p>
+                        <p
+                          className="truncate text-xs text-muted-foreground"
+                          title={stream.userAgent ?? undefined}
+                        >
+                          {[
+                            describeStreamDevice(stream),
+                            sharedAccount && stream.profile ? stream.profile.name : null,
+                            `since ${formatRelative(stream.startedAt)}`,
+                          ]
+                            .filter(Boolean)
+                            .join(', ')}
+                        </p>
+                      </div>
+                      {mayWrite ? (
+                        <Button
+                          size="sm"
+                          loading={stopStream.isPending && stopStream.variables === stream.id}
+                          onClick={() => stopStream.mutate(stream.id)}
+                        >
+                          Stop
+                        </Button>
+                      ) : null}
                     </li>
                   ))}
                 </ul>

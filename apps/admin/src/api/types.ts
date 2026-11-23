@@ -739,6 +739,8 @@ export interface Viewer {
   updatedAt: string;
   /** Devices signed in right now. */
   activeSessions: number;
+  /** Devices that may play at once, when an admin set it for this viewer. Null: not set. */
+  maxStreams: number | null;
   /** The plan the viewer watches through right now, if any. */
   plan: { id: string; name: string; endsAt: string | null } | null;
 }
@@ -844,6 +846,29 @@ export interface UpdateViewerInput {
   displayName?: string;
   status?: ViewerStatus;
   emailVerified?: boolean;
+  /** Null: follow the plan or the installation again. */
+  maxStreams?: number | null;
+}
+
+/** What one device of a viewer is playing right now. */
+export interface ViewerStream {
+  id: string;
+  kind: 'VIDEO' | 'LIVE';
+  subject: string;
+  device: 'DESKTOP' | 'MOBILE' | 'TABLET' | 'TV' | 'OTHER';
+  userAgent: string | null;
+  profile: { id: string; name: string } | null;
+  startedAt: string;
+  lastSeenAt: string;
+}
+
+/** What a viewer is playing, with how many devices may play at once and why. */
+export interface ViewerStreams {
+  /** Null: no limit. */
+  limit: number | null;
+  /** Where the limit comes from: set for the viewer, the plan, or the installation. */
+  source: 'VIEWER' | 'PLAN' | 'SITE';
+  streams: ViewerStream[];
 }
 
 /** What is open to the public on this installation. Set in its environment. */
@@ -887,6 +912,8 @@ export interface Plan {
   /** Whether the plan opens every paid title. Otherwise it opens its packages. */
   includesAll: boolean;
   packages: { id: string; name: string }[];
+  /** Devices a subscriber plays on at the same time. Null: the limit of the installation. */
+  maxStreams: number | null;
   /** Whether viewers are offered the plan. */
   isOffered: boolean;
   position: number;
@@ -907,6 +934,7 @@ export type PlanInput = Pick<
   | 'isRecommended'
   | 'isOffered'
   | 'includesAll'
+  | 'maxStreams'
 > & {
   /** The packages the plan opens while it does not open everything. */
   packageIds: string[];
@@ -971,6 +999,8 @@ export interface GrantSubscriptionInput {
 }
 
 export interface BillingOverview {
+  /** Devices one account plays on at once where a plan says nothing. 0: no limit. */
+  streamLimit: number;
   /** Currency of all prices, such as "EUR". */
   currency: string;
   /** Whether viewers can pay online. */

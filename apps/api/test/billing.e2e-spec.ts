@@ -150,6 +150,7 @@ describe.skipIf(!TEST_DATABASE_URL)('Billing (e2e)', () => {
         trialDays: 7,
         isRecommended: false,
         includesAll: true,
+        maxStreams: null,
         packages: [],
         isOffered: true,
         position: 0,
@@ -176,6 +177,7 @@ describe.skipIf(!TEST_DATABASE_URL)('Billing (e2e)', () => {
             trialDays: 7,
             isRecommended: false,
             includesAll: true,
+            maxStreams: null,
             packages: [],
           },
         ],
@@ -646,6 +648,7 @@ describe.skipIf(!TEST_DATABASE_URL)('Billing (e2e)', () => {
 
       const overview = await http().get('/v1/billing').set(admin()).expect(200);
       expect(overview.body).toEqual({
+        streamLimit: 0,
         currency: 'EUR',
         checkout: false,
         contactUrl: 'mailto:billing@example.com',

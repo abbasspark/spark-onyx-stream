@@ -75,3 +75,4 @@ Before the apps, the panel becomes a fuller catalog system. This work is outside
 11. The live page and the pages of categories and genres arranged with the same builder. **Done.**
 12. My list: viewers save titles to watch later, per profile, with a page and a row of their own, and the panel sees what is saved the most. **Done.**
 13. Coupons: codes made in the panel that lower the price of a plan or of renting and buying a title, with limits and a record of every use. **Done.**
+14. Stream limits: an account plays on so many devices at once, set for the installation, per plan or per viewer, with a way to stop another device. **Done.**

@@ -12,7 +12,9 @@ import { formatClock } from '@/lib/format';
 import { findEntry, isResumable } from '@/lib/progress';
 import { recordFinished, recordPosition, syncSettled } from '@/lib/watch-sync';
 import type { Playback } from '@/lib/types';
+import { readStreamLimit, type StreamLimitRefusal } from '@/lib/streams';
 import { authHref, ViewerApiError, viewerApi } from '@/lib/viewer-api';
+import { StreamLimitGate, StreamStoppedGate, useStreamPlace } from './stream-gates';
 import { Player } from './player/player';
 import { useViewerSession } from './viewer-session';
 
@@ -50,7 +52,11 @@ type Loaded =
   /** Subscribed, to a plan that does not open this title. */
   | { state: 'other-plan' }
   /** A title no plan opens: it is rented or bought. */
-  | { state: 'purchase' };
+  | { state: 'purchase' }
+  /** The account plays on as many devices as it may. */
+  | { state: 'limit'; refusal: StreamLimitRefusal }
+  /** The place of this device was taken away while it played. */
+  | { state: 'stopped' };
 
 /** Explains a refused playback request in the viewer's terms. */
 function refusal(status: number): { message: string; retry: boolean } {
@@ -146,6 +152,13 @@ export function WatchScreen({
             return;
           }
         }
+        if (response.status === 409) {
+          const limit = readStreamLimit(409, await response.json().catch(() => null));
+          if (limit) {
+            setLoaded({ state: 'limit', refusal: limit });
+            return;
+          }
+        }
         if (!response.ok) {
           setLoaded({ state: 'failed', ...refusal(response.status) });
           return;
@@ -211,6 +224,19 @@ export function WatchScreen({
     },
     [progress, heading, detail],
   );
+
+  // --- Holding a place among the streams of the account ------------------------
+
+  const stoppedElsewhere = useStreamPlace(
+    loaded.state === 'ready' ? loaded.playback.stream : null,
+    () => setAttempt((value) => value + 1),
+  );
+  useEffect(() => {
+    if (stoppedElsewhere) {
+      // The player goes away with this, and with it the picture and the sound.
+      setLoaded((current) => (current.state === 'ready' ? { state: 'stopped' } : current));
+    }
+  }, [stoppedElsewhere]);
 
   // --- Telling the server what is watched -------------------------------------
   // For the figures in the panel: how long the video really played. Nothing
@@ -436,6 +462,25 @@ export function WatchScreen({
           className="text-sm text-smoke underline underline-offset-4 hover:text-vein"
         >
           All ways to watch {heading}
+        </Link>
+      </div>
+    );
+  }
+
+  if (loaded.state === 'limit' || loaded.state === 'stopped') {
+    const again = () => setAttempt((value) => value + 1);
+    return (
+      <div className="flex min-h-dvh flex-col items-center justify-center gap-6 bg-onyx px-6 py-10 text-center">
+        {loaded.state === 'limit' ? (
+          <StreamLimitGate refusal={loaded.refusal} heading={heading} onRetry={again} />
+        ) : (
+          <StreamStoppedGate heading={heading} onRetry={again} />
+        )}
+        <Link
+          href={backHref}
+          className="text-sm text-smoke underline underline-offset-4 hover:text-vein"
+        >
+          Back to {heading}
         </Link>
       </div>
     );

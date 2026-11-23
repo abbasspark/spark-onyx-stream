@@ -39,15 +39,16 @@ Nothing else. The audit log names a viewer by id and never stores an email addre
 
 ## Settings
 
-| Name                        | Values                                   | Meaning                                                                                       |
-| --------------------------- | ---------------------------------------- | --------------------------------------------------------------------------------------------- |
-| `VIEWER_REGISTRATION`       | `open` (default), `closed`               | Whether people can create an account themselves. With `closed`, only admins create viewers    |
-| `CATALOG_PLAYBACK`          | `open` (default), `viewers`, `off`       | Who may play published titles. `viewers` needs a signed-in viewer                             |
-| `VIEWER_EMAIL_VERIFICATION` | `optional` (default), `required`         | Whether a viewer must confirm their email address before they can watch. Needs email to be on |
-| `SMTP_URL`                  | empty (default), `smtp://…`, `smtps://…` | The mail server. Empty turns email off                                                        |
-| `MAIL_FROM`                 | `Name <address>`                         | Sender of the emails. Needed with `SMTP_URL`                                                  |
-| `SITE_URL`                  | `https://host`                           | Address of the viewer website, for the links in emails. Needed with `SMTP_URL`                |
-| `SITE_NAME`                 | `Onyx Stream` (default)                  | Name of the site, as emails call it                                                           |
+| Name                        | Values                                   | Meaning                                                                                                    |
+| --------------------------- | ---------------------------------------- | ---------------------------------------------------------------------------------------------------------- |
+| `VIEWER_REGISTRATION`       | `open` (default), `closed`               | Whether people can create an account themselves. With `closed`, only admins create viewers                 |
+| `CATALOG_PLAYBACK`          | `open` (default), `viewers`, `off`       | Who may play published titles. `viewers` needs a signed-in viewer                                          |
+| `VIEWER_EMAIL_VERIFICATION` | `optional` (default), `required`         | Whether a viewer must confirm their email address before they can watch. Needs email to be on              |
+| `SMTP_URL`                  | empty (default), `smtp://…`, `smtps://…` | The mail server. Empty turns email off                                                                     |
+| `MAIL_FROM`                 | `Name <address>`                         | Sender of the emails. Needed with `SMTP_URL`                                                               |
+| `SITE_URL`                  | `https://host`                           | Address of the viewer website, for the links in emails. Needed with `SMTP_URL`                             |
+| `SITE_NAME`                 | `Onyx Stream` (default)                  | Name of the site, as emails call it                                                                        |
+| `STREAM_LIMIT`              | `0` (default) to `20`                    | On how many devices one account plays at the same time. `0`: no limit. See [Stream limits](#stream-limits) |
 
 A private service for invited people is `VIEWER_REGISTRATION=closed` with `CATALOG_PLAYBACK=viewers`.
 
@@ -73,6 +74,9 @@ All under `/v1/viewer`. Answers about a person are never cached.
 | `GET /watching/titles/{slug}`               | Progress in the videos of one title, finished ones included                                      |
 | `PUT /watching`                             | Report positions: `{ items: [{ title, episodeId?, position, duration, watchedAt? }] }`, up to 50 |
 | `DELETE /watching/{id}`, `DELETE /watching` | Forget one video, or everything                                                                  |
+| `GET /streams`                              | What the devices of the account are playing right now, and how many may                          |
+| `POST /streams/{id}/beat`                   | The player says it is still playing. `410` tells it to stop                                      |
+| `DELETE /streams/{id}`                      | Ends a stream: the player's own on leaving, or another device's to make room                     |
 | `GET /list`                                 | "My list": the saved titles as cards, the last added first, and how many more it takes           |
 | `GET /list/ids`                             | Only the ids of the saved titles, to mark them on any page                                       |
 | `PUT /list/{slug}`, `DELETE /list/{slug}`   | Put a title on the list, or take it off. Both are safe to repeat                                 |
@@ -97,6 +101,8 @@ All under `/v1/viewers`, with the permissions `viewers:read` and `viewers:write`
 | `POST /viewers/{id}/verification-email` | Email the viewer the link to confirm their address                                     |
 | `GET /mail`, `POST /mail/test`          | How email is set up, and sending a test. Permissions `settings:read`, `settings:write` |
 | `GET /viewers/{id}/watching`            | What the viewer watched: totals and the latest 25 videos                               |
+| `GET /viewers/{id}/streams`             | What the viewer is playing right now, with the limit and where it comes from           |
+| `DELETE /viewers/{id}/streams/{stream}` | Stop what one device is playing                                                        |
 | `GET /viewers/{id}/list`                | What the viewer saved to watch later: the latest 25, with whether each was begun       |
 | `GET /analytics/saved`                  | What stands on lists: totals and the ten titles on the most lists. `days`: 1 to 365    |
 
@@ -164,6 +170,20 @@ Each profile of an account remembers where it is in each video, so "Continue wat
 - Entries are deleted with the account, the profile, the title or the episode.
 
 On the website the list is also kept in the browser. For a visitor that is the only place. For a viewer it is a copy of the account's list: pages have it at once, and what was noted without a connection is handed over when the next page opens. Signing in hands over what the device kept as a visitor. Signing out removes the copy from the device.
+
+## Stream limits
+
+An account can be limited to a number of devices that play at the same time. Signing in is not limited: only playing is.
+
+- **Where the limit comes from.** `STREAM_LIMIT` sets it for the installation, and `0`, the default, means none. A plan can have its own number, "Devices at the same time", which counts for its subscribers. An admin can set a number for a single viewer, which counts whatever the plan says. With several plans, the most generous counts. A plan without a number follows the installation.
+- **What takes a place.** The main video of a movie or an episode, and a live channel, when a signed-in viewer plays it. Trailers and extras take none, and neither does a visitor who is not signed in.
+- **A place is taken when playback is asked for.** The answer carries `stream`, with an `id` and how often to report (`beatSeconds`, 30). A device over the limit gets no addresses: the answer is `409` with the code `stream_limit`, the `limit`, and the `streams` that hold the places, each with what it plays and on what kind of device.
+- **A device plays one video at a time.** Asking again from the same device, for the same video or another, replaces its place and never takes a second one.
+- **The player reports every half minute** to `POST /viewer/streams/{id}/beat`, and gives the place back when it leaves the video, also when the tab is closed. A device that goes silent, because it lost its connection or was switched off, frees its place after 75 seconds.
+- **A viewer can stop another device to watch here.** The page that says the account is full lists the devices with a button for each. The device that was stopped is told at its next report (`410`), stops the picture, and says why. The account page shows "Playing now" with the same buttons.
+- **Two devices never take the last place together:** places of one account are handed out one after the other.
+- **In the panel,** a viewer's sheet shows "Playing now": what each device plays, on what, since when, the limit and where it comes from, and a button to stop a device, which is written to the audit log. The plan editor has "Devices at the same time", and the page of plans on the website says it under each price.
+- **What this does not do.** The addresses for playing are signed and stay valid for their time. A player that ignores being told to stop can go on until they run out; the website's player does not. The limit keeps honest households to what they pay for, and makes sharing a password with many people impractical. It is not protection against copying.
 
 ## My list
 

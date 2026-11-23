@@ -29,6 +29,8 @@ export class AppConfig {
   readonly viewingStatistics: boolean;
   /** Days a record of a play is kept. 0: for good. */
   readonly viewingStatisticsDays: number;
+  /** Devices one viewer account plays on at the same time. 0: no limit. */
+  readonly streamLimit: number;
   readonly corsOrigins: readonly string[];
   /** Reverse proxies in front of the API whose X-Forwarded-For entry is trusted. */
   readonly trustProxyHops: number;
@@ -129,6 +131,7 @@ export class AppConfig {
     this.watchSettleSeconds = env.WATCH_SETTLE_SECONDS;
     this.viewingStatistics = env.VIEWING_STATISTICS === 'on';
     this.viewingStatisticsDays = env.VIEWING_STATISTICS_DAYS;
+    this.streamLimit = env.STREAM_LIMIT;
     this.corsOrigins = env.CORS_ORIGINS;
     this.trustProxyHops = env.TRUST_PROXY_HOPS;
     this.ffmpegPath = env.FFMPEG_PATH;

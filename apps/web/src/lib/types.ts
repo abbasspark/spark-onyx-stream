@@ -201,7 +201,16 @@ export interface P2pInfo {
 }
 
 /** Signed, short-lived addresses for playing one video. */
+/** The place a device holds among the streams of its account while it plays. */
+export interface StreamTicket {
+  id: string;
+  /** How often to report, in seconds. */
+  beatSeconds: number;
+}
+
 export interface Playback {
+  /** Set for a signed-in viewer on a site that counts streams. Missing from an older API. */
+  stream?: StreamTicket | null;
   protocol: 'hls';
   manifestUrl: string;
   posterUrl: string | null;
@@ -255,6 +264,8 @@ export interface Guide {
 
 /** Where to watch a channel, for a short time. */
 export interface LivePlayback {
+  /** Set for a signed-in viewer. Missing from an older API. */
+  stream?: StreamTicket | null;
   protocol: 'hls';
   url: string;
   expiresAt: string;

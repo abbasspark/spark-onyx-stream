@@ -20,6 +20,7 @@ import {
   type Plan,
   priceOf,
   yearlySaving,
+  describeStreams,
 } from './plans';
 
 const plan = (monthlyAmount: number | null, yearlyAmount: number | null): Plan => ({
@@ -237,5 +238,14 @@ describe('subscribeLabel', () => {
     expect(subscribeLabel({ trialDays: 1 }, true)).toBe('Start 1 day free');
     expect(subscribeLabel({ trialDays: 0 }, true)).toBe('Subscribe');
     expect(subscribeLabel({ trialDays: 7 }, false)).toBe('Subscribe');
+  });
+});
+
+describe('describeStreams', () => {
+  it('says on how many devices a plan plays, and nothing without a limit', () => {
+    expect(describeStreams({ maxStreams: 1 })).toBe('Watch on 1 device at a time');
+    expect(describeStreams({ maxStreams: 4 })).toBe('Watch on 4 devices at the same time');
+    expect(describeStreams({ maxStreams: null })).toBeNull();
+    expect(describeStreams({})).toBeNull();
   });
 });

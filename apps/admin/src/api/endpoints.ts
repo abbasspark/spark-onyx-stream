@@ -138,6 +138,7 @@ import type {
   ViewerStatus,
   ViewerSubscriptions,
   ViewerSaved,
+  ViewerStreams,
   ViewerWatching,
 } from './types';
 
@@ -328,6 +329,12 @@ export const viewersApi = {
   get: (id: string, signal?: AbortSignal) => request<ViewerDetail>(`/v1/viewers/${id}`, { signal }),
   watching: (id: string, signal?: AbortSignal) =>
     request<ViewerWatching>(`/v1/viewers/${id}/watching`, { signal }),
+  /** What the devices of the viewer are playing right now. */
+  streams: (id: string, signal?: AbortSignal) =>
+    request<ViewerStreams>(`/v1/viewers/${id}/streams`, { signal }),
+  /** Stops what one device is playing. The player stops within half a minute. */
+  stopStream: (id: string, streamId: string) =>
+    request<void>(`/v1/viewers/${id}/streams/${streamId}`, { method: 'DELETE' }),
   /** What the profiles of the viewer saved to watch later. */
   saved: (id: string, signal?: AbortSignal) =>
     request<ViewerSaved>(`/v1/viewers/${id}/list`, { signal }),
