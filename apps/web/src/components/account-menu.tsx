@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 'use client';
 
-import { LogOut, UserRound, UsersRound } from 'lucide-react';
+import { LogOut, UserRound, UsersRound, ListPlus } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
@@ -141,7 +141,11 @@ export function AccountMenu() {
               ))}
             </ul>
           ) : null}
-          <Link href="/profiles" className={`${item} mt-2`}>
+          <Link href="/my-list" className={`${item} mt-2`}>
+            <ListPlus className="size-4" aria-hidden="true" />
+            My list
+          </Link>
+          <Link href="/profiles" className={item}>
             <UsersRound className="size-4" aria-hidden="true" />
             {others.length > 0 ? 'Manage profiles' : 'Add a profile'}
           </Link>

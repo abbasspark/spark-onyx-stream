@@ -29,6 +29,7 @@ import { BulkModule } from './bulk/bulk.module.js';
 import { MetadataModule } from './metadata/metadata.module.js';
 import { ViewersModule } from './viewers/viewers.module.js';
 import { WatchingModule } from './watching/watching.module.js';
+import { WatchlistModule } from './watchlist/watchlist.module.js';
 import type { AppRole } from './roles/app-role.js';
 import { AnalyticsModule, PlaysModule } from './analytics/analytics.module.js';
 import { GuideModule } from './guide/guide.module.js';
@@ -57,6 +58,7 @@ const ROLE_MODULES: Record<AppRole, Type[]> = {
     BulkModule,
     ViewersModule,
     WatchingModule,
+    WatchlistModule,
     LiveModule,
     GuideModule,
     RecordingsModule,

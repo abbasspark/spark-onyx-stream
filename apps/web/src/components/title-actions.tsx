@@ -18,6 +18,7 @@ import { authHref, ViewerApiError, viewerApi } from '@/lib/viewer-api';
 import type { TitleDetail } from '@/lib/types';
 import { episodeCode, movieKey, nextUnwatched, watchHref } from '@/lib/watch';
 import { useWatching } from './continue-watching';
+import { MyListButton } from './my-list';
 import { useViewerSession } from './viewer-session';
 import { useWatchedVideos } from './watched-videos';
 
@@ -211,6 +212,7 @@ export function TitleActions({ title, offer }: { title: TitleDetail; offer: Titl
             Trailer
           </Link>
         ) : null}
+        <MyListButton title={{ id: title.id, slug: title.slug, name: title.name }} />
       </div>
 
       {problem ? (

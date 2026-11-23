@@ -64,7 +64,7 @@ export function sectionState(
   if (section.visibleUntil && new Date(section.visibleUntil).getTime() <= now) {
     return 'ended';
   }
-  return section.kind !== 'CONTINUE_WATCHING' && section.count === 0 ? 'empty' : 'shown';
+  return !isOwnRow(section.kind) && section.count === 0 ? 'empty' : 'shown';
 }
 
 const KIND_WORD = { MOVIE: 'movies', SERIES: 'series' } as const;
@@ -73,6 +73,13 @@ const KIND_WORD = { MOVIE: 'movies', SERIES: 'series' } as const;
  * One line that says what a section shows: "Movies of the category Drama,
  * best rated first, up to 20, as wide cards".
  */
+/**
+ * True for a place that each viewer's own browser fills: what they started,
+ * or what they saved. Such a section has no titles to choose.
+ */
+export const isOwnRow = (kind: HomeSectionKind): boolean =>
+  kind === 'CONTINUE_WATCHING' || kind === 'MY_LIST';
+
 export function describeSection(
   section: Pick<
     HomeSection,
@@ -91,6 +98,9 @@ export function describeSection(
 ): string {
   if (section.kind === 'CONTINUE_WATCHING') {
     return 'What each viewer started and did not finish. Shown only to those who have something.';
+  }
+  if (section.kind === 'MY_LIST') {
+    return 'What each viewer saved to watch later. Shown only to those who have something.';
   }
   const what = section.titleType ? KIND_WORD[section.titleType] : 'titles';
   const from: Record<HomeSource, string> = {
@@ -358,7 +368,7 @@ export interface SectionForm {
 
 /** What is still missing before a form can be saved, as a sentence. Null: nothing. */
 export function formProblem(kind: HomeSectionKind, form: SectionForm): string | null {
-  if (kind === 'CONTINUE_WATCHING') {
+  if (isOwnRow(kind)) {
     return datesProblem(form);
   }
   if (form.source === 'CATEGORY' && !form.categoryId) {

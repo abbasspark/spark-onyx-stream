@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 import { Info, ListVideo, Play } from 'lucide-react';
 import Link from 'next/link';
+import { MyListButton } from './my-list';
 import type { TitleCard } from '@/lib/types';
 import { Facts } from './facts';
 
@@ -67,6 +68,7 @@ export function Hero({ title }: { title: TitleCard }) {
               <Info />
               Details
             </Link>
+            <MyListButton title={{ id: title.id, slug: title.slug, name: title.name }} />
           </div>
         </div>
       </div>

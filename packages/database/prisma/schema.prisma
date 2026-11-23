@@ -102,6 +102,7 @@ model Viewer {
   payments      Payment[]
   purchases     Purchase[]
   watching      WatchProgress[]
+  saved         WatchlistItem[]
   plays         Play[]
   tokens        ViewerToken[]
 
@@ -782,6 +783,7 @@ model Title {
   payments     Payment[]
   seasons      Season[]
   watching     WatchProgress[]
+  saved        WatchlistItem[]
   watchedFiles WatchedFile[]
 
   @@index([type, status])
@@ -1132,9 +1134,28 @@ model ViewerProfile {
 
   sessions ViewerSession[]
   watching WatchProgress[]
+  saved    WatchlistItem[]
 
   @@index([viewerId])
   @@map("viewer_profiles")
+}
+
+/// A title a profile put on its list to watch later. One row per profile and title.
+model WatchlistItem {
+  id        String        @id @default(uuid(7)) @db.Uuid
+  viewerId  String        @db.Uuid
+  viewer    Viewer        @relation(fields: [viewerId], references: [id], onDelete: Cascade)
+  profileId String        @db.Uuid
+  profile   ViewerProfile @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  titleId   String        @db.Uuid
+  title     Title         @relation(fields: [titleId], references: [id], onDelete: Cascade)
+  createdAt DateTime      @default(now())
+
+  @@unique([profileId, titleId])
+  @@index([profileId, createdAt])
+  @@index([viewerId])
+  @@index([titleId])
+  @@map("watchlist_items")
 }
 
 /// How far a profile is in one video: a movie, or an episode of a series.
@@ -1877,6 +1898,8 @@ enum HomeSectionKind {
   HERO
   /// Where the viewer's own row of started videos goes.
   CONTINUE_WATCHING
+  /// Where the viewer's own list of saved titles goes.
+  MY_LIST
   /// A row of titles.
   TITLES
 }

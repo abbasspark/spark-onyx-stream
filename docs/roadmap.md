@@ -73,3 +73,4 @@ Before the apps, the panel becomes a fuller catalog system. This work is outside
 9. Viewing statistics: what is watched, how long, by how many and on what, per day and per title, recorded without addresses. **Done.** See [viewing-statistics.md](viewing-statistics.md).
 10. The pages for movies and for series arranged like the home page, in a group of their own in the panel. **Done.**
 11. The live page and the pages of categories and genres arranged with the same builder. **Done.**
+12. My list: viewers save titles to watch later, per profile, with a page and a row of their own, and the panel sees what is saved the most. **Done.**

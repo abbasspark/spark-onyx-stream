@@ -399,6 +399,8 @@ export function AnalyticsPage() {
         </div>
       ) : null}
 
+      <SavedTitlesCard days={days} />
+
       {openId ? (
         <TitleSheet
           id={openId}
@@ -408,6 +410,120 @@ export function AnalyticsPage() {
         />
       ) : null}
     </>
+  );
+}
+
+/**
+ * What viewers put on their lists. It stands apart from the views: a list is
+ * kept by the account, also while viewing statistics are off.
+ */
+function SavedTitlesCard({ days }: { days: number }) {
+  const saved = useQuery({
+    queryKey: ['analytics', 'saved', days],
+    queryFn: ({ signal }) => analyticsApi.saved(days, signal),
+    placeholderData: keepPreviousData,
+  });
+  const data = saved.data;
+  const most = data?.top[0]?.saves ?? 0;
+
+  return (
+    <Card className="mt-4 overflow-hidden">
+      <CardHeader
+        title="Saved to watch later"
+        description='What stands on the "My list" of viewers now. Much saved and little begun: wanted, and not yet watched.'
+        actions={
+          data && data.saves > 0 ? (
+            <p className="text-right text-xs text-muted-foreground">
+              <span className="block text-sm font-medium text-foreground tabular-nums">
+                {formatCount(data.saves)} on {formatCount(data.lists)}{' '}
+                {data.lists === 1 ? 'list' : 'lists'}
+              </span>
+              {formatCount(data.recent)} added in the last {days} days
+            </p>
+          ) : null
+        }
+      />
+      <ErrorNote error={saved.error} className="mx-6 mb-4" />
+      {saved.isPending ? <Skeleton className="mx-6 mb-6 h-24 rounded-lg" /> : null}
+      {data && data.top.length === 0 ? (
+        <p className="px-6 pb-6 text-sm text-muted-foreground">
+          No viewer has saved a title yet. The plus sign on every title of the website puts it on
+          their list.
+        </p>
+      ) : null}
+      {data && data.top.length > 0 ? (
+        <Table>
+          <thead>
+            <tr>
+              <Th className="w-8">#</Th>
+              <Th>Title</Th>
+              <Th className="text-right">On lists</Th>
+              <Th className="hidden text-right sm:table-cell">Added lately</Th>
+              <Th className="hidden text-right md:table-cell">Begun since</Th>
+            </tr>
+          </thead>
+          <tbody>
+            {data.top.map((row, index) => {
+              const Icon = row.title.type === 'SERIES' ? Tv : Film;
+              return (
+                <Tr key={row.title.id}>
+                  <Td className="text-muted-foreground tabular-nums">{index + 1}</Td>
+                  <Td>
+                    <div className="flex items-center gap-3">
+                      <span className="flex aspect-[2/3] w-8 shrink-0 items-center justify-center overflow-hidden rounded bg-muted text-muted-foreground">
+                        {row.title.poster ? (
+                          <img
+                            src={apiUrl(row.title.poster.url)}
+                            alt=""
+                            loading="lazy"
+                            className="size-full object-cover"
+                          />
+                        ) : (
+                          <Icon className="size-4" aria-hidden="true" />
+                        )}
+                      </span>
+                      <div className="min-w-0 flex-1">
+                        <Link
+                          to={titlePath(row.title)}
+                          className="block max-w-full truncate font-medium hover:underline"
+                        >
+                          {row.title.name}
+                          <span className="ml-2 text-xs font-normal text-muted-foreground">
+                            {row.title.type === 'SERIES' ? 'Series' : 'Movie'}
+                          </span>
+                        </Link>
+                        <div className="mt-1.5 h-1 max-w-56 overflow-hidden rounded-full bg-muted">
+                          <div
+                            className="h-full rounded-full bg-(--series-1)"
+                            style={{ width: `${Math.max(2, (row.saves / most) * 100)}%` }}
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  </Td>
+                  <Td className="text-right font-medium tabular-nums">{formatCount(row.saves)}</Td>
+                  <Td className="hidden text-right tabular-nums sm:table-cell">
+                    {formatCount(row.recent)}
+                  </Td>
+                  <Td className="hidden text-right tabular-nums md:table-cell">
+                    {formatCount(row.started)}{' '}
+                    <span className="text-muted-foreground">
+                      ({formatShare(row.started / row.saves)})
+                    </span>
+                  </Td>
+                </Tr>
+              );
+            })}
+          </tbody>
+        </Table>
+      ) : null}
+      {data && data.titles > data.top.length ? (
+        <p className="border-t px-6 py-3 text-xs text-muted-foreground">
+          The {data.top.length} titles on the most lists, of {formatCount(data.titles)} that stand
+          on one.
+        </p>
+      ) : null}
+    </Card>
   );
 }
 

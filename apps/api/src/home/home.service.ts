@@ -99,12 +99,15 @@ function sortFor(
   return sort === 'CURATED' && source !== 'COLLECTION' ? 'NEWEST' : sort;
 }
 
+/** A place a client fills with what belongs to the viewer: it carries no titles itself. */
+const isOwnRow = (kind: string): boolean => kind === 'CONTINUE_WATCHING' || kind === 'MY_LIST';
+
 /** One part of the page as the website gets it, before its titles are made into cards. */
 export interface HomeRow {
   /** Stable, for keys: "featured", "latest", "category:{slug}", or "section:{id}". */
   key: string;
   name: string;
-  kind: 'titles' | 'continue';
+  kind: 'titles' | 'continue' | 'list';
   layout: 'poster' | 'landscape' | 'numbered';
   category: { slug: string; name: string } | null;
   /** Where "See all" leads on the website. Null: the row shows everything. */
@@ -204,10 +207,9 @@ export class HomeService {
     const resolved = await Promise.all(
       shown.map(async (section) => ({
         section,
-        titles:
-          section.kind === 'CONTINUE_WATCHING'
-            ? []
-            : await this.titlesOf(section, now, section.limit, scope),
+        titles: isOwnRow(section.kind)
+          ? []
+          : await this.titlesOf(section, now, section.limit, scope),
       })),
     );
     const hero = resolved.find(({ section }) => section.kind === 'HERO');
@@ -219,7 +221,12 @@ export class HomeService {
       rows.push({
         key: `section:${section.id}`,
         name: section.name ?? defaultSectionName(section, PAGE_TYPE[section.page]),
-        kind: section.kind === 'CONTINUE_WATCHING' ? 'continue' : 'titles',
+        kind:
+          section.kind === 'CONTINUE_WATCHING'
+            ? 'continue'
+            : section.kind === 'MY_LIST'
+              ? 'list'
+              : 'titles',
         layout: section.layout.toLowerCase() as HomeRow['layout'],
         category:
           section.source === 'CATEGORY' && section.category
@@ -267,6 +274,15 @@ export class HomeService {
         browse: null,
         titles: [],
       },
+      {
+        key: 'list',
+        name: 'My list',
+        kind: 'list',
+        layout: 'poster',
+        category: null,
+        browse: '/my-list',
+        titles: [],
+      },
       // A featured row with a single title would only repeat the opening.
       ...(featured.length >= 2
         ? [this.automaticRow('featured', 'Featured', '/browse?featured=true', featured)]
@@ -289,7 +305,7 @@ export class HomeService {
       rows:
         latest.length === 0
           ? []
-          : rows.filter((entry) => entry.kind === 'continue' || entry.titles.length > 0),
+          : rows.filter((entry) => entry.kind !== 'titles' || entry.titles.length > 0),
     };
   }
 
@@ -513,7 +529,9 @@ export class HomeService {
     return [
       { kind: 'HERO', source: 'FEATURED', sort: 'NEWEST', limit: 5, titleType },
       // What a viewer started belongs to the first page, not to every page.
-      ...(page === 'HOME' ? [{ kind: 'CONTINUE_WATCHING' as const }] : []),
+      ...(page === 'HOME'
+        ? [{ kind: 'CONTINUE_WATCHING' as const }, { kind: 'MY_LIST' as const }]
+        : []),
       { ...row, source: 'FEATURED', sort: 'NEWEST' },
       { ...row, source: 'ALL', sort: 'NEWEST' },
       ...(page === 'HOME' ? [] : [{ ...row, source: 'ALL' as const, sort: 'RATING' as const }]),
@@ -547,7 +565,9 @@ export class HomeService {
       throw new ConflictException(
         input.kind === 'HERO'
           ? 'The page has an opening already'
-          : 'The page has a place for "Continue watching" already',
+          : input.kind === 'MY_LIST'
+            ? 'The page has a place for "My list" already'
+            : 'The page has a place for "Continue watching" already',
       );
     }
     const { titleIds, kind, ...fields } = input;
@@ -688,7 +708,7 @@ export class HomeService {
     ) {
       throw new BadRequestException('The end of the dates must come after their start');
     }
-    if (section.kind === 'CONTINUE_WATCHING') {
+    if (isOwnRow(section.kind)) {
       return;
     }
     if (section.kind === 'HERO' && section.limit > MAX_HERO_TITLES) {
@@ -764,10 +784,9 @@ export class HomeService {
     now: Date,
     scope?: PageScope,
   ): Promise<HomeSectionView> {
-    const titles =
-      section.kind === 'CONTINUE_WATCHING'
-        ? []
-        : await this.titlesOf(section, now, section.limit, scope);
+    const titles = isOwnRow(section.kind)
+      ? []
+      : await this.titlesOf(section, now, section.limit, scope);
     const picked =
       section.source === 'MANUAL' && section.titles.length > 0
         ? await this.prisma.title.findMany({
@@ -807,8 +826,7 @@ export class HomeService {
       visible: section.visible,
       visibleFrom: section.visibleFrom,
       visibleUntil: section.visibleUntil,
-      shownNow:
-        isShownAt(section, now) && (section.kind === 'CONTINUE_WATCHING' || titles.length > 0),
+      shownNow: isShownAt(section, now) && (isOwnRow(section.kind) || titles.length > 0),
       picked: section.titles.flatMap((entry) => {
         const title = byId.get(entry.titleId);
         return title ? [{ ...title, visible: seen.has(title.id) }] : [];

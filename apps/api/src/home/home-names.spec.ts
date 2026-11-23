@@ -55,6 +55,14 @@ describe('defaultSectionName on a page about one kind of title', () => {
   });
 });
 
+describe('the place of the list of a viewer', () => {
+  it('is called "My list" and leads to the page of the list', () => {
+    const mine = section({ kind: 'MY_LIST' });
+    expect(defaultSectionName(mine)).toBe('My list');
+    expect(browsePath(mine)).toBe('/my-list');
+  });
+});
+
 describe('browsePath', () => {
   it('leads to the browse page with the same filters', () => {
     expect(browsePath(section({}))).toBe('/browse');

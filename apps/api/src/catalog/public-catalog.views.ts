@@ -190,8 +190,11 @@ export interface PublicRow {
   /** Stable, for keys: "featured", "latest", "category:{slug}", "continue" or "section:{id}". */
   key: string;
   name: string;
-  /** "continue": the place of the viewer's own row of started videos. It has no titles here. */
-  kind: 'titles' | 'continue';
+  /**
+   * "continue": the place of the viewer's own row of started videos. "list":
+   * the place of the titles the viewer saved. Neither has titles here.
+   */
+  kind: 'titles' | 'continue' | 'list';
   /** How the cards look: posters, wide cards with the backdrop, or a numbered top list. */
   layout: 'poster' | 'landscape' | 'numbered';
   /** Set for a category row. */
