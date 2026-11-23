@@ -29,7 +29,7 @@ import {
   toTitleDetail,
   toTitleSummary,
 } from './catalog.views.js';
-import { isPlayable, PLAYABLE_ASSET, VISIBLE_TITLE } from './playable.js';
+import { availableAt, isPlayable, PLAYABLE_ASSET, visibleTitle } from './playable.js';
 import { slugify, uniqueSlug } from './slug.js';
 
 const SUMMARY_INCLUDE = {
@@ -50,6 +50,8 @@ const DETAIL_INCLUDE = {
   categories: { include: { category: true } },
   genres: { include: { genre: true } },
   credits: { include: { person: { include: { portrait: true } } } },
+  extras: { include: { asset: true } },
+  collections: { include: { collection: { select: { id: true, name: true } } } },
   packages: { include: { package: { select: { id: true, name: true, position: true } } } },
   seasons: { include: { poster: true, episodes: { include: { asset: true, still: true } } } },
 } satisfies Prisma.TitleInclude;
@@ -62,6 +64,18 @@ const NULLABLE_SORT_FIELDS: readonly ListTitlesInput['sort'][] = [
   'rating',
   'runtimeMinutes',
 ];
+
+/** Titles by the dates they are shown between. "current" also holds titles without dates. */
+function availabilityFilter(which: NonNullable<ListTitlesInput['availability']>) {
+  const now = new Date();
+  if (which === 'scheduled') {
+    return { availableFrom: { gt: now } } satisfies Prisma.TitleWhereInput;
+  }
+  if (which === 'ended') {
+    return { availableUntil: { lte: now } } satisfies Prisma.TitleWhereInput;
+  }
+  return { AND: availableAt(now) } satisfies Prisma.TitleWhereInput;
+}
 
 /** An episode without a video that plays. */
 const EPISODE_WITHOUT_VIDEO = {
@@ -117,7 +131,17 @@ export class TitlesService {
       ...(input.categoryId ? { categories: { some: { categoryId: input.categoryId } } } : {}),
       ...(input.genreId ? { genres: { some: { genreId: input.genreId } } } : {}),
       ...(input.personId ? { credits: { some: { personId: input.personId } } } : {}),
-      ...(input.video ? { AND: [VIDEO_FILTER[input.video]] } : {}),
+      ...(input.video || input.availability
+        ? {
+            AND: [
+              ...(input.video ? [VIDEO_FILTER[input.video]] : []),
+              ...(input.availability ? [availabilityFilter(input.availability)] : []),
+            ],
+          }
+        : {}),
+      ...(input.collectionId
+        ? { collections: { some: { collectionId: input.collectionId } } }
+        : {}),
       ...(input.packageId ? { packages: { some: { packageId: input.packageId } } } : {}),
       ...(input.packaged === 'none' ? { access: 'PAID', packages: { none: {} } } : {}),
       ...(input.q
@@ -151,7 +175,7 @@ export class TitlesService {
         ? []
         : (
             await this.prisma.title.findMany({
-              where: { id: { in: published.map((title) => title.id) }, ...VISIBLE_TITLE },
+              where: { id: { in: published.map((title) => title.id) }, ...visibleTitle() },
               select: { id: true },
             })
           ).map((title) => title.id),
@@ -213,13 +237,26 @@ export class TitlesService {
 
   async update(id: string, input: UpdateTitleInput): Promise<TitleDetail> {
     const current = await this.findOrThrow(id);
-    const { categoryIds, packageIds, genreIds, releaseDate, ...fields } = input;
+    const { categoryIds, packageIds, genreIds, collectionIds, releaseDate, ...fields } = input;
     const data: Prisma.TitleUncheckedUpdateInput = {
       ...fields,
       ...(releaseDate !== undefined
         ? { releaseDate: releaseDate ? new Date(`${releaseDate}T00:00:00Z`) : null }
         : {}),
     };
+    // The two dates are checked together, also when only one of them is sent.
+    const from = fields.availableFrom === undefined ? current.availableFrom : fields.availableFrom;
+    const until =
+      fields.availableUntil === undefined ? current.availableUntil : fields.availableUntil;
+    if (from && until && new Date(until) <= new Date(from)) {
+      throw new BadRequestException('The end of the availability must come after its start');
+    }
+    if (collectionIds) {
+      const found = await this.prisma.collection.count({ where: { id: { in: collectionIds } } });
+      if (found !== new Set(collectionIds).size) {
+        throw new BadRequestException('One of the chosen collections does not exist');
+      }
+    }
     if (current.type === 'MOVIE' && fields.seriesStatus) {
       throw new BadRequestException('Only a series is running or ended. This title is a movie');
     }
@@ -290,6 +327,27 @@ export class TitlesService {
           await tx.titleGenre.createMany({
             data: [...new Set(genreIds)].map((genreId) => ({ titleId: id, genreId })),
           });
+        }
+        if (collectionIds) {
+          // A title keeps its place in the collections it stays in, and goes to the end of new ones.
+          const wanted = [...new Set(collectionIds)];
+          await tx.collectionTitle.deleteMany({
+            where: { titleId: id, collectionId: { notIn: wanted } },
+          });
+          const kept = await tx.collectionTitle.findMany({
+            where: { titleId: id },
+            select: { collectionId: true },
+          });
+          const has = new Set(kept.map((row) => row.collectionId));
+          for (const collectionId of wanted.filter((value) => !has.has(value))) {
+            const last = await tx.collectionTitle.aggregate({
+              where: { collectionId },
+              _max: { position: true },
+            });
+            await tx.collectionTitle.create({
+              data: { collectionId, titleId: id, position: (last._max.position ?? -1) + 1 },
+            });
+          }
         }
         if (categoryIds) {
           await tx.titleCategory.deleteMany({ where: { titleId: id } });

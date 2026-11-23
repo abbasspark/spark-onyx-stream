@@ -4,6 +4,7 @@ import type {
   Credit,
   CreditInput,
   Episode,
+  ExtraKind,
   SeriesStatus,
   TitleDetail,
   TitleSummary,
@@ -29,6 +30,8 @@ const SHARED_FILTERS = [
   'person',
   'package',
   'packaged',
+  'collection',
+  'shown',
 ];
 
 /**
@@ -242,6 +245,7 @@ export interface DetailsForm {
   /** Empty for "not known". */
   seriesStatus: SeriesStatus | '';
   genreIds: string[];
+  collectionIds: string[];
   slug: string;
   isFeatured: boolean;
   /** Whether watching needs a subscription. */
@@ -279,6 +283,7 @@ export function toForm(title: TitleDetail, currency = 'EUR'): DetailsForm {
     slug: title.slug,
     isFeatured: title.isFeatured,
     isPaid: title.access === 'PAID',
+    collectionIds: title.collections.map((collection) => collection.id).sort(),
     categoryIds: title.categories.map((category) => category.id).sort(),
     packageIds: title.packages.map((item) => item.id).sort(),
   };
@@ -368,6 +373,9 @@ export function changedFields(
   if ([...form.genreIds].sort().join() !== saved.genreIds.join()) {
     changes.genreIds = form.genreIds;
   }
+  if ([...form.collectionIds].sort().join() !== saved.collectionIds.join()) {
+    changes.collectionIds = form.collectionIds;
+  }
   if (form.isFeatured !== saved.isFeatured) {
     changes.isFeatured = form.isFeatured;
   }
@@ -393,4 +401,75 @@ export function changedFields(
     changes.purchaseOnly = form.purchaseOnly;
   }
   return changes;
+}
+
+/** Where a title stands between the dates it is shown. "always": it has no dates. */
+export type AvailabilityState = 'always' | 'scheduled' | 'current' | 'ended';
+
+export function availabilityOf(
+  title: { availableFrom: string | null; availableUntil: string | null },
+  now: number = Date.now(),
+): AvailabilityState {
+  if (title.availableUntil && new Date(title.availableUntil).getTime() <= now) {
+    return 'ended';
+  }
+  if (title.availableFrom && new Date(title.availableFrom).getTime() > now) {
+    return 'scheduled';
+  }
+  return title.availableFrom || title.availableUntil ? 'current' : 'always';
+}
+
+/** An API moment as a "datetime-local" field holds it, in the admin's own time zone. */
+export function toLocalInput(iso: string | null): string {
+  if (!iso) {
+    return '';
+  }
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) {
+    return '';
+  }
+  const two = (value: number) => String(value).padStart(2, '0');
+  return `${date.getFullYear()}-${two(date.getMonth() + 1)}-${two(date.getDate())}T${two(date.getHours())}:${two(date.getMinutes())}`;
+}
+
+/** The other way round. Empty or unreadable text is "no date". */
+export function fromLocalInput(text: string): string | null {
+  if (!text) {
+    return null;
+  }
+  const date = new Date(text);
+  return Number.isNaN(date.getTime()) ? null : date.toISOString();
+}
+
+/** What is wrong with the two dates as typed, or null. */
+export function availabilityProblem(from: string, until: string): string | null {
+  const start = fromLocalInput(from);
+  const end = fromLocalInput(until);
+  return start && end && new Date(end) <= new Date(start)
+    ? 'The end must come after the start.'
+    : null;
+}
+
+export const EXTRA_KIND_LABELS: Record<ExtraKind, string> = {
+  TRAILER: 'Trailer',
+  TEASER: 'Teaser',
+  CLIP: 'Clip',
+  FEATURETTE: 'Featurette',
+  BEHIND_THE_SCENES: 'Behind the scenes',
+  INTERVIEW: 'Interview',
+  BLOOPERS: 'Bloopers',
+};
+
+/** Moves one entry of a list a step up or down. Out of range, the list comes back as it was. */
+export function moved<T>(list: readonly T[], index: number, step: -1 | 1): T[] {
+  const target = index + step;
+  const next = [...list];
+  const a = next[index];
+  const b = next[target];
+  if (a === undefined || b === undefined) {
+    return next;
+  }
+  next[index] = b;
+  next[target] = a;
+  return next;
 }

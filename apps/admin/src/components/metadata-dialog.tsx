@@ -43,6 +43,7 @@ interface Parts {
   genres: boolean;
   people: boolean;
   portraits: boolean;
+  collection: boolean;
   categories: boolean;
   createCategories: boolean;
   artwork: boolean;
@@ -56,6 +57,7 @@ const ALL_PARTS: Parts = {
   genres: true,
   people: true,
   portraits: true,
+  collection: true,
   // Categories are the shelves an admin arranges by hand. Genres come as genres.
   categories: false,
   createCategories: true,
@@ -511,6 +513,9 @@ function Review({ metadataId, language, title, onBack, onDone }: ReviewProps) {
                         ? 'None listed'
                         : `${data.cast} cast, ${data.crew} crew${data.leads.length > 0 ? `: ${data.leads.join(', ')}` : ''}`,
                     ],
+                    ...(data.collection
+                      ? ([['Part of', data.collection]] as [string, ReactNode][])
+                      : []),
                     ['Original language', data.originalLanguage ?? 'Unknown'],
                     ...(isSeries
                       ? ([['Content', describeSeasons(data.seasons) ?? 'No episodes yet']] as [
@@ -609,6 +614,14 @@ function Review({ metadataId, language, title, onBack, onDone }: ReviewProps) {
                   disabled={!parts.people}
                   onChange={(portraits) => set({ portraits })}
                 />
+                {data.collection ? (
+                  <Part
+                    label="Its collection"
+                    description={`Puts the movie into "${data.collection}", and creates the collection when it is new.`}
+                    checked={parts.collection}
+                    onChange={(collection) => set({ collection })}
+                  />
+                ) : null}
                 <Part
                   label="Artwork"
                   description="Poster, backdrop and logo, copied into your storage."

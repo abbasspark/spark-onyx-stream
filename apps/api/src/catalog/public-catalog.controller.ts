@@ -29,6 +29,8 @@ import {
 import { PublicCatalogService, type Watcher } from './public-catalog.service.js';
 import type {
   PublicCategory,
+  PublicCollection,
+  PublicCollectionDetail,
   PublicHome,
   PublicTitleCard,
   PublicTitleDetail,
@@ -67,6 +69,20 @@ export class PublicCatalogController {
     return this.catalog.home();
   }
 
+  @Get('collections')
+  @RateLimit(READS)
+  @Header('Cache-Control', CACHE_READS)
+  collections(): Promise<PublicCollection[]> {
+    return this.catalog.collections();
+  }
+
+  @Get('collections/:slug')
+  @RateLimit(READS)
+  @Header('Cache-Control', CACHE_READS)
+  collection(@Param('slug', slugPipe) slug: string): Promise<PublicCollectionDetail> {
+    return this.catalog.collection(slug);
+  }
+
   @Get('categories')
   @RateLimit(READS)
   @Header('Cache-Control', CACHE_READS)
@@ -101,6 +117,19 @@ export class PublicCatalogController {
     @Req() request: Request,
   ): Promise<PlaybackInfo> {
     return this.catalog.playTitle(slug, await this.watcher(request));
+  }
+
+  @Post('titles/:slug/extras/:id/playback')
+  @UseInterceptors(DeliveryHintInterceptor)
+  @RateLimit(PLAYBACK)
+  @HttpCode(HttpStatus.OK)
+  @Header('Cache-Control', 'no-store')
+  async playExtra(
+    @Param('slug', slugPipe) slug: string,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Req() request: Request,
+  ): Promise<PlaybackInfo> {
+    return this.catalog.playExtra(slug, id, await this.watcher(request));
   }
 
   @Post('titles/:slug/trailer/playback')

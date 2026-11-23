@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-only
-import type { Category, Image, TitleAccess, TitleType } from '@onyx/database';
+import type { Category, ExtraKind, Image, TitleAccess, TitleType } from '@onyx/database';
 import { toImageView } from './catalog.views.js';
 
 /**
@@ -84,6 +84,10 @@ export interface PublicTitleDetail extends PublicTitleCard {
   synopsis: string | null;
   originalLanguage: string | null;
   hasTrailer: boolean;
+  /** More videos around the title that can be played, in their order. Free to watch, like the trailer. */
+  extras: PublicExtra[];
+  /** Collections the title belongs to, such as the films of a series of films. */
+  collections: PublicCollectionRef[];
   /**
    * Where details and artwork were imported from, for example "tmdb". Sources
    * ask to be named where their material is shown. Null for a title typed by hand.
@@ -91,6 +95,32 @@ export interface PublicTitleDetail extends PublicTitleCard {
   metadataSource: string | null;
   /** Series: seasons that have something to watch, in order. Movies: empty. */
   seasons: PublicSeason[];
+}
+
+export interface PublicExtra {
+  id: string;
+  /** TRAILER, TEASER, CLIP, FEATURETTE, BEHIND_THE_SCENES, INTERVIEW or BLOOPERS. */
+  kind: ExtraKind;
+  name: string;
+  durationMs: number | null;
+}
+
+export interface PublicCollectionRef {
+  slug: string;
+  name: string;
+}
+
+export interface PublicCollection extends PublicCollectionRef {
+  synopsis: string;
+  poster: PublicImage | null;
+  backdrop: PublicImage | null;
+  /** Titles of the collection that viewers can see. */
+  titleCount: number;
+}
+
+export interface PublicCollectionDetail extends PublicCollection {
+  /** In the order of the collection. */
+  titles: PublicTitleCard[];
 }
 
 /** One row of the home page. */

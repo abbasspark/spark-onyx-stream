@@ -7,6 +7,7 @@ import {
   creditsOf,
   dateOf,
   episodesOf,
+  collectionOf,
   factsOf,
   languageOf,
   MAX_CAST,
@@ -452,5 +453,27 @@ describe('people', () => {
   it('copes with a title nobody is listed for', () => {
     expect(creditsOf('movie', {})).toEqual([]);
     expect(creditsOf('tv', { aggregate_credits: {} })).toEqual([]);
+  });
+});
+
+describe('collectionOf', () => {
+  it('reads the series of films a movie is part of', () => {
+    expect(
+      collectionOf({
+        belongs_to_collection: {
+          id: 2344,
+          name: ' The Matrix Collection ',
+          poster_path: '/abc.jpg',
+          backdrop_path: 'http://elsewhere.example/x.jpg',
+        },
+      }),
+    ).toEqual({ id: '2344', name: 'The Matrix Collection', poster: '/abc.jpg', backdrop: null });
+  });
+
+  it('is nothing without a usable id and name', () => {
+    expect(collectionOf({})).toBeNull();
+    expect(collectionOf({ belongs_to_collection: null })).toBeNull();
+    expect(collectionOf({ belongs_to_collection: { id: 0, name: 'X' } })).toBeNull();
+    expect(collectionOf({ belongs_to_collection: { id: 5, name: '  ' } })).toBeNull();
   });
 });

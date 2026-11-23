@@ -24,14 +24,39 @@ export const VISIBLE_EPISODE = {
 } satisfies Prisma.EpisodeWhereInput;
 
 /**
- * Titles viewers can see: published and with something to watch. A published
- * title whose video was deleted in the library, or is being processed again,
- * is left out until it plays again.
+ * The dates between which a published title is shown. Either end may be open.
+ * The start counts, the end does not: a title that ends at midnight is gone at midnight.
  */
-export const VISIBLE_TITLE = {
-  status: 'PUBLISHED',
-  OR: [
-    { type: 'MOVIE', asset: PLAYABLE_ASSET },
-    { type: 'SERIES', seasons: { some: { episodes: { some: VISIBLE_EPISODE } } } },
-  ],
-} satisfies Prisma.TitleWhereInput;
+export function availableAt(now: Date = new Date()) {
+  return [
+    { OR: [{ availableFrom: null }, { availableFrom: { lte: now } }] },
+    { OR: [{ availableUntil: null }, { availableUntil: { gt: now } }] },
+  ] satisfies Prisma.TitleWhereInput[];
+}
+
+/** The same rule for one title in hand. */
+export function isAvailable(
+  title: { availableFrom: Date | null; availableUntil: Date | null },
+  now: Date = new Date(),
+): boolean {
+  return (
+    (title.availableFrom === null || title.availableFrom <= now) &&
+    (title.availableUntil === null || title.availableUntil > now)
+  );
+}
+
+/**
+ * Titles viewers can see: published, inside their dates, and with something to
+ * watch. A published title whose video was deleted in the library, or is being
+ * processed again, is left out until it plays again.
+ */
+export function visibleTitle(now: Date = new Date()) {
+  return {
+    status: 'PUBLISHED',
+    OR: [
+      { type: 'MOVIE', asset: PLAYABLE_ASSET },
+      { type: 'SERIES', seasons: { some: { episodes: { some: VISIBLE_EPISODE } } } },
+    ],
+    AND: availableAt(now),
+  } satisfies Prisma.TitleWhereInput;
+}

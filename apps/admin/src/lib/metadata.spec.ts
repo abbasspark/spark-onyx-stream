@@ -7,6 +7,7 @@ const NOTHING: ImportReport = {
   fields: [],
   categoriesCreated: [],
   genresCreated: [],
+  collection: null,
   peopleCreated: 0,
   credits: 0,
   seasonsCreated: 0,

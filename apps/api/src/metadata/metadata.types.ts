@@ -89,6 +89,16 @@ export interface ImportedTitle extends ImportedText, ImportedFacts {
   seasons: ImportedSeasonSummary[];
   /** The cast in the order of the source, then the crew. */
   credits: ImportedCredit[];
+  /** Movies: the series of films it is part of. */
+  collection: ImportedCollection | null;
+}
+
+export interface ImportedCollection {
+  /** The id at the source. */
+  id: string;
+  name: string;
+  poster: string | null;
+  backdrop: string | null;
 }
 
 /** What an import would bring, shown before anything is changed. */
@@ -97,6 +107,8 @@ export interface MetadataPreview extends ImportedText, ImportedFacts {
   /** How many people the import would bring. */
   cast: number;
   crew: number;
+  /** Movies: the name of the series of films it is part of. */
+  collection: string | null;
   /** The first few of the cast, to recognize the title by. */
   leads: string[];
   type: TitleType;
@@ -116,6 +128,8 @@ export interface ImportReport {
   categoriesCreated: string[];
   /** Genres that were not known before. */
   genresCreated: string[];
+  /** The collection the title was put into, when it was not in it. */
+  collection: string | null;
   /** People that were not known before, and credits written. */
   peopleCreated: number;
   credits: number;

@@ -24,7 +24,14 @@ import { type FormEvent, type ReactNode, useEffect, useMemo, useState } from 're
 import { Link, useLocation, useNavigate, useParams } from 'react-router';
 import { toast } from 'sonner';
 import { ApiError, apiUrl } from '@/api/client';
-import { categoriesApi, genresApi, packagesApi, purchasesApi, titlesApi } from '@/api/endpoints';
+import {
+  categoriesApi,
+  collectionsApi,
+  genresApi,
+  packagesApi,
+  purchasesApi,
+  titlesApi,
+} from '@/api/endpoints';
 import type {
   Credit,
   PublishStatus,
@@ -35,7 +42,9 @@ import type {
 import { useSession } from '@/auth/session';
 import { useConfirm } from '@/components/confirm';
 import { MetadataDialog } from '@/components/metadata-dialog';
+import { TitleAvailability } from '@/components/title-availability';
 import { TitleCredits } from '@/components/title-credits';
+import { TitleExtras } from '@/components/title-extras';
 import { TitleEpisodes } from '@/components/title-episodes';
 import { TitleMedia } from '@/components/title-media';
 import { Button } from '@/components/ui/button';
@@ -64,6 +73,7 @@ import {
   Tooltip,
 } from '@/components/ui/overlay';
 import {
+  availabilityOf,
   changedFields,
   countryName,
   describeContent,
@@ -122,6 +132,7 @@ export function TitleEditorPage() {
   const refresh = () => {
     void queryClient.invalidateQueries({ queryKey: ['titles'] });
     void queryClient.invalidateQueries({ queryKey: ['categories'] });
+    void queryClient.invalidateQueries({ queryKey: ['collections'] });
   };
   const store = (next: TitleDetail) => {
     queryClient.setQueryData(['titles', 'detail', id], next);
@@ -195,6 +206,7 @@ export function TitleEditorPage() {
   const canPublish = open.length === 0;
   const TypeIcon = title.type === 'SERIES' ? Tv : Film;
   const hidden = title.status === 'PUBLISHED' && !title.isVisible;
+  const availability = availabilityOf(title);
 
   const askUnpublish = async () => {
     const confirmed = await confirm({
@@ -386,9 +398,13 @@ export function TitleEditorPage() {
           <div className="text-sm">
             <p className="font-medium">Viewers cannot see this title right now</p>
             <p className="text-muted-foreground">
-              {title.type === 'SERIES'
-                ? 'It is published, but none of its published episodes has a video that can be played. It appears again by itself once one does.'
-                : 'It is published, but its video was deleted or is being processed. It appears again by itself once the video can be played.'}
+              {availability === 'scheduled'
+                ? `It is published and waits for its start: ${formatDateTime(title.availableFrom)}. It appears by itself then.`
+                : availability === 'ended'
+                  ? `It is published, but its availability ended on ${formatDateTime(title.availableUntil)}. Change the dates to show it again.`
+                  : title.type === 'SERIES'
+                    ? 'It is published, but none of its published episodes has a video that can be played. It appears again by itself once one does.'
+                    : 'It is published, but its video was deleted or is being processed. It appears again by itself once the video can be played.'}
             </p>
           </div>
         </div>
@@ -434,7 +450,16 @@ export function TitleEditorPage() {
             />
           </TabsContent>
           <TabsContent value="media">
-            <TitleMedia title={title} disabled={!mayWrite} save={save} />
+            <div className="grid gap-6">
+              <TitleMedia title={title} disabled={!mayWrite} save={save} />
+              <TitleExtras
+                title={title}
+                disabled={!mayWrite}
+                onChange={(extras) =>
+                  queryClient.setQueryData(['titles', 'detail', id], { ...title, extras })
+                }
+              />
+            </div>
           </TabsContent>
         </Tabs>
 
@@ -443,15 +468,19 @@ export function TitleEditorPage() {
             <CardHeader
               title="Publishing"
               description={
-                hidden
-                  ? 'Published, but hidden from viewers.'
-                  : title.status === 'PUBLISHED'
-                    ? 'Viewers can see this title.'
-                    : title.status === 'ARCHIVED'
-                      ? 'Archived. Hidden from viewers.'
-                      : canPublish
-                        ? 'Ready to publish.'
-                        : 'A draft. Finish the required points to publish.'
+                hidden && availability === 'scheduled'
+                  ? 'Published. It waits for its start.'
+                  : hidden && availability === 'ended'
+                    ? 'Published, but its availability has ended.'
+                    : hidden
+                      ? 'Published, but hidden from viewers.'
+                      : title.status === 'PUBLISHED'
+                        ? 'Viewers can see this title.'
+                        : title.status === 'ARCHIVED'
+                          ? 'Archived. Hidden from viewers.'
+                          : canPublish
+                            ? 'Ready to publish.'
+                            : 'A draft. Finish the required points to publish.'
               }
             />
             <CardContent>
@@ -487,6 +516,8 @@ export function TitleEditorPage() {
               </ul>
             </CardContent>
           </Card>
+
+          <TitleAvailability title={title} disabled={!mayWrite} save={save} />
 
           <Card className="overflow-hidden">
             {title.backdrop ? (
@@ -596,6 +627,10 @@ function DetailsTab({ title, disabled, save }: DetailsTabProps) {
   const dirty = Object.keys(changes).length > 0;
   const pricesWrong = priceProblem(form, currency);
   const factsWrong = factsProblem(form);
+  const collections = useQuery({
+    queryKey: ['collections'],
+    queryFn: ({ signal }) => collectionsApi.list(signal),
+  });
   const genres = useQuery({
     queryKey: ['genres'],
     queryFn: ({ signal }) => genresApi.list(signal),
@@ -1018,6 +1053,57 @@ function DetailsTab({ title, disabled, save }: DetailsTabProps) {
               </Button>
             </div>
           )}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader
+          title="Collections"
+          description="Titles that belong together in an order, such as the films of a series of films."
+          actions={
+            <Button asChild variant="ghost" size="sm">
+              <Link to="/collections">Manage</Link>
+            </Button>
+          }
+        />
+        <CardContent className="grid gap-3">
+          <ErrorNote error={collections.error} />
+          {collections.data?.length === 0 ? (
+            <p className="text-sm text-muted-foreground">
+              There are no collections yet. Create one on the Collections page.
+            </p>
+          ) : null}
+          <div className="flex flex-wrap gap-2">
+            {collections.data?.map((collection) => {
+              const chosen = form.collectionIds.includes(collection.id);
+              return (
+                <button
+                  key={collection.id}
+                  type="button"
+                  role="checkbox"
+                  aria-checked={chosen}
+                  disabled={disabled}
+                  onClick={() =>
+                    set(
+                      'collectionIds',
+                      chosen
+                        ? form.collectionIds.filter((value) => value !== collection.id)
+                        : [...form.collectionIds, collection.id],
+                    )
+                  }
+                  className={cn(
+                    'inline-flex h-8 items-center gap-1.5 rounded-full border px-3 text-[13px] font-medium transition-colors hover:bg-accent disabled:pointer-events-none disabled:opacity-60',
+                    chosen &&
+                      'border-primary bg-primary text-primary-foreground hover:bg-primary/90',
+                  )}
+                >
+                  {chosen ? <Check className="size-3.5" aria-hidden="true" /> : null}
+                  {collection.name}
+                  {collection.visible ? null : <EyeOff className="size-3.5" aria-hidden="true" />}
+                </button>
+              );
+            })}
+          </div>
         </CardContent>
       </Card>
 

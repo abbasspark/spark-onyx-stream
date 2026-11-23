@@ -31,6 +31,7 @@ const ENTITY_TYPES: Record<string, string> = {
   Episode: 'Episodes',
   Category: 'Categories',
   Genre: 'Genres',
+  Collection: 'Collections',
   Person: 'People',
   Viewer: 'Viewers',
   Asset: 'Videos',

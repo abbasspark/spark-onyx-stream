@@ -428,6 +428,9 @@ export interface TitleSummary {
   releaseYear: number | null;
   status: PublishStatus;
   publishedAt: string | null;
+  /** A published title is shown to viewers between these moments. Null leaves that end open. */
+  availableFrom: string | null;
+  availableUntil: string | null;
   isFeatured: boolean;
   /** FREE, or PAID when watching needs a subscription. */
   access: TitleAccess;
@@ -559,6 +562,9 @@ export interface TitleDetail extends TitleSummary {
   /** The cast in order, then the crew in order. */
   credits: Credit[];
   trailerAsset: AssetRef | null;
+  /** More videos around the title, in their order. */
+  extras: Extra[];
+  collections: { id: string; name: string }[];
   /** Where the details were imported from. Null for a title typed by hand. */
   metadata: { source: string; id: string; language: string | null; syncedAt: string | null } | null;
   seasons: Season[];
@@ -613,6 +619,8 @@ export interface MetadataPreview {
   cast: number;
   crew: number;
   leads: string[];
+  /** Movies: the name of the series of films it is part of. */
+  collection: string | null;
 }
 
 /** Which parts an import brings. Left out, a part is brought. */
@@ -625,6 +633,7 @@ export interface MetadataParts {
   /** The cast and the crew that matters, and a picture of each. */
   people?: boolean;
   portraits?: boolean;
+  collection?: boolean;
   categories?: boolean;
   createCategories?: boolean;
   artwork?: boolean;
@@ -637,6 +646,8 @@ export interface ImportReport {
   fields: string[];
   categoriesCreated: string[];
   genresCreated: string[];
+  /** The collection the title was put into, when it was not in it. */
+  collection: string | null;
   peopleCreated: number;
   credits: number;
   seasonsCreated: number;
@@ -668,6 +679,9 @@ export interface UpdateTitleInput {
   imdbId?: string | null;
   seriesStatus?: SeriesStatus | null;
   genreIds?: string[];
+  collectionIds?: string[];
+  availableFrom?: string | null;
+  availableUntil?: string | null;
   isFeatured?: boolean;
   access?: TitleAccess;
   rentAmount?: number | null;
@@ -1548,3 +1562,51 @@ export interface DiagnosticsReport extends DiagnosticsSummary {
   processes: ProcessReport[];
   alerts: { emailAlerts: boolean; mailEnabled: boolean; recipients: string[] };
 }
+
+export type ExtraKind =
+  'TRAILER' | 'TEASER' | 'CLIP' | 'FEATURETTE' | 'BEHIND_THE_SCENES' | 'INTERVIEW' | 'BLOOPERS';
+
+/** A video that goes with a title beside the film itself. */
+export interface Extra {
+  id: string;
+  kind: ExtraKind;
+  name: string;
+  position: number;
+  /** Null when the video was deleted in the library. */
+  asset: AssetRef | null;
+}
+
+/** Titles that belong together in an order. */
+export interface Collection {
+  id: string;
+  slug: string;
+  name: string;
+  synopsis: string;
+  /** A hidden collection is kept in the panel and not offered to viewers. */
+  visible: boolean;
+  position: number;
+  poster: CatalogImage | null;
+  backdrop: CatalogImage | null;
+  titleCount: number;
+  /** Posters of its first titles. */
+  covers: CatalogImage[];
+  /** Where it was imported from, or null for one made by hand. */
+  metadataSource: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CollectionTitle {
+  id: string;
+  type: TitleType;
+  name: string;
+  releaseYear: number | null;
+  status: PublishStatus;
+  poster: CatalogImage | null;
+}
+
+export interface CollectionDetail extends Collection {
+  titles: CollectionTitle[];
+}
+
+export type Availability = 'scheduled' | 'current' | 'ended';

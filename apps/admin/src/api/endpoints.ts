@@ -42,7 +42,12 @@ import type {
   AssetStatus,
   AuditEntry,
   BillingOverview,
+  Availability,
   CatalogImage,
+  Collection,
+  CollectionDetail,
+  Extra,
+  ExtraKind,
   Category,
   CreateAdminInput,
   CreateApiKeyInput,
@@ -332,6 +337,8 @@ export interface TitleListQuery {
   seriesStatus?: SeriesStatus;
   /** "ready": the video is there. "missing": a movie without one, a series with an episode that lacks one. */
   video?: 'ready' | 'missing';
+  collectionId?: string;
+  availability?: Availability;
   packageId?: string;
   /** "none": paid titles in no package. */
   packaged?: 'none';
@@ -435,6 +442,43 @@ export const peopleApi = {
     },
   ) => request<Person>(`/v1/people/${id}`, { method: 'PATCH', body }),
   remove: (id: string) => request<void>(`/v1/people/${id}`, { method: 'DELETE' }),
+};
+
+export const collectionsApi = {
+  list: (signal?: AbortSignal) => request<Collection[]>('/v1/collections', { signal }),
+  get: (id: string, signal?: AbortSignal) =>
+    request<CollectionDetail>(`/v1/collections/${id}`, { signal }),
+  create: (body: { name: string; synopsis?: string; visible?: boolean; titleIds?: string[] }) =>
+    request<CollectionDetail>('/v1/collections', { method: 'POST', body }),
+  update: (
+    id: string,
+    body: {
+      name?: string;
+      slug?: string;
+      synopsis?: string;
+      visible?: boolean;
+      posterId?: string | null;
+      backdropId?: string | null;
+    },
+  ) => request<CollectionDetail>(`/v1/collections/${id}`, { method: 'PATCH', body }),
+  setTitles: (id: string, titleIds: string[]) =>
+    request<CollectionDetail>(`/v1/collections/${id}/titles`, {
+      method: 'PUT',
+      body: { titleIds },
+    }),
+  reorder: (ids: string[]) =>
+    request<Collection[]>('/v1/collections/order', { method: 'PUT', body: { ids } }),
+  remove: (id: string) => request<void>(`/v1/collections/${id}`, { method: 'DELETE' }),
+};
+
+export const extrasApi = {
+  add: (titleId: string, body: { kind: ExtraKind; name: string; assetId: string }) =>
+    request<Extra[]>(`/v1/titles/${titleId}/extras`, { method: 'POST', body }),
+  update: (id: string, body: { kind?: ExtraKind; name?: string }) =>
+    request<Extra[]>(`/v1/extras/${id}`, { method: 'PATCH', body }),
+  reorder: (titleId: string, ids: string[]) =>
+    request<Extra[]>(`/v1/titles/${titleId}/extras/order`, { method: 'PUT', body: { ids } }),
+  remove: (id: string) => request<void>(`/v1/extras/${id}`, { method: 'DELETE' }),
 };
 
 export const categoriesApi = {

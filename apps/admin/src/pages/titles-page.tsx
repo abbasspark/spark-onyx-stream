@@ -6,6 +6,7 @@ import {
   DownloadCloud,
   Film,
   LayoutGrid,
+  Library,
   List,
   Lock,
   MoreHorizontal,
@@ -22,11 +23,19 @@ import { type FormEvent, type ReactNode, useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router';
 import { toast } from 'sonner';
 import { apiUrl } from '@/api/client';
-import { categoriesApi, genresApi, packagesApi, peopleApi, titlesApi } from '@/api/endpoints';
+import {
+  categoriesApi,
+  collectionsApi,
+  genresApi,
+  packagesApi,
+  peopleApi,
+  titlesApi,
+} from '@/api/endpoints';
 import {
   PUBLISH_STATUSES,
   SERIES_STATUSES,
   TITLE_SORT_FIELDS,
+  type Availability,
   type PublishStatus,
   type SeriesStatus,
   type SortOrder,
@@ -67,6 +76,7 @@ import {
 } from '@/components/ui/overlay';
 import {
   describeContent,
+  availabilityOf,
   formatRating,
   sectionPath,
   SERIES_STATUS_LOOKS,
@@ -78,7 +88,7 @@ import { MetadataDialog } from '@/components/metadata-dialog';
 import { useAddressParams } from '@/lib/address-params';
 import { announceImport } from '@/lib/metadata-toast';
 import { cn } from '@/lib/cn';
-import { formatRelative, humanize } from '@/lib/format';
+import { formatDateTime, formatRelative, humanize } from '@/lib/format';
 
 const PAGE_SIZE = 24;
 const SEARCH_DELAY_MS = 300;
@@ -157,6 +167,25 @@ function PosterArt({ title, className }: { title: TitleSummary; className?: stri
  * because its video is gone or being processed, is marked as hidden.
  */
 function TitleStatus({ title }: { title: TitleSummary }) {
+  const availability = availabilityOf(title);
+  if (title.status === 'PUBLISHED' && availability === 'scheduled') {
+    return (
+      <Tooltip content={`Published. Viewers see it from ${formatDateTime(title.availableFrom)}`}>
+        <Badge tone="info" dot className="pointer-events-auto">
+          Scheduled
+        </Badge>
+      </Tooltip>
+    );
+  }
+  if (title.status === 'PUBLISHED' && availability === 'ended') {
+    return (
+      <Tooltip content={`Its availability ended on ${formatDateTime(title.availableUntil)}`}>
+        <Badge tone="warning" dot className="pointer-events-auto">
+          Ended
+        </Badge>
+      </Tooltip>
+    );
+  }
   if (title.status === 'PUBLISHED' && !title.isVisible) {
     return (
       <Tooltip content="Published, but viewers cannot see it: nothing in it can be played right now">
@@ -200,6 +229,10 @@ function TitlesList({ kind }: { kind: TitleType }) {
   const categoryId = params.get('category') ?? '';
   const genreId = params.get('genre') ?? '';
   const personId = params.get('person') ?? '';
+  const collectionId = params.get('collection') ?? '';
+  const availability = (
+    ['scheduled', 'current', 'ended'].includes(params.get('shown') ?? '') ? params.get('shown') : ''
+  ) as Availability | '';
   const video = (
     ['ready', 'missing'].includes(params.get('video') ?? '') ? params.get('video') : ''
   ) as 'ready' | 'missing' | '';
@@ -254,6 +287,8 @@ function TitlesList({ kind }: { kind: TitleType }) {
         categoryId,
         genreId,
         personId,
+        collectionId,
+        availability,
         video,
         seriesStatus,
         access,
@@ -273,6 +308,8 @@ function TitlesList({ kind }: { kind: TitleType }) {
           categoryId: categoryId || undefined,
           genreId: genreId || undefined,
           personId: personId || undefined,
+          collectionId: collectionId || undefined,
+          availability: availability || undefined,
           video: video || undefined,
           seriesStatus: seriesStatus || undefined,
           access: access || undefined,
@@ -306,6 +343,11 @@ function TitlesList({ kind }: { kind: TitleType }) {
     queryFn: ({ signal }) => peopleApi.get(personId, signal),
     enabled: personId !== '',
   });
+  const collection = useQuery({
+    queryKey: ['collections', 'detail', collectionId],
+    queryFn: ({ signal }) => collectionsApi.get(collectionId, signal),
+    enabled: collectionId !== '',
+  });
   const items = titles.data?.items ?? [];
   const filtered = Boolean(
     q ||
@@ -313,6 +355,8 @@ function TitlesList({ kind }: { kind: TitleType }) {
     categoryId ||
     genreId ||
     personId ||
+    collectionId ||
+    availability ||
     video ||
     seriesStatus ||
     access ||
@@ -459,6 +503,27 @@ function TitlesList({ kind }: { kind: TitleType }) {
         </div>
       ) : null}
 
+      {collectionId ? (
+        <div className="mb-4 flex flex-wrap items-center gap-2 rounded-lg border bg-muted/40 px-3 py-2 text-sm">
+          <Library className="size-4 text-muted-foreground" aria-hidden="true" />
+          <span>
+            {section.title} of the collection{' '}
+            <Link to={`/collections/${collectionId}`} className="font-semibold hover:underline">
+              {collection.data?.name ?? '…'}
+            </Link>
+          </span>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="ml-auto"
+            onClick={() => change({ collection: null, page: null })}
+          >
+            <X />
+            Show all
+          </Button>
+        </div>
+      ) : null}
+
       <div className="mb-4 flex flex-wrap items-center gap-2">
         <div className="relative w-full sm:w-72">
           <Search
@@ -482,6 +547,18 @@ function TitlesList({ kind }: { kind: TitleType }) {
           options={[
             { value: 'ALL', label: 'All statuses' },
             ...PUBLISH_STATUSES.map((value) => ({ value, label: humanize(value) })),
+          ]}
+        />
+        <Select
+          aria-label="Filter by availability"
+          className="w-44"
+          value={availability || 'ALL'}
+          onValueChange={(value) => change({ shown: value === 'ALL' ? null : value, page: null })}
+          options={[
+            { value: 'ALL', label: 'Any availability' },
+            { value: 'scheduled', label: 'Scheduled', description: 'The start is still to come' },
+            { value: 'current', label: 'Showing now', description: 'Inside its dates, or without' },
+            { value: 'ended', label: 'Ended', description: 'The end has passed' },
           ]}
         />
         <Select
@@ -602,6 +679,8 @@ function TitlesList({ kind }: { kind: TitleType }) {
                 category: null,
                 genre: null,
                 person: null,
+                collection: null,
+                shown: null,
                 video: null,
                 running: null,
                 access: null,

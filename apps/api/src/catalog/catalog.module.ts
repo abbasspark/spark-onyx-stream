@@ -6,6 +6,8 @@ import { ViewersModule } from '../viewers/viewers.module.js';
 import { CatalogController } from './catalog.controller.js';
 import { CategoriesService } from './categories.service.js';
 import { ImagesService } from './images.service.js';
+import { CollectionsController } from './collections.controller.js';
+import { CollectionsService } from './collections.service.js';
 import { PeopleController } from './people.controller.js';
 import { PeopleService } from './people.service.js';
 import { PublicCatalogController } from './public-catalog.controller.js';
@@ -20,8 +22,20 @@ import { TitlesService } from './titles.service.js';
  */
 @Module({
   imports: [PlaybackModule, ViewersModule, BillingModule],
-  controllers: [CatalogController, PeopleController, PublicCatalogController],
-  providers: [TitlesService, CategoriesService, ImagesService, PeopleService, PublicCatalogService],
-  exports: [TitlesService, CategoriesService, ImagesService, PeopleService],
+  controllers: [
+    CatalogController,
+    PeopleController,
+    CollectionsController,
+    PublicCatalogController,
+  ],
+  providers: [
+    TitlesService,
+    CategoriesService,
+    ImagesService,
+    PeopleService,
+    CollectionsService,
+    PublicCatalogService,
+  ],
+  exports: [TitlesService, CategoriesService, ImagesService, PeopleService, CollectionsService],
 })
 export class CatalogModule {}

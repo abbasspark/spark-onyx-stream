@@ -4,16 +4,18 @@ The catalog turns videos into things a viewer can find: movies and series with n
 
 ## Model
 
-| Thing    | What it is                                                                                                       |
-| -------- | ---------------------------------------------------------------------------------------------------------------- |
-| Title    | A movie or a series. Holds the name, texts, facts, age rating, language and publishing state                     |
-| Season   | A numbered part of a series, with an optional name, the day it was first shown and a poster                      |
-| Episode  | A numbered part of a season, with its own video, picture, air date, length and publishing state                  |
-| Genre    | What kind of story a title is: drama, thriller. Shared by all titles, one name once                              |
-| Person   | Somebody who plays in titles or makes them, with a portrait and a short biography                                |
-| Credit   | One person's part in one title: cast with the character played, or crew with the job. Credits have an order      |
-| Category | A shelf of the operator's own making that viewers browse by. Categories have an order. A title can be on several |
-| Image    | One uploaded picture: poster, backdrop, logo, episode still or portrait                                          |
+| Thing      | What it is                                                                                                                     |
+| ---------- | ------------------------------------------------------------------------------------------------------------------------------ |
+| Title      | A movie or a series. Holds the name, texts, facts, age rating, language and publishing state                                   |
+| Season     | A numbered part of a series, with an optional name, the day it was first shown and a poster                                    |
+| Episode    | A numbered part of a season, with its own video, picture, air date, length and publishing state                                |
+| Genre      | What kind of story a title is: drama, thriller. Shared by all titles, one name once                                            |
+| Person     | Somebody who plays in titles or makes them, with a portrait and a short biography                                              |
+| Credit     | One person's part in one title: cast with the character played, or crew with the job. Credits have an order                    |
+| Collection | Titles that belong together in an order: the films of a series of films, or a selection. Has its own poster, and can be hidden |
+| Extra      | A further video of a title: a second trailer, a clip, a look behind the scenes. Extras have a kind, a name and an order        |
+| Category   | A shelf of the operator's own making that viewers browse by. Categories have an order. A title can be on several               |
+| Image      | One uploaded picture: poster, backdrop, logo, episode still or portrait                                                        |
 
 A title does not contain a video. It points at an asset in the library. A movie has a main video and can have a trailer. A series can have a trailer, and each episode has its own video. Deleting a title never deletes a video.
 
@@ -44,6 +46,23 @@ A video "can be played" when it is ready and has a stream. A video stored withou
 
 One case is not blocked: an admin can delete a video in the library, or process it again, while a published title uses it. The title stays published but is hidden from viewers until it can be played again. The panel marks such a title as hidden and explains why.
 
+## Availability
+
+A title can have two dates: shown from, and shown until. Either may be empty.
+
+- **The dates only narrow publishing.** A draft stays a draft whatever its dates say. A published title outside its dates is treated like one that is not published: it is in no list, its page is not found, and nothing of it plays, its episodes and extras included.
+- **Nothing runs at the dates.** Every query compares them with the present moment, so a title appears and leaves on time without a scheduled job, and no job can be late or fail.
+- **The start counts, the end does not.** A title that ends at midnight is gone at midnight.
+- **The panel says which case it is.** A published title before its start is marked "Scheduled", after its end "Ended", and the lists filter by both.
+
+What a viewer bought or rented is not extended by this: a title outside its dates does not play for anyone.
+
+## Extras and collections
+
+**Extras** are videos of the library attached to a title beside its main video and its one trailer. Each has a kind (trailer, teaser, clip, featurette, behind the scenes, interview, bloopers), a name and a place in the order. Viewers get the ones that can be played, and play them without paying, like the trailer. Taking an extra out leaves the video in the library.
+
+**Collections** hold titles in an order. A title can be in several. A collection has a name, a synopsis, a poster and a backdrop, and a switch that hides it from viewers while it is being put together. Without a poster of its own, the panel shows the posters of its first titles. A movie imported from TMDB joins the collection TMDB puts it in ("The Matrix Collection"), which is created on the first import and found again by its id there. Deleting a collection leaves its titles in the catalog.
+
 ## Artwork
 
 - Pictures are JPEG, PNG or WebP, up to 10 MB and 8192 pixels per side.
@@ -58,30 +77,38 @@ Resized variants for small screens are not made yet.
 
 All routes are under `/v1` and need the `catalog:read` or `catalog:write` permission, except the artwork route, which is public.
 
-| Method and path                    | Purpose                                                                                                                                                            |
-| ---------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `GET /categories`                  | All categories in their order, with the number of titles                                                                                                           |
-| `POST /categories`                 | Create a category                                                                                                                                                  |
-| `PUT /categories/order`            | Set the order of all categories                                                                                                                                    |
-| `PATCH /categories/{id}`, `DELETE` | Change or delete a category                                                                                                                                        |
-| `GET /titles`                      | Page of titles. Filters: type, status, category, genre, person, series state, with or without video, search. Sorts by name, dates, release date, rating and length |
-| `POST /titles`                     | Create a draft movie or series                                                                                                                                     |
-| `GET /titles/{id}`                 | A title with seasons, episodes and the publishing checklist                                                                                                        |
-| `PATCH /titles/{id}`, `DELETE`     | Change or delete a title                                                                                                                                           |
-| `PUT /titles/{id}/status`          | Publish, unpublish or archive                                                                                                                                      |
-| `POST /titles/{id}/seasons`        | Add a season                                                                                                                                                       |
-| `PATCH /seasons/{id}`, `DELETE`    | Change or delete a season                                                                                                                                          |
-| `POST /seasons/{id}/episodes`      | Add an episode                                                                                                                                                     |
-| `PATCH /episodes/{id}`, `DELETE`   | Change, publish or delete an episode                                                                                                                               |
-| `PUT /titles/{id}/credits`         | Replace the cast and crew of a title with the list sent, in its order                                                                                              |
-| `GET /genres`, `POST /genres`      | All genres with the number of titles; create one                                                                                                                   |
-| `PATCH /genres/{id}`, `DELETE`     | Rename or delete a genre. Titles lose the genre and stay                                                                                                           |
-| `GET /people`, `POST /people`      | Page of people, searched by name; create one                                                                                                                       |
-| `GET /people/{id}`                 | A person with the titles they are in                                                                                                                               |
-| `PATCH /people/{id}`, `DELETE`     | Change or delete a person. Their credits go with them                                                                                                              |
-| `POST /images?kind=POSTER`         | Upload a picture. The request body is the file itself                                                                                                              |
-| `DELETE /images/{id}`              | Delete a picture that nothing uses                                                                                                                                 |
-| `GET /artwork/{id}.{ext}`          | The picture, public                                                                                                                                                |
+| Method and path                     | Purpose                                                                                                                                                                                                                        |
+| ----------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `GET /categories`                   | All categories in their order, with the number of titles                                                                                                                                                                       |
+| `POST /categories`                  | Create a category                                                                                                                                                                                                              |
+| `PUT /categories/order`             | Set the order of all categories                                                                                                                                                                                                |
+| `PATCH /categories/{id}`, `DELETE`  | Change or delete a category                                                                                                                                                                                                    |
+| `GET /titles`                       | Page of titles. Filters: type, status, category, genre, person, series state, with or without video, collection, availability (`scheduled`, `current`, `ended`), search. Sorts by name, dates, release date, rating and length |
+| `POST /titles`                      | Create a draft movie or series                                                                                                                                                                                                 |
+| `GET /titles/{id}`                  | A title with seasons, episodes and the publishing checklist                                                                                                                                                                    |
+| `PATCH /titles/{id}`, `DELETE`      | Change or delete a title                                                                                                                                                                                                       |
+| `PUT /titles/{id}/status`           | Publish, unpublish or archive                                                                                                                                                                                                  |
+| `POST /titles/{id}/seasons`         | Add a season                                                                                                                                                                                                                   |
+| `PATCH /seasons/{id}`, `DELETE`     | Change or delete a season                                                                                                                                                                                                      |
+| `POST /seasons/{id}/episodes`       | Add an episode                                                                                                                                                                                                                 |
+| `PATCH /episodes/{id}`, `DELETE`    | Change, publish or delete an episode                                                                                                                                                                                           |
+| `PUT /titles/{id}/credits`          | Replace the cast and crew of a title with the list sent, in its order                                                                                                                                                          |
+| `POST /titles/{id}/extras`          | Add a video of the library to the extras of a title                                                                                                                                                                            |
+| `PUT /titles/{id}/extras/order`     | Set the order of the extras                                                                                                                                                                                                    |
+| `PATCH /extras/{id}`, `DELETE`      | Change the kind or name of an extra, or take it out                                                                                                                                                                            |
+| `GET /collections`, `POST`          | All collections in their order; create one                                                                                                                                                                                     |
+| `PUT /collections/order`            | Set the order of all collections                                                                                                                                                                                               |
+| `GET /collections/{id}`             | A collection with its titles                                                                                                                                                                                                   |
+| `PATCH /collections/{id}`, `DELETE` | Change or delete a collection                                                                                                                                                                                                  |
+| `PUT /collections/{id}/titles`      | Set the titles of a collection and their order                                                                                                                                                                                 |
+| `GET /genres`, `POST /genres`       | All genres with the number of titles; create one                                                                                                                                                                               |
+| `PATCH /genres/{id}`, `DELETE`      | Rename or delete a genre. Titles lose the genre and stay                                                                                                                                                                       |
+| `GET /people`, `POST /people`       | Page of people, searched by name; create one                                                                                                                                                                                   |
+| `GET /people/{id}`                  | A person with the titles they are in                                                                                                                                                                                           |
+| `PATCH /people/{id}`, `DELETE`      | Change or delete a person. Their credits go with them                                                                                                                                                                          |
+| `POST /images?kind=POSTER`          | Upload a picture. The request body is the file itself                                                                                                                                                                          |
+| `DELETE /images/{id}`               | Delete a picture that nothing uses                                                                                                                                                                                             |
+| `GET /artwork/{id}.{ext}`           | The picture, public                                                                                                                                                                                                            |
 
 Changes to the catalog are written to the audit log.
 
@@ -89,15 +116,18 @@ Changes to the catalog are written to the audit log.
 
 The viewer website and the apps read the catalog through `/v1/catalog`. No sign-in is needed.
 
-| Method and path                                | Purpose                                                                                              |
-| ---------------------------------------------- | ---------------------------------------------------------------------------------------------------- |
-| `GET /catalog/home`                            | Rows for the home page: featured, new, then one row per category                                     |
-| `GET /catalog/categories`                      | Categories that have something to show, with the number of titles                                    |
-| `GET /catalog/titles`                          | Page of titles. Filters: `type`, `category` (slug), `featured`, `q`. Sorts: `newest`, `name`, `year` |
-| `GET /catalog/titles/{slug}`                   | One title, for a series with its seasons and episodes                                                |
-| `POST /catalog/titles/{slug}/playback`         | Signed addresses for playing a movie                                                                 |
-| `POST /catalog/titles/{slug}/trailer/playback` | The same for the trailer                                                                             |
-| `POST /catalog/episodes/{id}/playback`         | The same for an episode                                                                              |
+| Method and path                                    | Purpose                                                                                              |
+| -------------------------------------------------- | ---------------------------------------------------------------------------------------------------- |
+| `GET /catalog/home`                                | Rows for the home page: featured, new, then one row per category                                     |
+| `GET /catalog/categories`                          | Categories that have something to show, with the number of titles                                    |
+| `GET /catalog/titles`                              | Page of titles. Filters: `type`, `category` (slug), `featured`, `q`. Sorts: `newest`, `name`, `year` |
+| `GET /catalog/titles/{slug}`                       | One title, for a series with its seasons and episodes                                                |
+| `POST /catalog/titles/{slug}/playback`             | Signed addresses for playing a movie                                                                 |
+| `POST /catalog/titles/{slug}/trailer/playback`     | The same for the trailer                                                                             |
+| `POST /catalog/titles/{slug}/extras/{id}/playback` | The same for one of the extras                                                                       |
+| `GET /catalog/collections`                         | Collections that are shown and hold at least one visible title                                       |
+| `GET /catalog/collections/{slug}`                  | A collection with its visible titles, in its order                                                   |
+| `POST /catalog/episodes/{id}/playback`             | The same for an episode                                                                              |
 
 - **Only what can be watched is returned.** Every query uses one filter: the title is published, and a movie's video can be played, or a series has at least one published episode whose video can be played. Seasons and episodes without something to watch are left out, and the counts follow.
 - **A draft answers exactly like a title that does not exist.** A request cannot find out which slugs are in use.
@@ -165,9 +195,9 @@ All need `catalog:write`, except the first, which needs `catalog:read`.
 ## Not built yet
 
 - Renting or buying a single title. Subscriptions are in `phase-3-billing.md`
-- Pages in the panel to manage all people and all genres in one place: today they are edited from a title
-- Genres, facts and people on the viewer website and in the public catalog API
-- Several trailers and extras per title, collections, dates between which a title is available, and texts in more than one language
+- Genres, facts, people, extras and collections on the viewer website. The public catalog API has extras and collections; genres, facts and people are not in it yet
+- Texts of a title in more than one language
+- Extras from the source: an import brings no trailers
 - Collections and rows for the home page
 - Other sources than TMDB, and importing many titles at once
 - Trailers from the source. A trailer is a video of your own library

@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 import type { TitleType } from '@onyx/database';
 import type {
+  ImportedCollection,
   ImportedCredit,
   ImportedFacts,
   ImportedSeasonSummary,
@@ -421,6 +422,22 @@ export function toImportedTitle(
     seasons: kind === 'tv' ? seasonsOf(details) : [],
     ...factsOf(kind, details),
     credits: creditsOf(kind, details),
+    collection: collectionOf(details),
+  };
+}
+
+/** The series of films a movie belongs to, when the source names one. */
+export function collectionOf(details: TmdbDetails): ImportedCollection | null {
+  const collection = details.belongs_to_collection;
+  const name = cleanText(collection?.name, 200);
+  if (!collection || !name || !Number.isSafeInteger(collection.id) || Number(collection.id) <= 0) {
+    return null;
+  }
+  return {
+    id: String(collection.id),
+    name,
+    poster: safeImagePath(collection.poster_path),
+    backdrop: safeImagePath(collection.backdrop_path),
   };
 }
 

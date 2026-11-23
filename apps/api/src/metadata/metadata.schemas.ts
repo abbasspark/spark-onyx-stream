@@ -40,6 +40,8 @@ const parts = {
   people: z.boolean().default(true),
   /** A picture of each person who has none yet. */
   portraits: z.boolean().default(true),
+  /** Movies: puts the title into the series of films it is part of, creating the collection when new. */
+  collection: z.boolean().default(true),
   /** Genres also become categories of the same name. */
   categories: z.boolean().default(true),
   /** Creates a category for a genre that has none of the same name. */
