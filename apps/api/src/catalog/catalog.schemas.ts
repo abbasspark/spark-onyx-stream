@@ -102,7 +102,8 @@ const price = z
   .max(100_000_000)
   .nullable();
 
-export const listTitlesSchema = paginationSchema.extend({
+/** What narrows a list of titles down. Also says which titles something is done to in bulk. */
+export const titleFiltersSchema = z.object({
   type: z.enum(TITLE_TYPES).optional(),
   status: z.enum(PUBLISH_STATUSES).optional(),
   categoryId: z.uuid().optional(),
@@ -125,6 +126,11 @@ export const listTitlesSchema = paginationSchema.extend({
   packaged: z.enum(['none']).optional(),
   /** Matches the name and the original name, ignoring case. */
   q: z.string().trim().min(1).max(200).optional(),
+});
+export type TitleFilters = z.infer<typeof titleFiltersSchema>;
+
+export const listTitlesSchema = paginationSchema.extend({
+  ...titleFiltersSchema.shape,
   sort: z.enum(TITLE_SORT_FIELDS).default('createdAt'),
   order: z.enum(['asc', 'desc']).default('desc'),
 });

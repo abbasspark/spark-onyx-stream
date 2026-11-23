@@ -56,7 +56,10 @@ import type {
   WatchPlaceInput,
   WatchPlaceTest,
   WatchSummary,
+  BulkAction,
+  BulkResult,
   Translation,
+  TranslationJob,
   TranslationInput,
   Category,
   CreateAdminInput,
@@ -356,6 +359,21 @@ export interface TitleListQuery {
   sort?: TitleSortField;
   order?: SortOrder;
 }
+
+/** What narrows the list of titles, without the page and the order. */
+export type TitleFilters = Omit<TitleListQuery, 'page' | 'pageSize' | 'sort' | 'order'>;
+
+export const bulkApi = {
+  /** One action on titles named one by one, or on everything the filters match. */
+  run: (body: { ids?: string[]; filter?: TitleFilters; action: BulkAction }) =>
+    request<BulkResult>('/v1/titles/bulk', { method: 'POST', body }),
+};
+
+export const translationJobsApi = {
+  list: (signal?: AbortSignal) => request<TranslationJob[]>('/v1/translation-jobs', { signal }),
+  cancel: (id: string) =>
+    request<TranslationJob>(`/v1/translation-jobs/${id}/cancel`, { method: 'POST' }),
+};
 
 export const metadataApi = {
   status: (signal?: AbortSignal) => request<MetadataStatus>('/v1/metadata', { signal }),

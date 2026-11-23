@@ -84,6 +84,42 @@ The texts of a title are written in one language, the language of the catalog. A
 
 On the public side, `language` is accepted by `GET /catalog/home`, `/catalog/titles`, `/catalog/titles/{slug}`, `/catalog/collections/{slug}` and `/catalog/people/{slug}`. `GET /catalog/languages` says which languages are on offer: the catalog's own, and those at least one visible title is translated into.
 
+## Many titles at once
+
+On the lists of movies and series, titles can be selected and changed together.
+
+- **Which titles:** the ones ticked, on this page and on others (up to 500), or **everything the filters match**, which also means what is on pages nobody opened. One action changes 5,000 titles at most.
+- **What can be done:** publish, unpublish, archive, delete, feature or stop featuring; add to or take out of categories, genres and collections; set, change or remove the start and the end of the availability; and translate into a language.
+- **The rules of one title hold for many.** Each title goes through the same checks as a change made in its editor: a title with open points on its checklist is not published, a published title is not deleted. A title that cannot be changed is named with its reason, the others go on, and in the panel the ones that failed stay selected.
+- **Adding and taking out touches only what was ticked.** A title that is put into a genre keeps its other genres. In a collection it goes to the end and keeps its place in the others.
+- **Each date can be left alone.** The start of many titles can be set without touching their ends. A title whose own other date does not fit is left as it is and named.
+- **The log gets one line per action,** with what was done, to how many, and how the titles were chosen.
+
+### Translating many titles
+
+"Translate" fills in a language for every selected title that was imported from TMDB: the name, tagline and synopsis, and those of its seasons and episodes. It asks TMDB once per title, and once more per season of a series, so it does not happen in the request: a **job** is queued and worked off in the background, fifteen titles per look, and the panel shows how far it is.
+
+- **Empty texts are filled, nothing is replaced,** unless the job is told to replace. What an editor wrote stays.
+- **A title that was not imported is passed over,** and counted as such. A title TMDB does not know, or that fails for a reason of its own, is named with the reason and the job goes on.
+- **When TMDB does not answer,** the job waits and tries the same title again at the next look. After five looks without an answer it stops, keeps what it did, and says why.
+- **A job can be stopped.** Titles it finished keep their texts. After a restart of the server a job goes on from where it was.
+- Jobs run one after the other, the oldest first, in one API process at a time.
+
+| Method and path                      | Purpose                                                                                                  |
+| ------------------------------------ | -------------------------------------------------------------------------------------------------------- |
+| `POST /titles/bulk`                  | One action on titles named by `ids`, or on all that a `filter` matches. Answers with counts and failures |
+| `GET /translation-jobs`              | The newest jobs with their progress. `?active=true` keeps those waiting or running                       |
+| `POST /translation-jobs/{id}/cancel` | Stop a job                                                                                               |
+
+```json
+{
+  "filter": { "type": "MOVIE", "status": "PUBLISHED" },
+  "action": { "type": "translate", "language": "de" }
+}
+```
+
+The filter takes what `GET /titles` takes, without the page and the order. Actions are `publish`, `unpublish`, `archive`, `delete`, `feature` (`value`), `categories`, `genres` and `collections` (`add`, `remove`), `availability` (`availableFrom`, `availableUntil`; left out: unchanged, `null`: removed) and `translate` (`language`, `overwrite`).
+
 ## Artwork
 
 - Pictures are JPEG, PNG or WebP, up to 10 MB and 8192 pixels per side.
@@ -175,6 +211,7 @@ Browsing the catalog works in every case. With `open`, publishing a title makes 
 ## Admin panel
 
 - **Titles:** a wall of posters or a table, tabs for movies and series, search, filters for status and category, sorting.
+- **Selection:** tick boxes on posters and rows, a range with Shift, the whole page, or everything that matches the filters. A bar at the bottom of the screen holds the actions, and a card above the list shows translations in progress.
 - **Title editor:** details with one save button and a warning before unsaved changes are lost, videos and artwork that save as they are chosen, seasons and episodes for a series, and a publishing card with the checklist.
 - **Categories:** create, edit, delete and reorder.
 - The dashboard shows the number of titles, and the command palette can start a new title.

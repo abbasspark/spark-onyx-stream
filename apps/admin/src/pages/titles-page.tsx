@@ -19,7 +19,15 @@ import {
   UserRound,
   X,
 } from 'lucide-react';
-import { type FormEvent, type ReactNode, useEffect, useState } from 'react';
+import {
+  type FormEvent,
+  type MouseEvent,
+  type ReactNode,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import { Link, useNavigate } from 'react-router';
 import { toast } from 'sonner';
 import { apiUrl } from '@/api/client';
@@ -29,6 +37,7 @@ import {
   genresApi,
   packagesApi,
   peopleApi,
+  type TitleFilters,
   titlesApi,
 } from '@/api/endpoints';
 import {
@@ -36,6 +45,7 @@ import {
   SERIES_STATUSES,
   TITLE_SORT_FIELDS,
   type Availability,
+  type BulkResult,
   type PublishStatus,
   type SeriesStatus,
   type SortOrder,
@@ -45,7 +55,9 @@ import {
   type TitleType,
 } from '@/api/types';
 import { useSession } from '@/auth/session';
+import { BulkBar, type BulkTarget } from '@/components/bulk-actions';
 import { useConfirm } from '@/components/confirm';
+import { TranslationJobs } from '@/components/translation-jobs';
 import { Button } from '@/components/ui/button';
 import {
   Badge,
@@ -61,7 +73,7 @@ import {
   Th,
   Tr,
 } from '@/components/ui/display';
-import { Field, Input, Select } from '@/components/ui/form';
+import { Checkbox, Field, Input, Select } from '@/components/ui/form';
 import {
   Dialog,
   DialogBody,
@@ -87,6 +99,7 @@ import {
 import { MetadataDialog } from '@/components/metadata-dialog';
 import { useAddressParams } from '@/lib/address-params';
 import { announceImport } from '@/lib/metadata-toast';
+import { MAX_CHOSEN, rangeOf } from '@/lib/bulk';
 import { cn } from '@/lib/cn';
 import { formatDateTime, formatRelative, humanize } from '@/lib/format';
 
@@ -276,51 +289,42 @@ function TitlesList({ kind }: { kind: TitleType }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [search]);
 
-  const titles = useQuery({
-    queryKey: [
-      'titles',
-      'list',
-      {
-        page,
-        type,
-        status,
-        categoryId,
-        genreId,
-        personId,
-        collectionId,
-        availability,
-        video,
-        seriesStatus,
-        access,
-        packageFilter,
-        q,
-        sort,
-        order,
-      },
+  // What narrows the list. The same object tells an action what "all that match" means.
+  const filters = useMemo<TitleFilters>(
+    () => ({
+      type,
+      status: status || undefined,
+      categoryId: categoryId || undefined,
+      genreId: genreId || undefined,
+      personId: personId || undefined,
+      collectionId: collectionId || undefined,
+      availability: availability || undefined,
+      video: video || undefined,
+      seriesStatus: seriesStatus || undefined,
+      access: access || undefined,
+      packageId: packageFilter && packageFilter !== 'none' ? packageFilter : undefined,
+      packaged: packageFilter === 'none' ? 'none' : undefined,
+      q: q || undefined,
+    }),
+    [
+      type,
+      status,
+      categoryId,
+      genreId,
+      personId,
+      collectionId,
+      availability,
+      video,
+      seriesStatus,
+      access,
+      packageFilter,
+      q,
     ],
+  );
+  const titles = useQuery({
+    queryKey: ['titles', 'list', { page, ...filters, sort, order }],
     queryFn: ({ signal }) =>
-      titlesApi.list(
-        {
-          page,
-          pageSize: PAGE_SIZE,
-          type,
-          status: status || undefined,
-          categoryId: categoryId || undefined,
-          genreId: genreId || undefined,
-          personId: personId || undefined,
-          collectionId: collectionId || undefined,
-          availability: availability || undefined,
-          video: video || undefined,
-          seriesStatus: seriesStatus || undefined,
-          access: access || undefined,
-          packageId: packageFilter && packageFilter !== 'none' ? packageFilter : undefined,
-          packaged: packageFilter === 'none' ? 'none' : undefined,
-          q: q || undefined,
-          sort,
-          order,
-        },
-        signal,
-      ),
+      titlesApi.list({ page, pageSize: PAGE_SIZE, ...filters, sort, order }, signal),
     placeholderData: keepPreviousData,
   });
   const categories = useQuery({
@@ -361,6 +365,71 @@ function TitlesList({ kind }: { kind: TitleType }) {
     seriesStatus ||
     access ||
     packageFilter,
+  );
+
+  // --- Selection ------------------------------------------------------------------
+  // Chosen titles are kept over the pages. "All" means everything the filters match.
+  const [chosen, setChosen] = useState<ReadonlySet<string>>(new Set());
+  const [all, setAll] = useState(false);
+  const lastPicked = useRef<string | null>(null);
+  const clearSelection = () => {
+    setChosen(new Set());
+    setAll(false);
+    lastPicked.current = null;
+  };
+  // Other filters mean other titles: what was chosen under the old ones is let go.
+  useEffect(clearSelection, [filters]);
+
+  const total = titles.data?.total ?? 0;
+  const pageIds = items.map((title) => title.id);
+  const isSelected = (id: string) => all || chosen.has(id);
+  const selecting = mayWrite && (all || chosen.size > 0);
+  const pageState: boolean | 'indeterminate' =
+    all || (pageIds.length > 0 && pageIds.every((id) => chosen.has(id)))
+      ? true
+      : pageIds.some((id) => chosen.has(id))
+        ? 'indeterminate'
+        : false;
+
+  const choose = (ids: readonly string[], on: boolean) => {
+    // Out of "all", the titles of this page stay chosen, without the one unticked.
+    const next = new Set(all ? pageIds : chosen);
+    for (const id of ids) {
+      if (on) {
+        next.add(id);
+      } else {
+        next.delete(id);
+      }
+    }
+    if (next.size > MAX_CHOSEN) {
+      toast.message(
+        `${MAX_CHOSEN} can be chosen one by one. For more, filter the list and select all that match.`,
+      );
+      return;
+    }
+    setAll(false);
+    setChosen(next);
+  };
+  /** A click on a tick box. With Shift, everything from the last one to this one. */
+  const pick = (id: string, event: MouseEvent) => {
+    const on = !isSelected(id);
+    choose(event.shiftKey ? rangeOf(pageIds, lastPicked.current, id) : [id], on);
+    lastPicked.current = id;
+  };
+  const target: BulkTarget = all ? { filter: filters } : { ids: [...chosen] };
+  const afterBulk = (result: BulkResult) => {
+    // What could not be changed stays selected, to be dealt with and tried again.
+    const failed = result.failures.map((failure) => failure.titleId);
+    setAll(false);
+    setChosen(new Set(result.action === 'translate' ? [] : failed));
+  };
+  const tick = (title: TitleSummary, className?: string) => (
+    <Checkbox
+      checked={isSelected(title.id)}
+      aria-label={`Select ${title.name}`}
+      onClick={(event) => pick(title.id, event)}
+      className={cn('size-[18px]', className)}
+    />
   );
 
   const remove = useMutation({
@@ -523,6 +592,8 @@ function TitlesList({ kind }: { kind: TitleType }) {
           </Button>
         </div>
       ) : null}
+
+      <TranslationJobs className="mb-4" />
 
       <div className="mb-4 flex flex-wrap items-center gap-2">
         <div className="relative w-full sm:w-72">
@@ -695,8 +766,21 @@ function TitlesList({ kind }: { kind: TitleType }) {
           </Button>
         ) : null}
 
+        {mayWrite && items.length > 0 ? (
+          <label className="ml-auto flex h-9 cursor-pointer items-center gap-2 rounded-md border bg-card px-3 text-[13px] font-medium shadow-xs select-none hover:bg-accent">
+            <Checkbox
+              checked={pageState}
+              aria-label="Select everything on this page"
+              onCheckedChange={(checked) => choose(pageIds, checked === true)}
+            />
+            Select page
+          </label>
+        ) : null}
         <div
-          className="ml-auto flex rounded-md border bg-card p-0.5 shadow-xs"
+          className={cn(
+            'flex rounded-md border bg-card p-0.5 shadow-xs',
+            !(mayWrite && items.length > 0) && 'ml-auto',
+          )}
           role="group"
           aria-label="View"
         >
@@ -749,15 +833,45 @@ function TitlesList({ kind }: { kind: TitleType }) {
           {items.map((title) => (
             <li
               key={title.id}
-              className="group relative flex flex-col overflow-hidden rounded-xl border bg-card shadow-xs transition-shadow hover:shadow-md"
+              className={cn(
+                'group relative flex flex-col overflow-hidden rounded-xl border bg-card shadow-xs transition-shadow hover:shadow-md',
+                selecting && isSelected(title.id) && 'border-primary ring-2 ring-primary/40',
+              )}
             >
-              <Link to={titlePath(title)} tabIndex={-1} aria-hidden="true" className="block">
+              <Link
+                to={titlePath(title)}
+                tabIndex={-1}
+                aria-hidden="true"
+                className="block"
+                // While titles are being selected, a click on a poster selects as well.
+                onClick={
+                  selecting
+                    ? (event) => {
+                        event.preventDefault();
+                        pick(title.id, event);
+                      }
+                    : undefined
+                }
+              >
                 <PosterArt title={title} className="aspect-[2/3]" />
               </Link>
               <div className="pointer-events-none absolute inset-x-2 top-2 flex items-start justify-between gap-2">
-                {/* A solid backing keeps the labels readable on any artwork. */}
-                <span className="rounded-full bg-card shadow-sm">
-                  <TitleStatus title={title} />
+                <span className="flex items-center gap-1.5">
+                  {mayWrite ? (
+                    // Shown on hover, and always on touch screens and while selecting.
+                    <span
+                      className={cn(
+                        'pointer-events-auto flex size-6 items-center justify-center rounded-md bg-card shadow-sm transition-opacity focus-within:opacity-100 pointer-coarse:opacity-100 sm:opacity-0 sm:group-hover:opacity-100',
+                        selecting && 'sm:opacity-100',
+                      )}
+                    >
+                      {tick(title)}
+                    </span>
+                  ) : null}
+                  {/* A solid backing keeps the labels readable on any artwork. */}
+                  <span className="rounded-full bg-card shadow-sm">
+                    <TitleStatus title={title} />
+                  </span>
                 </span>
                 {title.isFeatured ? (
                   <span
@@ -819,6 +933,16 @@ function TitlesList({ kind }: { kind: TitleType }) {
           <Table>
             <thead>
               <tr>
+                {mayWrite ? (
+                  <Th className="w-10 pr-0">
+                    <Checkbox
+                      checked={pageState}
+                      aria-label="Select everything on this page"
+                      onCheckedChange={(checked) => choose(pageIds, checked === true)}
+                      className="size-[18px]"
+                    />
+                  </Th>
+                ) : null}
                 {(
                   [
                     ['name', isSeries ? 'Series' : 'Movie'],
@@ -865,7 +989,11 @@ function TitlesList({ kind }: { kind: TitleType }) {
             </thead>
             <tbody>
               {items.map((title) => (
-                <Tr key={title.id} className="group">
+                <Tr
+                  key={title.id}
+                  className={cn('group', selecting && isSelected(title.id) && 'bg-primary/5')}
+                >
+                  {mayWrite ? <Td className="w-10 pr-0">{tick(title)}</Td> : null}
                   <Td>
                     <div className="flex items-center gap-3">
                       <PosterArt title={title} className="aspect-[2/3] w-9 shrink-0 rounded" />
@@ -952,6 +1080,27 @@ function TitlesList({ kind }: { kind: TitleType }) {
           pageSize={PAGE_SIZE}
           total={titles.data.total}
           onChange={(next) => change({ page: next === 1 ? null : String(next) })}
+        />
+      ) : null}
+
+      {selecting ? (
+        <BulkBar
+          kind={kind}
+          nouns={section}
+          chosen={chosen.size}
+          all={all}
+          total={total}
+          target={target}
+          onSelectAll={
+            !all && total > chosen.size
+              ? () => {
+                  setAll(true);
+                  setChosen(new Set());
+                }
+              : null
+          }
+          onClear={clearSelection}
+          onDone={afterBulk}
         />
       ) : null}
 
