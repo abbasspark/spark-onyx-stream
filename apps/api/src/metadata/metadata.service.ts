@@ -29,6 +29,7 @@ import {
   type ImportedTitle,
   type ImportReport,
   type ImportResult,
+  type SourceTranslation,
   METADATA_SOURCE,
   type MetadataPreview,
   type MetadataSearchResult,
@@ -231,6 +232,74 @@ export class MetadataService {
     const imported = await this.fetchTitle(input.id, language);
     const report = await this.apply(titleId, imported, language, input, input.overwrite);
     return { title: await this.titles.get(titleId), report };
+  }
+
+  /**
+   * Reads the texts of an imported title from the source in another language.
+   * Changes nothing: the admin looks at them and saves the translation.
+   *
+   * The source answers in its default language where it has no translation.
+   * Texts that equal the title's own are left out, so such an answer does not
+   * pass for a translation.
+   *
+   * @throws ConflictException when the title was not imported.
+   */
+  async sourceTranslation(titleId: string, language: string): Promise<SourceTranslation> {
+    const title = await this.prisma.title.findUnique({
+      where: { id: titleId },
+      include: { seasons: { include: { episodes: true } } },
+    });
+    if (!title) {
+      throw new NotFoundException('Title not found');
+    }
+    if (title.metadataSource !== METADATA_SOURCE || !title.metadataId) {
+      throw new ConflictException(
+        'This title was not imported, so the source has no texts for it. Import its details first',
+      );
+    }
+    const imported = await this.fetchTitle(title.metadataId, language);
+    const other = (value: string | null, own: string | null) =>
+      value && value !== own ? value : null;
+    const result: SourceTranslation = {
+      language,
+      name: other(imported.name, title.name),
+      tagline: other(imported.tagline, title.tagline),
+      synopsis: other(imported.synopsis, title.synopsis),
+      seasons: [],
+      episodes: [],
+      warnings: [],
+    };
+    const sourceId = parseMetadataId(title.metadataId)?.id as number;
+    for (const season of imported.type === 'SERIES' ? title.seasons : []) {
+      let detail;
+      try {
+        detail = await this.tmdb.season(sourceId, season.number, language);
+      } catch (error) {
+        result.warnings.push(`Season ${season.number} could not be read from TMDB`);
+        this.logger.warn(`Reading season ${season.number} failed: ${(error as Error).message}`);
+        continue;
+      }
+      const name = other(seasonNameOf(detail.name, season.number), season.name);
+      const synopsis = other(episodesOfSeasonSynopsis(detail.overview), season.synopsis);
+      if (name || synopsis) {
+        result.seasons.push({ id: season.id, name, synopsis });
+      }
+      const byNumber = new Map(season.episodes.map((episode) => [episode.number, episode]));
+      for (const episode of episodesOf(detail.episodes)) {
+        const own = byNumber.get(episode.number);
+        if (!own) {
+          continue;
+        }
+        // "Episode 3", "Folge 3": one word and a number is a placeholder of the source, not a name.
+        const placeholder = /^\S+ \d+$/.test(episode.name);
+        const episodeName = placeholder ? null : other(episode.name, own.name);
+        const episodeSynopsis = other(episode.synopsis, own.synopsis);
+        if (episodeName || episodeSynopsis) {
+          result.episodes.push({ id: own.id, name: episodeName, synopsis: episodeSynopsis });
+        }
+      }
+    }
+    return result;
   }
 
   // --- The import itself --------------------------------------------------------

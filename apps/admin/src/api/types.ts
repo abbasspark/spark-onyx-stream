@@ -565,6 +565,8 @@ export interface TitleDetail extends TitleSummary {
   /** More videos around the title, in their order. */
   extras: Extra[];
   collections: { id: string; name: string }[];
+  /** The languages the title is translated into, as tags such as "de". */
+  translations: string[];
   /** Where the details were imported from. Null for a title typed by hand. */
   metadata: { source: string; id: string; language: string | null; syncedAt: string | null } | null;
   seasons: Season[];
@@ -1610,3 +1612,38 @@ export interface CollectionDetail extends Collection {
 }
 
 export type Availability = 'scheduled' | 'current' | 'ended';
+
+/** The texts of a season or an episode in one language. Null: not translated. */
+export interface PartTranslation {
+  id: string;
+  name: string | null;
+  synopsis: string | null;
+}
+
+/** Everything a title says in one more language. */
+export interface Translation {
+  language: string;
+  name: string | null;
+  tagline: string | null;
+  synopsis: string | null;
+  seasons: PartTranslation[];
+  episodes: PartTranslation[];
+  /** How many texts are translated, of how many the title has. */
+  filled: number;
+  total: number;
+  updatedAt: string;
+}
+
+export interface TranslationInput {
+  name: string | null;
+  tagline: string | null;
+  synopsis: string | null;
+  seasons: PartTranslation[];
+  episodes: PartTranslation[];
+}
+
+/** What the source says about a title in another language. */
+export interface SourceTranslation extends TranslationInput {
+  language: string;
+  warnings: string[];
+}

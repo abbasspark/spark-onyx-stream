@@ -69,6 +69,8 @@ const ACTION_LABELS: Record<string, string> = {
   'title.extra.add': 'Added an extra to a title',
   'title.extra.update': 'Changed an extra of a title',
   'title.extra.remove': 'Took an extra out of a title',
+  'title.translation.save': 'Saved a translation of a title',
+  'title.translation.delete': 'Removed a translation of a title',
   'collection.create': 'Created a collection',
   'collection.update': 'Changed a collection',
   'collection.titles': 'Changed the titles of a collection',

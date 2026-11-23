@@ -695,3 +695,17 @@ This replaces the "plain CSS without a component library" part of D-018.
 **Why:** the usual way to schedule is a job that flips the state at the right minute. Then there are two truths, the date and the state, and a job that did not run makes them disagree in the one direction that hurts: a licence has ended and the film is still up. With the dates inside the rule, there is one truth and nothing to run. It costs two comparisons per query on indexed columns. Keeping "published" separate from the dates also keeps the meaning of the button: publishing is the decision that a title is finished, the dates say when. The trailer was left alone because the website, the apps to come and the publishing checklist know it as the one video that introduces a title; turning it into the first row of a list would have changed all of them for no gain. Collections get an order and a poster because they are shown as a thing of their own, which a category, being a filter, is not.
 
 **Consequence:** public answers are cached for a short time, so a title can appear or leave some seconds after its date. What a viewer rented does not play after the end of the title's availability; an operator who sells rentals has to set the end with that in mind. A title is in a collection once, so the same film cannot appear twice in one. Extras are not imported from the source: its trailers are videos on other sites, and the catalog only plays its own.
+
+## D-054 Translations are rows beside a title, and fall back field by field
+
+**Date:** 2026-11-23
+
+- **The title keeps its texts in its own columns.** Other languages are rows in tables of their own, one per title, season or episode and language.
+- **Every field falls back on its own** to the language of the catalog.
+- **A language is a tag, and exists by being used.** There is no table of languages and no setting that lists them.
+- **Viewers name the language in the address** (`?language=de`), not in a header.
+- **The source fills a form, not the database.**
+
+**Why:** moving every text into a translations table, the catalog's own language included, is the tidy model, and it would have turned every query that reads a name into a join and every existing installation into a migration of its texts. Almost all reads want the catalog's language, so that stays where it is cheap, and the other languages cost one extra look-up only when one is asked for. Falling back per field matches how translations are really made: the name first, the synopsis later, the episodes of season four never. A whole-row fallback would show an English synopsis as missing the moment a German name is typed. A list of allowed languages would be one more thing to set up before the first translation, and it would be wrong the day a title arrives in a language nobody listed. The language is in the address because public answers are cached, and a cache keyed by address serves the right language without knowing about headers. Texts from the source go into the form because machine-matched texts are sometimes wrong, an answer in the wrong language being the common case, and a person looking before saving is the cheap check.
+
+**Consequence:** the slug is the same in every language, so addresses are not translated. Names of categories, genres, collections and people are not translated yet. Sorting by name and the admin's own search use the catalog's language. Two admins saving the same language of a title overwrite each other as a whole. The viewer website has no language switch yet: the API is ready for one.

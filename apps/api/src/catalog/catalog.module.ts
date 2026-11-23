@@ -12,6 +12,8 @@ import { PeopleController } from './people.controller.js';
 import { PeopleService } from './people.service.js';
 import { PublicCatalogController } from './public-catalog.controller.js';
 import { PublicCatalogService } from './public-catalog.service.js';
+import { TranslationsController } from './translations.controller.js';
+import { TranslationsService } from './translations.service.js';
 import { TitlesService } from './titles.service.js';
 
 /**
@@ -26,6 +28,7 @@ import { TitlesService } from './titles.service.js';
     CatalogController,
     PeopleController,
     CollectionsController,
+    TranslationsController,
     PublicCatalogController,
   ],
   providers: [
@@ -34,8 +37,16 @@ import { TitlesService } from './titles.service.js';
     ImagesService,
     PeopleService,
     CollectionsService,
+    TranslationsService,
     PublicCatalogService,
   ],
-  exports: [TitlesService, CategoriesService, ImagesService, PeopleService, CollectionsService],
+  exports: [
+    TitlesService,
+    CategoriesService,
+    ImagesService,
+    PeopleService,
+    CollectionsService,
+    TranslationsService,
+  ],
 })
 export class CatalogModule {}

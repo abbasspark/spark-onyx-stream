@@ -23,6 +23,7 @@ import {
   VISIBLE_EPISODE,
   visibleTitle,
 } from './playable.js';
+import { languageChain } from './language.js';
 import type { ListPublicTitlesInput } from './public-catalog.schemas.js';
 import {
   type PublicCategory,
@@ -35,6 +36,7 @@ import {
   toPublicCard,
   toPublicImage,
 } from './public-catalog.views.js';
+import { TranslationsService } from './translations.service.js';
 
 /** Who asks for playback: a signed-in viewer, or null for a visitor. */
 export type Watcher = { viewerId: string; emailVerified: boolean } | null;
@@ -93,6 +95,7 @@ export class PublicCatalogService {
     @Inject(PlaybackService) private readonly playback: PlaybackService,
     @Inject(SubscriptionsService) private readonly subscriptions: SubscriptionsService,
     @Inject(PurchasesService) private readonly purchases: PurchasesService,
+    @Inject(TranslationsService) private readonly translations: TranslationsService,
   ) {}
 
   async list(input: ListPublicTitlesInput): Promise<Page<PublicTitleCard>> {
@@ -111,6 +114,19 @@ export class PublicCatalogService {
               OR: [
                 { name: { contains: input.q, mode: 'insensitive' } },
                 { originalName: { contains: input.q, mode: 'insensitive' } },
+                // A viewer searches in the language they read the names in.
+                ...(input.language
+                  ? [
+                      {
+                        translations: {
+                          some: {
+                            language: { in: languageChain(input.language) },
+                            name: { contains: input.q, mode: 'insensitive' as const },
+                          },
+                        },
+                      },
+                    ]
+                  : []),
               ],
             }
           : {},
@@ -127,14 +143,17 @@ export class PublicCatalogService {
       this.prisma.title.count({ where }),
     ]);
     return toPage(
-      titles.map((title) => toPublicCard(title, this.config.mediaBaseUrl)),
+      await this.translations.localizeCards(
+        titles.map((title) => toPublicCard(title, this.config.mediaBaseUrl)),
+        input.language,
+      ),
       total,
       input,
     );
   }
 
   /** @throws NotFoundException when no visible title has this slug. */
-  async get(slug: string): Promise<PublicTitleDetail> {
+  async get(slug: string, language?: string): Promise<PublicTitleDetail> {
     const title = await this.prisma.title.findFirst({
       where: { slug, ...visibleTitle() },
       include: {
@@ -170,10 +189,14 @@ export class PublicCatalogService {
           })
         : [];
 
+    const translated = await this.translations.forTitle(title.id, language);
+    const card = toPublicCard(title, this.config.mediaBaseUrl);
     return {
-      ...toPublicCard(title, this.config.mediaBaseUrl),
+      ...card,
+      name: translated.title?.name ?? card.name,
+      tagline: translated.title?.tagline ?? card.tagline,
       originalName: title.originalName,
-      synopsis: title.synopsis,
+      synopsis: translated.title?.synopsis ?? title.synopsis,
       originalLanguage: title.originalLanguage,
       hasTrailer: isPlayable(title.trailerAsset),
       extras: title.extras.map((extra) => ({
@@ -189,13 +212,13 @@ export class PublicCatalogService {
       metadataSource: title.metadataSource,
       seasons: seasons.map((season) => ({
         number: season.number,
-        name: season.name,
-        synopsis: season.synopsis,
+        name: translated.season(season.id)?.name ?? season.name,
+        synopsis: translated.season(season.id)?.synopsis ?? season.synopsis,
         episodes: season.episodes.map((episode) => ({
           id: episode.id,
           number: episode.number,
-          name: episode.name,
-          synopsis: episode.synopsis,
+          name: translated.episode(episode.id)?.name ?? episode.name,
+          synopsis: translated.episode(episode.id)?.synopsis ?? episode.synopsis,
           still: toPublicImage(episode.still, this.config.mediaBaseUrl),
           durationMs: episode.asset?.durationMs ?? null,
         })),
@@ -240,7 +263,7 @@ export class PublicCatalogService {
   }
 
   /** @throws NotFoundException when no collection shown to viewers has this slug. */
-  async collection(slug: string): Promise<PublicCollectionDetail> {
+  async collection(slug: string, language?: string): Promise<PublicCollectionDetail> {
     const collection = await this.prisma.collection.findFirst({
       where: { slug, visible: true },
       include: {
@@ -263,12 +286,15 @@ export class PublicCatalogService {
       poster: toPublicImage(collection.poster, this.config.mediaBaseUrl),
       backdrop: toPublicImage(collection.backdrop, this.config.mediaBaseUrl),
       titleCount: collection.titles.length,
-      titles: collection.titles.map(({ title }) => toPublicCard(title, this.config.mediaBaseUrl)),
+      titles: await this.translations.localizeCards(
+        collection.titles.map(({ title }) => toPublicCard(title, this.config.mediaBaseUrl)),
+        language,
+      ),
     };
   }
 
   /** The rows of the home page: featured titles, the newest, then one row per category. */
-  async home(): Promise<PublicHome> {
+  async home(language?: string): Promise<PublicHome> {
     const row = (where: Prisma.TitleWhereInput) =>
       this.prisma.title.findMany({
         where: { AND: [visibleTitle(), where] },
@@ -286,8 +312,16 @@ export class PublicCatalogService {
       ),
     ]);
 
+    // One look-up serves every row: a title is often in several of them.
+    const all = await this.translations.localizeCards(
+      [featured ?? [], latest ?? [], ...perCategory]
+        .flat()
+        .map((title) => toPublicCard(title, this.config.mediaBaseUrl)),
+      language,
+    );
+    const byId = new Map(all.map((card) => [card.id, card]));
     const cards = (titles: Awaited<ReturnType<typeof row>>) =>
-      titles.map((title) => toPublicCard(title, this.config.mediaBaseUrl));
+      titles.flatMap((title) => byId.get(title.id) ?? []);
     const rows: PublicRow[] = [
       { key: 'featured', name: 'Featured', category: null, titles: cards(featured ?? []) },
       { key: 'latest', name: 'New', category: null, titles: cards(latest ?? []) },

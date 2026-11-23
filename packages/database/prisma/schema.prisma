@@ -652,16 +652,17 @@ model Title {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  categories  TitleCategory[]
-  genres      TitleGenre[]
-  credits     Credit[]
-  extras      TitleExtra[]
-  collections CollectionTitle[]
-  packages    TitlePackage[]
-  purchases   Purchase[]
-  payments    Payment[]
-  seasons     Season[]
-  watching    WatchProgress[]
+  categories   TitleCategory[]
+  genres       TitleGenre[]
+  credits      Credit[]
+  extras       TitleExtra[]
+  translations TitleTranslation[]
+  collections  CollectionTitle[]
+  packages     TitlePackage[]
+  purchases    Purchase[]
+  payments     Payment[]
+  seasons      Season[]
+  watching     WatchProgress[]
 
   @@index([type, status])
   @@index([type, releaseDate])
@@ -699,6 +700,47 @@ model TitleCategory {
   @@id([titleId, categoryId])
   @@index([categoryId])
   @@map("title_categories")
+}
+
+/// The texts of a title in one more language. The title's own fields hold the
+/// texts in the language of the catalog. An empty field here falls back to them.
+model TitleTranslation {
+  titleId  String  @db.Uuid
+  title    Title   @relation(fields: [titleId], references: [id], onDelete: Cascade)
+  /// A language tag such as "de" or "pt-BR".
+  language String
+  name     String?
+  tagline  String?
+  synopsis String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@id([titleId, language])
+  @@index([language])
+  @@map("title_translations")
+}
+
+model SeasonTranslation {
+  seasonId String  @db.Uuid
+  season   Season  @relation(fields: [seasonId], references: [id], onDelete: Cascade)
+  language String
+  name     String?
+  synopsis String?
+
+  @@id([seasonId, language])
+  @@map("season_translations")
+}
+
+model EpisodeTranslation {
+  episodeId String  @db.Uuid
+  episode   Episode @relation(fields: [episodeId], references: [id], onDelete: Cascade)
+  language  String
+  name      String?
+  synopsis  String?
+
+  @@id([episodeId, language])
+  @@map("episode_translations")
 }
 
 enum ExtraKind {
@@ -865,7 +907,8 @@ model Season {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  episodes Episode[]
+  episodes     Episode[]
+  translations SeasonTranslation[]
 
   @@unique([titleId, number])
   @@map("seasons")
@@ -894,6 +937,8 @@ model Episode {
   updatedAt DateTime @updatedAt
 
   watching WatchProgress[]
+
+  translations EpisodeTranslation[]
 
   @@unique([seasonId, number])
   @@index([assetId])

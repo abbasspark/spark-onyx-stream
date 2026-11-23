@@ -51,6 +51,7 @@ const DETAIL_INCLUDE = {
   genres: { include: { genre: true } },
   credits: { include: { person: { include: { portrait: true } } } },
   extras: { include: { asset: true } },
+  translations: { select: { language: true } },
   collections: { include: { collection: { select: { id: true, name: true } } } },
   packages: { include: { package: { select: { id: true, name: true, position: true } } } },
   seasons: { include: { poster: true, episodes: { include: { asset: true, still: true } } } },

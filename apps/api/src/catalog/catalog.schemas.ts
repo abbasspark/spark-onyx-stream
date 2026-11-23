@@ -379,3 +379,22 @@ export type CollectionTitlesInput = z.infer<typeof collectionTitlesSchema>;
 /** Every collection exactly once, in the order wanted. */
 export const orderCollectionsSchema = z.object({ ids: z.array(z.uuid()).max(1000) });
 export type OrderCollectionsInput = z.infer<typeof orderCollectionsSchema>;
+
+// --- Translations ----------------------------------------------------------------
+
+const translated = (maxLength: number) => z.string().trim().max(maxLength).nullable().optional();
+const translatedPart = z.object({
+  id: z.uuid(),
+  name: translated(200),
+  synopsis: translated(4000),
+});
+
+/** The texts of a title in one more language. Empty or left out: not translated. */
+export const translationSchema = z.object({
+  name: translated(200),
+  tagline: translated(300),
+  synopsis: translated(4000),
+  seasons: z.array(translatedPart).max(200).optional(),
+  episodes: z.array(translatedPart).max(5000).optional(),
+});
+export type TranslationInput = z.infer<typeof translationSchema>;

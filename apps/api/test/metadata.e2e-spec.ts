@@ -812,6 +812,76 @@ describe.skipIf(!TEST_DATABASE_URL)('Metadata import (e2e)', () => {
   });
 
   describe('permissions', () => {
+    it('reads the texts of an imported series in another language, and changes nothing', async () => {
+      const imported = await importNew({ id: 'tv:1399' }).expect(201);
+      const title = imported.body.title;
+      const source = () => http().get(`/v1/titles/${title.id}/translations/DE/source`).set(admin());
+
+      // Without a translation the source answers in its own language: nothing to offer.
+      const same = await source().expect(200);
+      expect(same.body).toEqual({
+        language: 'de',
+        name: null,
+        tagline: null,
+        synopsis: null,
+        seasons: [],
+        episodes: [],
+        warnings: [],
+      });
+      expect(tmdb.requests.at(-1)).toContain('language=de');
+
+      const details = tmdb.json['/3/tv/1399'] as Record<string, unknown>;
+      tmdb.json['/3/tv/1399'] = {
+        ...details,
+        name: 'Tiefes Wasser',
+        overview: 'Drei Tauchgänge, jeder tiefer als der letzte.',
+      };
+      const season = tmdb.json['/3/tv/1399/season/1'] as Record<string, unknown>;
+      tmdb.json['/3/tv/1399/season/1'] = {
+        ...season,
+        name: 'Staffel 1',
+        overview: 'Die ersten Tauchgänge.',
+        episodes: [
+          { episode_number: 1, name: 'Der Schelf', overview: 'Im Sonnenlicht.' },
+          // A placeholder of the source is not a name, and the same synopsis is no translation.
+          { episode_number: 2, name: 'Folge 2', overview: 'No light.' },
+          { episode_number: 9, name: 'Nicht im Katalog', overview: 'Fehlt.' },
+        ],
+      };
+      const german = await source().expect(200);
+      const first = title.seasons[0];
+      expect(german.body).toMatchObject({
+        name: 'Tiefes Wasser',
+        tagline: null,
+        synopsis: 'Drei Tauchgänge, jeder tiefer als der letzte.',
+        seasons: [{ id: first.id, name: null, synopsis: 'Die ersten Tauchgänge.' }],
+        episodes: [
+          {
+            id: first.episodes.find((episode: { number: number }) => episode.number === 1).id,
+            name: 'Der Schelf',
+            synopsis: 'Im Sonnenlicht.',
+          },
+        ],
+        warnings: [],
+      });
+      expect(await testApp.prisma.titleTranslation.count()).toBe(0);
+
+      // A title typed by hand has no source, and a tag must be one.
+      const typed = await http()
+        .post('/v1/titles')
+        .set(admin())
+        .send({ type: 'MOVIE', name: 'Typed' })
+        .expect(201);
+      await http()
+        .get(`/v1/titles/${typed.body.id}/translations/de/source`)
+        .set(admin())
+        .expect(409);
+      await http()
+        .get(`/v1/titles/${title.id}/translations/german/source`)
+        .set(admin())
+        .expect(400);
+    });
+
     it('puts a movie into the series of films it is part of, once', async () => {
       const first = await importNew({ id: 'movie:603' }).expect(201);
       expect(first.body.title.collections).toMatchObject([{ name: 'The Matrix Collection' }]);
