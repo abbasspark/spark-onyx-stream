@@ -2,6 +2,7 @@
 import { describe, expect, it } from 'vitest';
 import type { ViewerWatchingItem } from '@/api/types';
 import {
+  describeApp,
   describeDevice,
   generatePassword,
   initialsOf,
@@ -172,5 +173,20 @@ describe('stream limits', () => {
     expect(parseStreamLimit('0')).toBe('invalid');
     expect(parseStreamLimit('21')).toBe('invalid');
     expect(parseStreamLimit('two')).toBe('invalid');
+  });
+});
+
+describe('describeApp', () => {
+  it('says what a device is in a line', () => {
+    expect(
+      describeApp({ kind: 'TV', platform: 'android-tv', model: 'Chromecast with Google TV' }),
+    ).toBe('Television, Android TV, Chromecast with Google TV');
+    expect(describeApp({ kind: 'MOBILE', platform: 'android', model: null })).toBe(
+      'Phone, Android',
+    );
+    expect(describeApp({ kind: 'TV', platform: 'roku', model: 'Roku Ultra' })).toBe(
+      'Television, Roku',
+    );
+    expect(describeApp({ kind: 'NEW', platform: 'set-top-box' })).toBe('Device, set-top-box');
   });
 });

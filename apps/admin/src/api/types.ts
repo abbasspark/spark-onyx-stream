@@ -806,14 +806,10 @@ export interface Viewer {
 }
 
 /** A device a viewer is signed in on. */
-export interface ViewerSession {
-  id: string;
-  userAgent: string | null;
-  ipAddress: string | null;
-  createdAt: string;
-  lastUsedAt: string;
-  expiresAt: string;
-}
+/** A sign-in of a viewer: a browser, or an app known as a device. */
+export type ViewerSession = Schemas['ViewerSessionAdminView'];
+/** An app on a television, a phone or a tablet that a viewer is, or was, signed in on. */
+export type ViewerDevice = Schemas['ViewerAdminDetail']['devices'][number];
 
 /** One video a viewer began or finished. */
 export interface ViewerWatchingItem {
@@ -888,6 +884,7 @@ export interface ViewerDetail extends Viewer {
   /** The main profile first. */
   profiles: ViewerProfile[];
   sessions: ViewerSession[];
+  devices: ViewerDevice[];
 }
 
 export const VIEWER_SORT_FIELDS = ['createdAt', 'lastLoginAt', 'email', 'displayName'] as const;

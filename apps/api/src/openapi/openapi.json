@@ -24386,6 +24386,633 @@
         }
       }
     },
+    "/v1/viewer/device-codes": {
+      "post": {
+        "operationId": "ViewerDevices_start",
+        "tags": [
+          "Viewers"
+        ],
+        "summary": "A device asks for a code to show",
+        "description": "The viewer enters it on the website, on a phone or a computer where they are signed in. Open to everyone.",
+        "security": [],
+        "x-onyx-access": {
+          "kind": "public",
+          "permissions": [],
+          "sessionOnly": false
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "device": {
+                    "type": "object",
+                    "properties": {
+                      "installationId": {
+                        "type": "string",
+                        "pattern": "^[A-Za-z0-9_-]{8,64}$"
+                      },
+                      "name": {
+                        "type": "string"
+                      },
+                      "kind": {
+                        "default": "OTHER",
+                        "type": "string",
+                        "enum": [
+                          "TV",
+                          "MOBILE",
+                          "TABLET",
+                          "DESKTOP",
+                          "OTHER"
+                        ]
+                      },
+                      "platform": {
+                        "type": "string",
+                        "pattern": "^[a-z][a-z0-9-]{0,31}$"
+                      },
+                      "model": {
+                        "type": "string",
+                        "maxLength": 80
+                      },
+                      "appVersion": {
+                        "type": "string",
+                        "pattern": "^\\d{1,6}(\\.\\d{1,6}){0,3}([-+][0-9A-Za-z.-]{1,32})?$"
+                      }
+                    },
+                    "required": [
+                      "installationId",
+                      "name",
+                      "platform"
+                    ]
+                  }
+                },
+                "required": [
+                  "device"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "The answer.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StartedDeviceCode"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The input was refused. \"issues\" names every field.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests. \"Retry-After\" says when to try again.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/viewer/device-codes/{code}": {
+      "get": {
+        "operationId": "ViewerDevices_find",
+        "tags": [
+          "Viewers"
+        ],
+        "summary": "The device behind a code, for the viewer to look at before they answer",
+        "description": "For a signed-in viewer.",
+        "security": [
+          {
+            "viewerSession": []
+          },
+          {
+            "viewerCookie": []
+          }
+        ],
+        "x-onyx-access": {
+          "kind": "viewer",
+          "permissions": [],
+          "sessionOnly": false
+        },
+        "parameters": [
+          {
+            "name": "code",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The answer.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeviceCodeRequest"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or the sign-in ran out.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "What the address names does not exist.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests. \"Retry-After\" says when to try again.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/viewer/device-codes/{code}/approve": {
+      "post": {
+        "operationId": "ViewerDevices_approve",
+        "tags": [
+          "Viewers"
+        ],
+        "summary": "The viewer says yes: the device is signed in to their account",
+        "description": "For a signed-in viewer.",
+        "security": [
+          {
+            "viewerSession": []
+          },
+          {
+            "viewerCookie": []
+          }
+        ],
+        "x-onyx-access": {
+          "kind": "viewer",
+          "permissions": [],
+          "sessionOnly": false
+        },
+        "parameters": [
+          {
+            "name": "code",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The answer.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeviceCodeRequest"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or the sign-in ran out.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "What the address names does not exist.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests. \"Retry-After\" says when to try again.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/viewer/device-codes/{code}/deny": {
+      "post": {
+        "operationId": "ViewerDevices_deny",
+        "tags": [
+          "Viewers"
+        ],
+        "summary": "The viewer says no: the device is told, and the code stops working",
+        "description": "For a signed-in viewer.",
+        "security": [
+          {
+            "viewerSession": []
+          },
+          {
+            "viewerCookie": []
+          }
+        ],
+        "x-onyx-access": {
+          "kind": "viewer",
+          "permissions": [],
+          "sessionOnly": false
+        },
+        "parameters": [
+          {
+            "name": "code",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The answer.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeviceCodeRequest"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or the sign-in ran out.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "What the address names does not exist.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests. \"Retry-After\" says when to try again.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/viewer/device-codes/token": {
+      "post": {
+        "operationId": "ViewerDevices_poll",
+        "tags": [
+          "Viewers"
+        ],
+        "summary": "The device asks whether the viewer has answered",
+        "description": "Once they said yes, the answer holds the token, one time. Asking more often than every two seconds is answered with 429 and the code \"slow_down\". Open to everyone.",
+        "security": [],
+        "x-onyx-access": {
+          "kind": "public",
+          "permissions": [],
+          "sessionOnly": false
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "deviceCode": {
+                    "type": "string",
+                    "minLength": 20,
+                    "maxLength": 200
+                  }
+                },
+                "required": [
+                  "deviceCode"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The answer.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeviceCodePoll"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The input was refused. \"issues\" names every field.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests. \"Retry-After\" says when to try again.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/viewer/devices": {
+      "get": {
+        "operationId": "ViewerDevices_list",
+        "tags": [
+          "Viewers"
+        ],
+        "summary": "The apps the viewer is, or was, signed in on",
+        "description": "Browsers are under \"sessions\". For a signed-in viewer.",
+        "security": [
+          {
+            "viewerSession": []
+          },
+          {
+            "viewerCookie": []
+          }
+        ],
+        "x-onyx-access": {
+          "kind": "viewer",
+          "permissions": [],
+          "sessionOnly": false
+        },
+        "responses": {
+          "200": {
+            "description": "The answer.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/DeviceView"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or the sign-in ran out.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/viewer/devices/{id}": {
+      "delete": {
+        "operationId": "ViewerDevices_remove",
+        "tags": [
+          "Viewers"
+        ],
+        "summary": "Signs a device out and forgets it",
+        "description": "For a signed-in viewer.",
+        "security": [
+          {
+            "viewerSession": []
+          },
+          {
+            "viewerCookie": []
+          }
+        ],
+        "x-onyx-access": {
+          "kind": "viewer",
+          "permissions": [],
+          "sessionOnly": false
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Done. Nothing comes back."
+          },
+          "401": {
+            "description": "Not signed in, or the sign-in ran out.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "What the address names does not exist.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests. \"Retry-After\" says when to try again.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "operationId": "ViewerDevices_rename",
+        "tags": [
+          "Viewers"
+        ],
+        "summary": "Gives a device another name, such as \"Bedroom TV\"",
+        "description": "For a signed-in viewer.",
+        "security": [
+          {
+            "viewerSession": []
+          },
+          {
+            "viewerCookie": []
+          }
+        ],
+        "x-onyx-access": {
+          "kind": "viewer",
+          "permissions": [],
+          "sessionOnly": false
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "name"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The answer.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "name": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "name"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The input was refused. \"issues\" names every field.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or the sign-in ran out.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "What the address names does not exist.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests. \"Retry-After\" says when to try again.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/v1/viewer/email/send": {
       "post": {
         "operationId": "ViewerAuth_sendVerification",
@@ -24885,6 +25512,46 @@
                     "type": "string",
                     "minLength": 1,
                     "maxLength": 128
+                  },
+                  "device": {
+                    "type": "object",
+                    "properties": {
+                      "installationId": {
+                        "type": "string",
+                        "pattern": "^[A-Za-z0-9_-]{8,64}$"
+                      },
+                      "name": {
+                        "type": "string"
+                      },
+                      "kind": {
+                        "default": "OTHER",
+                        "type": "string",
+                        "enum": [
+                          "TV",
+                          "MOBILE",
+                          "TABLET",
+                          "DESKTOP",
+                          "OTHER"
+                        ]
+                      },
+                      "platform": {
+                        "type": "string",
+                        "pattern": "^[a-z][a-z0-9-]{0,31}$"
+                      },
+                      "model": {
+                        "type": "string",
+                        "maxLength": 80
+                      },
+                      "appVersion": {
+                        "type": "string",
+                        "pattern": "^\\d{1,6}(\\.\\d{1,6}){0,3}([-+][0-9A-Za-z.-]{1,32})?$"
+                      }
+                    },
+                    "required": [
+                      "installationId",
+                      "name",
+                      "platform"
+                    ]
                   }
                 },
                 "required": [
@@ -25920,6 +26587,46 @@
                     "type": "string",
                     "minLength": 8,
                     "maxLength": 128
+                  },
+                  "device": {
+                    "type": "object",
+                    "properties": {
+                      "installationId": {
+                        "type": "string",
+                        "pattern": "^[A-Za-z0-9_-]{8,64}$"
+                      },
+                      "name": {
+                        "type": "string"
+                      },
+                      "kind": {
+                        "default": "OTHER",
+                        "type": "string",
+                        "enum": [
+                          "TV",
+                          "MOBILE",
+                          "TABLET",
+                          "DESKTOP",
+                          "OTHER"
+                        ]
+                      },
+                      "platform": {
+                        "type": "string",
+                        "pattern": "^[a-z][a-z0-9-]{0,31}$"
+                      },
+                      "model": {
+                        "type": "string",
+                        "maxLength": 80
+                      },
+                      "appVersion": {
+                        "type": "string",
+                        "pattern": "^\\d{1,6}(\\.\\d{1,6}){0,3}([-+][0-9A-Za-z.-]{1,32})?$"
+                      }
+                    },
+                    "required": [
+                      "installationId",
+                      "name",
+                      "platform"
+                    ]
                   }
                 },
                 "required": [
@@ -26944,6 +27651,46 @@
                     "minLength": 8,
                     "maxLength": 128
                   },
+                  "device": {
+                    "type": "object",
+                    "properties": {
+                      "installationId": {
+                        "type": "string",
+                        "pattern": "^[A-Za-z0-9_-]{8,64}$"
+                      },
+                      "name": {
+                        "type": "string"
+                      },
+                      "kind": {
+                        "default": "OTHER",
+                        "type": "string",
+                        "enum": [
+                          "TV",
+                          "MOBILE",
+                          "TABLET",
+                          "DESKTOP",
+                          "OTHER"
+                        ]
+                      },
+                      "platform": {
+                        "type": "string",
+                        "pattern": "^[a-z][a-z0-9-]{0,31}$"
+                      },
+                      "model": {
+                        "type": "string",
+                        "maxLength": 80
+                      },
+                      "appVersion": {
+                        "type": "string",
+                        "pattern": "^\\d{1,6}(\\.\\d{1,6}){0,3}([-+][0-9A-Za-z.-]{1,32})?$"
+                      }
+                    },
+                    "required": [
+                      "installationId",
+                      "name",
+                      "platform"
+                    ]
+                  },
                   "emailVerified": {
                     "default": true,
                     "type": "boolean"
@@ -27240,6 +27987,86 @@
                 }
               }
             }
+          },
+          "401": {
+            "description": "Not signed in, or the sign-in ran out.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Signed in, but not allowed to do this.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "What the address names does not exist.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/viewers/{id}/devices/{deviceId}": {
+      "delete": {
+        "operationId": "ViewersAdmin_removeDevice",
+        "tags": [
+          "Viewers"
+        ],
+        "summary": "Signs one device of a viewer out and forgets it",
+        "description": "For an admin or an API key. Needs viewers:write.",
+        "security": [
+          {
+            "adminSession": []
+          },
+          {
+            "apiKey": []
+          }
+        ],
+        "x-onyx-access": {
+          "kind": "admin",
+          "permissions": [
+            "viewers:write"
+          ],
+          "sessionOnly": false
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "deviceId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Done. Nothing comes back."
           },
           "401": {
             "description": "Not signed in, or the sign-in ran out.",
@@ -34356,6 +35183,220 @@
           "down"
         ]
       },
+      "DeviceCodePoll": {
+        "anyOf": [
+          {
+            "type": "object",
+            "properties": {
+              "status": {
+                "type": "string",
+                "const": "pending"
+              }
+            },
+            "required": [
+              "status"
+            ]
+          },
+          {
+            "type": "object",
+            "properties": {
+              "status": {
+                "type": "string",
+                "const": "denied"
+              }
+            },
+            "required": [
+              "status"
+            ]
+          },
+          {
+            "type": "object",
+            "properties": {
+              "status": {
+                "type": "string",
+                "const": "expired"
+              }
+            },
+            "required": [
+              "status"
+            ]
+          },
+          {
+            "type": "object",
+            "properties": {
+              "status": {
+                "type": "string",
+                "const": "approved"
+              },
+              "token": {
+                "type": "string"
+              },
+              "expiresAt": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "viewer": {
+                "$ref": "#/components/schemas/ViewerView"
+              },
+              "profile": {
+                "$ref": "#/components/schemas/ProfileView"
+              },
+              "device": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string"
+                  },
+                  "name": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "id",
+                  "name"
+                ]
+              }
+            },
+            "required": [
+              "status",
+              "token",
+              "expiresAt",
+              "viewer",
+              "profile",
+              "device"
+            ]
+          }
+        ]
+      },
+      "DeviceCodeRequest": {
+        "type": "object",
+        "properties": {
+          "userCode": {
+            "type": "string"
+          },
+          "device": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string"
+              },
+              "kind": {
+                "$ref": "#/components/schemas/PlayDevice"
+              },
+              "platform": {
+                "type": "string"
+              },
+              "model": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            },
+            "required": [
+              "name",
+              "kind",
+              "platform",
+              "model"
+            ]
+          },
+          "requestedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "expiresAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "userCode",
+          "device",
+          "requestedAt",
+          "expiresAt"
+        ]
+      },
+      "DeviceRef": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/PlayDevice"
+          },
+          "platform": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "kind",
+          "platform"
+        ]
+      },
+      "DeviceView": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/PlayDevice"
+          },
+          "platform": {
+            "type": "string",
+            "description": "The app: \"android-tv\"."
+          },
+          "model": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "appVersion": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "lastSeenAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "signedIn": {
+            "type": "boolean",
+            "description": "Whether it is signed in right now."
+          },
+          "current": {
+            "type": "boolean",
+            "description": "Whether the request came from this device."
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "kind",
+          "platform",
+          "model",
+          "appVersion",
+          "lastSeenAt",
+          "createdAt",
+          "signedIn",
+          "current"
+        ]
+      },
       "DiagnosticsReport": {
         "type": "object",
         "properties": {
@@ -35369,11 +36410,11 @@
           "sort": {
             "$ref": "#/components/schemas/HomeSort"
           },
-          "source": {
-            "$ref": "#/components/schemas/HomeSource"
-          },
           "kind": {
             "$ref": "#/components/schemas/HomeSectionKind"
+          },
+          "source": {
+            "$ref": "#/components/schemas/HomeSource"
           },
           "visible": {
             "type": "boolean"
@@ -35522,8 +36563,8 @@
           "id",
           "name",
           "sort",
-          "source",
           "kind",
+          "source",
           "visible",
           "layout",
           "titleType",
@@ -38544,10 +39585,10 @@
       "PlayDevice": {
         "type": "string",
         "enum": [
-          "DESKTOP",
+          "TV",
           "MOBILE",
           "TABLET",
-          "TV",
+          "DESKTOP",
           "OTHER"
         ]
       },
@@ -41716,6 +42757,43 @@
           "warnings"
         ]
       },
+      "StartedDeviceCode": {
+        "type": "object",
+        "properties": {
+          "deviceCode": {
+            "type": "string",
+            "description": "The secret the device asks with from now on. It is never shown to the viewer."
+          },
+          "userCode": {
+            "type": "string",
+            "description": "What the device shows: \"CDFG-HJKM\"."
+          },
+          "verificationUrl": {
+            "type": "string",
+            "description": "Where the viewer enters the code. Shown beside it."
+          },
+          "verificationUrlComplete": {
+            "type": "string",
+            "description": "The same with the code filled in, for a QR code."
+          },
+          "expiresIn": {
+            "type": "number",
+            "description": "Seconds until the code stops working."
+          },
+          "interval": {
+            "type": "number",
+            "description": "Seconds to wait between asking whether the viewer has answered."
+          }
+        },
+        "required": [
+          "deviceCode",
+          "userCode",
+          "verificationUrl",
+          "verificationUrlComplete",
+          "expiresIn",
+          "interval"
+        ]
+      },
       "StorageDriver": {
         "type": "string",
         "enum": [
@@ -43887,6 +44965,63 @@
               "$ref": "#/components/schemas/ViewerSessionAdminView"
             }
           },
+          "devices": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "createdAt": {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                "kind": {
+                  "$ref": "#/components/schemas/PlayDevice"
+                },
+                "platform": {
+                  "type": "string",
+                  "description": "The app: \"android-tv\"."
+                },
+                "model": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "appVersion": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "lastSeenAt": {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                "signedIn": {
+                  "type": "boolean",
+                  "description": "Whether it is signed in right now."
+                }
+              },
+              "required": [
+                "id",
+                "name",
+                "createdAt",
+                "kind",
+                "platform",
+                "model",
+                "appVersion",
+                "lastSeenAt",
+                "signedIn"
+              ]
+            },
+            "description": "The apps the viewer is, or was, signed in on."
+          },
           "status": {
             "$ref": "#/components/schemas/ViewerStatus"
           },
@@ -43951,6 +45086,7 @@
         "required": [
           "profiles",
           "sessions",
+          "devices",
           "status",
           "emailVerifiedAt",
           "lastLoginAt",
@@ -44346,6 +45482,17 @@
             "type": "string",
             "format": "date-time"
           },
+          "device": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DeviceRef"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The app it belongs to. Null for a browser."
+          },
           "userAgent": {
             "type": [
               "string",
@@ -44363,6 +45510,7 @@
           "id",
           "expiresAt",
           "createdAt",
+          "device",
           "userAgent",
           "lastUsedAt"
         ]
@@ -44395,6 +45543,17 @@
           "current": {
             "type": "boolean",
             "description": "Whether this is the session the request came with."
+          },
+          "device": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DeviceRef"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The app it belongs to. Null for a browser."
           }
         },
         "required": [
@@ -44403,7 +45562,8 @@
           "createdAt",
           "lastUsedAt",
           "expiresAt",
-          "current"
+          "current",
+          "device"
         ]
       },
       "ViewerSignIn": {

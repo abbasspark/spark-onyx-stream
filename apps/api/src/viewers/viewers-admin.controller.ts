@@ -137,6 +137,20 @@ export class ViewersAdminController {
     await this.record('viewer.verification_email', id, principal, request);
   }
 
+  /** Signs one device of a viewer out and forgets it. */
+  @Delete(':id/devices/:deviceId')
+  @RequirePermissions('viewers:write')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  async removeDevice(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Param('deviceId', ParseUUIDPipe) deviceId: string,
+    @CurrentPrincipal() principal: Principal,
+    @Req() request: Request,
+  ): Promise<void> {
+    const device = await this.viewers.removeDevice(id, deviceId);
+    await this.record('viewer.device_remove', id, principal, request, { device });
+  }
+
   @Post(':id/sign-out')
   @RequirePermissions('viewers:write')
   @HttpCode(HttpStatus.OK)

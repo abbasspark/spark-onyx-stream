@@ -28,6 +28,7 @@ import {
 } from './viewer.view.js';
 import { ACCESS_SELECT, accessOf, runningAt, type ViewerAccess } from '../billing/entitlement.js';
 import { type OwnedTitle, toOwnedTitles, validAt } from '../purchases/purchase-rules.js';
+import { ViewerDevicesService } from './viewer-devices.service.js';
 import { ViewerEmailService } from './viewer-email.service.js';
 import {
   type ProfileView,
@@ -80,6 +81,7 @@ export class ViewerAuthService {
     @Inject(AppConfig) private readonly config: AppConfig,
     @Inject(ViewerEmailService) private readonly emails: ViewerEmailService,
     @Inject(ViewerProfilesService) private readonly profiles: ViewerProfilesService,
+    @Inject(ViewerDevicesService) private readonly devices: ViewerDevicesService,
   ) {}
 
   /** What the viewer's subscription opens: everything, or some packages. Null without one. */
@@ -145,7 +147,8 @@ export class ViewerAuthService {
       viewer: { id: viewer.id, email: viewer.email, displayName: viewer.displayName },
       by: 'signup',
     });
-    const { token, session } = await this.sessions.create(viewer.id, info);
+    const device = input.device ? await this.devices.remember(viewer.id, input.device) : null;
+    const { token, session } = await this.sessions.create(viewer.id, info, device?.id);
     return {
       viewer: toViewerView(viewer),
       profile: toProfileView(await this.profiles.main(viewer)),
@@ -191,7 +194,8 @@ export class ViewerAuthService {
           : {}),
       },
     });
-    const { token, session } = await this.sessions.create(viewer.id, info);
+    const device = input.device ? await this.devices.remember(viewer.id, input.device) : null;
+    const { token, session } = await this.sessions.create(viewer.id, info, device?.id);
     return {
       viewer: toViewerView(updated),
       profile: toProfileView(await this.profiles.main(updated)),

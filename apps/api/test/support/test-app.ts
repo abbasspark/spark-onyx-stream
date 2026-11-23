@@ -359,6 +359,7 @@ export async function createTestApp(
       await prisma.play.deleteMany();
       await prisma.auditLog.deleteMany();
       await prisma.backup.deleteMany();
+      await prisma.deviceCode.deleteMany();
       await prisma.setting.deleteMany();
       await prisma.payment.deleteMany();
       await prisma.recording.deleteMany();

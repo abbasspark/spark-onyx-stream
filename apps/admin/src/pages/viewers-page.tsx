@@ -13,12 +13,15 @@ import {
   MailCheck,
   MailPlus,
   MailQuestion,
+  Monitor,
   MonitorSmartphone,
   MoreHorizontal,
   Pencil,
   Plus,
   RefreshCw,
   Search,
+  Smartphone,
+  Tablet,
   Trash2,
   Tv,
   UserCheck,
@@ -37,6 +40,7 @@ import {
   type ViewerAccessConfig,
   type ViewerSortField,
   type ViewerStatus,
+  type ViewerDevice,
 } from '@/api/types';
 import { useSession } from '@/auth/session';
 import { useConfirm } from '@/components/confirm';
@@ -77,6 +81,7 @@ import { titlePath } from '@/lib/catalog';
 import { cn } from '@/lib/cn';
 import { formatDateTime, formatRelative, humanize } from '@/lib/format';
 import {
+  describeApp,
   describeDevice,
   describeStreamDevice,
   describeStreamLimit,
@@ -89,6 +94,13 @@ import {
 
 const PAGE_SIZE = 25;
 const SEARCH_DELAY_MS = 300;
+const DEVICE_ICONS: Record<string, typeof Tv> = {
+  TV: Tv,
+  MOBILE: Smartphone,
+  TABLET: Tablet,
+  DESKTOP: Monitor,
+};
+
 const MIN_PASSWORD_LENGTH = 8;
 
 const SORT_LABELS: Record<ViewerSortField, string> = {
@@ -1027,6 +1039,27 @@ function DetailSheet({
     queryFn: ({ signal }) => viewersApi.watching((viewer as Viewer).id, signal),
     enabled: viewer !== null,
   });
+  const confirm = useConfirm();
+  const removeDevice = useMutation({
+    mutationFn: (device: ViewerDevice) => viewersApi.removeDevice(viewer?.id ?? '', device.id),
+    onSuccess: (_, device) => toast.success(`${device.name} was removed`),
+    onError: (error: Error) => toast.error(error.message),
+    onSettled: () => queryClient.invalidateQueries({ queryKey: ['viewers'] }),
+  });
+  const askRemoveDevice = async (device: ViewerDevice) => {
+    const confirmed = await confirm({
+      title: `Remove ${device.name}?`,
+      description: device.signedIn
+        ? 'It is signed out at once and what it plays stops. The viewer can sign it in again.'
+        : 'It is taken off the list. Nothing changes for the viewer.',
+      confirmLabel: 'Remove',
+      destructive: true,
+    });
+    if (confirmed) {
+      removeDevice.mutate(device);
+    }
+  };
+
   // Who watched is worth saying only when several people share the account.
   const sharedAccount = (detail.data?.profiles.length ?? 1) > 1;
   // The list row is shown at once and replaced by the fresh answer when it arrives.
@@ -1113,9 +1146,10 @@ function DetailSheet({
                       />
                       <div className="min-w-0 text-sm">
                         <p className="font-medium" title={session.userAgent ?? undefined}>
-                          {describeDevice(session.userAgent)}
+                          {session.device?.name ?? describeDevice(session.userAgent)}
                         </p>
                         <p className="text-xs text-muted-foreground">
+                          {session.device ? `${describeApp(session.device)}. ` : ''}
                           Used {formatRelative(session.lastUsedAt)}, signed in{' '}
                           {formatRelative(session.createdAt)}
                           {session.ipAddress ? ` from ${session.ipAddress}` : ''}
@@ -1126,6 +1160,61 @@ function DetailSheet({
                 </ul>
               ) : null}
             </div>
+
+            {detail.data && detail.data.devices.length > 0 ? (
+              <div>
+                <div className="mb-2 flex items-baseline justify-between gap-3">
+                  <h3 className="text-[13px] font-medium">Apps and televisions</h3>
+                  <p className="text-xs text-muted-foreground">
+                    {detail.data.devices.length} known,{' '}
+                    {detail.data.devices.filter((device) => device.signedIn).length} signed in
+                  </p>
+                </div>
+                <ul className="divide-y rounded-lg border">
+                  {detail.data.devices.map((device) => {
+                    const DeviceIcon = DEVICE_ICONS[device.kind] ?? MonitorSmartphone;
+                    return (
+                      <li key={device.id} className="flex items-start gap-3 p-3">
+                        <DeviceIcon
+                          className="mt-0.5 size-4 shrink-0 text-muted-foreground"
+                          aria-hidden="true"
+                        />
+                        <div className="min-w-0 flex-1 text-sm">
+                          <p className="flex flex-wrap items-center gap-x-2 gap-y-1 font-medium">
+                            {device.name}
+                            {device.appVersion ? (
+                              <Badge className="font-mono text-[11px] font-normal">
+                                {device.appVersion}
+                              </Badge>
+                            ) : null}
+                            {device.signedIn ? null : <Badge>Signed out</Badge>}
+                          </p>
+                          <p className="text-xs text-muted-foreground">
+                            {describeApp(device)}. Used {formatRelative(device.lastSeenAt)}, first
+                            seen {formatRelative(device.createdAt)}
+                          </p>
+                        </div>
+                        {mayWrite ? (
+                          <Tooltip
+                            content={device.signedIn ? 'Sign out and forget' : 'Forget this device'}
+                          >
+                            <Button
+                              variant="ghost"
+                              size="icon-sm"
+                              aria-label={`Remove ${device.name}`}
+                              disabled={removeDevice.isPending}
+                              onClick={() => void askRemoveDevice(device)}
+                            >
+                              <Trash2 />
+                            </Button>
+                          </Tooltip>
+                        ) : null}
+                      </li>
+                    );
+                  })}
+                </ul>
+              </div>
+            ) : null}
 
             <div>
               <div className="mb-2 flex items-baseline justify-between gap-3">

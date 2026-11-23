@@ -3827,6 +3827,150 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/viewer/device-codes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * A device asks for a code to show
+         * @description The viewer enters it on the website, on a phone or a computer where they are signed in. Open to everyone.
+         */
+        post: operations["ViewerDevices_start"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/viewer/device-codes/{code}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The device behind a code, for the viewer to look at before they answer
+         * @description For a signed-in viewer.
+         */
+        get: operations["ViewerDevices_find"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/viewer/device-codes/{code}/approve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * The viewer says yes: the device is signed in to their account
+         * @description For a signed-in viewer.
+         */
+        post: operations["ViewerDevices_approve"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/viewer/device-codes/{code}/deny": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * The viewer says no: the device is told, and the code stops working
+         * @description For a signed-in viewer.
+         */
+        post: operations["ViewerDevices_deny"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/viewer/device-codes/token": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * The device asks whether the viewer has answered
+         * @description Once they said yes, the answer holds the token, one time. Asking more often than every two seconds is answered with 429 and the code "slow_down". Open to everyone.
+         */
+        post: operations["ViewerDevices_poll"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/viewer/devices": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The apps the viewer is, or was, signed in on
+         * @description Browsers are under "sessions". For a signed-in viewer.
+         */
+        get: operations["ViewerDevices_list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/viewer/devices/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Signs a device out and forgets it
+         * @description For a signed-in viewer.
+         */
+        delete: operations["ViewerDevices_remove"];
+        options?: never;
+        head?: never;
+        /**
+         * Gives a device another name, such as "Bedroom TV"
+         * @description For a signed-in viewer.
+         */
+        patch: operations["ViewerDevices_rename"];
+        trace?: never;
+    };
     "/v1/viewer/email/send": {
         parameters: {
             query?: never;
@@ -4450,6 +4594,26 @@ export interface paths {
         head?: never;
         /** @description For an admin or an API key. Needs viewers:write. */
         patch: operations["ViewersAdmin_update"];
+        trace?: never;
+    };
+    "/v1/viewers/{id}/devices/{deviceId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Signs one device of a viewer out and forgets it
+         * @description For an admin or an API key. Needs viewers:write.
+         */
+        delete: operations["ViewersAdmin_removeDevice"];
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
     "/v1/viewers/{id}/list": {
@@ -5818,6 +5982,64 @@ export interface components {
         };
         /** @enum {string} */
         DependencyStatus: "up" | "down";
+        DeviceCodePoll: {
+            /** @constant */
+            status: "pending";
+        } | {
+            /** @constant */
+            status: "denied";
+        } | {
+            /** @constant */
+            status: "expired";
+        } | {
+            /** @constant */
+            status: "approved";
+            token: string;
+            /** Format: date-time */
+            expiresAt: string;
+            viewer: components["schemas"]["ViewerView"];
+            profile: components["schemas"]["ProfileView"];
+            device: {
+                id: string;
+                name: string;
+            };
+        };
+        DeviceCodeRequest: {
+            userCode: string;
+            device: {
+                name: string;
+                kind: components["schemas"]["PlayDevice"];
+                platform: string;
+                model: string | null;
+            };
+            /** Format: date-time */
+            requestedAt: string;
+            /** Format: date-time */
+            expiresAt: string;
+        };
+        DeviceRef: {
+            id: string;
+            name: string;
+            kind: components["schemas"]["PlayDevice"];
+            platform: string;
+        };
+        DeviceView: {
+            id: string;
+            name: string;
+            kind: components["schemas"]["PlayDevice"];
+            /** @description The app: "android-tv". */
+            platform: string;
+            model: string | null;
+            appVersion: string | null;
+            /** Format: date-time */
+            lastSeenAt: string;
+            /** Format: date-time */
+            createdAt: string;
+            /** @description Whether it is signed in right now. */
+            signedIn: boolean;
+            /** @description Whether the request came from this device. */
+            current: boolean;
+        };
         DiagnosticsReport: {
             /** @description How long looking at everything took, in milliseconds. */
             tookMs: number;
@@ -6079,8 +6301,8 @@ export interface components {
             /** @description The heading an admin gave. Null: {@link defaultName} is used. */
             name: string | null;
             sort: components["schemas"]["HomeSort"];
-            source: components["schemas"]["HomeSource"];
             kind: components["schemas"]["HomeSectionKind"];
+            source: components["schemas"]["HomeSource"];
             visible: boolean;
             layout: components["schemas"]["HomeLayout"];
             titleType: ("MOVIE" | "SERIES") | null;
@@ -6880,7 +7102,7 @@ export interface components {
             p2p: components["schemas"]["P2pInfo"] | null;
         };
         /** @enum {string} */
-        PlayDevice: "DESKTOP" | "MOBILE" | "TABLET" | "TV" | "OTHER";
+        PlayDevice: "TV" | "MOBILE" | "TABLET" | "DESKTOP" | "OTHER";
         Principal: components["schemas"]["AdminPrincipal"] | components["schemas"]["ApiKeyPrincipal"];
         ProbeResult: {
             /** @constant */
@@ -7654,6 +7876,20 @@ export interface components {
             /** @description What could not be read, in words for the admin. */
             warnings: string[];
         };
+        StartedDeviceCode: {
+            /** @description The secret the device asks with from now on. It is never shown to the viewer. */
+            deviceCode: string;
+            /** @description What the device shows: "CDFG-HJKM". */
+            userCode: string;
+            /** @description Where the viewer enters the code. Shown beside it. */
+            verificationUrl: string;
+            /** @description The same with the code filled in, for a QR code. */
+            verificationUrlComplete: string;
+            /** @description Seconds until the code stops working. */
+            expiresIn: number;
+            /** @description Seconds to wait between asking whether the viewer has answered. */
+            interval: number;
+        };
         /** @enum {string} */
         StorageDriver: "LOCAL" | "S3";
         StoragePoolTestResult: {
@@ -8239,6 +8475,22 @@ export interface components {
                 isMain: boolean;
             }[];
             sessions: components["schemas"]["ViewerSessionAdminView"][];
+            /** @description The apps the viewer is, or was, signed in on. */
+            devices: {
+                id: string;
+                name: string;
+                /** Format: date-time */
+                createdAt: string;
+                kind: components["schemas"]["PlayDevice"];
+                /** @description The app: "android-tv". */
+                platform: string;
+                model: string | null;
+                appVersion: string | null;
+                /** Format: date-time */
+                lastSeenAt: string;
+                /** @description Whether it is signed in right now. */
+                signedIn: boolean;
+            }[];
             status: components["schemas"]["ViewerStatus"];
             /** Format: date-time */
             emailVerifiedAt: string | null;
@@ -8369,6 +8621,8 @@ export interface components {
             expiresAt: string;
             /** Format: date-time */
             createdAt: string;
+            /** @description The app it belongs to. Null for a browser. */
+            device: components["schemas"]["DeviceRef"] | null;
             /** @description The browser or app, as it named itself. */
             userAgent: string | null;
             /** Format: date-time */
@@ -8386,6 +8640,8 @@ export interface components {
             expiresAt: string;
             /** @description Whether this is the session the request came with. */
             current: boolean;
+            /** @description The app it belongs to. Null for a browser. */
+            device: components["schemas"]["DeviceRef"] | null;
         };
         ViewerSignIn: {
             viewer: components["schemas"]["ViewerView"];
@@ -21953,6 +22209,395 @@ export interface operations {
             };
         };
     };
+    ViewerDevices_start: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    device: {
+                        installationId: string;
+                        name: string;
+                        /**
+                         * @default OTHER
+                         * @enum {string}
+                         */
+                        kind?: "TV" | "MOBILE" | "TABLET" | "DESKTOP" | "OTHER";
+                        platform: string;
+                        model?: string;
+                        appVersion?: string;
+                    };
+                };
+            };
+        };
+        responses: {
+            /** @description The answer. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StartedDeviceCode"];
+                };
+            };
+            /** @description The input was refused. "issues" names every field. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Too many requests. "Retry-After" says when to try again. */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    ViewerDevices_find: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                code: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The answer. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeviceCodeRequest"];
+                };
+            };
+            /** @description Not signed in, or the sign-in ran out. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description What the address names does not exist. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Too many requests. "Retry-After" says when to try again. */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    ViewerDevices_approve: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                code: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The answer. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeviceCodeRequest"];
+                };
+            };
+            /** @description Not signed in, or the sign-in ran out. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description What the address names does not exist. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Too many requests. "Retry-After" says when to try again. */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    ViewerDevices_deny: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                code: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The answer. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeviceCodeRequest"];
+                };
+            };
+            /** @description Not signed in, or the sign-in ran out. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description What the address names does not exist. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Too many requests. "Retry-After" says when to try again. */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    ViewerDevices_poll: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    deviceCode: string;
+                };
+            };
+        };
+        responses: {
+            /** @description The answer. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeviceCodePoll"];
+                };
+            };
+            /** @description The input was refused. "issues" names every field. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Too many requests. "Retry-After" says when to try again. */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    ViewerDevices_list: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The answer. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeviceView"][];
+                };
+            };
+            /** @description Not signed in, or the sign-in ran out. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    ViewerDevices_remove: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Done. Nothing comes back. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Not signed in, or the sign-in ran out. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description What the address names does not exist. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Too many requests. "Retry-After" says when to try again. */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    ViewerDevices_rename: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    name: string;
+                };
+            };
+        };
+        responses: {
+            /** @description The answer. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        id: string;
+                        name: string;
+                    };
+                };
+            };
+            /** @description The input was refused. "issues" names every field. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Not signed in, or the sign-in ran out. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description What the address names does not exist. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Too many requests. "Retry-After" says when to try again. */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
     ViewerAuth_sendVerification: {
         parameters: {
             query?: never;
@@ -22255,6 +22900,18 @@ export interface operations {
                 "application/json": {
                     email: string;
                     password: string;
+                    device?: {
+                        installationId: string;
+                        name: string;
+                        /**
+                         * @default OTHER
+                         * @enum {string}
+                         */
+                        kind?: "TV" | "MOBILE" | "TABLET" | "DESKTOP" | "OTHER";
+                        platform: string;
+                        model?: string;
+                        appVersion?: string;
+                    };
                 };
             };
         };
@@ -22887,6 +23544,18 @@ export interface operations {
                     email: string;
                     displayName: string;
                     password: string;
+                    device?: {
+                        installationId: string;
+                        name: string;
+                        /**
+                         * @default OTHER
+                         * @enum {string}
+                         */
+                        kind?: "TV" | "MOBILE" | "TABLET" | "DESKTOP" | "OTHER";
+                        platform: string;
+                        model?: string;
+                        appVersion?: string;
+                    };
                 };
             };
         };
@@ -23441,6 +24110,18 @@ export interface operations {
                     email: string;
                     displayName: string;
                     password: string;
+                    device?: {
+                        installationId: string;
+                        name: string;
+                        /**
+                         * @default OTHER
+                         * @enum {string}
+                         */
+                        kind?: "TV" | "MOBILE" | "TABLET" | "DESKTOP" | "OTHER";
+                        platform: string;
+                        model?: string;
+                        appVersion?: string;
+                    };
                     /** @default true */
                     emailVerified?: boolean;
                 };
@@ -23620,6 +24301,54 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["Problem"];
                 };
+            };
+            /** @description Not signed in, or the sign-in ran out. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Signed in, but not allowed to do this. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description What the address names does not exist. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    ViewersAdmin_removeDevice: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                deviceId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Done. Nothing comes back. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Not signed in, or the sign-in ran out. */
             401: {

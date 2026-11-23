@@ -103,10 +103,13 @@ CMD ["node", "dist/main.js"]
 FROM base AS web-build
 COPY pnpm-lock.yaml pnpm-workspace.yaml package.json ./
 COPY apps/web/package.json apps/web/
+COPY packages/api-client/package.json packages/api-client/
 RUN --mount=type=cache,id=pnpm-store,target=/pnpm/store \
     pnpm install --frozen-lockfile --filter "@onyx/web..."
 
 COPY tsconfig.base.json ./
+# The types of the API, which the website is written against.
+COPY packages/api-client packages/api-client
 COPY apps/web apps/web
 # "standalone" writes a server with only the files it needs. Nothing about the
 # installation is fixed here: the site reads its settings when it starts.

@@ -171,3 +171,36 @@ export function parseStreamLimit(text: string): number | null | 'invalid' {
   const value = Number(trimmed);
   return /^\d+$/.test(trimmed) && value >= 1 && value <= 20 ? value : 'invalid';
 }
+
+const DEVICE_KINDS: Record<string, string> = {
+  TV: 'Television',
+  MOBILE: 'Phone',
+  TABLET: 'Tablet',
+  DESKTOP: 'Computer',
+  OTHER: 'Device',
+};
+
+const DEVICE_PLATFORMS: Record<string, string> = {
+  'android-tv': 'Android TV',
+  android: 'Android',
+  'fire-tv': 'Fire TV',
+  ios: 'iOS',
+  tvos: 'Apple TV',
+  tizen: 'Samsung TV',
+  webos: 'LG TV',
+  roku: 'Roku',
+};
+
+/** "Television, Android TV, Chromecast with Google TV": what a device is, without its name. */
+export function describeApp(device: {
+  kind: string;
+  platform: string;
+  model?: string | null;
+}): string {
+  const platform = DEVICE_PLATFORMS[device.platform] ?? device.platform;
+  const parts = [DEVICE_KINDS[device.kind] ?? 'Device', platform];
+  if (device.model && !device.model.toLowerCase().includes(platform.toLowerCase())) {
+    parts.push(device.model);
+  }
+  return parts.join(', ');
+}

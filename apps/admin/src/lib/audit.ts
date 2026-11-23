@@ -44,6 +44,7 @@ const ACTION_LABELS: Record<string, string> = {
   'asset.subtitle.update': 'Changed subtitles of a video',
   'asset.subtitle.remove': 'Removed subtitles from a video',
   'viewer.stream_stop': 'Stopped what a viewer was playing',
+  'viewer.device_remove': 'Removed a device of a viewer',
   'auth.two_factor_enable': 'Switched on two-factor sign-in',
   'auth.two_factor_disable': 'Switched off two-factor sign-in',
   'auth.recovery_codes_new': 'Made new recovery codes',

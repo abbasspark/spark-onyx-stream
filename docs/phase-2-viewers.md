@@ -197,6 +197,64 @@ A viewer saves titles to watch later. The list goes with the account, per profil
 - **Deleting a profile or an account deletes its list.**
 - **In the panel,** a viewer's sheet shows what they saved and whether they began it since. Analytics has "Saved to watch later": the titles on the most lists, how many were added lately and how many of those who saved a title have begun it. Much saved and little begun is a title that is wanted and not yet watched. These figures name no viewer, and they do not depend on viewing statistics being on: the list is something the viewer asked the site to keep.
 
+## Devices and signing in with a code
+
+A television has no keyboard, and typing an email address and a password with a remote is where people give up. So a television signs in the other way round: it shows a code, and the viewer confirms it on a phone or a computer where they are signed in already.
+
+### How it goes
+
+1. **The device asks for a code.** `POST /viewer/device-codes` with what the device says about itself. The answer holds a code to show (`CDFG-HJKM`), the address to show beside it, the same address with the code filled in for a QR code, and a secret the device keeps.
+2. **The device shows the code** and asks every five seconds whether it was let in: `POST /viewer/device-codes/token` with its secret. The answer is `pending` until the viewer has answered.
+3. **The viewer opens `/activate` on the website,** signs in if needed, and enters the code. They see which device asks: its name, what kind it is, and how long ago it asked.
+4. **The viewer says yes.** The next time the device asks, the answer is `approved` and holds its token, once. Or the viewer says no, and the device is told `denied`.
+
+A code works for ten minutes and for one answer. After that the device shows a new one.
+
+### Why two secrets
+
+The short code proves nothing by itself. It only lets a signed-in viewer say "this device is mine". The sign-in goes to whoever holds the long secret, which never leaves the device and is stored here as a hash. Someone who reads the code off a screen gains nothing: entering it signs that screen in to their own account.
+
+What remains is tricking a viewer into entering a code that is on somebody else's screen. The page says so in plain words before the viewer answers, and names the device that asks.
+
+- **The alphabet** has no vowels, so a code never spells a word, and none of the characters that are mixed up at a distance: no `0` and `O`, `1` and `I` and `L`, `2` and `Z`, `5` and `S`, `8` and `B`. That leaves 21 characters and about 38 billion codes.
+- **Guessing is slowed:** fifteen codes in ten minutes from one address, and a code is only worth guessing while it waits.
+- **A device that asks more often than every two seconds** is answered with `429` and the code `slow_down`.
+
+### Devices
+
+An app that signs in says what it is: an id it made up when it was installed, a name to start with, its kind (television, phone, tablet, computer), the app and its version. From then on that installation is a device of the account, and it stays the same device when it is signed out and in again, with the name the viewer gave it.
+
+- A television becomes a device when its code is approved. An app with a keyboard sends the same description with `POST /viewer/login` or `/viewer/register`.
+- A browser sends nothing and has no device. It shows in the list of sign-ins by what the browser calls itself, as before.
+- The version of the app is kept up to date from the `X-Onyx-Client` header, so the panel shows what each device runs.
+- An account remembers thirty devices. Beyond that, the ones not used for the longest and not signed in are forgotten.
+
+A viewer sees their devices under **Account > Devices** on the website, can rename them, and signs out the ones they do not use. An admin sees them in the sheet of a viewer, with the app version, and can remove one, which signs it out.
+
+Devices exist for what comes next: a notification is sent to a device, and a download belongs to one.
+
+### API
+
+| Method and path                            | Purpose                                                              |
+| ------------------------------------------ | -------------------------------------------------------------------- |
+| `POST /viewer/device-codes`                | Public. A device asks for a code to show                             |
+| `POST /viewer/device-codes/token`          | Public. The device asks whether it was let in. Holds the token, once |
+| `GET /viewer/device-codes/{code}`          | The device behind a code, for the viewer to look at                  |
+| `POST /viewer/device-codes/{code}/approve` | The viewer says yes                                                  |
+| `POST /viewer/device-codes/{code}/deny`    | The viewer says no                                                   |
+| `GET /viewer/devices`                      | The apps the viewer is, or was, signed in on                         |
+| `PATCH /viewer/devices/{id}`               | Give a device another name                                           |
+| `DELETE /viewer/devices/{id}`              | Sign a device out and forget it                                      |
+| `DELETE /viewers/{id}/devices/{deviceId}`  | For admins with `viewers:write`: the same, written to the audit log  |
+
+The address a device shows is the site address of the installation (`SITE_URL`) with `/activate`.
+
+### Limits
+
+- No email is sent when a new device signs in.
+- A device that was signed in keeps working after the viewer changes their password only until the sign-ins are ended, which changing a password does everywhere.
+- The device is trusted to describe itself. Its name and kind are what it says.
+
 ## Viewer website
 
 - **Sign in** and **Create an account** pages. After either, the viewer lands where they came from, for example on the video they wanted to watch. Only addresses on the site itself are accepted as the way back.

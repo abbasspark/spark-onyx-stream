@@ -42,6 +42,8 @@ export interface ViewerDevice {
   lastUsedAt: string;
   expiresAt: string;
   current: boolean;
+  /** The app the sign-in belongs to. Null for a browser, and from an API older than devices. */
+  device?: { id: string; name: string; kind: string; platform: string } | null;
 }
 
 /** What is open on this site. */

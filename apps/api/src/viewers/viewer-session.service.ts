@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 import { Inject, Injectable } from '@nestjs/common';
-import { PrismaClient, type Viewer, type ViewerSession } from '@onyx/database';
+import { PrismaClient, type Viewer, type ViewerDevice, type ViewerSession } from '@onyx/database';
 import type { Request } from 'express';
+import { CLIENT_HEADER, parseClient } from '../app-versions/app-version.rules.js';
 import { bearerToken, type RequestInfo } from '../auth/request-info.js';
 import { generateViewerToken, hashToken, VIEWER_TOKEN_PREFIX } from '../auth/tokens.js';
 import { readCookie, VIEWER_COOKIE } from './cookies.js';
@@ -52,11 +53,17 @@ export class ViewerSessionService {
     return null;
   }
 
-  async create(viewerId: string, info: RequestInfo): Promise<CreatedViewerSession> {
+  /** @param deviceId The app the sign-in belongs to. Left out for a browser. */
+  async create(
+    viewerId: string,
+    info: RequestInfo,
+    deviceId: string | null = null,
+  ): Promise<CreatedViewerSession> {
     const { token, tokenHash } = generateViewerToken();
     const session = await this.prisma.viewerSession.create({
       data: {
         viewerId,
+        deviceId,
         tokenHash,
         ipAddress: info.ipAddress,
         userAgent: info.userAgent,
@@ -69,9 +76,10 @@ export class ViewerSessionService {
   /**
    * Finds the viewer for a token.
    *
+   * @param appVersion The version the app names itself with, kept with its device.
    * @returns Null when the token is unknown, ended or expired, or the viewer is disabled.
    */
-  async validate(token: string): Promise<ViewerIdentity | null> {
+  async validate(token: string, appVersion: string | null = null): Promise<ViewerIdentity | null> {
     const found = await this.prisma.viewerSession.findUnique({
       where: { tokenHash: hashToken(token) },
       include: { viewer: true },
@@ -88,15 +96,27 @@ export class ViewerSessionService {
         where: { id: found.id },
         data: { lastUsedAt: new Date() },
       });
+      // The device is as recently used as its sign-in, and says which version it runs.
+      if (found.deviceId) {
+        await this.prisma.viewerDevice.updateMany({
+          where: { id: found.deviceId },
+          data: { lastSeenAt: new Date(), ...(appVersion ? { appVersion } : {}) },
+        });
+      }
     }
     const { viewer, ...session } = found;
     return { viewer, session };
   }
 
+  /** The version of the app a request comes from, when the app names itself. */
+  appVersion(request: Request): string | null {
+    return parseClient(request.headers[CLIENT_HEADER])?.version ?? null;
+  }
+
   /** The signed-in viewer of a request, or null. Never throws for bad credentials. */
   async identify(request: Request): Promise<ViewerIdentity | null> {
     const credentials = this.credentials(request);
-    return credentials ? this.validate(credentials.token) : null;
+    return credentials ? this.validate(credentials.token, this.appVersion(request)) : null;
   }
 
   /** Ends one session of a viewer. Does nothing when it is not theirs. */
@@ -125,10 +145,11 @@ export class ViewerSessionService {
     return result.count;
   }
 
-  listActive(viewerId: string): Promise<ViewerSession[]> {
+  listActive(viewerId: string): Promise<(ViewerSession & { device: ViewerDevice | null })[]> {
     return this.prisma.viewerSession.findMany({
       where: { viewerId, ...ACTIVE_SESSION() },
       orderBy: { lastUsedAt: 'desc' },
+      include: { device: true },
     });
   }
 }
