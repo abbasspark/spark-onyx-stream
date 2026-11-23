@@ -7,6 +7,7 @@ import {
   type OnApplicationShutdown,
 } from '@nestjs/common';
 import type { Redis } from 'ioredis';
+import { BrandingService } from '../branding/branding.service.js';
 import { AppConfig } from '../config/app-config.js';
 import { MailService } from '../mail/mail.service.js';
 import { diagnosticsMail } from '../mail/mail.templates.js';
@@ -40,6 +41,7 @@ export class DiagnosticsWatch implements OnApplicationBootstrap, OnApplicationSh
     @Inject(MailService) private readonly mail: MailService,
     @Inject(REDIS_CLIENT) private readonly redis: Redis,
     @Inject(AppConfig) private readonly config: AppConfig,
+    @Inject(BrandingService) private readonly branding: BrandingService,
   ) {}
 
   onApplicationBootstrap(): void {
@@ -77,7 +79,7 @@ export class DiagnosticsWatch implements OnApplicationBootstrap, OnApplicationSh
       }
       const siteUrl = this.config.siteUrl;
       const content = diagnosticsMail({
-        siteName: this.config.siteName,
+        siteName: await this.branding.siteName(),
         problems: decision.appeared.map(({ title, summary, hint }) => ({ title, summary, hint })),
         solved: decision.solved,
         panelUrl: siteUrl ? `${siteUrl}/admin/diagnostics` : '',

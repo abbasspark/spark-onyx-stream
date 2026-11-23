@@ -23,6 +23,7 @@ import { BackupsModule } from './backups/backups.module.js';
 import { DiagnosticsModule } from './diagnostics/diagnostics.module.js';
 import { ProcessBeaconModule } from './diagnostics/process-beacon.service.js';
 import { BillingModule } from './billing/billing.module.js';
+import { BrandingModule } from './branding/branding.module.js';
 import { MailModule } from './mail/mail.module.js';
 import { WatchModule } from './watch/watch.module.js';
 import { BulkModule } from './bulk/bulk.module.js';
@@ -55,6 +56,7 @@ const ROLE_MODULES: Record<AppRole, Type[]> = {
     StreamsModule,
     CatalogModule,
     MailModule,
+    BrandingModule,
     BillingModule,
     MetadataModule,
     WatchModule,

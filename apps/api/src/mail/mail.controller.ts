@@ -19,6 +19,7 @@ import { emailSchema } from '../auth/auth.schemas.js';
 import type { Principal } from '../auth/principal.js';
 import { requestInfo } from '../auth/request-info.js';
 import { ZodValidationPipe } from '../common/zod-validation.pipe.js';
+import { BrandingService } from '../branding/branding.service.js';
 import { AppConfig } from '../config/app-config.js';
 import { RateLimit } from '../rate-limit/rate-limit.guard.js';
 import { type MailDelivery, MailService } from './mail.service.js';
@@ -48,19 +49,20 @@ export class MailController {
   constructor(
     @Inject(MailService) private readonly mail: MailService,
     @Inject(AppConfig) private readonly config: AppConfig,
+    @Inject(BrandingService) private readonly branding: BrandingService,
     @Inject(AuditService) private readonly audit: AuditService,
   ) {}
 
   @Get()
   @RequirePermissions('settings:read')
-  status(): MailStatus {
+  async status(): Promise<MailStatus> {
     const { mail } = this.config;
     return {
       enabled: mail !== null,
       server: mail ? describeSmtpUrl(mail.smtpUrl) : null,
       from: mail?.from ?? null,
       siteUrl: this.config.siteUrl || null,
-      siteName: this.config.siteName,
+      siteName: await this.branding.siteName(),
       verification: this.config.viewerVerificationRequired ? 'required' : 'optional',
       lastDelivery: this.mail.last,
     };
@@ -86,7 +88,7 @@ export class MailController {
       await this.mail.sendNow({
         to: body.to,
         ...testMail({
-          siteName: this.config.siteName,
+          siteName: await this.branding.siteName(),
           sentBy: principal.type === 'admin' ? principal.displayName : principal.name,
         }),
       });

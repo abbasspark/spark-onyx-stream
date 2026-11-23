@@ -2346,3 +2346,33 @@ export interface TitleRevisionDetail extends TitleRevision {
   /** What bringing this version back would change now. */
   restore: TitleChange[];
 }
+
+/** A link in the footer of the website. */
+export interface FooterLink {
+  label: string;
+  url: string;
+}
+
+/** How the website presents itself. Null means: as it ships. */
+export interface BrandingSettings {
+  name: string | null;
+  description: string | null;
+  logoId: string | null;
+  /** Whether the name is written next to the logo, or the logo stands for it. */
+  logoShowsName: boolean;
+  iconId: string | null;
+  /** The one colour of the interface, as "#rrggbb". */
+  accent: string | null;
+  footerText: string | null;
+  footerLinks: FooterLink[];
+}
+
+export interface Branding {
+  settings: BrandingSettings;
+  logo: CatalogImage | null;
+  icon: CatalogImage | null;
+  /** What shows where a setting is left empty. */
+  defaults: { name: string; description: string; accent: string };
+  /** How light the accent has to be against black. */
+  minimumContrast: number;
+}
