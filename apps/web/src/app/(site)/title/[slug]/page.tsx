@@ -1,17 +1,31 @@
 // SPDX-License-Identifier: AGPL-3.0-only
+import { Play } from 'lucide-react';
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { EpisodeList } from '@/components/episode-list';
 import { Facts } from '@/components/facts';
+import { PersonCard } from '@/components/person-card';
 import { PosterCard } from '@/components/poster-card';
 import { TitleActions } from '@/components/title-actions';
 import { StripRow } from '@/components/title-row';
-import { getPlans, getTitle, getTitles } from '@/lib/api';
+import { getCollection, getPlans, getTitle, getTitles } from '@/lib/api';
 import { DEFAULT_RENTAL, NO_PLANS, subscribable } from '@/lib/plans';
 import { absoluteUrl, siteConfig } from '@/lib/config';
-import { isoDuration, truncate } from '@/lib/format';
-import type { TitleCard, TitleDetail } from '@/lib/types';
+import {
+  EXTRA_KIND_LABELS,
+  formatDay,
+  formatMinutes,
+  formatRating,
+  formatRuntime,
+  groupCrew,
+  isoDuration,
+  SERIES_STATUS_LABELS,
+  truncate,
+} from '@/lib/format';
+import { countryName, languageName } from '@/lib/language';
+import { watchHref } from '@/lib/watch';
+import type { Collection, TitleCard, TitleDetail } from '@/lib/types';
 
 interface TitlePageProps {
   params: Promise<{ slug: string }>;
@@ -42,15 +56,6 @@ export async function generateMetadata({ params }: TitlePageProps): Promise<Meta
   };
 }
 
-/** The name of a language for a code such as "en" or "pt-BR". */
-function languageName(code: string): string {
-  try {
-    return new Intl.DisplayNames(['en'], { type: 'language' }).of(code) ?? code;
-  } catch {
-    return code;
-  }
-}
-
 /** What search engines read to show a title with its picture and facts. */
 function structuredData(title: TitleDetail): Record<string, unknown> {
   const image = title.poster ?? title.backdrop;
@@ -62,10 +67,28 @@ function structuredData(title: TitleDetail): Record<string, unknown> {
     url: `${siteConfig.url}/title/${title.slug}`,
     description: title.synopsis ?? title.tagline ?? undefined,
     image: image ? absoluteUrl(image.url) : undefined,
-    datePublished: title.releaseYear ? String(title.releaseYear) : undefined,
+    datePublished: title.releaseDate ?? (title.releaseYear ? String(title.releaseYear) : undefined),
     contentRating: title.ageRating ?? undefined,
     inLanguage: title.originalLanguage ?? undefined,
-    genre: title.categories.map((category) => category.name),
+    genre: (title.genres?.length ? title.genres : title.categories).map((item) => item.name),
+    actor: title.cast?.map((person) => ({
+      '@type': 'Person',
+      name: person.name,
+      url: `${siteConfig.url}/person/${person.slug}`,
+    })),
+    director: title.crew
+      ?.filter((person) => person.role === 'Director')
+      .map((person) => ({ '@type': 'Person', name: person.name })),
+    countryOfOrigin: title.countries?.map((code) => ({ '@type': 'Country', name: code })),
+    aggregateRating:
+      title.rating && title.ratingCount
+        ? {
+            '@type': 'AggregateRating',
+            ratingValue: title.rating,
+            bestRating: 10,
+            ratingCount: title.ratingCount,
+          }
+        : undefined,
     duration: title.type === 'MOVIE' ? isoDuration(title.durationMs) : undefined,
     numberOfSeasons: title.type === 'SERIES' ? title.seasonCount : undefined,
     numberOfEpisodes: title.type === 'SERIES' ? title.episodeCount : undefined,
@@ -87,6 +110,20 @@ async function loadRelated(title: TitleDetail): Promise<TitleCard[]> {
   }
 }
 
+/** The first collection the title is in, with its other titles. */
+async function loadCollection(title: TitleDetail): Promise<Collection | null> {
+  const first = title.collections?.[0];
+  if (!first) {
+    return null;
+  }
+  try {
+    return await getCollection(first.slug);
+  } catch {
+    // The page is complete without this row.
+    return null;
+  }
+}
+
 export default async function TitlePage({ params }: TitlePageProps) {
   const { slug } = await params;
   const title = await getTitle(slug);
@@ -94,8 +131,9 @@ export default async function TitlePage({ params }: TitlePageProps) {
     notFound();
   }
   // A free title needs no offer, and the page must not fail because the plans could not be read.
-  const [related, plans] = await Promise.all([
+  const [related, collection, plans] = await Promise.all([
     loadRelated(title),
+    loadCollection(title),
     title.access === 'PAID' ? getPlans().catch(() => NO_PLANS) : NO_PLANS,
   ]);
   const offer = {
@@ -106,6 +144,14 @@ export default async function TitlePage({ params }: TitlePageProps) {
     subscribable: subscribable(title, plans.plans),
   };
   const firstCategory = title.categories[0];
+  const genres = title.genres ?? [];
+  const cast = title.cast ?? [];
+  const crew = groupCrew(title.crew ?? []);
+  const extras = title.extras ?? [];
+  const rating = formatRating(title.rating);
+  const released = formatDay(title.releaseDate);
+  // A movie says its exact length among the facts above. A series says here what an episode runs.
+  const episodeLength = title.type === 'SERIES' ? formatMinutes(title.runtimeMinutes) : null;
 
   return (
     <article>
@@ -164,9 +210,77 @@ export default async function TitlePage({ params }: TitlePageProps) {
               {title.synopsis}
             </p>
           ) : null}
+          {crew.length > 0 ? (
+            <dl className="mt-8 grid gap-x-8 gap-y-3 text-sm sm:grid-cols-[max-content_minmax(0,1fr)]">
+              {crew.map((group) => (
+                <div key={group.job} className="contents">
+                  <dt className="text-dust">{group.job}</dt>
+                  <dd className="flex flex-wrap gap-x-3 gap-y-1">
+                    {group.people.map((person) => (
+                      <Link
+                        key={person.slug}
+                        href={`/person/${person.slug}`}
+                        className="underline decoration-line underline-offset-4 hover:decoration-vein"
+                      >
+                        {person.name}
+                      </Link>
+                    ))}
+                  </dd>
+                </div>
+              ))}
+            </dl>
+          ) : null}
         </div>
 
         <dl className="grid content-start gap-4 text-sm">
+          {genres.length > 0 ? (
+            <div>
+              <dt className="text-dust">{genres.length === 1 ? 'Genre' : 'Genres'}</dt>
+              <dd className="mt-1 flex flex-wrap gap-x-3 gap-y-1">
+                {genres.map((genre) => (
+                  <Link
+                    key={genre.slug}
+                    href={`/browse?genre=${genre.slug}`}
+                    className="underline decoration-line underline-offset-4 hover:decoration-vein"
+                  >
+                    {genre.name}
+                  </Link>
+                ))}
+              </dd>
+            </div>
+          ) : null}
+          {rating ? (
+            <div>
+              <dt className="text-dust">Rating</dt>
+              <dd className="mt-1">
+                <span className="font-semibold text-sard">{rating}</span>
+                <span className="text-smoke"> of 10</span>
+                {title.ratingCount ? (
+                  <span className="text-dust">
+                    , {title.ratingCount.toLocaleString('en')} votes
+                  </span>
+                ) : null}
+              </dd>
+            </div>
+          ) : null}
+          {released ? (
+            <div>
+              <dt className="text-dust">{title.type === 'SERIES' ? 'First shown' : 'Released'}</dt>
+              <dd className="mt-1">{released}</dd>
+            </div>
+          ) : null}
+          {title.seriesStatus ? (
+            <div>
+              <dt className="text-dust">Status</dt>
+              <dd className="mt-1">{SERIES_STATUS_LABELS[title.seriesStatus]}</dd>
+            </div>
+          ) : null}
+          {episodeLength ? (
+            <div>
+              <dt className="text-dust">An episode runs</dt>
+              <dd className="mt-1">about {episodeLength}</dd>
+            </div>
+          ) : null}
           {title.categories.length > 0 ? (
             <div>
               <dt className="text-dust">Categories</dt>
@@ -195,10 +309,83 @@ export default async function TitlePage({ params }: TitlePageProps) {
               <dd className="mt-1">{languageName(title.originalLanguage)}</dd>
             </div>
           ) : null}
+          {title.countries?.length ? (
+            <div>
+              <dt className="text-dust">Made in</dt>
+              <dd className="mt-1">{title.countries.map(countryName).join(', ')}</dd>
+            </div>
+          ) : null}
+          {title.studios?.length ? (
+            <div>
+              <dt className="text-dust">{title.studios.length === 1 ? 'Studio' : 'Studios'}</dt>
+              <dd className="mt-1">{title.studios.join(', ')}</dd>
+            </div>
+          ) : null}
         </dl>
       </div>
 
       {title.type === 'SERIES' ? <EpisodeList title={title} /> : null}
+
+      {cast.length > 0 ? (
+        <div className="mt-20">
+          <StripRow heading="Cast">
+            {cast.map((person) => (
+              <li key={`${person.slug}:${person.role}`} className="w-[clamp(7rem,30vw,9.5rem)]">
+                <PersonCard person={person} />
+              </li>
+            ))}
+          </StripRow>
+        </div>
+      ) : null}
+
+      {extras.length > 0 ? (
+        <div className="mt-20">
+          <StripRow heading="Trailers and more">
+            {extras.map((extra) => {
+              const length = formatRuntime(extra.durationMs);
+              return (
+                <li key={extra.id} className="w-[clamp(14rem,60vw,20rem)]">
+                  <Link href={`${watchHref(title.slug)}?extra=${extra.id}`} className="group block">
+                    <div className="relative aspect-video overflow-hidden rounded-[3px] bg-ash outline-2 outline-offset-2 outline-transparent transition-[outline-color] duration-150 group-hover:outline-vein group-focus-visible:outline-sard">
+                      {title.backdrop ? (
+                        <img
+                          src={title.backdrop.url}
+                          alt=""
+                          loading="lazy"
+                          decoding="async"
+                          className="size-full object-cover opacity-60 transition-opacity duration-150 group-hover:opacity-80"
+                        />
+                      ) : null}
+                      <span className="absolute inset-0 flex items-center justify-center">
+                        <span className="flex size-12 items-center justify-center rounded-full bg-onyx/70 text-vein">
+                          <Play className="size-5 translate-x-px fill-current" aria-hidden="true" />
+                        </span>
+                      </span>
+                      <span className="absolute top-2 left-2 rounded-[3px] bg-onyx/80 px-1.5 text-[0.6875rem] leading-6 font-medium text-sard">
+                        {EXTRA_KIND_LABELS[extra.kind]}
+                      </span>
+                    </div>
+                    <p className="mt-2.5 text-sm leading-snug font-medium">{extra.name}</p>
+                    {length ? <p className="mt-0.5 text-sm text-smoke">{length}</p> : null}
+                  </Link>
+                </li>
+              );
+            })}
+          </StripRow>
+        </div>
+      ) : null}
+
+      {collection && collection.titles.length > 1 ? (
+        <div className="mt-20">
+          <StripRow heading={collection.name} href={`/collection/${collection.slug}`}>
+            {collection.titles.map((item) => (
+              <li key={item.id} className="w-[clamp(8.5rem,38vw,12.5rem)]">
+                <PosterCard title={item} />
+              </li>
+            ))}
+          </StripRow>
+        </div>
+      ) : null}
 
       {related.length > 0 && firstCategory ? (
         <div className="mt-20">

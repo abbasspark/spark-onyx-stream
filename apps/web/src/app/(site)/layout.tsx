@@ -2,7 +2,9 @@
 import { type ReactNode, Suspense } from 'react';
 import { SiteFooter } from '@/components/site-footer';
 import { SiteHeader } from '@/components/site-header';
-import { getCategories, getChannels, getPlans } from '@/lib/api';
+import { LanguageSwitch } from '@/components/language-switch';
+import { currentLanguage, getCategories, getChannels, getLanguages, getPlans } from '@/lib/api';
+import { nativeLanguageName } from '@/lib/language';
 import { siteConfig } from '@/lib/config';
 import type { Category } from '@/lib/types';
 
@@ -18,7 +20,7 @@ async function loadCategories(): Promise<Category[]> {
 /** The frame of every page except the player: header, content, footer. */
 export default async function SiteLayout({ children }: { children: ReactNode }) {
   // Asked for together. A site without plans or live channels shows no link to them.
-  const [categories, hasPlans, hasLive] = await Promise.all([
+  const [categories, hasPlans, hasLive, languages, language] = await Promise.all([
     loadCategories(),
     getPlans()
       .then((offer) => offer.plans.length > 0)
@@ -26,7 +28,12 @@ export default async function SiteLayout({ children }: { children: ReactNode }) 
     getChannels()
       .then((channels) => channels.length > 0)
       .catch(() => false),
+    getLanguages().catch(() => ({ default: 'en', translated: [] })),
+    currentLanguage(),
   ]);
+  const offered = [languages.default, ...languages.translated.map((item) => item.language)];
+  // A language that is no longer on offer falls back to the catalog's own.
+  const current = language && offered.includes(language) ? language : languages.default;
 
   return (
     <div className="flex min-h-dvh flex-col">
@@ -53,6 +60,15 @@ export default async function SiteLayout({ children }: { children: ReactNode }) 
         categories={categories}
         hasPlans={hasPlans}
         hasLive={hasLive}
+        languageSwitch={
+          offered.length > 1 ? (
+            <LanguageSwitch
+              own={languages.default}
+              current={current}
+              languages={offered.map((tag) => ({ tag, name: nativeLanguageName(tag) }))}
+            />
+          ) : null
+        }
       />
     </div>
   );

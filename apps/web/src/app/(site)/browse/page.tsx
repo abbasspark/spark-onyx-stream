@@ -3,9 +3,9 @@ import { ChevronLeft, ChevronRight } from 'lucide-react';
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { PosterCard } from '@/components/poster-card';
-import { getCategories, getTitles } from '@/lib/api';
+import { getCategories, getGenres, getTitles } from '@/lib/api';
 import { browseHref, type BrowseState, parseBrowseParams } from '@/lib/browse';
-import type { Category, TitleSort } from '@/lib/types';
+import type { Category, TitleSort, Genre } from '@/lib/types';
 
 const PAGE_SIZE = 36;
 
@@ -25,8 +25,17 @@ interface BrowseProps {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }
 
-function heading(state: BrowseState, category: Category | undefined): string {
+function heading(
+  state: BrowseState,
+  category: Category | undefined,
+  genre?: Genre | undefined,
+): string {
   const kind = state.type === 'MOVIE' ? 'movies' : state.type === 'SERIES' ? 'series' : null;
+  // "Thriller movies in Staff picks", "Thriller", "Staff picks series".
+  if (genre) {
+    const what = kind ? `${genre.name} ${kind}` : genre.name;
+    return category ? `${what} in ${category.name}` : what;
+  }
   if (category) {
     return kind ? `${category.name} ${kind}` : category.name;
   }
@@ -38,10 +47,14 @@ function heading(state: BrowseState, category: Category | undefined): string {
 
 export async function generateMetadata({ searchParams }: BrowseProps): Promise<Metadata> {
   const state = parseBrowseParams(await searchParams);
-  const categories = state.category ? await getCategories() : [];
+  const [categories, genres] = await Promise.all([
+    state.category ? getCategories() : [],
+    state.genre ? getGenres().catch(() => []) : [],
+  ]);
   const category = categories.find((item) => item.slug === state.category);
+  const genre = genres.find((item) => item.slug === state.genre);
   return {
-    title: heading(state, category),
+    title: heading(state, category, genre),
     description: category?.description ?? undefined,
     alternates: { canonical: browseHref(state, { page: state.page }) },
   };
@@ -49,18 +62,21 @@ export async function generateMetadata({ searchParams }: BrowseProps): Promise<M
 
 export default async function BrowsePage({ searchParams }: BrowseProps) {
   const state = parseBrowseParams(await searchParams);
-  const [titles, categories] = await Promise.all([
+  const [titles, categories, genres] = await Promise.all([
     getTitles({
       page: state.page,
       pageSize: PAGE_SIZE,
       type: state.type,
       category: state.category,
+      genre: state.genre,
       featured: state.featured || undefined,
       sort: state.sort,
     }),
     getCategories(),
+    getGenres().catch(() => []),
   ]);
   const category = categories.find((item) => item.slug === state.category);
+  const genre = genres.find((item) => item.slug === state.genre);
   const pages = Math.max(1, Math.ceil(titles.total / PAGE_SIZE));
 
   const chip = (active: boolean) =>
@@ -73,7 +89,7 @@ export default async function BrowsePage({ searchParams }: BrowseProps) {
   return (
     <div className="pt-28">
       <header className="gutter">
-        <h1 className="display text-3xl sm:text-4xl">{heading(state, category)}</h1>
+        <h1 className="display text-3xl sm:text-4xl">{heading(state, category, genre)}</h1>
         {category?.description ? (
           <p className="mt-4 max-w-2xl text-lg text-smoke">{category.description}</p>
         ) : null}
@@ -125,6 +141,28 @@ export default async function BrowsePage({ searchParams }: BrowseProps) {
               href={browseHref(state, { category: item.slug })}
               aria-current={state.category === item.slug ? 'true' : undefined}
               className={chip(state.category === item.slug)}
+            >
+              {item.name}
+            </Link>
+          ))}
+        </nav>
+      ) : null}
+
+      {genres.length > 0 ? (
+        <nav aria-label="Genre" className="strip mt-3 py-1">
+          <Link
+            href={browseHref(state, { genre: undefined })}
+            aria-current={!state.genre ? 'true' : undefined}
+            className={chip(!state.genre)}
+          >
+            Any genre
+          </Link>
+          {genres.map((item) => (
+            <Link
+              key={item.slug}
+              href={browseHref(state, { genre: item.slug })}
+              aria-current={state.genre === item.slug ? 'true' : undefined}
+              className={chip(state.genre === item.slug)}
             >
               {item.name}
             </Link>

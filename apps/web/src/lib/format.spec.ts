@@ -1,5 +1,15 @@
 // SPDX-License-Identifier: AGPL-3.0-only
-import { describeLength, formatClock, formatRuntime, isoDuration, truncate } from './format';
+import {
+  describeLength,
+  formatClock,
+  formatDay,
+  formatMinutes,
+  formatRating,
+  formatRuntime,
+  groupCrew,
+  isoDuration,
+  truncate,
+} from './format';
 import type { TitleCard } from './types';
 
 describe('formatRuntime', () => {
@@ -71,5 +81,40 @@ describe('truncate', () => {
 
   it('cuts inside a word when there is no good place to break', () => {
     expect(truncate('Supercalifragilisticexpialidocious', 10)).toBe('Supercali…');
+  });
+});
+
+describe('facts of a title', () => {
+  it('writes a day, a length in minutes and a rating', () => {
+    expect(formatDay('2024-03-14')).toBe('March 14, 2024');
+    expect(formatDay(null)).toBeNull();
+    expect(formatDay('soon')).toBeNull();
+    expect(formatMinutes(118)).toBe('1 h 58 min');
+    expect(formatMinutes(0)).toBeNull();
+    expect(formatMinutes(undefined)).toBeNull();
+    expect(formatRating(8)).toBe('8.0');
+    expect(formatRating(0)).toBeNull();
+    expect(formatRating(null)).toBeNull();
+  });
+});
+
+describe('groupCrew', () => {
+  it('puts people of one job together, in the order the jobs come', () => {
+    const crew = [
+      { slug: 'leni', role: 'Director' },
+      { slug: 'sam', role: 'Writer' },
+      { slug: 'leni', role: 'Writer' },
+      { slug: 'ada', role: 'Director' },
+      { slug: 'ada', role: 'Director' },
+      { slug: 'noor', role: null },
+    ];
+    expect(
+      groupCrew(crew).map((group) => [group.job, group.people.map((person) => person.slug)]),
+    ).toEqual([
+      ['Director', ['leni', 'ada']],
+      ['Writer', ['sam', 'leni']],
+      ['Crew', ['noor']],
+    ]);
+    expect(groupCrew([])).toEqual([]);
   });
 });

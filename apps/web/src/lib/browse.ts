@@ -5,6 +5,7 @@ import { TITLE_SORTS, type TitleSort, type TitleType } from './types';
 export interface BrowseState {
   type?: TitleType;
   category?: string;
+  genre?: string;
   featured: boolean;
   sort: TitleSort;
   page: number;
@@ -22,10 +23,12 @@ export function parseBrowseParams(params: RawParams): BrowseState {
   const sort = first(params.sort);
   const page = Number(first(params.page));
   const category = first(params.category)?.trim();
+  const genre = first(params.genre)?.trim();
 
   return {
     type: type === 'MOVIE' || type === 'SERIES' ? type : undefined,
     category: category || undefined,
+    genre: genre || undefined,
     featured: first(params.featured) === 'true',
     sort: (TITLE_SORTS as readonly string[]).includes(sort ?? '') ? (sort as TitleSort) : 'newest',
     page: Number.isInteger(page) && page >= 1 && page <= 10_000 ? page : 1,
@@ -48,6 +51,9 @@ export function browseHref(state: BrowseState, changes: Partial<BrowseState> = {
   }
   if (next.category) {
     params.set('category', next.category);
+  }
+  if (next.genre) {
+    params.set('genre', next.genre);
   }
   if (next.featured) {
     params.set('featured', 'true');

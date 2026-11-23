@@ -4,6 +4,7 @@
 import { Search } from 'lucide-react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
+import { languageFromCookies, withLanguage } from '@/lib/language';
 import type { Page, TitleCard } from '@/lib/types';
 import { PosterCard } from './poster-card';
 
@@ -50,7 +51,11 @@ export function SearchScreen() {
       router.replace(`/search?q=${encodeURIComponent(query)}`, { scroll: false });
       try {
         const response = await fetch(
-          `/v1/catalog/titles?q=${encodeURIComponent(query)}&pageSize=${PAGE_SIZE}&sort=name`,
+          // In the language the viewer reads names in, so that those names are found.
+          withLanguage(
+            `/v1/catalog/titles?q=${encodeURIComponent(query)}&pageSize=${PAGE_SIZE}&sort=name`,
+            languageFromCookies(document.cookie),
+          ),
           { signal: controller.signal, headers: { Accept: 'application/json' } },
         );
         if (response.status === 429) {

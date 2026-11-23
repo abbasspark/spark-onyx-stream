@@ -31,6 +31,9 @@ import {
 import { PublicCatalogService, type Watcher } from './public-catalog.service.js';
 import type {
   PublicCategory,
+  PublicGenre,
+  PublicLanguages,
+  PublicPerson,
   PublicCollection,
   PublicCollectionDetail,
   PublicHome,
@@ -71,6 +74,30 @@ export class PublicCatalogController {
     @Query(new ZodValidationPipe(languageQuerySchema)) query: LanguageQuery,
   ): Promise<PublicHome> {
     return this.catalog.home(query.language);
+  }
+
+  @Get('genres')
+  @RateLimit(READS)
+  @Header('Cache-Control', CACHE_READS)
+  genres(): Promise<PublicGenre[]> {
+    return this.catalog.genres();
+  }
+
+  @Get('languages')
+  @RateLimit(READS)
+  @Header('Cache-Control', CACHE_READS)
+  languages(): Promise<PublicLanguages> {
+    return this.catalog.languages();
+  }
+
+  @Get('people/:slug')
+  @RateLimit(READS)
+  @Header('Cache-Control', CACHE_READS)
+  person(
+    @Param('slug', slugPipe) slug: string,
+    @Query(new ZodValidationPipe(languageQuerySchema)) query: LanguageQuery,
+  ): Promise<PublicPerson> {
+    return this.catalog.person(slug, query.language);
   }
 
   @Get('collections')

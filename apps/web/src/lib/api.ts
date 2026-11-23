@@ -1,15 +1,21 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 import 'server-only';
+import { cookies } from 'next/headers';
 import { connection } from 'next/server';
 import { siteConfig } from './config';
+import { LANGUAGE_COOKIE, readLanguage, withLanguage } from './language';
 import { NO_PLANS, type Plans } from './plans';
 import { TtlCache } from './ttl-cache';
 import type {
   Category,
   Channel,
+  Collection,
+  Genre,
   Guide,
   Home,
+  Languages,
   Page,
+  Person,
   TitleCard,
   TitleDetail,
   TitleSort,
@@ -67,8 +73,82 @@ async function read<Result>(path: string): Promise<Result> {
   return (await answers.get(path, () => load(path))) as Result;
 }
 
+/**
+ * The language this viewer reads titles in, from their cookie. Undefined is
+ * the language of the catalog.
+ */
+export async function currentLanguage(): Promise<string | undefined> {
+  return readLanguage((await cookies()).get(LANGUAGE_COOKIE)?.value);
+}
+
+/**
+ * Reads texts that exist in more than one language, in the viewer's. Every
+ * language has its own address and with it its own shared answer.
+ */
+async function readLocal<Result>(path: string): Promise<Result> {
+  return read<Result>(withLanguage(path, await currentLanguage()));
+}
+
+/**
+ * The same, for something that may not exist.
+ *
+ * @returns Null when the API says so, or does not know the address at all (an
+ *   older API). That answer is kept like any other, so asking again and again
+ *   for what does not exist does not reach the API each time.
+ */
+async function findLocal<Result>(path: string): Promise<Result | null> {
+  await connection();
+  const address = withLanguage(path, await currentLanguage());
+  const answer = await answers.get(address, async () => {
+    try {
+      return await load(address);
+    } catch (error) {
+      // 400 is a slug that cannot exist, which for a visitor is the same as not found.
+      if (error instanceof CatalogError && (error.status === 404 || error.status === 400)) {
+        return null;
+      }
+      throw error;
+    }
+  });
+  return answer as Result | null;
+}
+
 export function getHome(): Promise<Home> {
-  return read<Home>('/home');
+  return readLocal<Home>('/home');
+}
+
+/** The genres that have something to watch. An API older than genres has none. */
+export async function getGenres(): Promise<Genre[]> {
+  try {
+    return await read<Genre[]>('/genres');
+  } catch (error) {
+    if (error instanceof CatalogError && error.status === 404) {
+      return [];
+    }
+    throw error;
+  }
+}
+
+/** The languages on offer. An API older than translations offers only its own. */
+export async function getLanguages(): Promise<Languages> {
+  try {
+    return await read<Languages>('/languages');
+  } catch (error) {
+    if (error instanceof CatalogError && error.status === 404) {
+      return { default: 'en', translated: [] };
+    }
+    throw error;
+  }
+}
+
+/** @returns Null when nobody with something to watch has this slug. */
+export function getPerson(slug: string): Promise<Person | null> {
+  return findLocal<Person>(`/people/${encodeURIComponent(slug)}`);
+}
+
+/** @returns Null when no collection shown to viewers has this slug. */
+export function getCollection(slug: string): Promise<Collection | null> {
+  return findLocal<Collection>(`/collections/${encodeURIComponent(slug)}`);
 }
 
 /**
@@ -95,6 +175,7 @@ export interface TitleQuery {
   pageSize?: number;
   type?: TitleType;
   category?: string;
+  genre?: string;
   featured?: true;
   sort?: TitleSort;
 }
@@ -109,7 +190,7 @@ export function getTitles(query: TitleQuery = {}): Promise<Page<TitleCard>> {
   // Sorted, so the same question always has the same address and one shared answer.
   params.sort();
   const search = params.toString();
-  return read<Page<TitleCard>>(`/titles${search ? `?${search}` : ''}`);
+  return readLocal<Page<TitleCard>>(`/titles${search ? `?${search}` : ''}`);
 }
 
 /**
@@ -117,21 +198,8 @@ export function getTitles(query: TitleQuery = {}): Promise<Page<TitleCard>> {
  *   is kept like any other, so asking again and again for a title that does
  *   not exist does not reach the API each time.
  */
-export async function getTitle(slug: string): Promise<TitleDetail | null> {
-  await connection();
-  const path = `/titles/${encodeURIComponent(slug)}`;
-  const answer = await answers.get(path, async () => {
-    try {
-      return await load(path);
-    } catch (error) {
-      // 400 is a slug that cannot exist, which for a visitor is the same as not found.
-      if (error instanceof CatalogError && (error.status === 404 || error.status === 400)) {
-        return null;
-      }
-      throw error;
-    }
-  });
-  return answer as TitleDetail | null;
+export function getTitle(slug: string): Promise<TitleDetail | null> {
+  return findLocal<TitleDetail>(`/titles/${encodeURIComponent(slug)}`);
 }
 
 /**

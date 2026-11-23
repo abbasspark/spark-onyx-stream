@@ -70,9 +70,87 @@ export interface TitleDetail extends TitleCard {
   synopsis: string | null;
   originalLanguage: string | null;
   hasTrailer: boolean;
+  // Everything from here to "seasons" is left out by an API older than it.
+  /** What kind of story it is. */
+  genres?: GenreRef[];
+  /** The day of the premiere, such as "1999-03-31". */
+  releaseDate?: string | null;
+  /** Movies: the length. Series: what an episode usually runs. In minutes. */
+  runtimeMinutes?: number | null;
+  /** Where it was made, as codes of two letters. */
+  countries?: string[];
+  studios?: string[];
+  /** From 0 to 10, with the number of votes. */
+  rating?: number | null;
+  ratingCount?: number | null;
+  seriesStatus?: 'UPCOMING' | 'RUNNING' | 'ENDED' | 'CANCELLED' | null;
+  cast?: Credit[];
+  crew?: Credit[];
+  /** More videos around the title, free to watch. */
+  extras?: Extra[];
+  collections?: CollectionRef[];
   /** Where details and artwork were imported from, for example "tmdb". */
   metadataSource?: string | null;
   seasons: Season[];
+}
+
+export interface GenreRef {
+  slug: string;
+  name: string;
+}
+
+export interface Genre extends GenreRef {
+  titleCount: number;
+}
+
+/** One person's part in a title. */
+export interface Credit {
+  /** Of the person, for the address of their page. */
+  slug: string;
+  name: string;
+  /** The character played, or the job. */
+  role: string | null;
+  portrait: CatalogImage | null;
+}
+
+export interface Person {
+  slug: string;
+  name: string;
+  knownFor: string | null;
+  biography: string | null;
+  portrait: CatalogImage | null;
+  titles: (TitleCard & { role: string | null })[];
+}
+
+export type ExtraKind =
+  'TRAILER' | 'TEASER' | 'CLIP' | 'FEATURETTE' | 'BEHIND_THE_SCENES' | 'INTERVIEW' | 'BLOOPERS';
+
+export interface Extra {
+  id: string;
+  kind: ExtraKind;
+  name: string;
+  durationMs: number | null;
+}
+
+export interface CollectionRef {
+  slug: string;
+  name: string;
+}
+
+export interface Collection extends CollectionRef {
+  synopsis: string;
+  poster: CatalogImage | null;
+  backdrop: CatalogImage | null;
+  titleCount: number;
+  /** In the order of the collection. */
+  titles: TitleCard[];
+}
+
+/** The languages titles can be read in. */
+export interface Languages {
+  /** The language the catalog is written in, such as "en". */
+  default: string;
+  translated: { language: string; titles: number }[];
 }
 
 export interface HomeRow {

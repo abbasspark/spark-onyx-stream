@@ -7,7 +7,7 @@ import { firstEpisode, movieKey, watchHref } from '@/lib/watch';
 
 interface WatchPageProps {
   params: Promise<{ slug: string }>;
-  searchParams: Promise<{ trailer?: string }>;
+  searchParams: Promise<{ trailer?: string; extra?: string }>;
 }
 
 export async function generateMetadata({
@@ -23,14 +23,31 @@ export async function generateMetadata({
   };
 }
 
-/** Plays a movie, or with "?trailer=1" the trailer of any title. */
+/** Plays a movie, or with "?trailer=1" the trailer, or with "?extra=" one of the extras of any title. */
 export default async function WatchPage({ params, searchParams }: WatchPageProps) {
-  const [{ slug }, { trailer }] = await Promise.all([params, searchParams]);
+  const [{ slug }, { trailer, extra }] = await Promise.all([params, searchParams]);
   const title = await getTitle(slug);
   if (!title) {
     notFound();
   }
   const backHref = `/title/${title.slug}`;
+
+  if (extra) {
+    const found = title.extras?.find((item) => item.id === extra);
+    if (!found) {
+      redirect(backHref);
+    }
+    return (
+      <WatchScreen
+        playbackPath={`/v1/catalog/titles/${title.slug}/extras/${found.id}/playback`}
+        heading={title.name}
+        detail={found.name}
+        backHref={backHref}
+        progress={null}
+        next={null}
+      />
+    );
+  }
 
   if (trailer) {
     if (!title.hasTrailer) {

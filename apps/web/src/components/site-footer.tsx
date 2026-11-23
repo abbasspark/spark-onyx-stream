@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 import Link from 'next/link';
+import type { ReactNode } from 'react';
 import type { Category } from '@/lib/types';
 import { BandMark } from './brand';
 
@@ -8,11 +9,14 @@ export function SiteFooter({
   categories,
   hasPlans = false,
   hasLive = false,
+  languageSwitch = null,
 }: {
   siteName: string;
   categories: Category[];
   hasPlans?: boolean;
   hasLive?: boolean;
+  /** Shown when titles can be read in more than one language. */
+  languageSwitch?: ReactNode;
 }) {
   return (
     <footer className="gutter mt-24 border-t border-line pt-10 pb-12 text-sm text-smoke">
@@ -71,6 +75,7 @@ export function SiteFooter({
           ) : null}
         </nav>
       </div>
+      {languageSwitch ? <div className="mt-10">{languageSwitch}</div> : null}
       <p className="mt-10 text-xs text-dust">
         Runs on{' '}
         <a
