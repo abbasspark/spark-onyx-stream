@@ -558,7 +558,7 @@ function CollectionTitles({ collection, disabled, onSaved }: PartProps) {
           ) : null
         }
       />
-      <CardContent className="grid gap-4">
+      <CardContent className="grid grid-cols-[minmax(0,1fr)] gap-4">
         {disabled ? null : (
           <TitleSearch
             exclude={rows.map((title) => title.id)}
@@ -604,7 +604,9 @@ function CollectionTitles({ collection, disabled, onSaved }: PartProps) {
                     {title.releaseYear ? ` · ${title.releaseYear}` : ''}
                   </span>
                 </span>
-                <StatusBadge status={title.status} />
+                <span className="hidden sm:block">
+                  <StatusBadge status={title.status} />
+                </span>
                 {disabled ? null : (
                   <span className="flex shrink-0 items-center">
                     <Button
