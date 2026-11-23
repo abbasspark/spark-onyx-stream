@@ -23,6 +23,7 @@ export const PERMISSIONS = [
   'catalog:write',
   'viewers:read',
   'viewers:write',
+  'analytics:read',
   'billing:read',
   'billing:write',
   'live:read',
@@ -43,6 +44,7 @@ export const NON_DELEGABLE_PERMISSIONS: readonly Permission[] = ['admins:write',
 
 const CONTENT_READ: readonly Permission[] = [
   'catalog:read',
+  'analytics:read',
   'assets:read',
   'jobs:read',
   'encoding-profiles:read',

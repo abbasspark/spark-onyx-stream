@@ -18,7 +18,7 @@ import type { Request } from 'express';
 import { Public } from '../auth/auth.decorators.js';
 import type { Page } from '../common/pagination.js';
 import { ZodValidationPipe } from '../common/zod-validation.pipe.js';
-import type { PlaybackInfo } from '../playback/playback.service.js';
+import { requestInfo } from '../auth/request-info.js';
 import { RateLimit } from '../rate-limit/rate-limit.guard.js';
 import { ViewerSessionService } from '../viewers/viewer-session.service.js';
 import {
@@ -28,7 +28,7 @@ import {
   listPublicTitlesSchema,
   slugParamSchema,
 } from './public-catalog.schemas.js';
-import { PublicCatalogService, type Watcher } from './public-catalog.service.js';
+import { type PlayAnswer, PublicCatalogService, type Watcher } from './public-catalog.service.js';
 import type {
   PublicCategory,
   PublicGenre,
@@ -152,8 +152,8 @@ export class PublicCatalogController {
   async playTitle(
     @Param('slug', slugPipe) slug: string,
     @Req() request: Request,
-  ): Promise<PlaybackInfo> {
-    return this.catalog.playTitle(slug, await this.watcher(request));
+  ): Promise<PlayAnswer> {
+    return this.catalog.playTitle(slug, await this.watcher(request), requestInfo(request));
   }
 
   @Post('titles/:slug/extras/:id/playback')
@@ -165,8 +165,8 @@ export class PublicCatalogController {
     @Param('slug', slugPipe) slug: string,
     @Param('id', ParseUUIDPipe) id: string,
     @Req() request: Request,
-  ): Promise<PlaybackInfo> {
-    return this.catalog.playExtra(slug, id, await this.watcher(request));
+  ): Promise<PlayAnswer> {
+    return this.catalog.playExtra(slug, id, await this.watcher(request), requestInfo(request));
   }
 
   @Post('titles/:slug/trailer/playback')
@@ -177,8 +177,8 @@ export class PublicCatalogController {
   async playTrailer(
     @Param('slug', slugPipe) slug: string,
     @Req() request: Request,
-  ): Promise<PlaybackInfo> {
-    return this.catalog.playTrailer(slug, await this.watcher(request));
+  ): Promise<PlayAnswer> {
+    return this.catalog.playTrailer(slug, await this.watcher(request), requestInfo(request));
   }
 
   @Post('episodes/:id/playback')
@@ -189,8 +189,8 @@ export class PublicCatalogController {
   async playEpisode(
     @Param('id', ParseUUIDPipe) id: string,
     @Req() request: Request,
-  ): Promise<PlaybackInfo> {
-    return this.catalog.playEpisode(id, await this.watcher(request));
+  ): Promise<PlayAnswer> {
+    return this.catalog.playEpisode(id, await this.watcher(request), requestInfo(request));
   }
 
   /**

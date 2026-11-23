@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 import {
   Activity,
+  BarChart3,
   Database,
   DatabaseBackup,
   Film,
@@ -51,7 +52,16 @@ export interface NavGroup {
 export const NAVIGATION: NavGroup[] = [
   {
     label: 'Overview',
-    items: [{ to: '/', label: 'Dashboard', icon: LayoutDashboard, keywords: 'home overview' }],
+    items: [
+      { to: '/', label: 'Dashboard', icon: LayoutDashboard, keywords: 'home overview' },
+      {
+        to: '/analytics',
+        label: 'Analytics',
+        icon: BarChart3,
+        permission: 'analytics:read',
+        keywords: 'views viewers watch time statistics figures audience popular top',
+      },
+    ],
   },
   {
     label: 'Catalog',

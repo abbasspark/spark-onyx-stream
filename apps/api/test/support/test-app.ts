@@ -16,6 +16,7 @@ import { EventsModule } from '../../src/events/events.module.js';
 import { DatabaseModule } from '../../src/database/database.module.js';
 import type { QueuedJobData } from '../../src/jobs/jobs.service.js';
 import { ProcessingCoreModule } from '../../src/processing/processing.module.js';
+import { PlaysModule } from '../../src/analytics/analytics.module.js';
 import { PROCESSING_QUEUE } from '../../src/queue/queue.constants.js';
 import { MailModule } from '../../src/mail/mail.module.js';
 import { MailService } from '../../src/mail/mail.service.js';
@@ -294,6 +295,7 @@ export async function createTestApp(
       AuditModule,
       StorageModule,
       ProcessingCoreModule,
+      PlaysModule,
       DeliveryCoreModule,
       MailModule,
       ...featureModules,
@@ -341,6 +343,7 @@ export async function createTestApp(
       queue.clear();
       await prisma.translationJob.deleteMany();
       await prisma.homeSection.deleteMany();
+      await prisma.play.deleteMany();
       await prisma.auditLog.deleteMany();
       await prisma.backup.deleteMany();
       await prisma.setting.deleteMany();

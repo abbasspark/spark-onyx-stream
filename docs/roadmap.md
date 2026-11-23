@@ -70,3 +70,4 @@ Before the apps, the panel becomes a fuller catalog system. This work is outside
 6. Actions on many movies or series at once, on a selection or on everything the filters match, including translating them into a language in the background. **Done.**
 7. Subtitle files for a video: added in the panel or found beside a video in a watched location, converted to WebVTT and offered by the player without processing the video again. **Done.**
 8. A home page arranged in the panel: an opening with titles that take turns, rows from categories, genres, collections or hand-picked titles, three looks for a row, and dates for rows of a season. **Done.**
+9. Viewing statistics: what is watched, how long, by how many and on what, per day and per title, recorded without addresses. **Done.** See [viewing-statistics.md](viewing-statistics.md).

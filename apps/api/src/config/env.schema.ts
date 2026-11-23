@@ -64,6 +64,14 @@ export const envSchema = z
      */
     WATCH_SETTLE_SECONDS: z.coerce.number().int().min(0).max(3600).default(60),
 
+    /**
+     * Whether it is recorded what is watched, for the figures in the panel.
+     * "off" records nothing: the figures stay empty.
+     */
+    VIEWING_STATISTICS: z.enum(['on', 'off']).default('on'),
+    /** How long a record of a play is kept, in days. 0 keeps them for good. */
+    VIEWING_STATISTICS_DAYS: z.coerce.number().int().min(0).max(3650).default(730),
+
     /** How long a playback URL stays valid, in seconds. Long videos get more time automatically. */
     PLAYBACK_URL_TTL_SECONDS: z.coerce
       .number()
