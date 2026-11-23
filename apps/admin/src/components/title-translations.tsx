@@ -508,12 +508,20 @@ interface AddLanguageDialogProps {
   open: boolean;
   /** Languages the title has already. */
   taken: readonly string[];
+  /** What to say when a typed language is taken. */
+  takenMessage?: string;
   onClose: () => void;
   onPick: (language: string) => void;
 }
 
 /** Chooses the language to add: one in use elsewhere, a common one, or any tag. */
-function AddLanguageDialog({ open, taken, onClose, onPick }: AddLanguageDialogProps) {
+export function AddLanguageDialog({
+  open,
+  taken,
+  takenMessage = 'The title has this language already.',
+  onClose,
+  onPick,
+}: AddLanguageDialogProps) {
   const used = useQuery({
     queryKey: ['translations', 'languages'],
     queryFn: ({ signal }) => translationsApi.languages(signal),
@@ -547,7 +555,7 @@ function AddLanguageDialog({ open, taken, onClose, onPick }: AddLanguageDialogPr
     choice === 'other' && typed.trim() && !tag
       ? 'Write a tag such as "sr", "pt-BR" or "zh-Hant".'
       : tag && taken.includes(tag)
-        ? 'The title has this language already.'
+        ? takenMessage
         : null;
 
   return (

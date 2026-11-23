@@ -863,6 +863,7 @@ model Category {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
+  translations CategoryTranslation[]
   titles       TitleCategory[]
   homeSections HomeSection[]
 
@@ -967,6 +968,62 @@ model EpisodeTranslation {
   @@map("episode_translations")
 }
 
+/// The name and the description of a category in one more language. An empty
+/// field falls back to the category's own, like the translations of a title.
+model CategoryTranslation {
+  categoryId  String   @db.Uuid
+  category    Category @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  language    String
+  name        String?
+  description String?
+  updatedAt   DateTime @updatedAt
+
+  @@id([categoryId, language])
+  @@index([language])
+  @@map("category_translations")
+}
+
+model GenreTranslation {
+  genreId   String   @db.Uuid
+  genre     Genre    @relation(fields: [genreId], references: [id], onDelete: Cascade)
+  language  String
+  name      String?
+  updatedAt DateTime @updatedAt
+
+  @@id([genreId, language])
+  @@index([language])
+  @@map("genre_translations")
+}
+
+model CollectionTranslation {
+  collectionId String     @db.Uuid
+  collection   Collection @relation(fields: [collectionId], references: [id], onDelete: Cascade)
+  language     String
+  name         String?
+  synopsis     String?
+  updatedAt    DateTime   @updatedAt
+
+  @@id([collectionId, language])
+  @@index([language])
+  @@map("collection_translations")
+}
+
+/// A person in one more language: the name as it is written there, what they
+/// are known for, and the biography.
+model PersonTranslation {
+  personId  String   @db.Uuid
+  person    Person   @relation(fields: [personId], references: [id], onDelete: Cascade)
+  language  String
+  name      String?
+  knownFor  String?
+  biography String?
+  updatedAt DateTime @updatedAt
+
+  @@id([personId, language])
+  @@index([language])
+  @@map("person_translations")
+}
+
 enum ExtraKind {
   TRAILER
   TEASER
@@ -1021,6 +1078,7 @@ model Collection {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  translations CollectionTranslation[]
   titles       CollectionTitle[]
   homeSections HomeSection[]
 
@@ -1051,6 +1109,7 @@ model Genre {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  translations GenreTranslation[]
   titles       TitleGenre[]
   homeSections HomeSection[]
 
@@ -1085,7 +1144,8 @@ model Person {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  credits Credit[]
+  translations PersonTranslation[]
+  credits      Credit[]
 
   @@unique([metadataSource, metadataId])
   @@index([name])

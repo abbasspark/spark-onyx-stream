@@ -84,6 +84,27 @@ The texts of a title are written in one language, the language of the catalog. A
 
 On the public side, `language` is accepted by `GET /catalog/home`, `/catalog/titles`, `/catalog/titles/{slug}`, `/catalog/collections/{slug}` and `/catalog/people/{slug}`. `GET /catalog/languages` says which languages are on offer: the catalog's own, and those at least one visible title is translated into.
 
+### Categories, genres, collections and people
+
+The names viewers see around the titles are translated too: the name and description of a category, the name of a genre, the name and synopsis of a collection, and the name, "known for" and biography of a person.
+
+- **One page in the panel, Catalog > Translations,** for all four. Choose a language; each kind shows how many of its entries have something in it.
+- **A sheet, not a form per entry:** every entry with its name in the language of the catalog and a field beside it. Enter goes to the next line. Longer texts open under the entry, with the original next to them.
+- **Search looks in both languages; "Only what is missing"** leaves the entries with nothing in the chosen language. The number of titles beside each entry tells the ones that matter from the rest.
+- **Everything typed is saved together,** up to 200 entries at once. An entry emptied of all its texts loses its translation.
+- **The same rules as for titles:** an empty text shows in the language of the catalog, and `de-AT` gets `de`. A person whose name is written the same everywhere needs none.
+- **Viewers read them** in the lists of categories, genres and collections, in the facts and cast of a title, on the pages of people, collections, categories and genres, on every card, and in the heading of a row that is called after a category, genre or collection. A heading typed in the layout builder stays as typed.
+- A language can be taken away from a kind as a whole. Translations go with their entry when it is deleted.
+
+| Method and path                                | Purpose                                                                                |
+| ---------------------------------------------- | -------------------------------------------------------------------------------------- |
+| `GET /translations/terms`                      | The four kinds with their texts and totals, and per language how many are translated   |
+| `GET /translations/terms/{kind}`               | A page of entries with their translation into `language`; `q` searches, `missing=true` |
+| `PUT /translations/terms/{kind}/{language}`    | `{ items: [{ id, texts }] }`: texts left out stay, empty ones are removed              |
+| `DELETE /translations/terms/{kind}/{language}` | Remove the language from every entry of the kind                                       |
+
+`kind` is `categories`, `genres`, `collections` or `people`. On the public side, `language` is now also accepted by `GET /catalog/categories`, `/catalog/genres`, `/catalog/collections` and the pages of categories and genres.
+
 ## Many titles at once
 
 On the lists of movies and series, titles can be selected and changed together.

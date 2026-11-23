@@ -9,6 +9,7 @@ import {
 import { type Prisma, PrismaClient } from '@onyx/database';
 import { CARD_INCLUDE, type CardTitle } from '../catalog/card-include.js';
 import { visibleTitle } from '../catalog/playable.js';
+import { TermTranslationsService } from '../catalog/term-translations.service.js';
 import { browsePath, defaultSectionName, isShownAt } from './home-names.js';
 import {
   type CreateSectionInput,
@@ -185,7 +186,10 @@ export interface PageSummary {
  */
 @Injectable()
 export class HomeService {
-  constructor(@Inject(PrismaClient) private readonly prisma: PrismaClient) {}
+  constructor(
+    @Inject(PrismaClient) private readonly prisma: PrismaClient,
+    @Inject(TermTranslationsService) private readonly terms: TermTranslationsService,
+  ) {}
 
   // --- For viewers ----------------------------------------------------------------
 
@@ -193,6 +197,7 @@ export class HomeService {
     page: LayoutPage = 'HOME',
     now: Date = new Date(),
     scope?: PageScope,
+    language?: string,
   ): Promise<HomeLayoutResult> {
     const sections = await this.prisma.homeSection.findMany({
       where: { page },
@@ -201,9 +206,14 @@ export class HomeService {
     });
     if (sections.length === 0) {
       // Only the home page has a page of its own without sections.
-      return page === 'HOME' ? this.automatic(now) : { custom: false, hero: null, rows: [] };
+      return page === 'HOME'
+        ? this.automatic(now, language)
+        : { custom: false, hero: null, rows: [] };
     }
-    const shown = sections.filter((section) => isShownAt(section, now));
+    const shown = await this.inLanguage(
+      sections.filter((section) => isShownAt(section, now)),
+      language,
+    );
     const resolved = await Promise.all(
       shown.map(async (section) => ({
         section,
@@ -239,8 +249,37 @@ export class HomeService {
     return { custom: true, hero: hero && hero.titles.length > 0 ? hero.titles : null, rows };
   }
 
+  /**
+   * Sections with the names of their category, genre or collection in a
+   * language, so a row that is called after one reads in that language too.
+   * A heading an admin typed stays as typed.
+   */
+  private async inLanguage(
+    sections: SectionRecord[],
+    language: string | undefined,
+  ): Promise<SectionRecord[]> {
+    if (!language || sections.length === 0) {
+      return sections;
+    }
+    const [categories, genres, collections] = await Promise.all([
+      this.terms.names('category', language),
+      this.terms.names('genre', language),
+      this.terms.names('collection', language),
+    ]);
+    const named = <Ref extends { slug: string; name: string }>(
+      ref: Ref | null,
+      names: Map<string, string>,
+    ): Ref | null => (ref ? { ...ref, name: names.get(ref.slug) ?? ref.name } : null);
+    return sections.map((section) => ({
+      ...section,
+      category: named(section.category, categories),
+      genre: named(section.genre, genres),
+      collection: named(section.collection, collections),
+    }));
+  }
+
   /** The page as it was before it could be arranged, and still is until someone does. */
-  private async automatic(now: Date): Promise<HomeLayoutResult> {
+  private async automatic(now: Date, language?: string): Promise<HomeLayoutResult> {
     const row = (where: Prisma.TitleWhereInput) =>
       this.prisma.title.findMany({
         where: { AND: [visibleTitle(now), where] },
@@ -248,12 +287,19 @@ export class HomeService {
         include: CARD_INCLUDE,
         take: AUTOMATIC_ROW_SIZE,
       });
-    const categories = await this.prisma.category.findMany({
-      where: { titles: { some: { title: visibleTitle(now) } } },
-      orderBy: [{ sortOrder: 'asc' }, { name: 'asc' }],
-      take: AUTOMATIC_CATEGORY_ROWS,
-      select: { slug: true, name: true },
-    });
+    const [found, names] = await Promise.all([
+      this.prisma.category.findMany({
+        where: { titles: { some: { title: visibleTitle(now) } } },
+        orderBy: [{ sortOrder: 'asc' }, { name: 'asc' }],
+        take: AUTOMATIC_CATEGORY_ROWS,
+        select: { slug: true, name: true },
+      }),
+      this.terms.names('category', language),
+    ]);
+    const categories = found.map((category) => ({
+      slug: category.slug,
+      name: names.get(category.slug) ?? category.name,
+    }));
     const [featured = [], latest = [], ...perCategory] = await Promise.all([
       row({ isFeatured: true }),
       row({}),

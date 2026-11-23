@@ -133,8 +133,10 @@ export class PublicCatalogController {
   @Get('genres')
   @RateLimit(READS)
   @Header('Cache-Control', CACHE_READS)
-  genres(): Promise<PublicGenre[]> {
-    return this.catalog.genres();
+  genres(
+    @Query(new ZodValidationPipe(languageQuerySchema)) query: LanguageQuery,
+  ): Promise<PublicGenre[]> {
+    return this.catalog.genres(query.language);
   }
 
   @Get('languages')
@@ -157,8 +159,10 @@ export class PublicCatalogController {
   @Get('collections')
   @RateLimit(READS)
   @Header('Cache-Control', CACHE_READS)
-  collections(): Promise<PublicCollection[]> {
-    return this.catalog.collections();
+  collections(
+    @Query(new ZodValidationPipe(languageQuerySchema)) query: LanguageQuery,
+  ): Promise<PublicCollection[]> {
+    return this.catalog.collections(query.language);
   }
 
   @Get('collections/:slug')
@@ -174,8 +178,10 @@ export class PublicCatalogController {
   @Get('categories')
   @RateLimit(READS)
   @Header('Cache-Control', CACHE_READS)
-  categories(): Promise<PublicCategory[]> {
-    return this.catalog.categories();
+  categories(
+    @Query(new ZodValidationPipe(languageQuerySchema)) query: LanguageQuery,
+  ): Promise<PublicCategory[]> {
+    return this.catalog.categories(query.language);
   }
 
   @Get('titles')

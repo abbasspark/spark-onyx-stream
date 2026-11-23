@@ -49,6 +49,8 @@ const ACTION_LABELS: Record<string, string> = {
   'auth.recovery_codes_new': 'Made new recovery codes',
   'auth.recovery_code_used': 'Signed in with a recovery code',
   'admin.two_factor_reset': 'Took two-factor sign-in off an admin',
+  'terms.translation.save': 'Saved translations of names',
+  'terms.translation.delete': 'Removed a language from names',
   'role.create': 'Made a role',
   'role.update': 'Changed a role',
   'role.delete': 'Deleted a role',

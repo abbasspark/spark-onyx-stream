@@ -32,6 +32,7 @@ import { PlansPage } from './pages/plans-page';
 import { RevenuePage } from './pages/revenue-page';
 import { AdminsPage } from './pages/admins-page';
 import { RolesPage } from './pages/roles-page';
+import { TranslationsPage } from './pages/translations-page';
 import { ApiKeysPage } from './pages/api-keys-page';
 import { AssetsPage } from './pages/assets-page';
 import { AuditPage } from './pages/audit-page';
@@ -158,6 +159,7 @@ function Pages() {
             <Route path="diagnostics" element={<DiagnosticsPage />} />
             <Route path="admins" element={<AdminsPage />} />
             <Route path="roles" element={<RolesPage />} />
+            <Route path="translations" element={<TranslationsPage />} />
             <Route path="api-keys" element={<ApiKeysPage />} />
             <Route path="audit" element={<AuditPage />} />
             <Route path="account" element={<AccountPage />} />
