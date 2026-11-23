@@ -17,7 +17,7 @@ import {
 } from '@/components/ui/display';
 import { Field, Input } from '@/components/ui/form';
 import { cn } from '@/lib/cn';
-import { humanize } from '@/lib/format';
+import { roleName } from '@/lib/roles';
 import { type ThemeChoice, useTheme } from '@/theme/theme';
 
 const THEMES: [ThemeChoice, typeof Sun, string][] = [
@@ -71,7 +71,7 @@ export function AccountPage() {
               items={[
                 ['Name', state.me.displayName],
                 ['Email', state.me.email],
-                ['Role', humanize(state.me.role)],
+                ['Role', roleName(state.me)],
               ]}
             />
           </CardContent>

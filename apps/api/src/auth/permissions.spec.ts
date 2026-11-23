@@ -3,6 +3,9 @@ import {
   effectiveApiKeyPermissions,
   hasAllPermissions,
   PERMISSIONS,
+  missingPermissions,
+  normalizePermissions,
+  permissionsOf,
   permissionsOfRole,
 } from './permissions.js';
 
@@ -34,28 +37,30 @@ describe('permissionsOfRole', () => {
 
 describe('effectiveApiKeyPermissions', () => {
   it('keeps scopes the creator holds', () => {
-    expect(effectiveApiKeyPermissions(['assets:read', 'assets:write'], 'EDITOR')).toEqual([
-      'assets:read',
-      'assets:write',
-    ]);
+    expect(
+      effectiveApiKeyPermissions(['assets:read', 'assets:write'], permissionsOfRole('EDITOR')),
+    ).toEqual(['assets:read', 'assets:write']);
   });
 
   it('drops scopes the creator no longer holds', () => {
-    expect(effectiveApiKeyPermissions(['assets:write', 'settings:write'], 'EDITOR')).toEqual([
-      'assets:write',
-    ]);
+    expect(
+      effectiveApiKeyPermissions(['assets:write', 'settings:write'], permissionsOfRole('EDITOR')),
+    ).toEqual(['assets:write']);
   });
 
   it('never grants non-delegable permissions, even for an owner', () => {
     expect(
-      effectiveApiKeyPermissions(['admins:write', 'api-keys:write', 'admins:read'], 'OWNER'),
+      effectiveApiKeyPermissions(
+        ['admins:write', 'api-keys:write', 'admins:read'],
+        permissionsOfRole('OWNER'),
+      ),
     ).toEqual(['admins:read']);
   });
 
   it('ignores unknown scopes', () => {
-    expect(effectiveApiKeyPermissions(['assets:read', 'everything'], 'OWNER')).toEqual([
-      'assets:read',
-    ]);
+    expect(
+      effectiveApiKeyPermissions(['assets:read', 'everything'], permissionsOfRole('OWNER')),
+    ).toEqual(['assets:read']);
   });
 });
 
@@ -67,5 +72,43 @@ describe('hasAllPermissions', () => {
 
   it('allows anything when nothing is required', () => {
     expect(hasAllPermissions([], [])).toBe(true);
+  });
+});
+
+describe('permissionsOf', () => {
+  it('follows the built-in role', () => {
+    expect(permissionsOf({ role: 'VIEWER' })).toEqual(permissionsOfRole('VIEWER'));
+  });
+
+  it('follows the custom role, without what the code does not know', () => {
+    expect(
+      permissionsOf({ role: 'CUSTOM', customRole: { permissions: ['viewers:read', 'gone:read'] } }),
+    ).toEqual(['viewers:read']);
+  });
+
+  it('grants nothing when the custom role is missing', () => {
+    expect(permissionsOf({ role: 'CUSTOM', customRole: null })).toEqual([]);
+  });
+});
+
+describe('normalizePermissions', () => {
+  it('adds seeing an area to changing it, in the order of the list', () => {
+    expect(normalizePermissions(['viewers:write', 'catalog:read'])).toEqual([
+      'catalog:read',
+      'viewers:read',
+      'viewers:write',
+    ]);
+  });
+
+  it('drops doubles and unknown entries', () => {
+    expect(normalizePermissions(['audit:read', 'audit:read', 'nothing'])).toEqual(['audit:read']);
+  });
+});
+
+describe('missingPermissions', () => {
+  it('lists what is wanted and not held', () => {
+    expect(missingPermissions(['catalog:read'], ['catalog:read', 'catalog:write'])).toEqual([
+      'catalog:write',
+    ]);
   });
 });

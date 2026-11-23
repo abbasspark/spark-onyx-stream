@@ -1,6 +1,10 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 import { download, request, requestText, uploadFile } from './client';
 import type {
+  Role,
+  RoleDetail,
+  RoleInput,
+  RolesOverview,
   TwoFactorSetup,
   TwoFactorStatus,
   Coupon,
@@ -247,6 +251,20 @@ export const adminsApi = {
   /** Takes two-factor sign-in off an admin who is locked out, and signs them out. */
   resetTwoFactor: (id: string) =>
     request<void>(`/v1/admins/${id}/two-factor`, { method: 'DELETE' }),
+};
+
+export const rolesApi = {
+  overview: (signal?: AbortSignal) => request<RolesOverview>('/v1/roles', { signal }),
+  get: (id: string, signal?: AbortSignal) => request<RoleDetail>(`/v1/roles/${id}`, { signal }),
+  create: (body: RoleInput) => request<Role>('/v1/roles', { method: 'POST', body }),
+  update: (id: string, body: Partial<RoleInput>) =>
+    request<Role>(`/v1/roles/${id}`, { method: 'PATCH', body }),
+  /** Deletes a role. `moveTo` is the role its holders get: a built-in name or a role id. */
+  remove: (id: string, moveTo?: string) =>
+    request<{ movedAdmins: number }>(`/v1/roles/${id}`, {
+      method: 'DELETE',
+      query: moveTo ? { moveTo } : undefined,
+    }),
 };
 
 export interface ViewerListQuery {

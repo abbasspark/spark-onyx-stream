@@ -8,6 +8,8 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { type AdminUser, PrismaClient } from '@onyx/database';
+import { manageDenialReason } from '../admins/admin.rules.js';
+import { subjectOfAdmin, subjectOfPrincipal } from '../admins/admin.view.js';
 import { AuditService } from '../audit/audit.service.js';
 import { AppConfig } from '../config/app-config.js';
 import { SecretBox } from '../crypto/secret-box.js';
@@ -259,7 +261,7 @@ export class TwoFactorService {
    * and set it up again.
    *
    * @throws BadRequestException for one's own account: that is done with the password and a code.
-   * @throws ForbiddenException when the target is an owner and the actor is not.
+   * @throws ForbiddenException when the target is an owner and the actor is not, or may do more than the actor.
    * @throws NotFoundException
    */
   async resetFor(principal: AdminPrincipal, targetId: string, info: RequestInfo): Promise<void> {
@@ -268,12 +270,18 @@ export class TwoFactorService {
         'Switch your own two-factor sign-in off under your account, with your password and a code',
       );
     }
-    const target = await this.prisma.adminUser.findUnique({ where: { id: targetId } });
+    const target = await this.prisma.adminUser.findUnique({
+      where: { id: targetId },
+      include: { customRole: true },
+    });
     if (!target) {
       throw new NotFoundException('Admin not found');
     }
-    if (target.role === 'OWNER' && principal.role !== 'OWNER') {
-      throw new ForbiddenException('Only an owner can change another owner');
+    // Taking the second factor off is a step towards the account, like a
+    // password reset, so the same rule decides who may do it.
+    const denial = manageDenialReason(subjectOfPrincipal(principal), subjectOfAdmin(target));
+    if (denial) {
+      throw new ForbiddenException(denial);
     }
     if (!target.totpEnabledAt && !target.totpSecret) {
       throw new ConflictException('This admin has no two-factor sign-in to take off');

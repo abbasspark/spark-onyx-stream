@@ -16,7 +16,7 @@ import {
   IS_PUBLIC_KEY,
   REQUIRED_PERMISSIONS_KEY,
 } from './auth.decorators.js';
-import { hasAllPermissions, type Permission, permissionsOfRole } from './permissions.js';
+import { hasAllPermissions, type Permission, permissionsOf } from './permissions.js';
 import type { AuthenticatedRequest, Principal } from './principal.js';
 import { bearerToken } from './request-info.js';
 import { SessionService } from './session.service.js';
@@ -97,7 +97,14 @@ export class AuthGuard implements CanActivate {
           email: found.admin.email,
           displayName: found.admin.displayName,
           role: found.admin.role,
-          permissions: permissionsOfRole(found.admin.role),
+          customRole: found.admin.customRole
+            ? {
+                id: found.admin.customRole.id,
+                name: found.admin.customRole.name,
+                color: found.admin.customRole.color,
+              }
+            : null,
+          permissions: permissionsOf(found.admin),
           twoFactorEnabled: found.admin.totpEnabledAt !== null,
           twoFactorSetupRequired:
             this.config.adminTwoFactorRequired && found.admin.totpEnabledAt === null,

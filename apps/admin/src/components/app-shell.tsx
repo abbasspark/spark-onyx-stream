@@ -20,6 +20,7 @@ import { useSession } from '@/auth/session';
 import { cn } from '@/lib/cn';
 import { markOf } from '@/lib/diagnostics';
 import { humanize } from '@/lib/format';
+import { roleName } from '@/lib/roles';
 import { findNavItem, NAVIGATION } from '@/lib/navigation';
 import { SITE_URL } from '@/lib/site';
 import { useLiveState } from '@/live/live';
@@ -171,7 +172,7 @@ export function AppShell() {
                 <span className="grid min-w-0 flex-1 leading-tight">
                   <span className="truncate text-sm font-medium">{state.me.displayName}</span>
                   <span className="truncate text-xs text-muted-foreground">
-                    {humanize(state.me.role)}
+                    {roleName(state.me)}
                   </span>
                 </span>
                 <ChevronsUpDown className="size-4 text-muted-foreground" aria-hidden="true" />

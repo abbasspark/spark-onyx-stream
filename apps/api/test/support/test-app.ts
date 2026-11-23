@@ -372,6 +372,7 @@ export async function createTestApp(
       await prisma.encodingProfile.deleteMany();
       await prisma.storagePool.deleteMany();
       await prisma.adminUser.deleteMany();
+      await prisma.adminCustomRole.deleteMany();
       await prisma.viewer.deleteMany();
       // After the viewers, whose subscriptions point to plans.
       await prisma.plan.deleteMany();
