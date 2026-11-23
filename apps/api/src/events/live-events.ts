@@ -48,6 +48,12 @@ export type LiveEvent =
       backupId: string;
     }
   | {
+      /** A watched location was changed or looked through, or one of its files moved on. */
+      type: 'watch';
+      /** Null when files of several locations changed. */
+      locationId: string | null;
+    }
+  | {
       type: 'channel';
       channelId: string;
       /** "status" is sent by the live process when a channel starts, stops or reconnects. */
@@ -63,6 +69,7 @@ export const EVENT_PERMISSIONS: Record<LiveEvent['type'], Permission> = {
   recording: 'live:read',
   edge: 'delivery:read',
   backup: 'settings:read',
+  watch: 'catalog:read',
 };
 
 /** Reads an event from its channel message. Null when the message is not a valid event. */

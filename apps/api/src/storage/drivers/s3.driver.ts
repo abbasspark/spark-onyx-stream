@@ -172,7 +172,19 @@ export class S3StorageDriver implements StorageDriver {
 
   async *list(prefix: string): AsyncIterable<StorageListEntry> {
     // The trailing slash makes "assets/abc" match "assets/abc/x" and not "assets/abcd/x".
-    const objectPrefix = `${this.objectKey(prefix)}/`;
+    yield* this.listUnder(`${this.objectKey(prefix)}/`);
+  }
+
+  async *listAll(): AsyncIterable<StorageListEntry> {
+    for await (const entry of this.listUnder(this.keyPrefix)) {
+      // Some tools mark folders with an empty object whose name ends in a slash.
+      if (entry.key !== '' && !entry.key.endsWith('/')) {
+        yield entry;
+      }
+    }
+  }
+
+  private async *listUnder(objectPrefix: string): AsyncIterable<StorageListEntry> {
     const pages = paginateListObjectsV2(
       { client: this.client },
       { Bucket: this.bucket, Prefix: objectPrefix },

@@ -21,6 +21,7 @@ type LiveEvent =
   | { type: 'recording'; recordingId: string }
   | { type: 'edge'; edgeId: string }
   | { type: 'backup'; backupId: string }
+  | { type: 'watch'; locationId: string | null }
   | { type: 'channel'; channelId: string; change: 'created' | 'updated' | 'deleted' | 'status' };
 
 export type LiveState = 'connecting' | 'live' | 'offline';
@@ -112,6 +113,10 @@ export function LiveProvider({ children }: { children: ReactNode }) {
       }
       if (event.type === 'backup') {
         refresh(['backups']);
+        return;
+      }
+      if (event.type === 'watch') {
+        refresh(['watch']);
         return;
       }
       if (event.type === 'channel') {

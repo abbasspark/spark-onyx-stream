@@ -98,6 +98,17 @@ export function describeStorageDriverContract(createDriver: () => Promise<Storag
     expect(await keysUnder('assets/none')).toEqual([]);
   });
 
+  it('lists everything it holds, with keys from its root', async () => {
+    await driver.write('top.mkv', Buffer.from('1'));
+    await driver.write('in/deep/603_x.mkv', Buffer.from('22'));
+
+    const keys: string[] = [];
+    for await (const entry of driver.listAll()) {
+      keys.push(entry.key);
+    }
+    expect(keys.sort()).toEqual(['in/deep/603_x.mkv', 'top.mkv']);
+  });
+
   it('deletes everything under a prefix and nothing else', async () => {
     await driver.write('assets/abc/master.m3u8', Buffer.from('1'));
     await driver.write('assets/abc/v/720p/seg-1.m4s', Buffer.from('2'));

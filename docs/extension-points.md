@@ -37,6 +37,8 @@ export interface StorageDriver {
   delete(key: string): Promise<void>;
   deletePrefix(prefix: string): Promise<number>;
   list(prefix: string): AsyncIterable<StorageListEntry>;
+  /** Everything the driver can see, for places that are looked through as a whole. */
+  listAll(): AsyncIterable<StorageListEntry>;
   localPath?(key: string): string;
   close?(): Promise<void>;
 }

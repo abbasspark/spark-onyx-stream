@@ -12,6 +12,7 @@
 | [phase-4-live.md](phase-4-live.md)                 | Live channels, the guide, going back in time and recording           |
 | [phase-5-edges.md](phase-5-edges.md)               | Edge servers: how they deliver, who is sent where, how to set one up |
 | [phase-6-operations.md](phase-6-operations.md)     | Backups, the installer, updates with rollback, diagnostics           |
+| [watched-locations.md](watched-locations.md)       | Folders and buckets that import videos named by their TMDB id        |
 | [extension-points.md](extension-points.md)         | Interfaces that let features be added without changing the core      |
 
 These documents describe the plan. Where code and documents disagree, the code is right and the document needs an update.

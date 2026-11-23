@@ -221,7 +221,7 @@ All need `catalog:write`, except the first, which needs `catalog:read`.
 - Translated names in what a viewer is watching (the "continue watching" row)
 - Extras from the source: an import brings no trailers
 - Collections and rows for the home page
-- Other sources than TMDB, and importing many titles at once
+- Other sources than TMDB. Many titles at once come in through [watched locations](watched-locations.md)
 - Trailers from the source. A trailer is a video of your own library
 - Resized artwork, and choosing a poster from a video's own pictures
 - Subtitles uploaded as separate files
