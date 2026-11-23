@@ -16,7 +16,7 @@ import { titlePath } from './lib/catalog';
 import { LiveProvider } from './live/live';
 import { AccountPage } from './pages/account-page';
 import { AnalyticsPage } from './pages/analytics-page';
-import { HomePageBuilder } from './pages/home-page';
+import { LayoutPage } from './pages/layout-page';
 import { EmailPage } from './pages/email-page';
 import { ChannelsPage } from './pages/channels-page';
 import { DeliveryPage } from './pages/delivery-page';
@@ -119,7 +119,10 @@ function Pages() {
             <Route path="movies/:id" element={<TitleEditorPage />} />
             <Route path="series" element={<SeriesPage />} />
             <Route path="series/:id" element={<TitleEditorPage />} />
-            <Route path="home-page" element={<HomePageBuilder />} />
+            <Route path="layout/:page" element={<LayoutPage />} />
+            <Route path="layout" element={<Navigate to="/layout/home" replace />} />
+            {/* The address from before other pages could be arranged. */}
+            <Route path="home-page" element={<Navigate to="/layout/home" replace />} />
             <Route path="collections" element={<CollectionsPage />} />
             <Route path="collections/:id" element={<CollectionEditorPage />} />
             <Route path="people" element={<PeoplePage />} />

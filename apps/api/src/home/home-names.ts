@@ -20,12 +20,16 @@ const KIND_WORD = { MOVIE: 'movies', SERIES: 'series' } as const;
 /**
  * What a section is called when nobody gave it a heading: after what it
  * shows. "New movies", "Top rated", "Drama series", the name of a collection.
+ *
+ * @param pageType The kind of title the page of the section is about, if it is about one.
  */
-export function defaultSectionName(section: NamedSection): string {
+export function defaultSectionName(section: NamedSection, pageType: TitleType = null): string {
   if (section.kind === 'CONTINUE_WATCHING') {
     return 'Continue watching';
   }
-  const kind = section.titleType ? KIND_WORD[section.titleType] : null;
+  // On the page for movies, "New" says enough: "New movies" would repeat the page.
+  const kind =
+    section.titleType && section.titleType !== pageType ? KIND_WORD[section.titleType] : null;
   const withKind = (word: string) => (kind ? `${word} ${kind}` : word);
   switch (section.source) {
     case 'FEATURED':

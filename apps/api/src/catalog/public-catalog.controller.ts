@@ -18,6 +18,8 @@ import type { Request } from 'express';
 import { Public } from '../auth/auth.decorators.js';
 import type { Page } from '../common/pagination.js';
 import { ZodValidationPipe } from '../common/zod-validation.pipe.js';
+import { LayoutPagePipe } from '../home/home.controller.js';
+import type { LayoutPage } from '../home/home.service.js';
 import { requestInfo } from '../auth/request-info.js';
 import { RateLimit } from '../rate-limit/rate-limit.guard.js';
 import { ViewerSessionService } from '../viewers/viewer-session.service.js';
@@ -74,6 +76,21 @@ export class PublicCatalogController {
     @Query(new ZodValidationPipe(languageQuerySchema)) query: LanguageQuery,
   ): Promise<PublicHome> {
     return this.catalog.home(query.language);
+  }
+
+  /**
+   * A page of the website as it is arranged in the panel: "home", "movies" or
+   * "series". `custom` is false, and there are no rows, while "movies" or
+   * "series" was not arranged: the list of all of them is the page then.
+   */
+  @Get('pages/:page')
+  @RateLimit(READS)
+  @Header('Cache-Control', CACHE_READS)
+  page(
+    @Param('page', LayoutPagePipe) page: LayoutPage,
+    @Query(new ZodValidationPipe(languageQuerySchema)) query: LanguageQuery,
+  ): Promise<PublicHome> {
+    return this.catalog.page(page, query.language);
   }
 
   @Get('genres')

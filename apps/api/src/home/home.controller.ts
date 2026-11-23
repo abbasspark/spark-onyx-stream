@@ -7,9 +7,12 @@ import {
   HttpCode,
   HttpStatus,
   Inject,
+  Injectable,
+  NotFoundException,
   Param,
   ParseUUIDPipe,
   Patch,
+  type PipeTransform,
   Post,
   Put,
   Req,
@@ -31,18 +34,42 @@ import {
   type UpdateSectionInput,
   updateSectionSchema,
 } from './home.schemas.js';
-import { type HomeSectionView, HomeService, type HomeView } from './home.service.js';
+import {
+  type HomeSectionView,
+  HomeService,
+  type HomeView,
+  LAYOUT_PAGES,
+  type LayoutPage,
+  type PageSummary,
+} from './home.service.js';
+
+/**
+ * Reads the page from the address: "home", "movies" or "series".
+ *
+ * @throws NotFoundException for anything else.
+ */
+@Injectable()
+export class LayoutPagePipe implements PipeTransform<string, LayoutPage> {
+  transform(value: string): LayoutPage {
+    const page = value.toUpperCase() as LayoutPage;
+    if (value !== value.toLowerCase() || !LAYOUT_PAGES.includes(page)) {
+      throw new NotFoundException('There is no such page');
+    }
+    return page;
+  }
+}
 
 /** A section as the panel gets it: its preview as cards with their pictures. */
 export type HomeSectionAnswer = Omit<HomeSectionView, 'preview'> & { preview: PublicTitleCard[] };
 export interface HomeAnswer {
-  /** False while the page puts itself together. */
+  page: LayoutPage;
+  /** False while the page has no sections and is what it is by itself. */
   custom: boolean;
   sections: HomeSectionAnswer[];
 }
 
-/** The home page of the website, as admins arrange it. */
-@Controller('home')
+/** The pages of the website that admins arrange: the home page, "Movies" and "Series". */
+@Controller('layout')
 export class HomeController {
   constructor(
     @Inject(HomeService) private readonly home: HomeService,
@@ -58,7 +85,11 @@ export class HomeController {
   }
 
   private answer(view: HomeView): HomeAnswer {
-    return { custom: view.custom, sections: view.sections.map((entry) => this.section(entry)) };
+    return {
+      page: view.page,
+      custom: view.custom,
+      sections: view.sections.map((entry) => this.section(entry)),
+    };
   }
 
   private record(
@@ -78,63 +109,79 @@ export class HomeController {
     });
   }
 
+  /** Every page, with whether it is arranged and how many sections it has. */
   @Get()
   @RequirePermissions('catalog:read')
-  async get(): Promise<HomeAnswer> {
-    return this.answer(await this.home.get());
+  pages(): Promise<PageSummary[]> {
+    return this.home.pages();
   }
 
-  /** Takes the page over from the automatic one, starting with what it shows now. */
-  @Post('start')
+  @Get(':page')
+  @RequirePermissions('catalog:read')
+  async get(@Param('page', LayoutPagePipe) page: LayoutPage): Promise<HomeAnswer> {
+    return this.answer(await this.home.get(page));
+  }
+
+  /** Takes a page over, starting with sections made for it. */
+  @Post(':page/start')
   @RequirePermissions('catalog:write')
   async start(
+    @Param('page', LayoutPagePipe) page: LayoutPage,
     @CurrentPrincipal() principal: Principal,
     @Req() request: Request,
   ): Promise<HomeAnswer> {
-    const view = await this.home.start();
-    await this.record('home.start', principal, request, undefined, {
+    const view = await this.home.start(page);
+    await this.record('layout.start', principal, request, undefined, {
+      page,
       sections: view.sections.length,
     });
     return this.answer(view);
   }
 
-  /** Deletes every section: the page puts itself together again. */
-  @Delete()
+  /** Deletes every section of a page: it is again what it is by itself. */
+  @Delete(':page')
   @RequirePermissions('catalog:write')
   @HttpCode(HttpStatus.NO_CONTENT)
-  async reset(@CurrentPrincipal() principal: Principal, @Req() request: Request): Promise<void> {
-    const sections = await this.home.reset();
-    await this.record('home.reset', principal, request, undefined, { sections });
+  async reset(
+    @Param('page', LayoutPagePipe) page: LayoutPage,
+    @CurrentPrincipal() principal: Principal,
+    @Req() request: Request,
+  ): Promise<void> {
+    const sections = await this.home.reset(page);
+    await this.record('layout.reset', principal, request, undefined, { page, sections });
   }
 
-  @Post('sections')
+  @Post(':page/sections')
   @RequirePermissions('catalog:write')
   async create(
+    @Param('page', LayoutPagePipe) page: LayoutPage,
     @Body(new ZodValidationPipe(createSectionSchema)) body: CreateSectionInput,
     @CurrentPrincipal() principal: Principal,
     @Req() request: Request,
   ): Promise<HomeSectionAnswer> {
-    const view = await this.home.create(body);
-    await this.record('home.section.create', principal, request, view.id, {
+    const view = await this.home.create(page, body);
+    await this.record('layout.section.create', principal, request, view.id, {
+      page,
       kind: view.kind,
       name: view.name ?? view.defaultName,
     });
     return this.section(view);
   }
 
-  /** Before ":id", so that "order" is not read as an id. */
-  @Put('sections/order')
+  @Put(':page/sections/order')
   @RequirePermissions('catalog:write')
   async order(
+    @Param('page', LayoutPagePipe) page: LayoutPage,
     @Body(new ZodValidationPipe(orderSectionsSchema)) body: OrderSectionsInput,
     @CurrentPrincipal() principal: Principal,
     @Req() request: Request,
   ): Promise<HomeAnswer> {
-    const view = await this.home.order(body.ids);
-    await this.record('home.reorder', principal, request);
+    const view = await this.home.order(page, body.ids);
+    await this.record('layout.reorder', principal, request, undefined, { page });
     return this.answer(view);
   }
 
+  /** A section is known by its id, whatever page it is on. */
   @Patch('sections/:id')
   @RequirePermissions('catalog:write')
   async update(
@@ -144,7 +191,7 @@ export class HomeController {
     @Req() request: Request,
   ): Promise<HomeSectionAnswer> {
     const view = await this.home.update(id, body);
-    await this.record('home.section.update', principal, request, id, {
+    await this.record('layout.section.update', principal, request, id, {
       name: view.name ?? view.defaultName,
       changed: Object.keys(body),
     });
@@ -160,7 +207,7 @@ export class HomeController {
     @Req() request: Request,
   ): Promise<void> {
     const view = await this.home.remove(id);
-    await this.record('home.section.delete', principal, request, id, {
+    await this.record('layout.section.delete', principal, request, id, {
       kind: view.kind,
       name: view.name ?? view.defaultName,
     });

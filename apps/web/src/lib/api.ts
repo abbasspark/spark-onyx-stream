@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-only
-import { normalizeHome, type RawHome } from './home';
+import { isEmptyHome, normalizeHome, type RawHome } from './home';
 import 'server-only';
 import { cookies } from 'next/headers';
 import { connection } from 'next/server';
@@ -116,6 +116,21 @@ async function findLocal<Result>(path: string): Promise<Result | null> {
 
 export async function getHome(): Promise<Home> {
   return normalizeHome(await readLocal<RawHome>('/home'));
+}
+
+/**
+ * The page for movies or for series, as it is arranged in the panel.
+ *
+ * @returns Null while nobody arranged it, or when the API is from before
+ *   pages could be arranged: the list of all movies or series is the page then.
+ */
+export async function getArrangedPage(page: 'movies' | 'series'): Promise<Home | null> {
+  const raw = await findLocal<RawHome & { custom?: boolean }>(`/pages/${page}`);
+  if (!raw?.custom) {
+    return null;
+  }
+  const arranged = normalizeHome({ ...raw, hero: raw.hero ?? null });
+  return isEmptyHome(arranged) ? null : arranged;
 }
 
 /** The genres that have something to watch. An API older than genres has none. */

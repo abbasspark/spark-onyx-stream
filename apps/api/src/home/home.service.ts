@@ -25,6 +25,11 @@ const AUTOMATIC_CATEGORY_ROWS = 12;
 /** Titles shown of a section in the panel, to see what it holds. */
 const PREVIEW_SIZE = 12;
 
+export type LayoutPage = 'HOME' | 'MOVIES' | 'SERIES';
+export const LAYOUT_PAGES: readonly LayoutPage[] = ['HOME', 'MOVIES', 'SERIES'];
+/** The kind of title a page is about. The home page is about both. */
+const PAGE_TYPE = { HOME: null, MOVIES: 'MOVIE', SERIES: 'SERIES' } as const;
+
 const SECTION_INCLUDE = {
   category: { select: { id: true, name: true, slug: true } },
   genre: { select: { id: true, name: true, slug: true } },
@@ -113,17 +118,27 @@ export interface HomeSectionView {
 }
 
 export interface HomeView {
+  page: LayoutPage;
   custom: boolean;
   sections: HomeSectionView[];
 }
 
+/** A page in the list of pages: whether it is arranged, and how much is on it. */
+export interface PageSummary {
+  page: LayoutPage;
+  custom: boolean;
+  sections: number;
+}
+
 /**
- * The home page of the website: which sections it has, in which order, and
- * which titles each of them shows.
+ * The pages of the website that are arranged in the panel: which sections
+ * each has, in which order, and which titles each section shows.
  *
- * While no section exists the page puts itself together: the featured titles,
- * the newest, and a row per category. The first section an admin makes takes
- * over the whole page.
+ * While a page has no section it is what it was before pages could be
+ * arranged. The home page puts itself together: the featured titles, the
+ * newest, and a row per category. "Movies" and "Series" are the list of all
+ * of them with its filters. The first section an admin makes takes over the
+ * whole page.
  *
  * Every title goes through the visibleTitle filter, so nothing a viewer may
  * not see can be put on the page, whatever a section says.
@@ -134,13 +149,15 @@ export class HomeService {
 
   // --- For viewers ----------------------------------------------------------------
 
-  async layout(now: Date = new Date()): Promise<HomeLayoutResult> {
+  async layout(page: LayoutPage = 'HOME', now: Date = new Date()): Promise<HomeLayoutResult> {
     const sections = await this.prisma.homeSection.findMany({
+      where: { page },
       orderBy: [{ position: 'asc' }, { id: 'asc' }],
       include: SECTION_INCLUDE,
     });
     if (sections.length === 0) {
-      return this.automatic(now);
+      // Only the home page has a page of its own without sections.
+      return page === 'HOME' ? this.automatic(now) : { custom: false, hero: null, rows: [] };
     }
     const shown = sections.filter((section) => isShownAt(section, now));
     const resolved = await Promise.all(
@@ -160,7 +177,7 @@ export class HomeService {
       }
       rows.push({
         key: `section:${section.id}`,
-        name: section.name ?? defaultSectionName(section),
+        name: section.name ?? defaultSectionName(section, PAGE_TYPE[section.page]),
         kind: section.kind === 'CONTINUE_WATCHING' ? 'continue' : 'titles',
         layout: section.layout.toLowerCase() as HomeRow['layout'],
         category:
@@ -301,61 +318,82 @@ export class HomeService {
 
   // --- For admins -----------------------------------------------------------------
 
-  async get(now: Date = new Date()): Promise<HomeView> {
+  /** Every page, with whether it is arranged. */
+  async pages(): Promise<PageSummary[]> {
+    const counts = await this.prisma.homeSection.groupBy({ by: ['page'], _count: { _all: true } });
+    return LAYOUT_PAGES.map((page) => {
+      const sections = counts.find((entry) => entry.page === page)?._count._all ?? 0;
+      return { page, custom: sections > 0, sections };
+    });
+  }
+
+  async get(page: LayoutPage = 'HOME', now: Date = new Date()): Promise<HomeView> {
     const sections = await this.prisma.homeSection.findMany({
+      where: { page },
       orderBy: [{ position: 'asc' }, { id: 'asc' }],
       include: SECTION_INCLUDE,
     });
     return {
+      page,
       custom: sections.length > 0,
       sections: await Promise.all(sections.map((section) => this.toView(section, now))),
     };
   }
 
   /**
-   * Takes the page over from the automatic one: makes the sections that
-   * show what it shows now, for an admin to change.
+   * Takes a page over: makes sections for an admin to change. For the home
+   * page they show what the automatic page shows now. For "Movies" and
+   * "Series" they are a first page of that kind: an opening, the featured,
+   * the newest, the best rated, and a row per category.
    *
    * @throws ConflictException when the page is arranged already.
    */
-  async start(): Promise<HomeView> {
-    if ((await this.prisma.homeSection.count()) > 0) {
-      throw new ConflictException('The home page is arranged already');
+  async start(page: LayoutPage = 'HOME'): Promise<HomeView> {
+    if ((await this.prisma.homeSection.count({ where: { page } })) > 0) {
+      throw new ConflictException('The page is arranged already');
     }
+    const titleType = PAGE_TYPE[page];
+    const ofPage: Prisma.TitleWhereInput = titleType ? { type: titleType } : {};
     const categories = await this.prisma.category.findMany({
-      where: { titles: { some: { title: visibleTitle() } } },
+      where: { titles: { some: { title: { AND: [visibleTitle(), ofPage] } } } },
       orderBy: [{ sortOrder: 'asc' }, { name: 'asc' }],
       take: AUTOMATIC_CATEGORY_ROWS,
       select: { id: true },
     });
-    const sections: Prisma.HomeSectionCreateManyInput[] = [
-      { kind: 'HERO', source: 'FEATURED', sort: 'NEWEST', limit: 5 },
-      { kind: 'CONTINUE_WATCHING' },
-      { kind: 'TITLES', source: 'FEATURED', sort: 'NEWEST' },
-      { kind: 'TITLES', source: 'ALL', sort: 'NEWEST' },
+    const row = { kind: 'TITLES', titleType } as const;
+    const sections: Omit<Prisma.HomeSectionCreateManyInput, 'page'>[] = [
+      { kind: 'HERO', source: 'FEATURED', sort: 'NEWEST', limit: 5, titleType },
+      // What a viewer started belongs to the first page, not to every page.
+      ...(page === 'HOME' ? [{ kind: 'CONTINUE_WATCHING' as const }] : []),
+      { ...row, source: 'FEATURED', sort: 'NEWEST' },
+      { ...row, source: 'ALL', sort: 'NEWEST' },
+      ...(page === 'HOME' ? [] : [{ ...row, source: 'ALL' as const, sort: 'RATING' as const }]),
       ...categories.map((category) => ({
-        kind: 'TITLES' as const,
+        ...row,
         source: 'CATEGORY' as const,
         categoryId: category.id,
         sort: 'NEWEST' as const,
       })),
     ];
     await this.prisma.homeSection.createMany({
-      data: sections.map((section, position) => ({ ...section, position })),
+      data: sections.map((section, position) => ({ ...section, page, position })),
     });
-    return this.get();
+    return this.get(page);
   }
 
-  /** Gives the page back to the automatic one. Every section is deleted. */
-  async reset(): Promise<number> {
-    const { count } = await this.prisma.homeSection.deleteMany();
+  /** Gives a page back to what it is without sections. Every section of it is deleted. */
+  async reset(page: LayoutPage = 'HOME'): Promise<number> {
+    const { count } = await this.prisma.homeSection.deleteMany({ where: { page } });
     return count;
   }
 
-  async create(input: CreateSectionInput): Promise<HomeSectionView> {
-    const existing = await this.prisma.homeSection.findMany({ select: { kind: true } });
+  async create(page: LayoutPage, input: CreateSectionInput): Promise<HomeSectionView> {
+    const existing = await this.prisma.homeSection.findMany({
+      where: { page },
+      select: { kind: true },
+    });
     if (existing.length >= MAX_SECTIONS) {
-      throw new ConflictException(`A home page has ${MAX_SECTIONS} sections at most`);
+      throw new ConflictException(`A page has ${MAX_SECTIONS} sections at most`);
     }
     if (input.kind !== 'TITLES' && existing.some((section) => section.kind === input.kind)) {
       throw new ConflictException(
@@ -367,13 +405,15 @@ export class HomeService {
     const { titleIds, kind, ...fields } = input;
     const source = fields.source ?? (kind === 'HERO' ? 'FEATURED' : 'ALL');
     const data = {
+      page,
       kind,
       name: fields.name ?? null,
       source,
       categoryId: fields.categoryId ?? null,
       genreId: fields.genreId ?? null,
       collectionId: fields.collectionId ?? null,
-      titleType: fields.titleType ?? null,
+      // A row of the page for movies shows movies, unless it is told otherwise.
+      titleType: fields.titleType === undefined ? PAGE_TYPE[page] : fields.titleType,
       sort: sortFor(source, fields.sort ?? (source === 'COLLECTION' ? 'CURATED' : 'NEWEST')),
       limit: fields.limit ?? (kind === 'HERO' ? 5 : 20),
       layout: fields.layout ?? 'POSTER',
@@ -386,7 +426,7 @@ export class HomeService {
     const section = await this.prisma.$transaction(async (tx) => {
       // The opening stands first. Everything else goes to the end.
       if (kind === 'HERO') {
-        await tx.homeSection.updateMany({ data: { position: { increment: 1 } } });
+        await tx.homeSection.updateMany({ where: { page }, data: { position: { increment: 1 } } });
       }
       const created = await tx.homeSection.create({
         data: { ...data, position: kind === 'HERO' ? 0 : existing.length },
@@ -457,8 +497,11 @@ export class HomeService {
    *
    * @throws BadRequestException when the list is not exactly the sections there are.
    */
-  async order(ids: readonly string[]): Promise<HomeView> {
-    const existing = await this.prisma.homeSection.findMany({ select: { id: true } });
+  async order(page: LayoutPage, ids: readonly string[]): Promise<HomeView> {
+    const existing = await this.prisma.homeSection.findMany({
+      where: { page },
+      select: { id: true },
+    });
     const known = new Set(existing.map((section) => section.id));
     if (
       new Set(ids).size !== ids.length ||
@@ -472,7 +515,7 @@ export class HomeService {
         this.prisma.homeSection.update({ where: { id }, data: { position } }),
       ),
     );
-    return this.get();
+    return this.get(page);
   }
 
   // --- Inside --------------------------------------------------------------------
@@ -598,7 +641,7 @@ export class HomeService {
       position: section.position,
       kind: section.kind,
       name: section.name,
-      defaultName: defaultSectionName(section),
+      defaultName: defaultSectionName(section, PAGE_TYPE[section.page]),
       source: section.source,
       category: ref(section.category),
       genre: ref(section.genre),

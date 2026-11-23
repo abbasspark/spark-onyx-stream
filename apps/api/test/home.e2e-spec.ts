@@ -83,7 +83,7 @@ describe.skipIf(!TEST_DATABASE_URL)('Home page (e2e)', () => {
     return response.body.id as string;
   }
   const section = async (body: object) =>
-    (await post('/v1/home/sections', body).expect(201)).body as { id: string };
+    (await post('/v1/layout/home/sections', body).expect(201)).body as { id: string };
   const home = async () =>
     (await http().get('/v1/catalog/home').expect(200)).body as {
       custom: boolean;
@@ -114,7 +114,11 @@ describe.skipIf(!TEST_DATABASE_URL)('Home page (e2e)', () => {
       await movie('Beta', { isFeatured: true });
       await movie('Gamma', { isFeatured: true, backdropId: await backdrop() });
 
-      expect((await get('/v1/home').expect(200)).body).toEqual({ custom: false, sections: [] });
+      expect((await get('/v1/layout/home').expect(200)).body).toEqual({
+        page: 'HOME',
+        custom: false,
+        sections: [],
+      });
       const page = await home();
       expect(page.custom).toBe(false);
       // The opening is the featured title with a picture, not the newest of them by chance.
@@ -134,7 +138,7 @@ describe.skipIf(!TEST_DATABASE_URL)('Home page (e2e)', () => {
       await movie('Gamma', { isFeatured: true });
       const before = await home();
 
-      const started = await post('/v1/home/start').expect(201);
+      const started = await post('/v1/layout/home/start').expect(201);
       expect(started.body.custom).toBe(true);
       expect(
         started.body.sections.map((entry: { kind: string; defaultName: string; count: number }) => [
@@ -149,7 +153,7 @@ describe.skipIf(!TEST_DATABASE_URL)('Home page (e2e)', () => {
         ['TITLES', 'New', 3],
         ['TITLES', 'Drama', 1],
       ]);
-      await post('/v1/home/start').expect(409);
+      await post('/v1/layout/home/start').expect(409);
 
       const after = await home();
       expect(after.custom).toBe(true);
@@ -159,7 +163,7 @@ describe.skipIf(!TEST_DATABASE_URL)('Home page (e2e)', () => {
       expect(names(after.hero?.titles ?? [])).toEqual(['Gamma', 'Beta']);
 
       // And given back.
-      await http().delete('/v1/home').set(auth()).expect(204);
+      await http().delete('/v1/layout/home').set(auth()).expect(204);
       expect((await home()).custom).toBe(false);
       expect(await testApp.prisma.homeSection.count()).toBe(0);
     });
@@ -231,7 +235,7 @@ describe.skipIf(!TEST_DATABASE_URL)('Home page (e2e)', () => {
       ]);
 
       // The panel names every picked title, and says which one viewers do not get.
-      const view = (await get('/v1/home').expect(200)).body.sections[0];
+      const view = (await get('/v1/layout/home').expect(200)).body.sections[0];
       expect(view).toMatchObject({ id: picks.id, sort: 'CURATED', count: 2, shownNow: true });
       expect(view.picked).toEqual([
         { id: first, name: 'First', type: 'MOVIE', visible: true },
@@ -241,13 +245,13 @@ describe.skipIf(!TEST_DATABASE_URL)('Home page (e2e)', () => {
       expect(names(view.preview)).toEqual(['First', 'Second']);
 
       // Another list replaces the picks. Another source lets them go.
-      const changed = await patch(`/v1/home/sections/${picks.id}`, { titleIds: [second] }).expect(
+      const changed = await patch(`/v1/layout/sections/${picks.id}`, { titleIds: [second] }).expect(
         200,
       );
       expect(names(changed.body.picked)).toEqual(['Second']);
-      await patch(`/v1/home/sections/${picks.id}`, { source: 'ALL' }).expect(200);
+      await patch(`/v1/layout/sections/${picks.id}`, { source: 'ALL' }).expect(200);
       expect(await testApp.prisma.homeSectionTitle.count()).toBe(0);
-      expect((await get('/v1/home').expect(200)).body.sections[0]).toMatchObject({
+      expect((await get('/v1/layout/home').expect(200)).body.sections[0]).toMatchObject({
         source: 'ALL',
         sort: 'NEWEST',
         defaultName: 'New',
@@ -276,7 +280,7 @@ describe.skipIf(!TEST_DATABASE_URL)('Home page (e2e)', () => {
         ['Shown', ['Alpha']],
         ['In season', ['Alpha']],
       ]);
-      const sections = (await get('/v1/home').expect(200)).body.sections;
+      const sections = (await get('/v1/layout/home').expect(200)).body.sections;
       expect(sections.map((entry: { shownNow: boolean }) => entry.shownNow)).toEqual([
         true,
         false,
@@ -286,13 +290,13 @@ describe.skipIf(!TEST_DATABASE_URL)('Home page (e2e)', () => {
         false,
       ]);
 
-      await patch(`/v1/home/sections/${off.id}`, { visible: true }).expect(200);
+      await patch(`/v1/layout/sections/${off.id}`, { visible: true }).expect(200);
       expect((await layout()).map(([name]) => name)).toEqual([
         'Shown',
         'Switched off',
         'In season',
       ]);
-      await post('/v1/home/sections', {
+      await post('/v1/layout/home/sections', {
         kind: 'TITLES',
         visibleFrom: future,
         visibleUntil: past,
@@ -305,7 +309,9 @@ describe.skipIf(!TEST_DATABASE_URL)('Home page (e2e)', () => {
       const b = await section({ kind: 'TITLES', name: 'B' });
       const c = await section({ kind: 'CONTINUE_WATCHING' });
 
-      const ordered = await put('/v1/home/sections/order', { ids: [c.id, b.id, a.id] }).expect(200);
+      const ordered = await put('/v1/layout/home/sections/order', {
+        ids: [c.id, b.id, a.id],
+      }).expect(200);
       expect(ordered.body.sections.map((entry: { id: string }) => entry.id)).toEqual([
         c.id,
         b.id,
@@ -316,20 +322,20 @@ describe.skipIf(!TEST_DATABASE_URL)('Home page (e2e)', () => {
         ['B', 'titles'],
         ['A', 'titles'],
       ]);
-      await put('/v1/home/sections/order', { ids: [a.id, b.id] }).expect(400);
-      await put('/v1/home/sections/order', { ids: [a.id, a.id, b.id] }).expect(400);
+      await put('/v1/layout/home/sections/order', { ids: [a.id, b.id] }).expect(400);
+      await put('/v1/layout/home/sections/order', { ids: [a.id, a.id, b.id] }).expect(400);
 
-      const renamed = await patch(`/v1/home/sections/${a.id}`, { name: '  ' }).expect(200);
+      const renamed = await patch(`/v1/layout/sections/${a.id}`, { name: '  ' }).expect(200);
       expect(renamed.body).toMatchObject({ name: null, defaultName: 'New' });
-      await http().delete(`/v1/home/sections/${b.id}`).set(auth()).expect(204);
-      await http().delete(`/v1/home/sections/${b.id}`).set(auth()).expect(404);
+      await http().delete(`/v1/layout/sections/${b.id}`).set(auth()).expect(204);
+      await http().delete(`/v1/layout/sections/${b.id}`).set(auth()).expect(404);
       expect((await home()).rows.map((row) => row.name)).toEqual(['Continue watching', 'New']);
     });
 
     it('are checked', async () => {
       const missing = '01a1fdfd-0000-7000-8000-000000000000';
       const refused = async (body: object, message: RegExp) => {
-        const response = await post('/v1/home/sections', body).expect(400);
+        const response = await post('/v1/layout/home/sections', body).expect(400);
         expect(response.body.message).toMatch(message);
       };
       await refused({ kind: 'TITLES', source: 'CATEGORY' }, /Choose the category/);
@@ -337,12 +343,12 @@ describe.skipIf(!TEST_DATABASE_URL)('Home page (e2e)', () => {
       await refused({ kind: 'TITLES', source: 'MANUAL', titleIds: [missing] }, /picked titles/);
       await refused({ kind: 'TITLES', limit: 2 }, /4 titles at least/);
       await refused({ kind: 'HERO', limit: 9 }, /8 titles at most/);
-      await post('/v1/home/sections', { kind: 'BANNER' }).expect(400);
+      await post('/v1/layout/home/sections', { kind: 'BANNER' }).expect(400);
 
       await section({ kind: 'HERO' });
       await section({ kind: 'CONTINUE_WATCHING' });
-      await post('/v1/home/sections', { kind: 'HERO' }).expect(409);
-      await post('/v1/home/sections', { kind: 'CONTINUE_WATCHING' }).expect(409);
+      await post('/v1/layout/home/sections', { kind: 'HERO' }).expect(409);
+      await post('/v1/layout/home/sections', { kind: 'CONTINUE_WATCHING' }).expect(409);
     });
 
     it('go with the category, genre or collection they show', async () => {
@@ -351,8 +357,130 @@ describe.skipIf(!TEST_DATABASE_URL)('Home page (e2e)', () => {
       await section({ kind: 'TITLES', source: 'CATEGORY', categoryId: drama });
       await section({ kind: 'TITLES', name: 'Stays' });
       await http().delete(`/v1/categories/${drama}`).set(auth()).expect(204);
-      expect((await get('/v1/home').expect(200)).body.sections).toHaveLength(1);
+      expect((await get('/v1/layout/home').expect(200)).body.sections).toHaveLength(1);
       expect((await home()).custom).toBe(true);
+    });
+  });
+
+  describe('the pages for movies and for series', () => {
+    const page = async (name: string) =>
+      (await http().get(`/v1/catalog/pages/${name}`).expect(200)).body as {
+        custom: boolean;
+        hero: { titles: { name: string }[] } | null;
+        rows: Row[];
+      };
+
+    it('are the list of all of them until someone arranges them', async () => {
+      await movie('Alpha');
+      expect(await page('movies')).toEqual({ custom: false, hero: null, rows: [] });
+      expect(await page('series')).toEqual({ custom: false, hero: null, rows: [] });
+      // The home page is a page like the others, under its own name as well.
+      expect((await page('home')).rows.map((row) => row.key)).toEqual(['continue', 'latest']);
+      await http().get('/v1/catalog/pages/live').expect(404);
+      await http().get('/v1/catalog/pages/MOVIES').expect(404);
+
+      expect((await get('/v1/layout').expect(200)).body).toEqual([
+        { page: 'HOME', custom: false, sections: 0 },
+        { page: 'MOVIES', custom: false, sections: 0 },
+        { page: 'SERIES', custom: false, sections: 0 },
+      ]);
+    });
+
+    it('start with sections about their own kind of title, each page by itself', async () => {
+      const drama = await named('categories', 'Drama');
+      const shows = await named('categories', 'Shows only');
+      await movie('Alpha', { categoryIds: [drama] });
+      const beta = await movie('Beta', { isFeatured: true });
+      const deep = await series('Deep Water');
+      await patch(`/v1/titles/${deep}`, { categoryIds: [shows], isFeatured: true }).expect(200);
+      await testApp.prisma.title.update({ where: { id: beta }, data: { rating: 9 } });
+
+      const started = await post('/v1/layout/movies/start').expect(201);
+      expect(started.body.page).toBe('MOVIES');
+      expect(
+        started.body.sections.map(
+          (entry: { kind: string; defaultName: string; titleType: string; count: number }) => [
+            entry.kind,
+            entry.defaultName,
+            entry.titleType,
+            entry.count,
+          ],
+        ),
+      ).toEqual([
+        ['HERO', 'Featured', 'MOVIE', 1],
+        ['TITLES', 'Featured', 'MOVIE', 1],
+        ['TITLES', 'New', 'MOVIE', 2],
+        ['TITLES', 'Top rated', 'MOVIE', 2],
+        // Only categories that have a movie: "Shows only" has none.
+        ['TITLES', 'Drama', 'MOVIE', 1],
+      ]);
+      await post('/v1/layout/movies/start').expect(409);
+
+      const movies = await page('movies');
+      expect(movies.custom).toBe(true);
+      expect(names(movies.hero?.titles ?? [])).toEqual(['Beta']);
+      expect(movies.rows.map((row) => [row.name, row.browse, names(row.titles)])).toEqual([
+        ['Featured', '/browse?type=MOVIE&featured=true', ['Beta']],
+        ['New', '/browse?type=MOVIE', ['Beta', 'Alpha']],
+        ['Top rated', '/browse?type=MOVIE&sort=rating', ['Beta', 'Alpha']],
+        ['Drama', '/browse?type=MOVIE&category=drama', ['Alpha']],
+      ]);
+
+      // The other pages are untouched.
+      expect((await page('series')).custom).toBe(false);
+      expect((await home()).custom).toBe(false);
+      expect((await get('/v1/layout').expect(200)).body).toEqual([
+        { page: 'HOME', custom: false, sections: 0 },
+        { page: 'MOVIES', custom: true, sections: 5 },
+        { page: 'SERIES', custom: false, sections: 0 },
+      ]);
+    });
+
+    it('have an opening and an order of their own', async () => {
+      await movie('Alpha');
+      await series('Deep Water');
+      const first = (
+        await post('/v1/layout/series/sections', { kind: 'TITLES', name: 'A' }).expect(201)
+      ).body;
+      // A new row of the page for series shows series, unless it is told otherwise.
+      expect(first).toMatchObject({ titleType: 'SERIES', defaultName: 'New' });
+      const both = (
+        await post('/v1/layout/series/sections', {
+          kind: 'TITLES',
+          name: 'Everything',
+          titleType: null,
+        }).expect(201)
+      ).body;
+      await post('/v1/layout/series/sections', { kind: 'HERO', source: 'ALL' }).expect(201);
+      await post('/v1/layout/series/sections', { kind: 'HERO' }).expect(409);
+      // Each page has one opening of its own.
+      await post('/v1/layout/home/sections', { kind: 'HERO', source: 'ALL' }).expect(201);
+      await post('/v1/layout/movies/sections', { kind: 'TITLES' }).expect(201);
+
+      const series1 = await page('series');
+      expect(names(series1.hero?.titles ?? [])).toEqual(['Deep Water']);
+      expect(series1.rows.map((row) => [row.name, names(row.titles)])).toEqual([
+        ['A', ['Deep Water']],
+        ['Everything', ['Deep Water', 'Alpha']],
+      ]);
+
+      const sections = (await get('/v1/layout/series').expect(200)).body.sections as {
+        id: string;
+      }[];
+      const hero = sections[0]?.id as string;
+      await put('/v1/layout/series/sections/order', { ids: [hero, both.id, first.id] }).expect(200);
+      expect((await page('series')).rows.map((row) => row.name)).toEqual(['Everything', 'A']);
+      // The sections of another page are not part of this order.
+      const other = (await get('/v1/layout/movies').expect(200)).body.sections[0].id as string;
+      await put('/v1/layout/series/sections/order', {
+        ids: [hero, both.id, first.id, other],
+      }).expect(400);
+
+      await http().delete('/v1/layout/series').set(auth()).expect(204);
+      expect((await page('series')).custom).toBe(false);
+      expect((await page('movies')).custom).toBe(true);
+      expect((await home()).custom).toBe(true);
+      await get('/v1/layout/live').expect(404);
     });
   });
 
@@ -364,15 +492,15 @@ describe.skipIf(!TEST_DATABASE_URL)('Home page (e2e)', () => {
       const hero = await section({ kind: 'HERO', source: 'ALL' });
 
       // Made last, and still first on the page.
-      const sections = (await get('/v1/home').expect(200)).body.sections;
+      const sections = (await get('/v1/layout/home').expect(200)).body.sections;
       expect(sections.map((entry: { kind: string }) => entry.kind)).toEqual(['HERO', 'TITLES']);
       expect(names((await home()).hero?.titles ?? [])).toEqual(['Pictured']);
 
       // Featured titles without a picture are better than no opening.
-      await patch(`/v1/home/sections/${hero.id}`, { source: 'FEATURED' }).expect(200);
+      await patch(`/v1/layout/sections/${hero.id}`, { source: 'FEATURED' }).expect(200);
       expect(names((await home()).hero?.titles ?? [])).toEqual(['Plain']);
 
-      await patch(`/v1/home/sections/${hero.id}`, {
+      await patch(`/v1/layout/sections/${hero.id}`, {
         source: 'MANUAL',
         titleIds: [plain, pictured],
       }).expect(200);
@@ -380,7 +508,7 @@ describe.skipIf(!TEST_DATABASE_URL)('Home page (e2e)', () => {
       expect(names(page.hero?.titles ?? [])).toEqual(['Plain', 'Pictured']);
       expect(page.rows.map((row) => row.name)).toEqual(['Row']);
 
-      await patch(`/v1/home/sections/${hero.id}`, { visible: false }).expect(200);
+      await patch(`/v1/layout/sections/${hero.id}`, { visible: false }).expect(200);
       expect((await home()).hero).toBeNull();
     });
   });
@@ -398,20 +526,24 @@ describe.skipIf(!TEST_DATABASE_URL)('Home page (e2e)', () => {
 
     it('needs the right to write the catalog, and is written to the log', async () => {
       const made = await section({ kind: 'TITLES', name: 'Row' });
-      await http().get('/v1/home').expect(401);
+      await http().get('/v1/layout/home').expect(401);
       await post('/v1/admins', READER).expect(201);
       const reader = testApp.bearer(await testApp.login(READER.email, READER.password));
-      await http().get('/v1/home').set(reader).expect(200);
-      await http().post('/v1/home/sections').set(reader).send({ kind: 'TITLES' }).expect(403);
-      await http().delete('/v1/home').set(reader).expect(403);
+      await http().get('/v1/layout/home').set(reader).expect(200);
       await http()
-        .patch(`/v1/home/sections/${made.id}`)
+        .post('/v1/layout/home/sections')
+        .set(reader)
+        .send({ kind: 'TITLES' })
+        .expect(403);
+      await http().delete('/v1/layout/home').set(reader).expect(403);
+      await http()
+        .patch(`/v1/layout/sections/${made.id}`)
         .set(reader)
         .send({ name: 'x' })
         .expect(403);
 
       const entry = await testApp.prisma.auditLog.findFirst({
-        where: { action: 'home.section.create' },
+        where: { action: 'layout.section.create' },
       });
       expect(entry).toMatchObject({ entityType: 'HomeSection', entityId: made.id });
       expect(entry?.metadata).toMatchObject({ kind: 'TITLES', name: 'Row' });

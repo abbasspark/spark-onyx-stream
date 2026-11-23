@@ -38,6 +38,23 @@ describe('defaultSectionName', () => {
   });
 });
 
+describe('defaultSectionName on a page about one kind of title', () => {
+  it('does not repeat the kind the page is about', () => {
+    expect(defaultSectionName(section({ titleType: 'MOVIE' }), 'MOVIE')).toBe('New');
+    expect(defaultSectionName(section({ titleType: 'MOVIE', sort: 'RATING' }), 'MOVIE')).toBe(
+      'Top rated',
+    );
+    expect(
+      defaultSectionName(
+        section({ source: 'CATEGORY', category: drama, titleType: 'MOVIE' }),
+        'MOVIE',
+      ),
+    ).toBe('Drama');
+    // A row about the other kind still says so.
+    expect(defaultSectionName(section({ titleType: 'SERIES' }), 'MOVIE')).toBe('New series');
+  });
+});
+
 describe('browsePath', () => {
   it('leads to the browse page with the same filters', () => {
     expect(browsePath(section({}))).toBe('/browse');

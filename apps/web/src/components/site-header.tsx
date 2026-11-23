@@ -19,8 +19,9 @@ interface SiteHeaderProps {
 }
 
 const LINKS = [
-  { href: '/browse?type=MOVIE', label: 'Movies', type: 'MOVIE' },
-  { href: '/browse?type=SERIES', label: 'Series', type: 'SERIES' },
+  // These pages can be arranged in the panel. Until they are, they lead on to the list.
+  { href: '/movies', label: 'Movies', type: 'MOVIE' },
+  { href: '/series', label: 'Series', type: 'SERIES' },
 ] as const;
 
 /**
@@ -86,6 +87,9 @@ export function SiteHeader({
 
   const currentType = pathname === '/browse' ? params.get('type') : null;
   const currentCategory = pathname === '/browse' ? params.get('category') : null;
+  /** On the page itself, or in the list it leads to. */
+  const isCurrent = (link: (typeof LINKS)[number]) =>
+    pathname === link.href || (currentType === link.type && !currentCategory);
   const linkClass = (active: boolean) =>
     `heading text-base transition-colors hover:text-vein ${active ? 'text-vein' : 'text-smoke'}`;
 
@@ -110,8 +114,8 @@ export function SiteHeader({
             <Link
               key={link.href}
               href={link.href}
-              aria-current={currentType === link.type && !currentCategory ? 'page' : undefined}
-              className={linkClass(currentType === link.type && !currentCategory)}
+              aria-current={isCurrent(link) ? 'page' : undefined}
+              className={linkClass(isCurrent(link))}
             >
               {link.label}
             </Link>

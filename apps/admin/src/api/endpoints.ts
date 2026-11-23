@@ -66,6 +66,8 @@ import type {
   HomeSection,
   HomeSectionInput,
   HomeSectionKind,
+  LayoutPageSlug,
+  LayoutPageSummary,
   BulkAction,
   BulkResult,
   SubtitleTrack,
@@ -424,20 +426,24 @@ export const subtitlesApi = {
   fileUrl: (assetId: string, trackId: string) => `/v1/assets/${assetId}/subtitles/${trackId}/file`,
 };
 
-/** The home page of the website, as admins arrange it. */
-export const homeApi = {
-  get: (signal?: AbortSignal) => request<HomePage>('/v1/home', { signal }),
-  /** Takes the page over from the automatic one, starting with what it shows now. */
-  start: () => request<HomePage>('/v1/home/start', { method: 'POST' }),
-  /** Deletes every section: the page puts itself together again. */
-  reset: () => request<void>('/v1/home', { method: 'DELETE' }),
-  create: (body: HomeSectionInput & { kind: HomeSectionKind }) =>
-    request<HomeSection>('/v1/home/sections', { method: 'POST', body }),
+/** The pages of the website that admins arrange, each by its name in addresses. */
+export const layoutApi = {
+  /** Every page, with whether it is arranged. */
+  pages: (signal?: AbortSignal) => request<LayoutPageSummary[]>('/v1/layout', { signal }),
+  get: (page: LayoutPageSlug, signal?: AbortSignal) =>
+    request<HomePage>(`/v1/layout/${page}`, { signal }),
+  /** Takes the page over, starting with sections made for it. */
+  start: (page: LayoutPageSlug) =>
+    request<HomePage>(`/v1/layout/${page}/start`, { method: 'POST' }),
+  /** Deletes every section of the page: it is again what it is by itself. */
+  reset: (page: LayoutPageSlug) => request<void>(`/v1/layout/${page}`, { method: 'DELETE' }),
+  create: (page: LayoutPageSlug, body: HomeSectionInput & { kind: HomeSectionKind }) =>
+    request<HomeSection>(`/v1/layout/${page}/sections`, { method: 'POST', body }),
+  reorder: (page: LayoutPageSlug, ids: string[]) =>
+    request<HomePage>(`/v1/layout/${page}/sections/order`, { method: 'PUT', body: { ids } }),
   update: (id: string, body: HomeSectionInput) =>
-    request<HomeSection>(`/v1/home/sections/${id}`, { method: 'PATCH', body }),
-  remove: (id: string) => request<void>(`/v1/home/sections/${id}`, { method: 'DELETE' }),
-  reorder: (ids: string[]) =>
-    request<HomePage>('/v1/home/sections/order', { method: 'PUT', body: { ids } }),
+    request<HomeSection>(`/v1/layout/sections/${id}`, { method: 'PATCH', body }),
+  remove: (id: string) => request<void>(`/v1/layout/sections/${id}`, { method: 'DELETE' }),
 };
 
 /** The days asked about, both included, and the time zone days are counted in. */

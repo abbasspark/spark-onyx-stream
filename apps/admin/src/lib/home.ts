@@ -6,6 +6,7 @@ import type {
   HomeSectionKind,
   HomeSort,
   HomeSource,
+  LayoutPageSlug,
 } from '@/api/types';
 
 export const MAX_HERO_TITLES = 8;
@@ -118,6 +119,82 @@ export function describeSection(
 }
 
 const cap = (word: string) => word.charAt(0).toUpperCase() + word.slice(1);
+
+/** What the panel says about each page that can be arranged. */
+export const LAYOUT_PAGES: Record<
+  LayoutPageSlug,
+  {
+    label: string;
+    /** The kind of title the page is about. Null: both. */
+    titleType: 'MOVIE' | 'SERIES' | null;
+    /** Where the page is on the website. */
+    path: string;
+    description: string;
+    /** What the page is while nobody arranged it. */
+    automatic: { title: string; text: string; rows: string[] };
+    /** What arranging it gives. */
+    arranged: string;
+  }
+> = {
+  home: {
+    label: 'Home page',
+    titleType: null,
+    path: '/',
+    description: 'What visitors of the website see first: the opening, and the rows under it.',
+    automatic: {
+      title: 'The page puts itself together',
+      text: 'Right now the website opens with a featured title, then shows what each viewer started, the featured titles, the newest, and one row for each category, in the order of your categories. Nothing to maintain.',
+      rows: ['Continue watching', 'Featured', 'New', 'Your categories'],
+    },
+    arranged:
+      'Arrange it yourself to choose the rows and their order, pick titles by hand, show a top ten or a row for a season, and let several titles take turns in the opening. You start with the page as it is now, and can go back at any time.',
+  },
+  movies: {
+    label: 'Movies page',
+    titleType: 'MOVIE',
+    path: '/movies',
+    description: 'Where "Movies" in the menu of the website leads.',
+    automatic: {
+      title: '"Movies" is the list of all movies',
+      text: 'Right now "Movies" in the menu of the website opens the list of every movie, with its filters for order, category and genre. Nothing to maintain.',
+      rows: ['All movies, newest first'],
+    },
+    arranged:
+      'Arrange it to give movies a page of their own: an opening, then rows such as the newest, the best rated, a genre or your own picks. You start with a first page made for you, the full list stays one click away, and you can go back at any time.',
+  },
+  series: {
+    label: 'Series page',
+    titleType: 'SERIES',
+    path: '/series',
+    description: 'Where "Series" in the menu of the website leads.',
+    automatic: {
+      title: '"Series" is the list of all series',
+      text: 'Right now "Series" in the menu of the website opens the list of every series, with its filters for order, category and genre. Nothing to maintain.',
+      rows: ['All series, newest first'],
+    },
+    arranged:
+      'Arrange it to give series a page of their own: an opening, then rows such as the newest, the best rated, a genre or your own picks. You start with a first page made for you, the full list stays one click away, and you can go back at any time.',
+  },
+};
+
+export const isLayoutPage = (value: string | undefined): value is LayoutPageSlug =>
+  value !== undefined && Object.hasOwn(LAYOUT_PAGES, value);
+
+/**
+ * The ready-made sections a page offers. On the page for movies a row is
+ * about movies anyway, so the rows that only say "movies" or "series" are
+ * left out there.
+ */
+export function presetsFor(page: LayoutPageSlug): SectionPreset[] {
+  const { titleType } = LAYOUT_PAGES[page];
+  if (!titleType) {
+    return SECTION_PRESETS;
+  }
+  return SECTION_PRESETS.filter((preset) => !preset.input.titleType).map((preset) => ({
+    ...preset,
+    input: { ...preset.input, titleType },
+  }));
+}
 
 /** Ready-made sections offered when one is added. */
 export interface SectionPreset {
