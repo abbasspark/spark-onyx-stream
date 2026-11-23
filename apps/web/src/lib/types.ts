@@ -156,11 +156,19 @@ export interface Languages {
 export interface HomeRow {
   key: string;
   name: string;
+  /** "continue": the place of the viewer's own row of started videos. */
+  kind: 'titles' | 'continue';
+  /** Upright posters, wide cards with the backdrop, or a numbered top list. */
+  layout: 'poster' | 'landscape' | 'numbered';
   category: CategoryRef | null;
+  /** Where "See all" leads. Null: the row shows everything it has. */
+  browse: string | null;
   titles: TitleCard[];
 }
 
 export interface Home {
+  /** The opening: one title, or a few that take turns. Null: the page starts with its rows. */
+  hero: { titles: TitleCard[] } | null;
   rows: HomeRow[];
 }
 
@@ -171,7 +179,7 @@ export interface Page<Item> {
   pageSize: number;
 }
 
-export const TITLE_SORTS = ['newest', 'name', 'year'] as const;
+export const TITLE_SORTS = ['newest', 'name', 'year', 'rating'] as const;
 export type TitleSort = (typeof TITLE_SORTS)[number];
 
 /** How viewers of the same video or channel find each other. */

@@ -15,6 +15,8 @@ import { PublicCatalogService } from './public-catalog.service.js';
 import { TranslationsController } from './translations.controller.js';
 import { TranslationsService } from './translations.service.js';
 import { TitlesService } from './titles.service.js';
+import { HomeController } from '../home/home.controller.js';
+import { HomeService } from '../home/home.service.js';
 
 /**
  * The catalog: titles, seasons, episodes, genres, people, categories and artwork, and the
@@ -29,6 +31,7 @@ import { TitlesService } from './titles.service.js';
     PeopleController,
     CollectionsController,
     TranslationsController,
+    HomeController,
     PublicCatalogController,
   ],
   providers: [
@@ -38,6 +41,7 @@ import { TitlesService } from './titles.service.js';
     PeopleService,
     CollectionsService,
     TranslationsService,
+    HomeService,
     PublicCatalogService,
   ],
   exports: [
@@ -47,6 +51,7 @@ import { TitlesService } from './titles.service.js';
     PeopleService,
     CollectionsService,
     TranslationsService,
+    HomeService,
   ],
 })
 export class CatalogModule {}

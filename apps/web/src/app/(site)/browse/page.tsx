@@ -13,6 +13,7 @@ const SORT_LABELS: Record<TitleSort, string> = {
   newest: 'Newest',
   name: 'A to Z',
   year: 'Release year',
+  rating: 'Best rated',
 };
 
 const KINDS = [

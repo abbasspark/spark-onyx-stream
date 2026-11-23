@@ -5,7 +5,7 @@ import { TITLE_TYPES } from './catalog.schemas.js';
 import { normalizeLanguage } from './language.js';
 import { MAX_SLUG_LENGTH, SLUG_PATTERN } from './slug.js';
 
-export const PUBLIC_SORTS = ['newest', 'name', 'year'] as const;
+export const PUBLIC_SORTS = ['newest', 'name', 'year', 'rating'] as const;
 
 const slug = z.string().trim().min(1).max(MAX_SLUG_LENGTH).regex(SLUG_PATTERN, 'Not a valid slug');
 

@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-only
+import { normalizeHome, type RawHome } from './home';
 import 'server-only';
 import { cookies } from 'next/headers';
 import { connection } from 'next/server';
@@ -113,8 +114,8 @@ async function findLocal<Result>(path: string): Promise<Result | null> {
   return answer as Result | null;
 }
 
-export function getHome(): Promise<Home> {
-  return readLocal<Home>('/home');
+export async function getHome(): Promise<Home> {
+  return normalizeHome(await readLocal<RawHome>('/home'));
 }
 
 /** The genres that have something to watch. An API older than genres has none. */

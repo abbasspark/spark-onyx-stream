@@ -34,34 +34,17 @@ import {
   type PublicPerson,
   type PublicCollectionDetail,
   type PublicHome,
-  type PublicRow,
   type PublicTitleCard,
   type PublicTitleDetail,
   toPublicCard,
   toPublicImage,
 } from './public-catalog.views.js';
 import { TranslationsService } from './translations.service.js';
+import { CARD_INCLUDE } from './card-include.js';
+import { HomeService } from '../home/home.service.js';
 
 /** Who asks for playback: a signed-in viewer, or null for a visitor. */
 export type Watcher = { viewerId: string; emailVerified: boolean } | null;
-
-/** Titles in one row of the home page. */
-export const ROW_SIZE = 20;
-/** Category rows on the home page. Further categories are reached through the category list. */
-export const MAX_CATEGORY_ROWS = 12;
-
-const CARD_INCLUDE = {
-  poster: true,
-  backdrop: true,
-  logo: true,
-  asset: { select: { durationMs: true } },
-  categories: { include: { category: true } },
-  packages: { select: { packageId: true } },
-  seasons: {
-    where: { episodes: { some: VISIBLE_EPISODE } },
-    select: { _count: { select: { episodes: { where: VISIBLE_EPISODE } } } },
-  },
-} satisfies Prisma.TitleInclude;
 
 const PACKAGE_IDS = { select: { packageId: true } } as const;
 
@@ -84,6 +67,11 @@ const ORDER_BY: Record<ListPublicTitlesInput['sort'], Prisma.TitleOrderByWithRel
   newest: NEWEST_FIRST,
   name: [{ name: 'asc' }, { id: 'desc' }],
   year: [{ releaseYear: { sort: 'desc', nulls: 'last' } }, { name: 'asc' }, { id: 'desc' }],
+  rating: [
+    { rating: { sort: 'desc', nulls: 'last' } },
+    { ratingCount: { sort: 'desc', nulls: 'last' } },
+    ...NEWEST_FIRST,
+  ],
 };
 
 /**
@@ -104,6 +92,7 @@ export class PublicCatalogService {
     @Inject(SubscriptionsService) private readonly subscriptions: SubscriptionsService,
     @Inject(PurchasesService) private readonly purchases: PurchasesService,
     @Inject(TranslationsService) private readonly translations: TranslationsService,
+    @Inject(HomeService) private readonly homeLayout: HomeService,
   ) {}
 
   async list(input: ListPublicTitlesInput): Promise<Page<PublicTitleCard>> {
@@ -411,46 +400,27 @@ export class PublicCatalogService {
     };
   }
 
-  /** The rows of the home page: featured titles, the newest, then one row per category. */
+  /**
+   * The home page: its opening and its rows, as an admin arranged them, or as
+   * the page puts itself together while nobody did.
+   */
   async home(language?: string): Promise<PublicHome> {
-    const row = (where: Prisma.TitleWhereInput) =>
-      this.prisma.title.findMany({
-        where: { AND: [visibleTitle(), where] },
-        orderBy: NEWEST_FIRST,
-        include: CARD_INCLUDE,
-        take: ROW_SIZE,
-      });
-
-    const categories = (await this.categories()).slice(0, MAX_CATEGORY_ROWS);
-    const [featured, latest, ...perCategory] = await Promise.all([
-      row({ isFeatured: true }),
-      row({}),
-      ...categories.map((category) =>
-        row({ categories: { some: { category: { slug: category.slug } } } }),
-      ),
-    ]);
-
-    // One look-up serves every row: a title is often in several of them.
+    const layout = await this.homeLayout.layout();
+    // One look-up serves the whole page: a title is often in several rows.
     const all = await this.translations.localizeCards(
-      [featured ?? [], latest ?? [], ...perCategory]
+      [layout.hero ?? [], ...layout.rows.map((row) => row.titles)]
         .flat()
         .map((title) => toPublicCard(title, this.config.mediaBaseUrl)),
       language,
     );
     const byId = new Map(all.map((card) => [card.id, card]));
-    const cards = (titles: Awaited<ReturnType<typeof row>>) =>
+    const cards = (titles: readonly { id: string }[]) =>
       titles.flatMap((title) => byId.get(title.id) ?? []);
-    const rows: PublicRow[] = [
-      { key: 'featured', name: 'Featured', category: null, titles: cards(featured ?? []) },
-      { key: 'latest', name: 'New', category: null, titles: cards(latest ?? []) },
-      ...categories.map((category, index) => ({
-        key: `category:${category.slug}`,
-        name: category.name,
-        category: { slug: category.slug, name: category.name },
-        titles: cards(perCategory[index] ?? []),
-      })),
-    ];
-    return { rows: rows.filter((entry) => entry.titles.length > 0) };
+    return {
+      custom: layout.custom,
+      hero: layout.hero ? { titles: cards(layout.hero) } : null,
+      rows: layout.rows.map((row) => ({ ...row, titles: cards(row.titles) })),
+    };
   }
 
   /**

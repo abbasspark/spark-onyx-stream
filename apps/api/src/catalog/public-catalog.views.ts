@@ -187,15 +187,25 @@ export interface PublicCollectionDetail extends PublicCollection {
 
 /** One row of the home page. */
 export interface PublicRow {
-  /** "featured", "latest" or "category:{slug}". Stable, for keys and links. */
+  /** Stable, for keys: "featured", "latest", "category:{slug}", "continue" or "section:{id}". */
   key: string;
   name: string;
+  /** "continue": the place of the viewer's own row of started videos. It has no titles here. */
+  kind: 'titles' | 'continue';
+  /** How the cards look: posters, wide cards with the backdrop, or a numbered top list. */
+  layout: 'poster' | 'landscape' | 'numbered';
   /** Set for a category row. */
   category: PublicCategoryRef | null;
+  /** Where "See all" leads on the website. Null: the row shows everything it has. */
+  browse: string | null;
   titles: PublicTitleCard[];
 }
 
 export interface PublicHome {
+  /** True when an admin arranged the page. */
+  custom: boolean;
+  /** The opening: one title, or a few that take turns. Null: the page starts with its rows. */
+  hero: { titles: PublicTitleCard[] } | null;
   rows: PublicRow[];
 }
 

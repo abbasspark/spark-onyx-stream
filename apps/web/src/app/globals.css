@@ -164,6 +164,23 @@
     flex-shrink: 0;
   }
 
+  /* The opening of the home page changing its title: the new one fades in. */
+  .hero-turn {
+    animation: hero-turn 700ms ease-out both;
+  }
+
+  /* The mark of the title that holds the opening fills while its turn lasts. */
+  .hero-turn-band {
+    animation: hero-turn-band linear both;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .hero-turn,
+    .hero-turn-band {
+      animation: none;
+    }
+  }
+
   /* Progress drawn as a band: a pale track with an amber vein. */
   .band {
     height: 3px;
@@ -305,5 +322,20 @@
 
   .button-danger:hover {
     background: rgb(255 138 122 / 0.12);
+  }
+}
+
+@keyframes hero-turn {
+  from {
+    opacity: 0.25;
+  }
+}
+
+@keyframes hero-turn-band {
+  from {
+    width: 0;
+  }
+  to {
+    width: 100%;
   }
 }

@@ -8,6 +8,7 @@ import {
   KeyRound,
   Library,
   LayoutDashboard,
+  LayoutTemplate,
   Boxes,
   CreditCard,
   Receipt,
@@ -68,6 +69,13 @@ export const NAVIGATION: NavGroup[] = [
         icon: Tv,
         permission: 'catalog:read',
         keywords: 'shows titles seasons episodes catalog',
+      },
+      {
+        to: '/home-page',
+        label: 'Home page',
+        icon: LayoutTemplate,
+        permission: 'catalog:read',
+        keywords: 'website start front rows hero opening sections builder layout carousel',
       },
       {
         to: '/collections',
