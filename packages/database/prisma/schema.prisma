@@ -1864,6 +1864,12 @@ enum LayoutPage {
   MOVIES
   /// The page "Series" leads to.
   SERIES
+  /// The page of the live channels: what stands under the channels.
+  LIVE
+  /// The page of a category. One arrangement serves every category, each showing its own titles.
+  CATEGORY
+  /// The page of a genre, in the same way.
+  GENRE
 }
 
 enum HomeSectionKind {

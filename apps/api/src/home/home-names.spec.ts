@@ -78,6 +78,31 @@ describe('browsePath', () => {
   });
 });
 
+describe('browsePath on the page of a category or genre', () => {
+  const page = { kind: 'category', slug: 'drama' } as const;
+  it('stays inside the category of the page', () => {
+    expect(browsePath(section({}), page)).toBe('/browse?category=drama');
+    expect(browsePath(section({ titleType: 'MOVIE', sort: 'RATING' }), page)).toBe(
+      '/browse?type=MOVIE&category=drama&sort=rating',
+    );
+    expect(
+      browsePath(section({ source: 'GENRE', genre: { name: 'Crime', slug: 'crime' } }), page),
+    ).toBe('/browse?genre=crime&category=drama');
+    expect(browsePath(section({ source: 'FEATURED' }), { kind: 'genre', slug: 'crime' })).toBe(
+      '/browse?genre=crime&featured=true',
+    );
+  });
+  it('has no address for what the browse page cannot show', () => {
+    expect(browsePath(section({ source: 'CATEGORY', category: drama }), page)).toBeNull();
+    expect(
+      browsePath(
+        section({ source: 'COLLECTION', collection: { name: 'Saga', slug: 'saga' } }),
+        page,
+      ),
+    ).toBeNull();
+  });
+});
+
 describe('isShownAt', () => {
   const now = new Date('2026-12-10T12:00:00Z');
   const base = { visible: true, visibleFrom: null, visibleUntil: null };

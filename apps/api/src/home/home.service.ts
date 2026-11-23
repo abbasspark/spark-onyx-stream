@@ -25,10 +25,42 @@ const AUTOMATIC_CATEGORY_ROWS = 12;
 /** Titles shown of a section in the panel, to see what it holds. */
 const PREVIEW_SIZE = 12;
 
-export type LayoutPage = 'HOME' | 'MOVIES' | 'SERIES';
-export const LAYOUT_PAGES: readonly LayoutPage[] = ['HOME', 'MOVIES', 'SERIES'];
-/** The kind of title a page is about. The home page is about both. */
-const PAGE_TYPE = { HOME: null, MOVIES: 'MOVIE', SERIES: 'SERIES' } as const;
+export type LayoutPage = 'HOME' | 'MOVIES' | 'SERIES' | 'LIVE' | 'CATEGORY' | 'GENRE';
+export const LAYOUT_PAGES: readonly LayoutPage[] = [
+  'HOME',
+  'MOVIES',
+  'SERIES',
+  'LIVE',
+  'CATEGORY',
+  'GENRE',
+];
+/** The kind of title a page is about. Most are about both. */
+const PAGE_TYPE = {
+  HOME: null,
+  MOVIES: 'MOVIE',
+  SERIES: 'SERIES',
+  LIVE: null,
+  CATEGORY: null,
+  GENRE: null,
+} as const;
+
+/**
+ * The category or genre a page is about. The pages CATEGORY and GENRE are
+ * arranged once and serve every category or genre: each shows only its own
+ * titles in every section.
+ */
+export interface PageScope {
+  kind: 'category' | 'genre';
+  id: string;
+  slug: string;
+  name: string;
+}
+
+/** Which pages are about one category or genre, and which kind. */
+const SCOPE_OF: Partial<Record<LayoutPage, PageScope['kind']>> = {
+  CATEGORY: 'category',
+  GENRE: 'genre',
+};
 
 const SECTION_INCLUDE = {
   category: { select: { id: true, name: true, slug: true } },
@@ -119,6 +151,11 @@ export interface HomeSectionView {
 
 export interface HomeView {
   page: LayoutPage;
+  /**
+   * On the page of categories or genres: the one whose titles the panel
+   * shows in the sections, as an example. Null when there is none yet.
+   */
+  example: { id: string; slug: string; name: string } | null;
   custom: boolean;
   sections: HomeSectionView[];
 }
@@ -149,7 +186,11 @@ export class HomeService {
 
   // --- For viewers ----------------------------------------------------------------
 
-  async layout(page: LayoutPage = 'HOME', now: Date = new Date()): Promise<HomeLayoutResult> {
+  async layout(
+    page: LayoutPage = 'HOME',
+    now: Date = new Date(),
+    scope?: PageScope,
+  ): Promise<HomeLayoutResult> {
     const sections = await this.prisma.homeSection.findMany({
       where: { page },
       orderBy: [{ position: 'asc' }, { id: 'asc' }],
@@ -166,7 +207,7 @@ export class HomeService {
         titles:
           section.kind === 'CONTINUE_WATCHING'
             ? []
-            : await this.titlesOf(section, now, section.limit),
+            : await this.titlesOf(section, now, section.limit, scope),
       })),
     );
     const hero = resolved.find(({ section }) => section.kind === 'HERO');
@@ -184,7 +225,7 @@ export class HomeService {
           section.source === 'CATEGORY' && section.category
             ? { slug: section.category.slug, name: section.category.name }
             : null,
-        browse: browsePath(section),
+        browse: browsePath(section, scope),
         titles,
       });
     }
@@ -257,9 +298,22 @@ export class HomeService {
   }
 
   /** The titles a section shows to viewers at a moment, in its order. */
-  private async titlesOf(section: SectionRecord, now: Date, take: number): Promise<CardTitle[]> {
+  private async titlesOf(
+    section: SectionRecord,
+    now: Date,
+    take: number,
+    scope?: PageScope,
+  ): Promise<CardTitle[]> {
     const type: Prisma.TitleWhereInput = section.titleType ? { type: section.titleType } : {};
-    const visible = { AND: [visibleTitle(now), type] } satisfies Prisma.TitleWhereInput;
+    // On the page of a category or genre, every section stays inside it.
+    const inScope: Prisma.TitleWhereInput = !scope
+      ? {}
+      : scope.kind === 'category'
+        ? { categories: { some: { categoryId: scope.id } } }
+        : { genres: { some: { genreId: scope.id } } };
+    const visible = {
+      AND: [visibleTitle(now), type, inScope],
+    } satisfies Prisma.TitleWhereInput;
 
     if (section.source === 'MANUAL') {
       const picked = await this.prisma.homeSectionTitle.findMany({
@@ -327,17 +381,83 @@ export class HomeService {
     });
   }
 
-  async get(page: LayoutPage = 'HOME', now: Date = new Date()): Promise<HomeView> {
+  /**
+   * @param exampleId On the page of categories or genres: the one to show
+   *   the sections with. Left out, or unknown, the first one that has titles.
+   */
+  async get(
+    page: LayoutPage = 'HOME',
+    now: Date = new Date(),
+    exampleId?: string,
+  ): Promise<HomeView> {
     const sections = await this.prisma.homeSection.findMany({
       where: { page },
       orderBy: [{ position: 'asc' }, { id: 'asc' }],
       include: SECTION_INCLUDE,
     });
+    const scope = await this.exampleOf(page, exampleId);
     return {
       page,
+      example: scope ? { id: scope.id, slug: scope.slug, name: scope.name } : null,
       custom: sections.length > 0,
-      sections: await Promise.all(sections.map((section) => this.toView(section, now))),
+      sections: await Promise.all(sections.map((section) => this.toView(section, now, scope))),
     };
+  }
+
+  /**
+   * The category or genre with a slug, for its page on the website.
+   *
+   * @returns Null when there is none, or when it has nothing viewers can watch.
+   */
+  async scopeOf(
+    kind: PageScope['kind'],
+    slug: string,
+  ): Promise<(PageScope & { description: string | null }) | null> {
+    const shown = { titles: { some: { title: visibleTitle() } } };
+    if (kind === 'category') {
+      const category = await this.prisma.category.findFirst({ where: { slug, ...shown } });
+      return category
+        ? {
+            kind,
+            id: category.id,
+            slug: category.slug,
+            name: category.name,
+            description: category.description,
+          }
+        : null;
+    }
+    const genre = await this.prisma.genre.findFirst({ where: { slug, ...shown } });
+    return genre
+      ? { kind, id: genre.id, slug: genre.slug, name: genre.name, description: null }
+      : null;
+  }
+
+  /** The category or genre the panel shows a page of categories or genres with. */
+  private async exampleOf(page: LayoutPage, wantedId?: string): Promise<PageScope | undefined> {
+    const kind = SCOPE_OF[page];
+    if (!kind) {
+      return undefined;
+    }
+    const shown = { titles: { some: { title: visibleTitle() } } };
+    const pick = <Row extends { id: string; slug: string; name: string }>(
+      rows: Row[],
+    ): PageScope | undefined => {
+      const row = rows.find((entry) => entry.id === wantedId) ?? rows[0];
+      return row ? { kind, id: row.id, slug: row.slug, name: row.name } : undefined;
+    };
+    return kind === 'category'
+      ? pick(
+          await this.prisma.category.findMany({
+            where: wantedId ? { OR: [{ id: wantedId }, shown] } : shown,
+            orderBy: [{ sortOrder: 'asc' }, { name: 'asc' }],
+          }),
+        )
+      : pick(
+          await this.prisma.genre.findMany({
+            where: wantedId ? { OR: [{ id: wantedId }, shown] } : shown,
+            orderBy: { name: 'asc' },
+          }),
+        );
   }
 
   /**
@@ -352,6 +472,35 @@ export class HomeService {
     if ((await this.prisma.homeSection.count({ where: { page } })) > 0) {
       throw new ConflictException('The page is arranged already');
     }
+    const sections = await this.firstSections(page);
+    await this.prisma.homeSection.createMany({
+      data: sections.map((section, position) => ({ ...section, page, position })),
+    });
+    return this.get(page);
+  }
+
+  /** The sections a page starts with when it is taken over. */
+  private async firstSections(
+    page: LayoutPage,
+  ): Promise<Omit<Prisma.HomeSectionCreateManyInput, 'page'>[]> {
+    if (page === 'LIVE') {
+      // Under the channels: something to watch when nothing on air appeals.
+      return [
+        { kind: 'TITLES', source: 'FEATURED', sort: 'NEWEST', layout: 'LANDSCAPE' },
+        { kind: 'TITLES', source: 'ALL', sort: 'NEWEST' },
+      ];
+    }
+    if (SCOPE_OF[page]) {
+      // Every section shows the titles of the category or genre the page is opened for.
+      return [
+        { kind: 'HERO', source: 'ALL', sort: 'NEWEST', limit: 5 },
+        { kind: 'TITLES', source: 'FEATURED', sort: 'NEWEST', layout: 'LANDSCAPE' },
+        { kind: 'TITLES', source: 'ALL', sort: 'NEWEST' },
+        { kind: 'TITLES', source: 'ALL', sort: 'RATING' },
+        { kind: 'TITLES', source: 'ALL', sort: 'NEWEST', titleType: 'MOVIE' },
+        { kind: 'TITLES', source: 'ALL', sort: 'NEWEST', titleType: 'SERIES' },
+      ];
+    }
     const titleType = PAGE_TYPE[page];
     const ofPage: Prisma.TitleWhereInput = titleType ? { type: titleType } : {};
     const categories = await this.prisma.category.findMany({
@@ -361,7 +510,7 @@ export class HomeService {
       select: { id: true },
     });
     const row = { kind: 'TITLES', titleType } as const;
-    const sections: Omit<Prisma.HomeSectionCreateManyInput, 'page'>[] = [
+    return [
       { kind: 'HERO', source: 'FEATURED', sort: 'NEWEST', limit: 5, titleType },
       // What a viewer started belongs to the first page, not to every page.
       ...(page === 'HOME' ? [{ kind: 'CONTINUE_WATCHING' as const }] : []),
@@ -375,10 +524,6 @@ export class HomeService {
         sort: 'NEWEST' as const,
       })),
     ];
-    await this.prisma.homeSection.createMany({
-      data: sections.map((section, position) => ({ ...section, page, position })),
-    });
-    return this.get(page);
   }
 
   /** Gives a page back to what it is without sections. Every section of it is deleted. */
@@ -394,6 +539,9 @@ export class HomeService {
     });
     if (existing.length >= MAX_SECTIONS) {
       throw new ConflictException(`A page has ${MAX_SECTIONS} sections at most`);
+    }
+    if (page === 'LIVE' && input.kind === 'HERO') {
+      throw new BadRequestException('The live page opens with its channels, so it has no opening');
     }
     if (input.kind !== 'TITLES' && existing.some((section) => section.kind === input.kind)) {
       throw new ConflictException(
@@ -608,12 +756,18 @@ export class HomeService {
     if (!section) {
       throw new NotFoundException('Section not found');
     }
-    return this.toView(section, new Date());
+    return this.toView(section, new Date(), await this.exampleOf(section.page));
   }
 
-  private async toView(section: SectionRecord, now: Date): Promise<HomeSectionView> {
+  private async toView(
+    section: SectionRecord,
+    now: Date,
+    scope?: PageScope,
+  ): Promise<HomeSectionView> {
     const titles =
-      section.kind === 'CONTINUE_WATCHING' ? [] : await this.titlesOf(section, now, section.limit);
+      section.kind === 'CONTINUE_WATCHING'
+        ? []
+        : await this.titlesOf(section, now, section.limit, scope);
     const picked =
       section.source === 'MANUAL' && section.titles.length > 0
         ? await this.prisma.title.findMany({

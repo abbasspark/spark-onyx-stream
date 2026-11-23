@@ -86,7 +86,13 @@ export function SiteHeader({
   }, [menuOpen]);
 
   const currentType = pathname === '/browse' ? params.get('type') : null;
-  const currentCategory = pathname === '/browse' ? params.get('category') : null;
+  // A category is open on its own page, or as a filter of the list.
+  const currentCategory =
+    pathname === '/browse'
+      ? params.get('category')
+      : pathname.startsWith('/category/')
+        ? decodeURIComponent(pathname.slice('/category/'.length))
+        : null;
   /** On the page itself, or in the list it leads to. */
   const isCurrent = (link: (typeof LINKS)[number]) =>
     pathname === link.href || (currentType === link.type && !currentCategory);
@@ -152,7 +158,7 @@ export function SiteHeader({
                   {categories.map((category) => (
                     <li key={category.slug}>
                       <Link
-                        href={`/browse?category=${category.slug}`}
+                        href={`/category/${category.slug}`}
                         aria-current={currentCategory === category.slug ? 'page' : undefined}
                         className="block py-1.5 text-sm text-smoke hover:text-vein aria-[current]:text-sard"
                       >
@@ -243,7 +249,7 @@ export function SiteHeader({
               <ul className="grid grid-cols-2 gap-x-6">
                 {categories.map((category) => (
                   <li key={category.slug}>
-                    <Link href={`/browse?category=${category.slug}`} className="block py-2.5">
+                    <Link href={`/category/${category.slug}`} className="block py-2.5">
                       {category.name}
                     </Link>
                   </li>

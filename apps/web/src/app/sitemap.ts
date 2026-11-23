@@ -19,7 +19,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const categories = await getCategories();
   for (const category of categories) {
     entries.push({
-      url: `${siteConfig.url}/browse?category=${category.slug}`,
+      url: `${siteConfig.url}/category/${category.slug}`,
       changeFrequency: 'weekly',
       priority: 0.5,
     });
@@ -27,7 +27,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
 
   for (const genre of await getGenres().catch(() => [])) {
     entries.push({
-      url: `${siteConfig.url}/browse?genre=${genre.slug}`,
+      url: `${siteConfig.url}/genre/${genre.slug}`,
       changeFrequency: 'weekly',
       priority: 0.5,
     });

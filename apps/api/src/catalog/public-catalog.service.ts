@@ -41,8 +41,13 @@ import {
 } from './public-catalog.views.js';
 import { TranslationsService } from './translations.service.js';
 import { CARD_INCLUDE } from './card-include.js';
-import { HomeService, type LayoutPage } from '../home/home.service.js';
+import { HomeService, type LayoutPage, type PageScope } from '../home/home.service.js';
 import { PlaysService } from '../analytics/plays.service.js';
+
+/** The page of one category or genre: its rows, and what it is the page of. */
+export type PublicSubjectPage = PublicHome & {
+  subject: { slug: string; name: string; description: string | null };
+};
 
 /** What is known of the device that asks, to count it. Neither is stored. */
 export interface PlayClient {
@@ -427,8 +432,8 @@ export class PublicCatalogService {
    * answer with nothing while nobody arranged them: clients then show the
    * list of all movies or series, as before.
    */
-  async page(page: LayoutPage, language?: string): Promise<PublicHome> {
-    const layout = await this.homeLayout.layout(page);
+  async page(page: LayoutPage, language?: string, scope?: PageScope): Promise<PublicHome> {
+    const layout = await this.homeLayout.layout(page, new Date(), scope);
     // One look-up serves the whole page: a title is often in several rows.
     const all = await this.translations.localizeCards(
       [layout.hero ?? [], ...layout.rows.map((row) => row.titles)]
@@ -443,6 +448,27 @@ export class PublicCatalogService {
       custom: layout.custom,
       hero: layout.hero ? { titles: cards(layout.hero) } : null,
       rows: layout.rows.map((row) => ({ ...row, titles: cards(row.titles) })),
+    };
+  }
+
+  /**
+   * The page of one category or genre.
+   *
+   * @throws NotFoundException when there is none with this slug, or it has nothing to watch.
+   */
+  async subjectPage(
+    kind: 'category' | 'genre',
+    slug: string,
+    language?: string,
+  ): Promise<PublicSubjectPage> {
+    const scope = await this.homeLayout.scopeOf(kind, slug);
+    if (!scope) {
+      throw new NotFoundException(kind === 'category' ? 'Category not found' : 'Genre not found');
+    }
+    const page = await this.page(kind === 'category' ? 'CATEGORY' : 'GENRE', language, scope);
+    return {
+      ...page,
+      subject: { slug: scope.slug, name: scope.name, description: scope.description },
     };
   }
 

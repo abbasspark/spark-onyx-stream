@@ -139,7 +139,19 @@ Three pages of the website are arranged in the panel, in the group **Layout**: t
 - **The full list stays within reach:** an arranged page for movies or series ends with a link to all of them.
 - A category, genre or collection that is deleted takes the sections that show it along.
 
-`{page}` is `home`, `movies` or `series`.
+### The live page, and the pages of categories and genres
+
+Three more pages are arranged with the same builder.
+
+- **The live page keeps its channels on top.** Its sections are rows of movies and series that stand under the channels: something to watch when nothing on air appeals. It has no opening, because the channels are its opening. Without sections it ends with its channels, as before.
+- **"Category pages" and "Genre pages" are arranged once, for all of them.** Every category then has a page of its own at `/category/{slug}`, every genre at `/genre/{slug}`, with the name and the description on top. Each section holds only titles of the category or genre a visitor opened: "New" is the newest of that category, the opening shows titles of that category.
+- **The panel shows the sections with one of yours,** and lets you choose which, so you can see how the arrangement looks for a small category and for a large one.
+- **A row for another category makes no sense on the page of a category,** so the builder does not offer it there. A row for a genre does: on the page of "Drama" it shows the dramas of that genre.
+- **While these pages are not arranged, a category or genre is the list of its titles,** with its filters, as before. The addresses `/category/{slug}` and `/genre/{slug}` then lead on to that list. An arranged page ends with a link to it.
+- **A category or genre without a published title has no page.**
+- "See all" of a row leads to the list, narrowed to the category or genre of the page.
+
+`{page}` is `home`, `movies`, `series`, `live`, `category` or `genre`. For `category` and `genre`, `GET /layout/{page}` takes `example`, the id of the category or genre to show the sections with, and answers with the one it used.
 
 | Method and path                         | Purpose                                                                  |
 | --------------------------------------- | ------------------------------------------------------------------------ |
@@ -151,7 +163,7 @@ Three pages of the website are arranged in the panel, in the group **Layout**: t
 | `PUT /layout/{page}/sections/order`     | Set the order of all sections of the page                                |
 | `PATCH /layout/sections/{id}`, `DELETE` | Change or remove a section. `titleIds` replaces the picked titles        |
 
-For viewers, `GET /catalog/pages/{page}` answers with `custom`, `hero` (`{ titles }` or null) and `rows`. `GET /catalog/home` is the same as `/catalog/pages/home`. For `movies` and `series`, `custom` is false and there are no rows while the page was not arranged: a client then shows its list. Each row has a `key`, a `name`, a `kind` (`titles`, or `continue` for the place of the viewer's own row, which carries no titles), a `layout` (`poster`, `landscape`, `numbered`), `browse` (the path "See all" leads to on the website, or null) and its `titles`.
+For viewers, `GET /catalog/pages/{page}` (`home`, `movies`, `series` or `live`) answers with `custom`, `hero` (`{ titles }` or null) and `rows`. `GET /catalog/home` is the same as `/catalog/pages/home`. For `movies` and `series`, `custom` is false and there are no rows while the page was not arranged: a client then shows its list. Each row has a `key`, a `name`, a `kind` (`titles`, or `continue` for the place of the viewer's own row, which carries no titles), a `layout` (`poster`, `landscape`, `numbered`), `browse` (the path "See all" leads to on the website, or null) and its `titles`. `GET /catalog/pages/category/{slug}` and `GET /catalog/pages/genre/{slug}` answer the same, with a `subject` (`slug`, `name`, `description`) beside it, and with 404 for one that does not exist or has nothing published.
 
 On the website, the pages are `/movies` and `/series`. Until they are arranged they lead on to `/browse?type=MOVIE` and `/browse?type=SERIES`.
 
@@ -211,7 +223,8 @@ The viewer website and the apps read the catalog through `/v1/catalog`. No sign-
 | Method and path                                    | Purpose                                                                                                                                              |
 | -------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `GET /catalog/home`                                | The home page: its opening and its rows, as arranged in the panel, or put together by itself. See [The home page](#the-home-page)                    |
-| `GET /catalog/pages/{page}`                        | The same for `home`, `movies` or `series`                                                                                                            |
+| `GET /catalog/pages/{page}`                        | The same for `home`, `movies`, `series` or `live`                                                                                                    |
+| `GET /catalog/pages/category/{slug}`, `genre/…`    | The arranged page of one category or genre, with its name and description                                                                            |
 | `GET /catalog/categories`                          | Categories that have something to show, with the number of titles                                                                                    |
 | `GET /catalog/titles`                              | Page of titles. Filters: `type`, `category`, `genre`, `person`, `collection` (all slugs), `featured`, `q`. Sorts: `newest`, `name`, `year`, `rating` |
 | `GET /catalog/titles/{slug}`                       | One title, for a series with its seasons and episodes                                                                                                |

@@ -69,13 +69,23 @@ const BROWSE_SORT: Record<Sort, string | null> = {
  * Where "See all" of a row leads on the website: the browse page with the
  * same filters, or the page of the collection. Null for picked titles, which
  * the row shows all of.
+ *
+ * @param scope The category or genre the page itself is about, on such a page.
  */
-export function browsePath(section: NamedSection): string | null {
+export function browsePath(
+  section: NamedSection,
+  scope?: { kind: 'category' | 'genre'; slug: string },
+): string | null {
   if (section.kind !== 'TITLES' || section.source === 'MANUAL') {
     return null;
   }
   if (section.source === 'COLLECTION') {
-    return section.collection ? `/collection/${section.collection.slug}` : null;
+    // The page of a collection cannot be narrowed to the category or genre of a page.
+    return section.collection && !scope ? `/collection/${section.collection.slug}` : null;
+  }
+  // The browse page takes one category and one genre: a second one has no address.
+  if (scope && scope.kind.toUpperCase() === section.source) {
+    return null;
   }
   const params = new URLSearchParams();
   if (section.titleType) {
@@ -86,6 +96,9 @@ export function browsePath(section: NamedSection): string | null {
   }
   if (section.source === 'GENRE' && section.genre) {
     params.set('genre', section.genre.slug);
+  }
+  if (scope) {
+    params.set(scope.kind, scope.slug);
   }
   if (section.source === 'FEATURED') {
     params.set('featured', 'true');

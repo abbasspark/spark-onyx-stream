@@ -1883,9 +1883,9 @@ export interface HomeSection {
 }
 
 /** A page of the website that is arranged in the panel, as the API names it. */
-export type LayoutPageName = 'HOME' | 'MOVIES' | 'SERIES';
+export type LayoutPageName = 'HOME' | 'MOVIES' | 'SERIES' | 'LIVE' | 'CATEGORY' | 'GENRE';
 /** The same, as it stands in addresses. */
-export type LayoutPageSlug = 'home' | 'movies' | 'series';
+export type LayoutPageSlug = 'home' | 'movies' | 'series' | 'live' | 'category' | 'genre';
 
 export interface LayoutPageSummary {
   page: LayoutPageName;
@@ -1896,6 +1896,8 @@ export interface LayoutPageSummary {
 
 export interface HomePage {
   page: LayoutPageName;
+  /** On the page of categories or genres: the one the sections are shown with. */
+  example: { id: string; slug: string; name: string } | null;
   /** False while the page has no sections and is what it is by itself. */
   custom: boolean;
   sections: HomeSection[];

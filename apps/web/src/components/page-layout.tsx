@@ -45,19 +45,40 @@ interface PageLayoutProps {
   page: Home;
   /** The heading of the page for those who cannot see it, when it has no opening. */
   heading: string;
+  /** Shown above the first row: what the page is the page of. */
+  lead?: ReactNode;
   /** Shown after the last row. */
   children?: ReactNode;
 }
 
+/** The rows of an arranged page, in their order and look, without an opening. */
+export function PageRows({ rows }: { rows: HomeRow[] }) {
+  const firstTitles = rows.findIndex((row) => row.kind === 'titles');
+  return rows.map((row, index) =>
+    row.kind === 'continue' ? (
+      <ContinueWatching key={row.key} />
+    ) : (
+      <StripRow key={row.key} heading={row.name} href={rowHref(row)}>
+        <RowCards row={row} eager={index === firstTitles} />
+      </StripRow>
+    ),
+  );
+}
+
 /**
  * A page as it is arranged in the panel: its opening, then its rows in their
- * order and look. The home page, "Movies" and "Series" are all drawn here.
+ * order and look. The home page, "Movies", "Series" and the pages of
+ * categories and genres are all drawn here.
  */
-export function PageLayout({ page, heading, children }: PageLayoutProps) {
-  const firstTitles = page.rows.findIndex((row) => row.kind === 'titles');
+export function PageLayout({ page, heading, lead, children }: PageLayoutProps) {
   return (
     <>
-      {page.hero ? <HeroStage titles={page.hero.titles} /> : <h1 className="sr-only">{heading}</h1>}
+      {page.hero ? (
+        <HeroStage titles={page.hero.titles} />
+      ) : lead ? null : (
+        // A lead carries the heading of the page itself.
+        <h1 className="sr-only">{heading}</h1>
+      )}
       <div
         className={
           page.hero
@@ -66,15 +87,8 @@ export function PageLayout({ page, heading, children }: PageLayoutProps) {
               'flex flex-col gap-12 pt-28 sm:gap-14 sm:pt-32'
         }
       >
-        {page.rows.map((row, index) =>
-          row.kind === 'continue' ? (
-            <ContinueWatching key={row.key} />
-          ) : (
-            <StripRow key={row.key} heading={row.name} href={rowHref(row)}>
-              <RowCards row={row} eager={index === firstTitles} />
-            </StripRow>
-          ),
-        )}
+        {lead}
+        <PageRows rows={page.rows} />
         {children}
       </div>
     </>

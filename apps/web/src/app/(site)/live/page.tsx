@@ -2,7 +2,8 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { ChannelLineup } from '@/components/channel-lineup';
-import { getChannels } from '@/lib/api';
+import { PageRows } from '@/components/page-layout';
+import { getArrangedPage, getChannels } from '@/lib/api';
 
 export const metadata: Metadata = {
   title: 'Live',
@@ -11,7 +12,8 @@ export const metadata: Metadata = {
 
 /** Every live channel of the site, with what is on air right now. */
 export default async function LivePage() {
-  const channels = await getChannels();
+  // The rows under the channels are arranged in the panel. Without them the page ends there.
+  const [channels, arranged] = await Promise.all([getChannels(), getArrangedPage('live')]);
   const onAir = channels.filter((channel) => channel.onAir).length;
 
   return (
@@ -34,6 +36,12 @@ export default async function LivePage() {
         ) : null}
       </header>
       {channels.length > 0 ? <ChannelLineup channels={channels} /> : null}
+      {arranged ? (
+        // The rows bring their own margins at the sides, so they leave those of the page.
+        <div className="-mx-[clamp(1rem,4vw,3.5rem)] mt-16 flex flex-col gap-12 sm:gap-14">
+          <PageRows rows={arranged.rows} />
+        </div>
+      ) : null}
     </div>
   );
 }

@@ -15,6 +15,7 @@ import {
   type PipeTransform,
   Post,
   Put,
+  Query,
   Req,
 } from '@nestjs/common';
 import type { Request } from 'express';
@@ -44,7 +45,8 @@ import {
 } from './home.service.js';
 
 /**
- * Reads the page from the address: "home", "movies" or "series".
+ * Reads the page from the address: "home", "movies", "series", "live",
+ * "category" or "genre".
  *
  * @throws NotFoundException for anything else.
  */
@@ -63,12 +65,17 @@ export class LayoutPagePipe implements PipeTransform<string, LayoutPage> {
 export type HomeSectionAnswer = Omit<HomeSectionView, 'preview'> & { preview: PublicTitleCard[] };
 export interface HomeAnswer {
   page: LayoutPage;
+  /** On the page of categories or genres: the one the sections are shown with. */
+  example: { id: string; slug: string; name: string } | null;
   /** False while the page has no sections and is what it is by itself. */
   custom: boolean;
   sections: HomeSectionAnswer[];
 }
 
-/** The pages of the website that admins arrange: the home page, "Movies" and "Series". */
+/**
+ * The pages of the website that admins arrange: the home page, "Movies",
+ * "Series", the live page, and the pages of categories and of genres.
+ */
 @Controller('layout')
 export class HomeController {
   constructor(
@@ -87,6 +94,7 @@ export class HomeController {
   private answer(view: HomeView): HomeAnswer {
     return {
       page: view.page,
+      example: view.example,
       custom: view.custom,
       sections: view.sections.map((entry) => this.section(entry)),
     };
@@ -116,10 +124,17 @@ export class HomeController {
     return this.home.pages();
   }
 
+  /**
+   * The sections of a page. On the page of categories or genres, `example`
+   * names the one whose titles the sections are shown with.
+   */
   @Get(':page')
   @RequirePermissions('catalog:read')
-  async get(@Param('page', LayoutPagePipe) page: LayoutPage): Promise<HomeAnswer> {
-    return this.answer(await this.home.get(page));
+  async get(
+    @Param('page', LayoutPagePipe) page: LayoutPage,
+    @Query('example', new ParseUUIDPipe({ optional: true })) example?: string,
+  ): Promise<HomeAnswer> {
+    return this.answer(await this.home.get(page, new Date(), example));
   }
 
   /** Takes a page over, starting with sections made for it. */

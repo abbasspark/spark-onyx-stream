@@ -134,9 +134,29 @@ describe('moved and placedAt', () => {
 describe('pages', () => {
   it('are known by their name in addresses', () => {
     expect(isLayoutPage('movies')).toBe(true);
-    expect(isLayoutPage('live')).toBe(false);
+    expect(isLayoutPage('live')).toBe(true);
+    expect(isLayoutPage('channels')).toBe(false);
     expect(isLayoutPage(undefined)).toBe(false);
     expect(isLayoutPage('toString')).toBe(false);
+  });
+  it('say that a section of the page of categories stays within the category', () => {
+    expect(describeSection(section({}), 'category')).toBe(
+      'Everything in the category, newest first, up to 20',
+    );
+    expect(describeSection(section({ titleType: 'MOVIE' }), 'genre')).toBe(
+      'All movies of the genre, newest first, up to 20',
+    );
+    expect(describeSection(section({ source: 'FEATURED' }), 'genre')).toBe(
+      'Featured titles of the genre, newest first, up to 20',
+    );
+  });
+
+  it('do not offer a row for a category on the page of categories', () => {
+    const keys = (page: 'category' | 'genre') => presetsFor(page).map((preset) => preset.key);
+    expect(keys('category')).not.toContain('category');
+    expect(keys('category')).toContain('genre');
+    expect(keys('genre')).not.toContain('genre');
+    expect(keys('genre')).toContain('category');
   });
   it('offer rows about their own kind of title', () => {
     expect(presetsFor('home').map((preset) => preset.key)).toContain('movies');

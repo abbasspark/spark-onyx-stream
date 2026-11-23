@@ -7,6 +7,7 @@ import {
   HttpCode,
   HttpStatus,
   Inject,
+  NotFoundException,
   Param,
   ParseUUIDPipe,
   Post,
@@ -30,7 +31,12 @@ import {
   listPublicTitlesSchema,
   slugParamSchema,
 } from './public-catalog.schemas.js';
-import { type PlayAnswer, PublicCatalogService, type Watcher } from './public-catalog.service.js';
+import {
+  type PlayAnswer,
+  PublicCatalogService,
+  type PublicSubjectPage,
+  type Watcher,
+} from './public-catalog.service.js';
 import type {
   PublicCategory,
   PublicGenre,
@@ -79,9 +85,10 @@ export class PublicCatalogController {
   }
 
   /**
-   * A page of the website as it is arranged in the panel: "home", "movies" or
-   * "series". `custom` is false, and there are no rows, while "movies" or
-   * "series" was not arranged: the list of all of them is the page then.
+   * A page of the website as it is arranged in the panel: "home", "movies",
+   * "series" or "live". `custom` is false, and there are no rows, while a
+   * page other than the home page was not arranged: clients then show what
+   * the page was before.
    */
   @Get('pages/:page')
   @RateLimit(READS)
@@ -90,7 +97,37 @@ export class PublicCatalogController {
     @Param('page', LayoutPagePipe) page: LayoutPage,
     @Query(new ZodValidationPipe(languageQuerySchema)) query: LanguageQuery,
   ): Promise<PublicHome> {
+    // The pages of categories and genres are about one of them: see below.
+    if (page === 'CATEGORY' || page === 'GENRE') {
+      throw new NotFoundException('There is no such page');
+    }
     return this.catalog.page(page, query.language);
+  }
+
+  /**
+   * The page of one category, as the page of categories is arranged: every
+   * row holds titles of this category only. 404 for a category that does not
+   * exist or has nothing to watch.
+   */
+  @Get('pages/category/:slug')
+  @RateLimit(READS)
+  @Header('Cache-Control', CACHE_READS)
+  categoryPage(
+    @Param('slug', slugPipe) slug: string,
+    @Query(new ZodValidationPipe(languageQuerySchema)) query: LanguageQuery,
+  ): Promise<PublicSubjectPage> {
+    return this.catalog.subjectPage('category', slug, query.language);
+  }
+
+  /** The same for one genre. */
+  @Get('pages/genre/:slug')
+  @RateLimit(READS)
+  @Header('Cache-Control', CACHE_READS)
+  genrePage(
+    @Param('slug', slugPipe) slug: string,
+    @Query(new ZodValidationPipe(languageQuerySchema)) query: LanguageQuery,
+  ): Promise<PublicSubjectPage> {
+    return this.catalog.subjectPage('genre', slug, query.language);
   }
 
   @Get('genres')

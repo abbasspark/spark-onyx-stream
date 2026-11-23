@@ -11,6 +11,7 @@ import {
   GalleryHorizontal,
   GripVertical,
   History,
+  Layers,
   LayoutTemplate,
   ListOrdered,
   MoreHorizontal,
@@ -131,8 +132,28 @@ function LayoutBuilder({ page }: { page: LayoutPageSlug }) {
   // The order shown while a new one is being saved.
   const [pending, setPending] = useState<HomeSection[] | null>(null);
 
-  const key = ['layout', page];
-  const home = useQuery({ queryKey: key, queryFn: ({ signal }) => layoutApi.get(page, signal) });
+  // On the page of categories or genres: the one the sections are shown with.
+  const [exampleId, setExampleId] = useState<string | undefined>(undefined);
+  const key = ['layout', page, exampleId ?? null];
+  const home = useQuery({
+    queryKey: key,
+    queryFn: ({ signal }) => layoutApi.get(page, exampleId, signal),
+    // Another example brings other titles to the same sections: keep them standing meanwhile.
+    placeholderData: (previous) => previous,
+  });
+  const subjects = useQuery({
+    queryKey: [about.each?.one === 'genre' ? 'genres' : 'categories'],
+    queryFn: ({ signal }): Promise<{ id: string; name: string }[]> =>
+      about.each?.one === 'genre' ? genresApi.list(signal) : categoriesApi.list(signal),
+    enabled: about.each !== undefined,
+  });
+  const hasOpening = about.opening !== false;
+  const example = home.data?.example ?? null;
+  const sitePath = about.each
+    ? example
+      ? `/${about.each.one}/${example.slug}`
+      : null
+    : about.path;
   const pages = useQuery({
     queryKey: ['layout'],
     queryFn: ({ signal }) => layoutApi.pages(signal),
@@ -222,10 +243,10 @@ function LayoutBuilder({ page }: { page: LayoutPageSlug }) {
   };
   const askRemove = async (section: HomeSection) => {
     const confirmed = await confirm({
-      title: `Remove "${section.name ?? section.defaultName}" from the home page?`,
+      title: `Remove "${section.name ?? section.defaultName}" from the ${about.label.toLowerCase()}?`,
       description:
         section.kind === 'CONTINUE_WATCHING'
-          ? 'Viewers no longer see what they started on the home page. Their progress is kept.'
+          ? 'Viewers no longer see what they started on this page. Their progress is kept.'
           : 'Only the section goes. The titles it shows stay in the catalog.',
       confirmLabel: 'Remove',
       destructive: true,
@@ -239,7 +260,9 @@ function LayoutBuilder({ page }: { page: LayoutPageSlug }) {
       title:
         page === 'home'
           ? 'Let the page put itself together again?'
-          : `Give "${about.label}" back to the list?`,
+          : page === 'live'
+            ? 'Leave the live page to its channels again?'
+            : `Give "${about.label}" back to the list?`,
       description:
         page === 'home'
           ? `All ${all.length} sections are deleted. The page then shows the featured titles, the newest, and a row for each category, as it did before.`
@@ -279,8 +302,8 @@ function LayoutBuilder({ page }: { page: LayoutPageSlug }) {
             </span>
           </DropdownMenuItem>
         ))}
-        {!hero || !hasContinue ? <DropdownMenuSeparator /> : null}
-        {!hero ? (
+        {(hasOpening && !hero) || !hasContinue ? <DropdownMenuSeparator /> : null}
+        {hasOpening && !hero ? (
           <DropdownMenuItem
             onSelect={() =>
               setEditing({ mode: 'new', kind: 'HERO', preset: { source: 'FEATURED', limit: 5 } })
@@ -315,9 +338,9 @@ function LayoutBuilder({ page }: { page: LayoutPageSlug }) {
         description={about.description}
         actions={
           <>
-            {SITE_URL !== null ? (
+            {SITE_URL !== null && sitePath !== null ? (
               <Button asChild>
-                <a href={`${SITE_URL}${about.path}`} target="_blank" rel="noreferrer">
+                <a href={`${SITE_URL}${sitePath}`} target="_blank" rel="noreferrer">
                   <ExternalLink />
                   View the site
                 </a>
@@ -333,7 +356,11 @@ function LayoutBuilder({ page }: { page: LayoutPageSlug }) {
                 <DropdownMenuContent align="end">
                   <DropdownMenuItem destructive onSelect={() => void askReset()}>
                     <RotateCcw />
-                    {page === 'home' ? 'Back to the automatic page' : 'Back to the list'}
+                    {page === 'home'
+                      ? 'Back to the automatic page'
+                      : page === 'live'
+                        ? 'Back to the channels alone'
+                        : 'Back to the list'}
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
@@ -343,7 +370,7 @@ function LayoutBuilder({ page }: { page: LayoutPageSlug }) {
         }
       />
 
-      <nav aria-label="Page" className="mb-4 flex flex-wrap gap-2">
+      <nav aria-label="Page" className="mb-4 grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-6">
         {(Object.keys(LAYOUT_PAGES) as LayoutPageSlug[]).map((slug) => {
           const summary = pages.data?.find((entry) => entry.page.toLowerCase() === slug);
           const current = slug === page;
@@ -353,7 +380,7 @@ function LayoutBuilder({ page }: { page: LayoutPageSlug }) {
               to={`/layout/${slug}`}
               aria-current={current ? 'page' : undefined}
               className={cn(
-                'grid min-w-40 gap-0.5 rounded-xl border bg-card px-4 py-2.5 text-sm shadow-xs transition-colors hover:border-primary/50',
+                'grid min-w-0 gap-0.5 rounded-xl border bg-card px-4 py-2.5 text-sm shadow-xs transition-colors hover:border-primary/50',
                 current && 'border-primary ring-1 ring-primary',
               )}
             >
@@ -371,7 +398,11 @@ function LayoutBuilder({ page }: { page: LayoutPageSlug }) {
                     ? `Arranged, ${summary.sections} ${summary.sections === 1 ? 'section' : 'sections'}`
                     : slug === 'home'
                       ? 'Puts itself together'
-                      : 'The list of all of them'
+                      : slug === 'live'
+                        ? 'The channels alone'
+                        : LAYOUT_PAGES[slug].each
+                          ? 'The list of its titles'
+                          : 'The list of all of them'
                   : ' '}
               </span>
             </Link>
@@ -416,7 +447,7 @@ function LayoutBuilder({ page }: { page: LayoutPageSlug }) {
               aria-hidden="true"
               className="hidden gap-2 rounded-xl border bg-muted/40 p-3 md:grid"
             >
-              {page === 'home' ? (
+              {page === 'home' || about.each ? (
                 <div className="flex h-20 items-end rounded-lg bg-linear-to-br from-primary/30 to-primary/5 p-2">
                   <span className="h-2 w-16 rounded-full bg-foreground/40" />
                 </div>
@@ -437,11 +468,42 @@ function LayoutBuilder({ page }: { page: LayoutPageSlug }) {
       ) : null}
 
       {home.data?.custom ? (
-        <div className="grid gap-3">
-          {hero ? (
+        <div className="grid grid-cols-1 gap-3">
+          {about.each ? (
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-3 rounded-xl border bg-muted/40 px-4 py-3">
+              <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                <Layers className="size-4" aria-hidden="true" />
+              </span>
+              <p className="min-w-[min(100%,16rem)] flex-1 text-sm text-muted-foreground">
+                <span className="block font-medium text-foreground">
+                  One arrangement for all your {about.each.many}
+                </span>
+                {example
+                  ? `Each section holds only titles of the ${about.each.one} a visitor opened. Here you see them with one of yours.`
+                  : `No ${about.each.one} has a published title yet, so the sections stand empty for now.`}
+              </p>
+              {example ? (
+                <label className="flex items-center gap-2 text-sm">
+                  <span className="text-muted-foreground">Shown with</span>
+                  <Select
+                    aria-label={`The ${about.each.one} the sections are shown with`}
+                    className="w-48"
+                    value={example.id}
+                    onValueChange={setExampleId}
+                    options={(subjects.data ?? [example]).map((subject) => ({
+                      value: subject.id,
+                      label: subject.name,
+                    }))}
+                  />
+                </label>
+              ) : null}
+            </div>
+          ) : null}
+          {!hasOpening ? null : hero ? (
             <SectionCard
               section={hero}
               mayWrite={mayWrite}
+              within={about.each?.one}
               pinned
               onEdit={() => setEditing({ mode: 'edit', section: hero })}
               onToggle={() => toggle.mutate(hero)}
@@ -464,10 +526,12 @@ function LayoutBuilder({ page }: { page: LayoutPageSlug }) {
 
           {rows.length === 0 ? (
             <EmptyState icon={LayoutTemplate} title="No rows yet" action={addMenu}>
-              Add rows of titles to fill the page under the opening.
+              {hasOpening
+                ? 'Add rows of titles to fill the page under the opening.'
+                : 'Add rows of titles to stand under the channels.'}
             </EmptyState>
           ) : (
-            <ol className="grid gap-3">
+            <ol className="grid grid-cols-1 gap-3">
               {rows.map((section, index) => (
                 <li
                   key={section.id}
@@ -487,6 +551,7 @@ function LayoutBuilder({ page }: { page: LayoutPageSlug }) {
                   <SectionCard
                     section={section}
                     mayWrite={mayWrite}
+                    within={about.each?.one}
                     place={index + 1}
                     onEdit={() => setEditing({ mode: 'edit', section })}
                     onToggle={() => toggle.mutate(section)}
@@ -536,6 +601,8 @@ const STATE_BADGES = {
 interface SectionCardProps {
   section: HomeSection;
   mayWrite: boolean;
+  /** On the page of categories or genres: which of the two the sections stay within. */
+  within?: string;
   /** The opening: it stands first and cannot be moved. */
   pinned?: boolean;
   place?: number;
@@ -553,6 +620,7 @@ interface SectionCardProps {
 function SectionCard({
   section,
   mayWrite,
+  within,
   pinned,
   place,
   onEdit,
@@ -628,7 +696,7 @@ function SectionCard({
             ) : null}
           </div>
           <p className="mt-0.5 text-xs text-muted-foreground">
-            {describeSection(section)}
+            {describeSection(section, within)}
             {dates ? `. Shown ${dates}` : ''}
           </p>
 
@@ -943,17 +1011,26 @@ function SectionEditor({
 
             {!isContinue ? (
               <>
-                <Field label="Shows">
+                <Field
+                  label="Shows"
+                  hint={
+                    LAYOUT_PAGES[page].each
+                      ? `Always within the ${LAYOUT_PAGES[page].each.one} a visitor opened.`
+                      : undefined
+                  }
+                >
                   {(id) => (
                     <Select
                       id={id}
                       value={form.source}
                       onValueChange={(value) => chooseSource(value as HomeSource)}
-                      options={(Object.keys(SOURCE_LABELS) as HomeSource[]).map((value) => ({
-                        value,
-                        label: SOURCE_LABELS[value].label,
-                        description: SOURCE_LABELS[value].about,
-                      }))}
+                      options={(Object.keys(SOURCE_LABELS) as HomeSource[])
+                        .filter((value) => value.toLowerCase() !== LAYOUT_PAGES[page].each?.one)
+                        .map((value) => ({
+                          value,
+                          label: SOURCE_LABELS[value].label,
+                          description: SOURCE_LABELS[value].about,
+                        }))}
                     />
                   )}
                 </Field>
