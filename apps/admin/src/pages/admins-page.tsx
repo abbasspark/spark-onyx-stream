@@ -5,16 +5,19 @@ import {
   MoreHorizontal,
   Plus,
   ShieldCheck,
+  ShieldHalf,
   ShieldOff,
   UserCheck,
   UserX,
 } from 'lucide-react';
 import { type FormEvent, useEffect, useState } from 'react';
 import { toast } from 'sonner';
-import { adminsApi } from '@/api/endpoints';
-import { ADMIN_ROLES, type Admin, type AdminRole, type UpdateAdminInput } from '@/api/types';
+import { Link } from 'react-router';
+import { adminsApi, rolesApi } from '@/api/endpoints';
+import type { Admin, UpdateAdminInput } from '@/api/types';
 import { useSession } from '@/auth/session';
 import { useConfirm } from '@/components/confirm';
+import { RoleBadge } from '@/components/role-access';
 import { Button } from '@/components/ui/button';
 import {
   Badge,
@@ -28,7 +31,7 @@ import {
   Th,
   Tr,
 } from '@/components/ui/display';
-import { Field, Input, Select } from '@/components/ui/form';
+import { Field, Input, Select, type SelectOption } from '@/components/ui/form';
 import {
   Dialog,
   DialogBody,
@@ -41,21 +44,10 @@ import {
   DropdownMenuTrigger,
   Tooltip,
 } from '@/components/ui/overlay';
-import { formatDateTime, formatRelative, humanize } from '@/lib/format';
+import { formatDateTime, formatRelative } from '@/lib/format';
+import { mayManage, roleColor, roleFields, roleName, roleOptions, roleValue } from '@/lib/roles';
 
 const PAGE_SIZE = 25;
-
-const ROLE_HELP: Record<AdminRole, string> = {
-  OWNER: 'Everything, including other admins',
-  ADMIN: 'Everything except managing admins',
-  EDITOR: 'Upload and manage videos',
-  VIEWER: 'Read only',
-};
-const ROLE_OPTIONS = ADMIN_ROLES.map((role) => ({
-  value: role,
-  label: humanize(role),
-  description: ROLE_HELP[role],
-}));
 
 const initialsOf = (name: string) =>
   name
@@ -80,7 +72,21 @@ export function AdminsPage() {
     queryFn: ({ signal }) => adminsApi.list({ page, pageSize: PAGE_SIZE }, signal),
     placeholderData: keepPreviousData,
   });
-  const refresh = () => queryClient.invalidateQueries({ queryKey: ['admins'] });
+  // The roles, built in and custom: for the dropdowns, and to know whom this admin may change.
+  const roles = useQuery({
+    queryKey: ['roles'],
+    queryFn: ({ signal }) => rolesApi.overview(signal),
+  });
+  const allRoles = roles.data?.roles ?? [];
+  const me =
+    state.status === 'signedIn'
+      ? { role: state.me.role, permissions: state.me.permissions }
+      : { role: 'VIEWER' as const, permissions: [] };
+  const options = roleOptions(allRoles, me);
+  const refresh = () => {
+    void queryClient.invalidateQueries({ queryKey: ['admins'] });
+    void queryClient.invalidateQueries({ queryKey: ['roles'] });
+  };
 
   const update = useMutation({
     mutationFn: ({ admin, body }: { admin: Admin; body: UpdateAdminInput; message: string }) =>
@@ -143,12 +149,20 @@ export function AdminsPage() {
         title="Admins"
         description="The people who can sign in to this panel, and what each of them may do."
         actions={
-          mayWrite ? (
-            <Button variant="primary" onClick={() => setCreating(true)}>
-              <Plus />
-              New admin
+          <>
+            <Button asChild>
+              <Link to="/roles">
+                <ShieldHalf />
+                Roles
+              </Link>
             </Button>
-          ) : null
+            {mayWrite ? (
+              <Button variant="primary" onClick={() => setCreating(true)}>
+                <Plus />
+                New admin
+              </Button>
+            ) : null}
+          </>
         }
       />
 
@@ -170,8 +184,9 @@ export function AdminsPage() {
             </thead>
             <tbody>
               {admins.data.items.map((admin) => {
-                // An admin does not change their own role or switch themselves off by accident.
-                const editable = mayWrite && admin.id !== myId;
+                // An admin does not change their own role or switch themselves off by
+                // accident, and nobody changes an admin who may do more than they do.
+                const editable = mayWrite && admin.id !== myId && mayManage(me, admin, allRoles);
                 return (
                   <Tr key={admin.id}>
                     <Td>
@@ -189,23 +204,25 @@ export function AdminsPage() {
                       </div>
                     </Td>
                     <Td>
-                      {editable ? (
+                      {editable && options.length > 0 ? (
                         <Select
                           aria-label={`Role of ${admin.displayName}`}
-                          className="h-8 w-32"
-                          value={admin.role}
+                          className="h-8 w-44"
+                          value={roleValue(admin)}
                           disabled={update.isPending}
-                          onValueChange={(role) =>
+                          onValueChange={(value) => {
+                            const label =
+                              options.find((option) => option.value === value)?.label ?? 'changed';
                             update.mutate({
                               admin,
-                              body: { role: role as AdminRole },
-                              message: `${admin.displayName} is now ${humanize(role).toLowerCase()}`,
-                            })
-                          }
-                          options={ROLE_OPTIONS}
+                              body: roleFields(value),
+                              message: `${admin.displayName} now has the role ${label}`,
+                            });
+                          }}
+                          options={options}
                         />
                       ) : (
-                        humanize(admin.role)
+                        <RoleBadge name={roleName(admin)} color={roleColor(admin)} />
                       )}
                     </Td>
                     <Td>
@@ -285,6 +302,7 @@ export function AdminsPage() {
       ) : null}
 
       <CreateAdminDialog
+        roleOptions={options}
         open={creating}
         onOpenChange={setCreating}
         onSaved={(admin) => {
@@ -376,10 +394,13 @@ function ResetPasswordDialog({
 }
 
 function CreateAdminDialog({
+  roleOptions: options,
   open,
   onOpenChange,
   onSaved,
 }: {
+  /** The roles, with the ones this admin may not hand out switched off. */
+  roleOptions: readonly SelectOption[];
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onSaved: (admin: Admin) => void;
@@ -387,11 +408,21 @@ function CreateAdminDialog({
   const [email, setEmail] = useState('');
   const [displayName, setDisplayName] = useState('');
   const [password, setPassword] = useState('');
-  const [role, setRole] = useState<AdminRole>('EDITOR');
+  const [role, setRole] = useState('');
+  // Editor when it may be given, otherwise the first role that may.
+  const firstRole =
+    options.find((option) => option.value === 'EDITOR' && !option.disabled)?.value ??
+    options.find((option) => !option.disabled)?.value ??
+    '';
 
   const create = useMutation({
     mutationFn: () =>
-      adminsApi.create({ email: email.trim(), displayName: displayName.trim(), password, role }),
+      adminsApi.create({
+        email: email.trim(),
+        displayName: displayName.trim(),
+        password,
+        ...roleFields(role),
+      }),
     onSuccess: onSaved,
   });
 
@@ -401,7 +432,7 @@ function CreateAdminDialog({
       setEmail('');
       setDisplayName('');
       setPassword('');
-      setRole('EDITOR');
+      setRole(firstRole);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
@@ -441,13 +472,25 @@ function CreateAdminDialog({
                 )}
               </Field>
             </div>
-            <Field label="Role">
+            <Field
+              label="Role"
+              hint={
+                <>
+                  What they may do in this panel. See or make roles under{' '}
+                  <Link to="/roles" className="text-primary hover:underline">
+                    Roles
+                  </Link>
+                  .
+                </>
+              }
+            >
               {(id) => (
                 <Select
                   id={id}
                   value={role}
-                  onValueChange={(value) => setRole(value as AdminRole)}
-                  options={ROLE_OPTIONS}
+                  onValueChange={setRole}
+                  placeholder="Choose a role"
+                  options={options}
                 />
               )}
             </Field>
@@ -471,7 +514,12 @@ function CreateAdminDialog({
           </DialogBody>
           <DialogFooter>
             <Button onClick={() => onOpenChange(false)}>Cancel</Button>
-            <Button type="submit" variant="primary" loading={create.isPending}>
+            <Button
+              type="submit"
+              variant="primary"
+              loading={create.isPending}
+              disabled={role === ''}
+            >
               Create admin
             </Button>
           </DialogFooter>

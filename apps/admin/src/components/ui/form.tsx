@@ -61,6 +61,8 @@ export interface SelectOption {
   value: string;
   label: string;
   description?: string;
+  /** Shown, and cannot be chosen. */
+  disabled?: boolean;
 }
 
 interface SelectProps {
@@ -112,7 +114,8 @@ export function Select({
               <SelectPrimitive.Item
                 key={option.value}
                 value={option.value}
-                className="relative flex cursor-default items-start rounded-sm py-1.5 pr-8 pl-2 text-sm outline-none select-none data-highlighted:bg-accent data-highlighted:text-accent-foreground"
+                disabled={option.disabled}
+                className="relative flex cursor-default items-start rounded-sm py-1.5 pr-8 pl-2 text-sm outline-none select-none data-disabled:opacity-45 data-highlighted:bg-accent data-highlighted:text-accent-foreground"
               >
                 <div>
                   <SelectPrimitive.ItemText>{option.label}</SelectPrimitive.ItemText>

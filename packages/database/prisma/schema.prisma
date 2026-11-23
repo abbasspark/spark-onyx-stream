@@ -25,15 +25,40 @@ enum AdminRole {
   ADMIN
   EDITOR
   VIEWER
+  /// A role made in the panel. Which one is in customRoleId.
+  CUSTOM
+}
+
+/// A role made in the panel: a name and the list of things its holders may do.
+/// The four built-in roles are not stored here.
+model AdminCustomRole {
+  id          String   @id @default(uuid(7)) @db.Uuid
+  name        String   @unique
+  description String   @default("")
+  /// The colour of its badge in the panel, one of a fixed set of names.
+  color       String   @default("slate")
+  /// What its holders may do: entries of the permission list in the code.
+  /// An entry the code no longer knows is ignored.
+  permissions String[]
+  createdById String?  @db.Uuid
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  admins AdminUser[]
+
+  @@map("admin_custom_roles")
 }
 
 model AdminUser {
   recordings    Recording[]
-  id            String      @id @default(uuid(7)) @db.Uuid
-  email         String      @unique
+  id            String           @id @default(uuid(7)) @db.Uuid
+  email         String           @unique
   passwordHash  String
   displayName   String
-  role          AdminRole   @default(EDITOR)
+  role          AdminRole        @default(EDITOR)
+  /// Set when role is CUSTOM, and only then. A role in use cannot be deleted.
+  customRoleId  String?          @db.Uuid
+  customRole    AdminCustomRole? @relation(fields: [customRoleId], references: [id], onDelete: Restrict)
   /// The secret an authenticator app makes its codes from, encrypted with the
   /// master key. Set while two-factor sign-in is being set up, and while it is on.
   totpSecret    String?
@@ -41,10 +66,10 @@ model AdminUser {
   totpEnabledAt DateTime?
   /// The time step of the last code that was accepted. A code counts once.
   totpLastStep  Int?
-  isActive      Boolean     @default(true)
+  isActive      Boolean          @default(true)
   lastLoginAt   DateTime?
-  createdAt     DateTime    @default(now())
-  updatedAt     DateTime    @updatedAt
+  createdAt     DateTime         @default(now())
+  updatedAt     DateTime         @updatedAt
 
   sessions             AdminSession[]
   apiKeys              ApiKey[]
@@ -58,6 +83,7 @@ model AdminUser {
   backups              Backup[]
   translationJobs      TranslationJob[]
 
+  @@index([customRoleId])
   @@map("admin_users")
 }
 

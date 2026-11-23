@@ -28,6 +28,7 @@ import {
   Mail,
   Radio,
   ScrollText,
+  ShieldHalf,
   SlidersHorizontal,
   Stethoscope,
   Shapes,
@@ -329,7 +330,14 @@ export const NAVIGATION: NavGroup[] = [
         label: 'Admins',
         icon: Users,
         permission: 'admins:read',
-        keywords: 'users team roles',
+        keywords: 'users team staff people',
+      },
+      {
+        to: '/roles',
+        label: 'Roles',
+        icon: ShieldHalf,
+        permission: 'admins:read',
+        keywords: 'permissions access rights custom role rbac',
       },
       {
         to: '/api-keys',

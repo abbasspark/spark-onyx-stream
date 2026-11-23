@@ -165,6 +165,7 @@ export class AuthService {
           ? { passwordHash: await hashPassword(input.password) }
           : {}),
       },
+      include: { customRole: true },
     });
 
     const { token, session } = await this.sessions.create(admin.id, info);

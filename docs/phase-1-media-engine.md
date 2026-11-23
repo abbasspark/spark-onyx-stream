@@ -278,6 +278,8 @@ Status shows what exists today.
 | `DELETE`                | `/admins/{id}/two-factor`               | Take two-factor sign-in off another admin who is locked out                                                     | Built  |
 | `GET` `POST`            | `/admins`                               | List and create admins                                                                                          | Built  |
 | `GET` `PATCH` `DELETE`  | `/admins/{id}`                          | Read, update and deactivate an admin                                                                            | Built  |
+| `GET` `POST`            | `/roles`                                | The roles, built in and custom, with every permission explained; make a custom role                             | Built  |
+| `GET` `PATCH` `DELETE`  | `/roles/{id}`                           | Read a custom role with its holders, change it, delete it (`?moveTo=` says where its holders go)                | Built  |
 | `GET` `POST`            | `/api-keys`                             | List and create API keys                                                                                        | Built  |
 | `DELETE`                | `/api-keys/{id}`                        | Revoke an API key                                                                                               | Built  |
 | `GET`                   | `/audit-logs`                           | List audit entries with filters                                                                                 | Built  |
@@ -327,7 +329,7 @@ A token or key is shown once, when it is created. It cannot be read back later.
 
 ### Permissions
 
-Endpoints declare the permissions they need. A role grants a fixed set:
+Endpoints declare the permissions they need. Each of the four built-in roles grants a fixed set:
 
 | Permission area                       | OWNER          | ADMIN          | EDITOR         | VIEWER |
 | ------------------------------------- | -------------- | -------------- | -------------- | ------ |
@@ -342,6 +344,22 @@ Further rules:
 - The last active owner cannot be demoted or deactivated.
 - Admins are deactivated, never deleted, so the audit log keeps its references.
 - Deactivation, a role change and a password reset sign the admin out everywhere.
+
+### Custom roles
+
+Between "everything" and "content only" there is room for a support team, a finance person or a live operator. A custom role is a name, a colour and a list of permissions, made on the **Roles** page of the panel.
+
+- **Each area of the panel has up to three levels:** no access, can see, can change. Changing an area includes seeing it. The page explains every level in a sentence, and marks the areas that reach further than their own page: billing, settings, admins and API keys.
+- **The built-in roles stay as they are.** They can be duplicated as a starting point. **Compare** shows every role next to every other.
+- **A change to a role counts from the next request** of everyone who holds it. Nobody has to sign in again.
+- **Nobody hands out more than they hold.** An admin can only build a role from their own permissions, only give a role that may do no more than theirs, and only change, reset or deactivate an admin who may do no more than they do. Without this, a role that may only manage admins would be a way to every other permission.
+- **Nobody changes the role they hold themselves,** and nobody changes a role that may do more than their own.
+- **Owner stays special:** only an owner makes or changes an owner, whatever a custom role holds.
+- **A role in use is not deleted by accident.** Deleting it asks which role its holders get instead; they are signed out, as after any change of role.
+- **API keys follow:** a key loses a permission the moment the role of its creator does.
+- Roles are managed by a signed-in admin with the permission to change admins, never by an API key. Every change is written to the audit log with what was added and what was taken away.
+
+For the API: an admin has `role` (`OWNER`, `ADMIN`, `EDITOR`, `VIEWER` or `CUSTOM`) and, for `CUSTOM`, `customRoleId`.
 
 ### API keys
 

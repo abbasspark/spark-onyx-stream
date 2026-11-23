@@ -11,6 +11,8 @@ export interface AdminPrincipal {
   email: string;
   displayName: string;
   role: AdminRole;
+  /** The role made in the panel that this admin holds. Set when role is CUSTOM. */
+  customRole: { id: string; name: string; color: string } | null;
   permissions: readonly Permission[];
   /** Whether a code is asked for when this admin signs in. */
   twoFactorEnabled: boolean;

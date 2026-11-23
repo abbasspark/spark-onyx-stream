@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 import { Inject, Injectable } from '@nestjs/common';
-import { type AdminSession, type AdminUser, PrismaClient } from '@onyx/database';
+import { type AdminSession, PrismaClient } from '@onyx/database';
+import type { AdminWithRole } from '../admins/admin.view.js';
 import type { RequestInfo } from './request-info.js';
 import { generateSessionToken, hashToken } from './tokens.js';
 
@@ -40,10 +41,10 @@ export class SessionService {
    * Finds the session for a token and its admin.
    * Returns null when the token is unknown, revoked or expired, or the admin is deactivated.
    */
-  async validate(token: string): Promise<{ session: AdminSession; admin: AdminUser } | null> {
+  async validate(token: string): Promise<{ session: AdminSession; admin: AdminWithRole } | null> {
     const session = await this.prisma.adminSession.findUnique({
       where: { tokenHash: hashToken(token) },
-      include: { admin: true },
+      include: { admin: { include: { customRole: true } } },
     });
 
     if (!session || session.revokedAt || session.expiresAt.getTime() <= Date.now()) {

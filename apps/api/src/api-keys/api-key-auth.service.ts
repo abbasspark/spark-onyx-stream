@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 import { Inject, Injectable } from '@nestjs/common';
 import { PrismaClient } from '@onyx/database';
-import { effectiveApiKeyPermissions } from '../auth/permissions.js';
+import { effectiveApiKeyPermissions, permissionsOf } from '../auth/permissions.js';
 import type { ApiKeyPrincipal } from '../auth/principal.js';
 import { hashToken } from '../auth/tokens.js';
 
@@ -20,7 +20,7 @@ export class ApiKeyAuthService {
   async authenticate(key: string): Promise<ApiKeyPrincipal | null> {
     const apiKey = await this.prisma.apiKey.findUnique({
       where: { keyHash: hashToken(key) },
-      include: { createdBy: true },
+      include: { createdBy: { include: { customRole: true } } },
     });
 
     if (!apiKey || apiKey.revokedAt) {
@@ -46,7 +46,7 @@ export class ApiKeyAuthService {
       apiKeyId: apiKey.id,
       adminId: apiKey.createdById,
       name: apiKey.name,
-      permissions: effectiveApiKeyPermissions(apiKey.scopes, apiKey.createdBy.role),
+      permissions: effectiveApiKeyPermissions(apiKey.scopes, permissionsOf(apiKey.createdBy)),
     };
   }
 }

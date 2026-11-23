@@ -32,12 +32,15 @@ export async function runAdminCli(args: string[], io: AdminCliIo): Promise<numbe
   const prisma = io.prisma ?? createPrismaClient(io.env.DATABASE_URL);
   try {
     if (command === 'list') {
-      const admins = await prisma.adminUser.findMany({ orderBy: { email: 'asc' } });
+      const admins = await prisma.adminUser.findMany({
+        orderBy: { email: 'asc' },
+        include: { customRole: true },
+      });
       for (const admin of admins) {
         io.out(
           [
             admin.email,
-            admin.role,
+            admin.customRole ? admin.customRole.name : admin.role,
             admin.isActive ? 'active' : 'deactivated',
             admin.totpEnabledAt ? 'two-factor on' : 'two-factor off',
           ].join('  '),

@@ -2,7 +2,18 @@
 //
 // Shapes of the API's JSON answers. Dates arrive as ISO 8601 text.
 
-export type AdminRole = 'OWNER' | 'ADMIN' | 'EDITOR' | 'VIEWER';
+/** The four roles that ship with the software. */
+export type BuiltInRole = 'OWNER' | 'ADMIN' | 'EDITOR' | 'VIEWER';
+
+/** The role of an admin: a built-in one, or CUSTOM for a role made in the panel. */
+export type AdminRole = BuiltInRole | 'CUSTOM';
+
+/** The custom role of an admin, as far as a list needs it. */
+export interface CustomRoleRef {
+  id: string;
+  name: string;
+  color: string;
+}
 
 export type Permission =
   | 'admins:read'
@@ -37,6 +48,8 @@ export interface Admin {
   email: string;
   displayName: string;
   role: AdminRole;
+  /** The role made in the panel that this admin holds. Set when role is CUSTOM. */
+  customRole: CustomRoleRef | null;
   isActive: boolean;
   /** Whether a code is asked for when this admin signs in. */
   twoFactorEnabled: boolean;
@@ -70,6 +83,8 @@ export interface Me {
   email: string;
   displayName: string;
   role: AdminRole;
+  /** The role made in the panel that this admin holds. Set when role is CUSTOM. */
+  customRole: CustomRoleRef | null;
   permissions: Permission[];
   /** Whether a code is asked for when this admin signs in. */
   twoFactorEnabled: boolean;
@@ -184,6 +199,20 @@ export interface Job {
 
 export const ADMIN_ROLES = ['OWNER', 'ADMIN', 'EDITOR', 'VIEWER'] as const;
 
+/** The colours a role badge can have. */
+export const ROLE_COLORS = [
+  'slate',
+  'blue',
+  'cyan',
+  'teal',
+  'green',
+  'amber',
+  'orange',
+  'rose',
+  'violet',
+] as const;
+export type RoleColor = (typeof ROLE_COLORS)[number];
+
 export const ENCODER_PRESETS = [
   'ultrafast',
   'superfast',
@@ -281,11 +310,15 @@ export interface CreateAdminInput {
   displayName: string;
   password: string;
   role: AdminRole;
+  /** Which custom role. Needed when role is CUSTOM. */
+  customRoleId?: string;
 }
 
 export interface UpdateAdminInput {
   displayName?: string;
   role?: AdminRole;
+  /** Which custom role. Needed when role is CUSTOM. */
+  customRoleId?: string;
   isActive?: boolean;
   password?: string;
 }
@@ -2162,4 +2195,63 @@ export interface CouponRedemption {
   discountAmount: number;
   currency: string;
   createdAt: string;
+}
+
+/** A role as the panel lists it: one of the four built in, or one made there. */
+export interface Role {
+  /** The id of a custom role. Null for a built-in one, which is named by `key`. */
+  id: string | null;
+  key: AdminRole;
+  builtIn: boolean;
+  name: string;
+  description: string;
+  color: string;
+  permissions: Permission[];
+  /** How many admins hold it, deactivated ones included. */
+  adminCount: number;
+  /** The built-in role whose permissions this one covers, as a hint. */
+  like: BuiltInRole | null;
+  createdAt: string | null;
+  updatedAt: string | null;
+}
+
+export interface RoleHolder {
+  id: string;
+  displayName: string;
+  email: string;
+  isActive: boolean;
+}
+
+export interface RoleDetail extends Role {
+  admins: RoleHolder[];
+}
+
+/** A part of the panel a role can be let into. */
+export interface PermissionArea {
+  key: string;
+  label: string;
+  read: { permission: Permission; description: string };
+  /** Null for areas that can only be seen. */
+  write: { permission: Permission; description: string } | null;
+  /** Reaches beyond its own page: the panel shows a warning. */
+  sensitive: boolean;
+}
+
+export interface PermissionSection {
+  key: string;
+  label: string;
+  description: string;
+  areas: PermissionArea[];
+}
+
+export interface RolesOverview {
+  roles: Role[];
+  catalog: PermissionSection[];
+}
+
+export interface RoleInput {
+  name: string;
+  description: string;
+  color: string;
+  permissions: Permission[];
 }

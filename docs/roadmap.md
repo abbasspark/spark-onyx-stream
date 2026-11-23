@@ -77,3 +77,4 @@ Before the apps, the panel becomes a fuller catalog system. This work is outside
 13. Coupons: codes made in the panel that lower the price of a plan or of renting and buying a title, with limits and a record of every use. **Done.**
 14. Stream limits: an account plays on so many devices at once, set for the installation, per plan or per viewer, with a way to stop another device. **Done.**
 15. Two-factor sign-in for admins: a code from an authenticator app after the password, recovery codes, and an installation that can ask every admin for it. **Done.**
+16. Custom roles: roles made in the panel from the permission list, area by area, with rules that keep anyone from handing out more than they hold. **Done.**
