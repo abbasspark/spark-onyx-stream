@@ -141,7 +141,7 @@ describe.skipIf(!TEST_DATABASE_URL)('Public catalog (e2e)', () => {
 
   it('answers without sign-in, and with nothing when the catalog is empty', async () => {
     const home = await http().get('/v1/catalog/home').expect(200);
-    expect(home.body).toEqual({ rows: [] });
+    expect(home.body).toEqual({ custom: false, hero: null, rows: [] });
     expect(home.headers['cache-control']).toBe('public, max-age=30');
 
     const titles = await http().get('/v1/catalog/titles').expect(200);
@@ -355,11 +355,19 @@ describe.skipIf(!TEST_DATABASE_URL)('Public catalog (e2e)', () => {
           names(row.titles),
         ]),
       ).toEqual([
-        ['featured', 'Featured', ['Harvest']],
+        ['continue', 'Continue watching', []],
+        // One featured title is the opening. A row of one would only repeat it.
         ['latest', 'New', ['Harvest', 'Night Train']],
         ['category:drama', 'Drama', ['Night Train']],
       ]);
-      expect(home.body.rows[2].category).toEqual({ slug: 'drama', name: 'Drama' });
+      expect(home.body.custom).toBe(false);
+      expect(names(home.body.hero.titles)).toEqual(['Harvest']);
+      expect(home.body.rows[2]).toMatchObject({
+        category: { slug: 'drama', name: 'Drama' },
+        kind: 'titles',
+        layout: 'poster',
+        browse: '/browse?category=drama',
+      });
     });
   });
 

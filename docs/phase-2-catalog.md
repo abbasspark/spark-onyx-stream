@@ -120,6 +120,34 @@ On the lists of movies and series, titles can be selected and changed together.
 
 The filter takes what `GET /titles` takes, without the page and the order. Actions are `publish`, `unpublish`, `archive`, `delete`, `feature` (`value`), `categories`, `genres` and `collections` (`add`, `remove`), `availability` (`availableFrom`, `availableUntil`; left out: unchanged, `null`: removed) and `translate` (`language`, `overwrite`).
 
+## The home page
+
+What a visitor of the website sees first is arranged in the panel, under **Home page**.
+
+- **While nobody arranged it, the page puts itself together:** an opening with a featured title, the viewer's own row of started videos, the featured titles, the newest, and a row for each category in the order of the categories. This is what every installation starts with, and it needs no care.
+- **"Arrange the page myself" takes it over.** Sections are made that show exactly what the automatic page shows at that moment, and from then on the page is what its sections say. "Back to the automatic page" deletes them.
+- **A page is an opening and rows.** There is one opening at most, and it stands first. Rows follow in the order they are given, which is changed by dragging or with arrows.
+- **A row shows titles from a source:** the whole catalog, the featured titles, a category, a genre, a collection, or titles picked one by one. It can be narrowed to movies or series, ordered (newest, latest premiere, best rated, by name, or the own order of a collection or of the picks), and limited to between 4 and 40 titles.
+- **A row has a look:** upright posters, wide cards with the backdrop, or a numbered top list.
+- **The opening shows one title large, or up to 8 that take turns** every few seconds. Its titles come from a source like those of a row. Titles with a backdrop are preferred; without any, the others are taken rather than leaving the page without an opening. The turn waits while the pointer or the keyboard is on the opening, and does not run for visitors who asked their system for less motion.
+- **"Continue watching" is a section too:** the place where a viewer finds what they started. Without it, the page does not show that row.
+- **A section can be switched off, and can have dates.** With a start and an end, a row for a season appears and leaves by itself.
+- **A heading is optional.** Without one, a section is named after what it shows: "New movies", "Top rated", the name of the category or collection.
+- **Nothing a viewer may not see gets on the page.** Every section goes through the filter of the public catalog, so a draft that was picked by hand is left out, and the panel marks it. A section with nothing to show is not sent, and appears by itself once it has something.
+- **"See all" leads where the row came from:** the browse page with the same filters and order, or the page of the collection. Picked titles have none.
+- A category, genre or collection that is deleted takes the sections that show it along.
+
+| Method and path                       | Purpose                                                                                       |
+| ------------------------------------- | --------------------------------------------------------------------------------------------- |
+| `GET /home`                           | The sections, each with the titles viewers get right now. `custom: false` while there is none |
+| `POST /home/start`                    | Make the sections that show what the automatic page shows                                     |
+| `DELETE /home`                        | Delete every section: back to the automatic page                                              |
+| `POST /home/sections`                 | Add a section: `kind` is `HERO`, `CONTINUE_WATCHING` or `TITLES`                              |
+| `PATCH /home/sections/{id}`, `DELETE` | Change or remove a section. `titleIds` replaces the picked titles                             |
+| `PUT /home/sections/order`            | Set the order of all sections                                                                 |
+
+`GET /catalog/home` answers with `hero` (`{ titles }` or null) and `rows`. Each row has a `key`, a `name`, a `kind` (`titles`, or `continue` for the place of the viewer's own row, which carries no titles), a `layout` (`poster`, `landscape`, `numbered`), `browse` (the path "See all" leads to on the website, or null) and its `titles`.
+
 ## Artwork
 
 - Pictures are JPEG, PNG or WebP, up to 10 MB and 8192 pixels per side.
@@ -173,21 +201,21 @@ Changes to the catalog are written to the audit log.
 
 The viewer website and the apps read the catalog through `/v1/catalog`. No sign-in is needed.
 
-| Method and path                                    | Purpose                                                                                                                                    |
-| -------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
-| `GET /catalog/home`                                | Rows for the home page: featured, new, then one row per category                                                                           |
-| `GET /catalog/categories`                          | Categories that have something to show, with the number of titles                                                                          |
-| `GET /catalog/titles`                              | Page of titles. Filters: `type`, `category`, `genre`, `person`, `collection` (all slugs), `featured`, `q`. Sorts: `newest`, `name`, `year` |
-| `GET /catalog/titles/{slug}`                       | One title, for a series with its seasons and episodes                                                                                      |
-| `POST /catalog/titles/{slug}/playback`             | Signed addresses for playing a movie                                                                                                       |
-| `POST /catalog/titles/{slug}/trailer/playback`     | The same for the trailer                                                                                                                   |
-| `POST /catalog/titles/{slug}/extras/{id}/playback` | The same for one of the extras                                                                                                             |
-| `GET /catalog/collections`                         | Collections that are shown and hold at least one visible title                                                                             |
-| `GET /catalog/collections/{slug}`                  | A collection with its visible titles, in its order                                                                                         |
-| `GET /catalog/genres`                              | Genres that have something to watch, with the number of titles                                                                             |
-| `GET /catalog/people/{slug}`                       | A person with the visible titles they have a part in. 404 for somebody with nothing to watch                                               |
-| `GET /catalog/languages`                           | The languages titles can be read in                                                                                                        |
-| `POST /catalog/episodes/{id}/playback`             | The same for an episode                                                                                                                    |
+| Method and path                                    | Purpose                                                                                                                                              |
+| -------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `GET /catalog/home`                                | The home page: its opening and its rows, as arranged in the panel, or put together by itself. See [The home page](#the-home-page)                    |
+| `GET /catalog/categories`                          | Categories that have something to show, with the number of titles                                                                                    |
+| `GET /catalog/titles`                              | Page of titles. Filters: `type`, `category`, `genre`, `person`, `collection` (all slugs), `featured`, `q`. Sorts: `newest`, `name`, `year`, `rating` |
+| `GET /catalog/titles/{slug}`                       | One title, for a series with its seasons and episodes                                                                                                |
+| `POST /catalog/titles/{slug}/playback`             | Signed addresses for playing a movie                                                                                                                 |
+| `POST /catalog/titles/{slug}/trailer/playback`     | The same for the trailer                                                                                                                             |
+| `POST /catalog/titles/{slug}/extras/{id}/playback` | The same for one of the extras                                                                                                                       |
+| `GET /catalog/collections`                         | Collections that are shown and hold at least one visible title                                                                                       |
+| `GET /catalog/collections/{slug}`                  | A collection with its visible titles, in its order                                                                                                   |
+| `GET /catalog/genres`                              | Genres that have something to watch, with the number of titles                                                                                       |
+| `GET /catalog/people/{slug}`                       | A person with the visible titles they have a part in. 404 for somebody with nothing to watch                                                         |
+| `GET /catalog/languages`                           | The languages titles can be read in                                                                                                                  |
+| `POST /catalog/episodes/{id}/playback`             | The same for an episode                                                                                                                              |
 
 - **Only what can be watched is returned.** Every query uses one filter: the title is published, and a movie's video can be played, or a series has at least one published episode whose video can be played. Seasons and episodes without something to watch are left out, and the counts follow.
 - **A draft answers exactly like a title that does not exist.** A request cannot find out which slugs are in use.
@@ -214,6 +242,7 @@ Browsing the catalog works in every case. With `open`, publishing a title makes 
 - **Selection:** tick boxes on posters and rows, a range with Shift, the whole page, or everything that matches the filters. A bar at the bottom of the screen holds the actions, and a card above the list shows translations in progress.
 - **Title editor:** details with one save button and a warning before unsaved changes are lost, videos and artwork that save as they are chosen, seasons and episodes for a series, and a publishing card with the checklist.
 - **Categories:** create, edit, delete and reorder.
+- **Home page:** the sections of the website's first page as cards that show what each one holds right now, with a switch, the order by dragging, and an editor at the side.
 - The dashboard shows the number of titles, and the command palette can start a new title.
 - A published title that viewers cannot see is marked as hidden in the list and explained in the editor. The editor links to the title's public data.
 

@@ -1833,3 +1833,73 @@ export interface AddedSubtitle {
   /** Something to check, when the file looks as if it belonged to another video. */
   warning: string | null;
 }
+
+// --- The home page of the website ---------------------------------------------------------
+
+export type HomeSectionKind = 'HERO' | 'CONTINUE_WATCHING' | 'TITLES';
+export type HomeSource = 'ALL' | 'FEATURED' | 'CATEGORY' | 'GENRE' | 'COLLECTION' | 'MANUAL';
+export type HomeSort = 'CURATED' | 'NEWEST' | 'RELEASED' | 'RATING' | 'NAME';
+export type HomeLayout = 'POSTER' | 'LANDSCAPE' | 'NUMBERED';
+
+/** A title as viewers get it on a card, as far as the panel shows it. */
+export interface HomePreviewTitle {
+  id: string;
+  type: TitleType;
+  slug: string;
+  name: string;
+  poster: { url: string } | null;
+  backdrop: { url: string } | null;
+}
+
+export interface HomeSection {
+  id: string;
+  position: number;
+  kind: HomeSectionKind;
+  /** The heading an admin gave. Null: `defaultName` is used. */
+  name: string | null;
+  defaultName: string;
+  source: HomeSource;
+  category: { id: string; name: string } | null;
+  genre: { id: string; name: string } | null;
+  collection: { id: string; name: string } | null;
+  /** Only movies or only series. Null: both. */
+  titleType: TitleType | null;
+  sort: HomeSort;
+  /** The most titles shown. */
+  limit: number;
+  layout: HomeLayout;
+  visible: boolean;
+  visibleFrom: string | null;
+  visibleUntil: string | null;
+  /** Whether viewers see it right now: switched on, inside its dates, and not empty. */
+  shownNow: boolean;
+  /** The picked titles of a MANUAL section, also those viewers cannot see. */
+  picked: { id: string; name: string; type: TitleType; visible: boolean }[];
+  /** The first titles viewers get. */
+  preview: HomePreviewTitle[];
+  /** How many titles viewers get, up to the limit. */
+  count: number;
+}
+
+export interface HomePage {
+  /** False while the page puts itself together. */
+  custom: boolean;
+  sections: HomeSection[];
+}
+
+export interface HomeSectionInput {
+  name?: string | null;
+  source?: HomeSource;
+  categoryId?: string | null;
+  genreId?: string | null;
+  collectionId?: string | null;
+  titleType?: TitleType | null;
+  sort?: HomeSort;
+  limit?: number;
+  layout?: HomeLayout;
+  visible?: boolean;
+  visibleFrom?: string | null;
+  visibleUntil?: string | null;
+  /** For the source MANUAL: the titles, in their order. */
+  titleIds?: string[];
+}

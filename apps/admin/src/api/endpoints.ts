@@ -57,6 +57,10 @@ import type {
   WatchPlaceTest,
   WatchSummary,
   AddedSubtitle,
+  HomePage,
+  HomeSection,
+  HomeSectionInput,
+  HomeSectionKind,
   BulkAction,
   BulkResult,
   SubtitleTrack,
@@ -413,6 +417,22 @@ export const subtitlesApi = {
   file: (assetId: string, trackId: string, signal?: AbortSignal) =>
     requestText(`/v1/assets/${assetId}/subtitles/${trackId}/file`, signal),
   fileUrl: (assetId: string, trackId: string) => `/v1/assets/${assetId}/subtitles/${trackId}/file`,
+};
+
+/** The home page of the website, as admins arrange it. */
+export const homeApi = {
+  get: (signal?: AbortSignal) => request<HomePage>('/v1/home', { signal }),
+  /** Takes the page over from the automatic one, starting with what it shows now. */
+  start: () => request<HomePage>('/v1/home/start', { method: 'POST' }),
+  /** Deletes every section: the page puts itself together again. */
+  reset: () => request<void>('/v1/home', { method: 'DELETE' }),
+  create: (body: HomeSectionInput & { kind: HomeSectionKind }) =>
+    request<HomeSection>('/v1/home/sections', { method: 'POST', body }),
+  update: (id: string, body: HomeSectionInput) =>
+    request<HomeSection>(`/v1/home/sections/${id}`, { method: 'PATCH', body }),
+  remove: (id: string) => request<void>(`/v1/home/sections/${id}`, { method: 'DELETE' }),
+  reorder: (ids: string[]) =>
+    request<HomePage>('/v1/home/sections/order', { method: 'PUT', body: { ids } }),
 };
 
 export const metadataApi = {

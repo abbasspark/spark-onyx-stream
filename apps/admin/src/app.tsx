@@ -15,6 +15,7 @@ import { TooltipProvider } from './components/ui/overlay';
 import { titlePath } from './lib/catalog';
 import { LiveProvider } from './live/live';
 import { AccountPage } from './pages/account-page';
+import { HomePageBuilder } from './pages/home-page';
 import { EmailPage } from './pages/email-page';
 import { ChannelsPage } from './pages/channels-page';
 import { DeliveryPage } from './pages/delivery-page';
@@ -116,6 +117,7 @@ function Pages() {
             <Route path="movies/:id" element={<TitleEditorPage />} />
             <Route path="series" element={<SeriesPage />} />
             <Route path="series/:id" element={<TitleEditorPage />} />
+            <Route path="home-page" element={<HomePageBuilder />} />
             <Route path="collections" element={<CollectionsPage />} />
             <Route path="collections/:id" element={<CollectionEditorPage />} />
             <Route path="people" element={<PeoplePage />} />

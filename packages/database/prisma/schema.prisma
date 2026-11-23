@@ -769,6 +769,7 @@ model Title {
   updatedAt   DateTime @updatedAt
 
   categories   TitleCategory[]
+  homeSections HomeSectionTitle[]
   genres       TitleGenre[]
   credits      Credit[]
   extras       TitleExtra[]
@@ -802,7 +803,8 @@ model Category {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  titles TitleCategory[]
+  titles       TitleCategory[]
+  homeSections HomeSection[]
 
   @@index([sortOrder])
   @@map("categories")
@@ -959,7 +961,8 @@ model Collection {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  titles CollectionTitle[]
+  titles       CollectionTitle[]
+  homeSections HomeSection[]
 
   @@unique([metadataSource, metadataId])
   @@index([position])
@@ -988,7 +991,8 @@ model Genre {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  titles TitleGenre[]
+  titles       TitleGenre[]
+  homeSections HomeSection[]
 
   @@map("genres")
 }
@@ -1843,4 +1847,101 @@ model Backup {
   @@index([createdAt])
   @@index([status])
   @@map("backups")
+}
+
+// ---------------------------------------------------------------------------
+// The home page of the website
+// ---------------------------------------------------------------------------
+
+enum HomeSectionKind {
+  /// The opening of the page: one title shown large, or a few that take turns.
+  HERO
+  /// Where the viewer's own row of started videos goes.
+  CONTINUE_WATCHING
+  /// A row of titles.
+  TITLES
+}
+
+/// Which titles a section shows.
+enum HomeSource {
+  /// Every title.
+  ALL
+  /// The titles marked as featured.
+  FEATURED
+  CATEGORY
+  GENRE
+  COLLECTION
+  /// Titles picked one by one, in the order they were put.
+  MANUAL
+}
+
+enum HomeSort {
+  /// The order of the collection, or of the picked titles.
+  CURATED
+  /// Last published first.
+  NEWEST
+  /// Latest premiere first.
+  RELEASED
+  /// Best rated first.
+  RATING
+  NAME
+}
+
+/// How the cards of a row look.
+enum HomeLayout {
+  POSTER
+  /// Wide cards with the backdrop.
+  LANDSCAPE
+  /// Posters with their place in the row beside them: a top ten.
+  NUMBERED
+}
+
+/// One part of the home page. Without any, the page is put together by itself.
+model HomeSection {
+  id       String          @id @default(uuid(7)) @db.Uuid
+  /// Order on the page, from 0. The hero opens the page wherever it stands.
+  position Int             @default(0)
+  kind     HomeSectionKind
+  /// The heading. Empty, the section is named after what it shows.
+  name     String?
+
+  source       HomeSource  @default(ALL)
+  categoryId   String?     @db.Uuid
+  category     Category?   @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  genreId      String?     @db.Uuid
+  genre        Genre?      @relation(fields: [genreId], references: [id], onDelete: Cascade)
+  collectionId String?     @db.Uuid
+  collection   Collection? @relation(fields: [collectionId], references: [id], onDelete: Cascade)
+  /// Only movies, or only series. Null: both.
+  titleType    TitleType?
+  sort         HomeSort    @default(NEWEST)
+  /// The most titles shown.
+  limit        Int         @default(20)
+  layout       HomeLayout  @default(POSTER)
+
+  /// A hidden section stays in the panel and is not shown.
+  visible      Boolean   @default(true)
+  /// Shown from this moment, and until that one. For rows of a season.
+  visibleFrom  DateTime?
+  visibleUntil DateTime?
+
+  titles    HomeSectionTitle[]
+  createdAt DateTime           @default(now())
+  updatedAt DateTime           @updatedAt
+
+  @@index([position])
+  @@map("home_sections")
+}
+
+/// A title picked for a section, with its place in it.
+model HomeSectionTitle {
+  sectionId String      @db.Uuid
+  section   HomeSection @relation(fields: [sectionId], references: [id], onDelete: Cascade)
+  titleId   String      @db.Uuid
+  title     Title       @relation(fields: [titleId], references: [id], onDelete: Cascade)
+  position  Int         @default(0)
+
+  @@id([sectionId, titleId])
+  @@index([titleId])
+  @@map("home_section_titles")
 }

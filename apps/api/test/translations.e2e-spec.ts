@@ -254,9 +254,8 @@ describe.skipIf(!TEST_DATABASE_URL)('Translations (e2e)', () => {
 
       const home = await http().get('/v1/catalog/home?language=de').expect(200);
       const rows = home.body.rows as { key: string; titles: { name: string }[] }[];
-      expect(names(rows.find((row) => row.key === 'featured')?.titles ?? [])).toEqual([
-        'Hafenlichter',
-      ]);
+      // The one featured title is the opening of the page.
+      expect(names(home.body.hero.titles)).toEqual(['Hafenlichter']);
       expect(names(rows.find((row) => row.key === 'latest')?.titles ?? []).sort()).toEqual([
         'Hafenlichter',
         'Night Ferry',
