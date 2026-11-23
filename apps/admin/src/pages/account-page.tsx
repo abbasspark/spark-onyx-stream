@@ -5,6 +5,7 @@ import { type FormEvent, useState } from 'react';
 import { toast } from 'sonner';
 import { authApi } from '@/api/endpoints';
 import { useSession } from '@/auth/session';
+import { TwoFactorCard } from '@/components/two-factor';
 import { Button } from '@/components/ui/button';
 import {
   Card,
@@ -99,6 +100,8 @@ export function AccountPage() {
             </div>
           </CardContent>
         </Card>
+
+        <TwoFactorCard />
 
         <Card>
           <CardHeader

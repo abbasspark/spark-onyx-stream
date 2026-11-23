@@ -238,6 +238,32 @@ Reading needs `settings:read`, changing `settings:write`.
 - The state of email is that of the process that answers: whether its last email was taken by the mail server.
 - "A newer version is there" compares with the main branch of the project. An installation that follows another branch or a fork should set `UPDATE_CHECK_URL`, or switch the check off.
 
+## Two-factor sign-in for admins
+
+An admin can protect their account with a second step: after the password, the panel asks for a code from an authenticator app on their phone.
+
+- **Any authenticator app works.** The codes are the standard time-based ones (TOTP, RFC 6238): six digits that change every 30 seconds. Google Authenticator, Microsoft Authenticator, Aegis, 1Password and the like all make them.
+- **Setting it up** is under **My account**: the password, then a QR code to scan (or a key to type), then the first code from the app. Nothing changes at sign-in before that first code was accepted. Switching it on signs the admin out on their other devices.
+- **Ten recovery codes** are shown once at the end. Each signs the admin in a single time without the app, for a phone that is lost or broken. They can be copied or downloaded, and replaced by ten new ones at any time. The panel warns when three or fewer are left, and after a sign-in that used one.
+- **At sign-in the code is asked for only after the right password,** so the form tells a stranger nothing about an account. A code counts once: seen over a shoulder, it is worth nothing. A wrong code counts like a wrong password, five of them lock sign-in for a quarter of an hour.
+- **Switching it off, and making new recovery codes, need the password and a code.** A session left open on a desk is not enough.
+- **The secret is stored encrypted** with `MASTER_KEY`, and recovery codes as hashes only.
+- **`ADMIN_TWO_FACTOR=required`** asks every admin for it. An admin without it can still sign in, and gets one screen: setting it up. The API refuses everything else for them with `403` and the code `two_factor_setup_required`. It can then not be switched off. API keys are not affected: they are not people at a keyboard.
+- **The Admins page shows who has it on.** An admin who may manage admins can take it off a colleague who lost both phone and codes: the colleague is signed out, signs in with the password alone, and sets it up again. Only an owner can do this for an owner, nobody can do it for themselves, and it is written to the audit log. Make sure it really is the colleague who asks.
+
+### Locked out with nobody to ask
+
+The only owner, without the phone and without recovery codes, gets back in from the command line of the server:
+
+```sh
+docker compose run --rm api node dist/cli/admin.js list
+docker compose run --rm api node dist/cli/admin.js two-factor-off owner@example.com
+```
+
+The tool works on the database directly and needs only `DATABASE_URL`, not a running application. It takes two-factor sign-in off the one admin, ends their sessions and leaves a line in the audit log. Whoever can run it can already read and change the database, so it opens nothing that was closed.
+
+Signing in at the API directly: `POST /auth/login` takes `code` beside `email` and `password`. Without it, an account with two-factor sign-in answers `401` with the code `two_factor_required`; a wrong one answers `401` with `two_factor_invalid`.
+
 ## What phase 6 leaves for later
 
 - Published images and releases, which would turn the build step of an installation and of an update into a download.

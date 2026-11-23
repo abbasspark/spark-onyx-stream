@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 import { download, request, requestText, uploadFile } from './client';
 import type {
+  TwoFactorSetup,
+  TwoFactorStatus,
   Coupon,
   CouponInput,
   CouponRedemption,
@@ -146,12 +148,35 @@ export const authApi = {
   setupStatus: () => request<{ required: boolean }>('/v1/auth/setup'),
   setup: (body: { email: string; displayName: string; password: string }) =>
     request<Admin>('/v1/auth/setup', { method: 'POST', body }),
-  login: (body: { email: string; password: string }) =>
+  /** `code`: for an admin with two-factor sign-in, from the app or a recovery code. */
+  login: (body: { email: string; password: string; code?: string }) =>
     request<LoginResult>('/v1/auth/login', { method: 'POST', body }),
   logout: () => request<void>('/v1/auth/logout', { method: 'POST' }),
   me: (signal?: AbortSignal) => request<Me>('/v1/auth/me', { signal }),
   changePassword: (body: { currentPassword: string; newPassword: string }) =>
     request<void>('/v1/auth/password', { method: 'POST', body }),
+};
+
+/** Two-factor sign-in of the signed-in admin. */
+export const twoFactorApi = {
+  status: (signal?: AbortSignal) => request<TwoFactorStatus>('/v1/auth/two-factor', { signal }),
+  /** Starts setting it up. Answers with the secret for the authenticator app. */
+  begin: (password: string) =>
+    request<TwoFactorSetup>('/v1/auth/two-factor/setup', { method: 'POST', body: { password } }),
+  /** Switches it on with the first code from the app. Answers with the recovery codes, once. */
+  enable: (code: string) =>
+    request<{ recoveryCodes: string[] }>('/v1/auth/two-factor/enable', {
+      method: 'POST',
+      body: { code },
+    }),
+  disable: (body: { password: string; code: string }) =>
+    request<void>('/v1/auth/two-factor/disable', { method: 'POST', body }),
+  /** Makes new recovery codes and ends the old ones. */
+  newRecoveryCodes: (body: { password: string; code: string }) =>
+    request<{ recoveryCodes: string[] }>('/v1/auth/two-factor/recovery-codes', {
+      method: 'POST',
+      body,
+    }),
 };
 
 export interface AssetListQuery {
@@ -219,6 +244,9 @@ export const adminsApi = {
   create: (body: CreateAdminInput) => request<Admin>('/v1/admins', { method: 'POST', body }),
   update: (id: string, body: UpdateAdminInput) =>
     request<Admin>(`/v1/admins/${id}`, { method: 'PATCH', body }),
+  /** Takes two-factor sign-in off an admin who is locked out, and signs them out. */
+  resetTwoFactor: (id: string) =>
+    request<void>(`/v1/admins/${id}/two-factor`, { method: 'DELETE' }),
 };
 
 export interface ViewerListQuery {

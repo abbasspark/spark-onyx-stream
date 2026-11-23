@@ -107,6 +107,8 @@ export class AppConfig {
   /** Address of the viewer website, for links in emails. Empty when not set. */
   readonly siteUrl: string;
   readonly siteName: string;
+  /** Whether every admin has to use two-factor sign-in. */
+  readonly adminTwoFactorRequired: boolean;
   /** Whether a viewer must confirm their email address before they can watch. */
   readonly viewerVerificationRequired: boolean;
 
@@ -190,6 +192,7 @@ export class AppConfig {
     this.mail = env.SMTP_URL ? { smtpUrl: env.SMTP_URL, from: env.MAIL_FROM } : null;
     this.siteUrl = env.SITE_URL;
     this.siteName = env.SITE_NAME;
+    this.adminTwoFactorRequired = env.ADMIN_TWO_FACTOR === 'required';
     this.viewerVerificationRequired = env.VIEWER_EMAIL_VERIFICATION === 'required';
   }
 

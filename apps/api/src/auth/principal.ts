@@ -12,6 +12,13 @@ export interface AdminPrincipal {
   displayName: string;
   role: AdminRole;
   permissions: readonly Permission[];
+  /** Whether a code is asked for when this admin signs in. */
+  twoFactorEnabled: boolean;
+  /**
+   * True when the installation asks every admin for two-factor sign-in and
+   * this one has yet to set it up. Until then nothing else is open to them.
+   */
+  twoFactorSetupRequired: boolean;
 }
 
 /** A program using an API key. It acts with a subset of its creator's permissions. */

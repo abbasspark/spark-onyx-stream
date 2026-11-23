@@ -38,9 +38,29 @@ export interface Admin {
   displayName: string;
   role: AdminRole;
   isActive: boolean;
+  /** Whether a code is asked for when this admin signs in. */
+  twoFactorEnabled: boolean;
   lastLoginAt: string | null;
   createdAt: string;
   updatedAt: string;
+}
+
+/** Where the signed-in admin stands with two-factor sign-in. */
+export interface TwoFactorStatus {
+  enabled: boolean;
+  enabledAt: string | null;
+  /** Recovery codes that were not used yet. */
+  recoveryCodesLeft: number;
+  /** Whether this installation asks every admin for it. */
+  required: boolean;
+}
+
+/** What an authenticator app needs to make the codes. */
+export interface TwoFactorSetup {
+  /** The secret as base32, for typing it in by hand. */
+  secret: string;
+  /** The same as an address for a QR code. */
+  uri: string;
 }
 
 /** The signed-in admin as returned by GET /v1/auth/me. */
@@ -51,12 +71,18 @@ export interface Me {
   displayName: string;
   role: AdminRole;
   permissions: Permission[];
+  /** Whether a code is asked for when this admin signs in. */
+  twoFactorEnabled: boolean;
+  /** True when the installation asks for two-factor sign-in and this admin has yet to set it up. */
+  twoFactorSetupRequired: boolean;
 }
 
 export interface LoginResult {
   token: string;
   expiresAt: string;
   admin: Admin;
+  /** Set when a recovery code was used to sign in: how many are left. */
+  recoveryCodesLeft?: number;
 }
 
 export interface Page<Item> {

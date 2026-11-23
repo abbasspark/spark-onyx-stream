@@ -271,6 +271,11 @@ Status shows what exists today.
 | `POST`                  | `/auth/logout`                          | End the session                                                                                                 | Built  |
 | `GET`                   | `/auth/me`                              | The authenticated caller and its permissions                                                                    | Built  |
 | `POST`                  | `/auth/password`                        | Change your own password                                                                                        | Built  |
+| `GET`                   | `/auth/two-factor`                      | Where you stand with two-factor sign-in. See [operations](phase-6-operations.md#two-factor-sign-in-for-admins)  | Built  |
+| `POST`                  | `/auth/two-factor/setup`, `/enable`     | Set it up: your password for the secret, then the first code from the app for the recovery codes                | Built  |
+| `POST`                  | `/auth/two-factor/disable`              | Switch it off, with your password and a code                                                                    | Built  |
+| `POST`                  | `/auth/two-factor/recovery-codes`       | Make new recovery codes, with your password and a code                                                          | Built  |
+| `DELETE`                | `/admins/{id}/two-factor`               | Take two-factor sign-in off another admin who is locked out                                                     | Built  |
 | `GET` `POST`            | `/admins`                               | List and create admins                                                                                          | Built  |
 | `GET` `PATCH` `DELETE`  | `/admins/{id}`                          | Read, update and deactivate an admin                                                                            | Built  |
 | `GET` `POST`            | `/api-keys`                             | List and create API keys                                                                                        | Built  |
@@ -350,7 +355,6 @@ These events are recorded with actor, target, time and IP address: setup, sign-i
 
 ### Not built yet
 
-- Two-factor authentication. The schema has the field for it.
 - Cookie-based sessions for the admin panel. Bearer tokens are used for now.
 - A setting for trusted proxies. Until it exists, the recorded IP address is that of the nearest proxy when the API runs behind one.
 

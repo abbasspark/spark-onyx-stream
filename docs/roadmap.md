@@ -76,3 +76,4 @@ Before the apps, the panel becomes a fuller catalog system. This work is outside
 12. My list: viewers save titles to watch later, per profile, with a page and a row of their own, and the panel sees what is saved the most. **Done.**
 13. Coupons: codes made in the panel that lower the price of a plan or of renting and buying a title, with limits and a record of every use. **Done.**
 14. Stream limits: an account plays on so many devices at once, set for the installation, per plan or per viewer, with a way to stop another device. **Done.**
+15. Two-factor sign-in for admins: a code from an authenticator app after the password, recovery codes, and an installation that can ask every admin for it. **Done.**

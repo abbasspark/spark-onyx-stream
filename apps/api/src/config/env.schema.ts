@@ -95,6 +95,11 @@ export const envSchema = z
      * Whether people can create a viewer account themselves.
      * "closed": only admins create viewers, in the panel.
      */
+    /**
+     * Whether every admin has to use two-factor sign-in. With "required", an
+     * admin without it can sign in and do nothing but set it up.
+     */
+    ADMIN_TWO_FACTOR: z.enum(['optional', 'required']).default('optional'),
     VIEWER_REGISTRATION: z.enum(['open', 'closed']).default('open'),
     /**
      * Whether a viewer must confirm their email address before they can watch.

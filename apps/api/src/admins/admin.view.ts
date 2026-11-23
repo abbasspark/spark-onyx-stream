@@ -8,6 +8,8 @@ export interface AdminView {
   displayName: string;
   role: AdminRole;
   isActive: boolean;
+  /** Whether a code is asked for when this admin signs in. */
+  twoFactorEnabled: boolean;
   lastLoginAt: Date | null;
   createdAt: Date;
   updatedAt: Date;
@@ -20,6 +22,7 @@ export function toAdminView(admin: AdminUser): AdminView {
     displayName: admin.displayName,
     role: admin.role,
     isActive: admin.isActive,
+    twoFactorEnabled: admin.totpEnabledAt !== null,
     lastLoginAt: admin.lastLoginAt,
     createdAt: admin.createdAt,
     updatedAt: admin.updatedAt,

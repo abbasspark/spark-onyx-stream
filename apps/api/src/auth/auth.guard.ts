@@ -9,8 +9,10 @@ import {
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { ApiKeyAuthService } from '../api-keys/api-key-auth.service.js';
+import { AppConfig } from '../config/app-config.js';
 import {
   ADMIN_SESSION_ONLY_KEY,
+  ALLOW_WITHOUT_TWO_FACTOR_KEY,
   IS_PUBLIC_KEY,
   REQUIRED_PERMISSIONS_KEY,
 } from './auth.decorators.js';
@@ -33,6 +35,7 @@ export class AuthGuard implements CanActivate {
     @Inject(Reflector) private readonly reflector: Reflector,
     @Inject(SessionService) private readonly sessions: SessionService,
     @Inject(ApiKeyAuthService) private readonly apiKeys: ApiKeyAuthService,
+    @Inject(AppConfig) private readonly config: AppConfig,
   ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
@@ -51,6 +54,19 @@ export class AuthGuard implements CanActivate {
       principal.type !== 'admin'
     ) {
       throw new ForbiddenException('This action needs a signed-in admin, not an API key');
+    }
+
+    if (
+      principal.type === 'admin' &&
+      principal.twoFactorSetupRequired &&
+      !this.reflector.getAllAndOverride<boolean>(ALLOW_WITHOUT_TWO_FACTOR_KEY, targets)
+    ) {
+      throw new ForbiddenException({
+        statusCode: 403,
+        error: 'Forbidden',
+        code: 'two_factor_setup_required',
+        message: 'Set up two-factor sign-in first. This installation asks every admin for it.',
+      });
     }
 
     const required =
@@ -82,6 +98,9 @@ export class AuthGuard implements CanActivate {
           displayName: found.admin.displayName,
           role: found.admin.role,
           permissions: permissionsOfRole(found.admin.role),
+          twoFactorEnabled: found.admin.totpEnabledAt !== null,
+          twoFactorSetupRequired:
+            this.config.adminTwoFactorRequired && found.admin.totpEnabledAt === null,
         };
       }
       case 'apiKey': {
