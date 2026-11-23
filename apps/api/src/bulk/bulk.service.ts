@@ -3,6 +3,7 @@ import { BadRequestException, HttpException, Inject, Injectable } from '@nestjs/
 import { PrismaClient } from '@onyx/database';
 import type { UpdateTitleInput } from '../catalog/catalog.schemas.js';
 import { TitlesService } from '../catalog/titles.service.js';
+import { TitleHistoryService } from '../history/title-history.service.js';
 import { type BulkAction, type BulkInput, MAX_TITLES } from './bulk.schemas.js';
 import { type TranslationJobView, TranslationJobsService } from './translation-jobs.service.js';
 
@@ -104,6 +105,7 @@ export class BulkService {
     @Inject(PrismaClient) private readonly prisma: PrismaClient,
     @Inject(TitlesService) private readonly titles: TitlesService,
     @Inject(TranslationJobsService) private readonly jobs: TranslationJobsService,
+    @Inject(TitleHistoryService) private readonly history: TitleHistoryService,
   ) {}
 
   async run(input: BulkInput, adminId: string | null): Promise<BulkResult> {
@@ -127,6 +129,7 @@ export class BulkService {
       return result;
     }
     await this.assertExist(action);
+    const touched: string[] = [];
 
     for (let start = 0; start < ids.length; start += CHUNK) {
       const rows: Row[] = await this.prisma.title.findMany({
@@ -148,6 +151,9 @@ export class BulkService {
         try {
           const changed = await this.apply(row, action);
           result[changed ? 'changed' : 'unchanged'] += 1;
+          if (changed) {
+            touched.push(row.id);
+          }
         } catch (error) {
           result.failed += 1;
           if (result.failures.length < FAILURES_NAMED) {
@@ -158,6 +164,9 @@ export class BulkService {
     }
     // Titles deleted by someone else since the selection was made.
     result.matched = result.changed + result.unchanged + result.failed;
+    if (action.type !== 'delete') {
+      await this.history.captureMany(touched, adminId, 'bulk');
+    }
     return result;
   }
 

@@ -3,6 +3,7 @@ import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tansta
 import {
   ArrowDown,
   ArrowUp,
+  Copy,
   DownloadCloud,
   Film,
   LayoutGrid,
@@ -30,6 +31,7 @@ import {
 } from 'react';
 import { Link, useNavigate } from 'react-router';
 import { toast } from 'sonner';
+import { DuplicateTitleDialog } from '@/components/duplicate-title-dialog';
 import { apiUrl } from '@/api/client';
 import {
   categoriesApi,
@@ -268,6 +270,7 @@ function TitlesList({ kind }: { kind: TitleType }) {
   const [view, setView] = useState<View>(readView);
   const [createOpen, setCreateOpen] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
+  const [duplicating, setDuplicating] = useState<string | null>(null);
 
   // A link such as /titles?new=1 opens the dialog for a new title.
   useEffect(() => {
@@ -488,6 +491,10 @@ function TitlesList({ kind }: { kind: TitleType }) {
         </DropdownMenuItem>
         {mayWrite ? (
           <>
+            <DropdownMenuItem onSelect={() => setDuplicating(title.id)}>
+              <Copy />
+              Duplicate
+            </DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem destructive onSelect={() => void askDelete(title)}>
               <Trash2 />
@@ -1104,6 +1111,18 @@ function TitlesList({ kind }: { kind: TitleType }) {
         />
       ) : null}
 
+      <DuplicateTitleDialog
+        titleId={duplicating}
+        onClose={() => setDuplicating(null)}
+        onDone={(copy) => {
+          setDuplicating(null);
+          toast.success(`${copy.name} is ready as a draft`, {
+            description: 'It shares its pictures and videos with the original.',
+          });
+          void queryClient.invalidateQueries({ queryKey: ['titles'] });
+          void navigate(titlePath(copy));
+        }}
+      />
       <NewTitleDialog
         open={createOpen}
         onOpenChange={setCreateOpen}

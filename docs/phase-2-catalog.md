@@ -105,6 +105,38 @@ The names viewers see around the titles are translated too: the name and descrip
 
 `kind` is `categories`, `genres`, `collections` or `people`. On the public side, `language` is now also accepted by `GET /catalog/categories`, `/catalog/genres`, `/catalog/collections` and the pages of categories and genres.
 
+## Duplicating a title
+
+"Duplicate", in the menu of a title on the list and on its page, makes a copy: for a director's cut, a dubbed version kept as a title of its own, a remake, or a series that continues under a new name.
+
+- **The copy is always a draft,** not featured, with a name of its own ("… (copy)" unless another is typed) and an address made from it. Its episodes are drafts too. Nothing changes on the original.
+- **The texts and facts always come along.** Everything else is a choice, shown with what the title has of it: artwork; genres, categories and keywords; cast and crew; translations; access and prices with the packages; videos; a place at the end of its collections; the availability dates; the link to TMDB.
+- **For a series,** the seasons and episodes come without their videos, with them, or not at all.
+- **Three ready-made choices:** "Starting point" (what describes the title, without videos), "Exact copy" (all of it) and "Texts only".
+- **Videos and pictures are shared, never copied as files.** A copy costs no storage and no encoding. A picture two titles share cannot be deleted while either uses it, and changing the video or the poster of one title does not touch the other.
+- **What viewers did stays with the original:** plays, progress, purchases, lists. So does its place on the arranged pages.
+
+`POST /titles/{id}/duplicate` takes `{ name?, parts? }` and answers with the new title and how many of each thing it got. `parts` holds `artwork`, `classification`, `credits`, `translations`, `pricing` (on unless said otherwise), `videos`, `collections`, `availability`, `metadataLink` (off unless asked for) and `seasons`: `structure` (the default), `full` or `none`.
+
+## The history of a title
+
+Every title keeps a history: after each change, what the title looks like and what differs from before. It is the **History** tab on the page of a title.
+
+- **What is followed:** the texts and facts, publishing (status, address, featured, dates), access and prices, artwork, genres, categories and keywords, cast and crew, videos and extras, translations, and the seasons and episodes of a series. Not followed: the rating from the metadata source and what viewers do.
+- **Each entry says who, when and what.** Short values show as before and after, longer texts word by word with what was taken out and put in, lists as what joined and what left. The list can be narrowed to one kind of change.
+- **Every way of changing a title is recorded:** its page, the lists with many titles at once, an import or update from TMDB, translating in the background, duplicating. A save that changes nothing leaves no entry.
+- **Bring back** restores an earlier version, after showing what that would change now. It brings back texts, facts, access and prices, artwork, genres, categories and keywords, cast and crew, and translations. It leaves alone whether the title is published, its address, its videos and its seasons and episodes: bringing those back could take a title off the site or point it at a video that is gone.
+- **What no longer exists is left out and named:** a genre, a person or a picture of that version that was deleted since.
+- **Bringing a version back is itself an entry,** so it can be undone the same way.
+- The newest 100 entries of a title are kept. The history goes with the title when it is deleted; the audit log keeps the fact that it existed.
+- Titles from before this was built get a first entry, "recorded as it was", when the API starts after the update.
+
+| Method and path                                  | Purpose                                                              |
+| ------------------------------------------------ | -------------------------------------------------------------------- |
+| `GET /titles/{id}/history`                       | The entries, the newest first. `group` narrows to one kind of change |
+| `GET /titles/{id}/history/{revisionId}`          | One entry, with what bringing it back would change now               |
+| `POST /titles/{id}/history/{revisionId}/restore` | Bring it back. Answers how much, and what could not be               |
+
 ## Many titles at once
 
 On the lists of movies and series, titles can be selected and changed together.

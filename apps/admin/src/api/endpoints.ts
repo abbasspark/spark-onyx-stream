@@ -1,6 +1,11 @@
 // SPDX-License-Identifier: AGPL-3.0-only
+import type { DuplicateParts } from '@/lib/duplicate';
 import { download, request, requestText, uploadFile } from './client';
 import type {
+  ChangeGroup,
+  TitleChange,
+  TitleRevision,
+  TitleRevisionDetail,
   TermKind,
   TermRow,
   TermSaveItem,
@@ -579,6 +584,12 @@ export const titlesApi = {
   get: (id: string, signal?: AbortSignal) => request<TitleDetail>(`/v1/titles/${id}`, { signal }),
   create: (body: { type: TitleType; name: string }) =>
     request<TitleDetail>('/v1/titles', { method: 'POST', body }),
+  /** Makes a copy of a title as a draft. `parts` says what comes along. */
+  duplicate: (id: string, body: { name: string; parts: DuplicateParts }) =>
+    request<{ title: TitleDetail; copied: Record<string, number> }>(`/v1/titles/${id}/duplicate`, {
+      method: 'POST',
+      body,
+    }),
   update: (id: string, body: UpdateTitleInput) =>
     request<TitleDetail>(`/v1/titles/${id}`, { method: 'PATCH', body }),
   setStatus: (id: string, status: PublishStatus) =>
@@ -672,6 +683,22 @@ export const collectionsApi = {
   reorder: (ids: string[]) =>
     request<Collection[]>('/v1/collections/order', { method: 'PUT', body: { ids } }),
   remove: (id: string) => request<void>(`/v1/collections/${id}`, { method: 'DELETE' }),
+};
+
+export const titleHistoryApi = {
+  list: (
+    titleId: string,
+    query: { page: number; pageSize: number; group?: ChangeGroup },
+    signal?: AbortSignal,
+  ) => request<Page<TitleRevision>>(`/v1/titles/${titleId}/history`, { query, signal }),
+  get: (titleId: string, revisionId: string, signal?: AbortSignal) =>
+    request<TitleRevisionDetail>(`/v1/titles/${titleId}/history/${revisionId}`, { signal }),
+  /** Brings a version back. `left` is what of it no longer exists. */
+  restore: (titleId: string, revisionId: string) =>
+    request<{ restored: number; left: TitleChange[] }>(
+      `/v1/titles/${titleId}/history/${revisionId}/restore`,
+      { method: 'POST' },
+    ),
 };
 
 export const termsApi = {

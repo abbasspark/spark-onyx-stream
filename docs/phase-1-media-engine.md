@@ -278,6 +278,9 @@ Status shows what exists today.
 | `DELETE`                | `/admins/{id}/two-factor`               | Take two-factor sign-in off another admin who is locked out                                                     | Built  |
 | `GET` `POST`            | `/admins`                               | List and create admins                                                                                          | Built  |
 | `GET` `PATCH` `DELETE`  | `/admins/{id}`                          | Read, update and deactivate an admin                                                                            | Built  |
+| `POST`                  | `/titles/{id}/duplicate`                | A copy of a title as a draft, with a choice of what comes along                                                 | Built  |
+| `GET`                   | `/titles/{id}/history`                  | What changed on a title, who changed it and when. See [the catalog](phase-2-catalog.md#the-history-of-a-title)  | Built  |
+| `POST`                  | `/titles/{id}/history/{rev}/restore`    | Bring an earlier version of a title back                                                                        | Built  |
 | `GET`                   | `/translations/terms`                   | Categories, genres, collections and people: what there is to translate and how far each language is             | Built  |
 | `GET`                   | `/translations/terms/{kind}`            | The terms of a kind with their translation into `?language=`, searchable, or only what is `missing`             | Built  |
 | `PUT` `DELETE`          | `/translations/terms/{kind}/{language}` | Save the translations of up to 200 terms at once; take a language away from a kind                              | Built  |
