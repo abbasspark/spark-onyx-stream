@@ -267,7 +267,7 @@ describe.skipIf(!TEST_DATABASE_URL)('Watched locations (e2e)', () => {
     it('is seen, left alone while it may still be copied, then imported and moved away', async () => {
       const { id } = await location();
       await drop('603_the-matrix.mkv', 'the film itself');
-      await drop('603_the-matrix.en.srt', 'subtitles');
+      await drop('603_the-matrix.en.srt', '1\n00:00:01,000 --> 00:00:02,000\nWake up, Neo.\n');
       await drop('notes.txt', 'not a video');
 
       // The first look only takes note of it.
@@ -318,6 +318,21 @@ describe.skipIf(!TEST_DATABASE_URL)('Watched locations (e2e)', () => {
         1,
       );
 
+      // The subtitles beside it became a track of the video, in the language their name says.
+      const tracks = await testApp.prisma.subtitleTrack.findMany({ where: { assetId: asset.id } });
+      expect(tracks).toMatchObject([
+        { language: 'en', label: 'English', source: 'UPLOADED', isForced: false },
+      ]);
+      const kept = path.join(
+        workDirectory,
+        'storage',
+        'subtitles',
+        asset.id,
+        `${tracks[0]?.id}.vtt`,
+      );
+      expect(await readFile(kept, 'utf8')).toBe(
+        'WEBVTT\n\n00:00:01.000 --> 00:00:02.000\nWake up, Neo.\n',
+      );
       // The file and its subtitles moved to "imported". What is not a video stays.
       expect(await exists('603_the-matrix.mkv')).toBe(false);
       expect((await readdir(path.join(folder, 'imported'))).sort()).toEqual([
@@ -339,7 +354,45 @@ describe.skipIf(!TEST_DATABASE_URL)('Watched locations (e2e)', () => {
         attention: 0,
       });
       const audit = await testApp.prisma.auditLog.findFirst({ where: { action: 'watch.import' } });
-      expect(audit?.metadata).toMatchObject({ location: 'Incoming', path: '603_the-matrix.mkv' });
+      expect(audit?.metadata).toMatchObject({
+        location: 'Incoming',
+        path: '603_the-matrix.mkv',
+        subtitles: ['English'],
+      });
+    });
+
+    it('takes every subtitle file beside it, and says which one it could not read', async () => {
+      await location();
+      await drop('603_the-matrix.mkv', 'the film itself');
+      await drop('603_the-matrix.de.srt', '1\n00:00:01,000 --> 00:00:02,000\nWach auf, Neo.\n');
+      await drop('603_the-matrix.en.forced.vtt', 'WEBVTT\n\n00:01.000 --> 00:02.000\nSign\n');
+      await drop('603_the-matrix.fr.srt', 'this is not a subtitle file');
+      await drop('603_the-matrix.nfo', 'notes');
+      await drop('604_another-film.es.srt', '1\n00:00:01,000 --> 00:00:02,000\nHola\n');
+      await lookTwice();
+
+      const row = await file('603_the-matrix.mkv');
+      expect(row.state).toBe('IMPORTED');
+      expect(row.note).toBe(
+        'The subtitle file "603_the-matrix.fr.srt" was not added: No subtitle with a start and an end was found in the file.',
+      );
+      const tracks = await testApp.prisma.subtitleTrack.findMany({
+        where: { assetId: row.asset?.id },
+        orderBy: { language: 'asc' },
+      });
+      expect(tracks.map((track) => [track.language, track.label, track.isForced])).toEqual([
+        ['de', 'Deutsch', false],
+        ['en', 'English (Forced)', true],
+      ]);
+      // All of them travelled with the video, also the one that could not be read.
+      expect((await readdir(path.join(folder, 'imported'))).sort()).toEqual([
+        '603_the-matrix.de.srt',
+        '603_the-matrix.en.forced.vtt',
+        '603_the-matrix.fr.srt',
+        '603_the-matrix.mkv',
+        '603_the-matrix.nfo',
+      ]);
+      expect(await exists('604_another-film.es.srt')).toBe(true);
     });
 
     it('joins the title the catalog has already, and does not take the place of its video', async () => {

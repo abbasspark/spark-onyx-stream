@@ -356,15 +356,7 @@ export interface AssetMedia {
     /** Bytes as text. */
     sizeBytes: string;
   }[];
-  subtitles: {
-    id: string;
-    language: string;
-    label: string | null;
-    source: 'EMBEDDED' | 'UPLOADED' | 'GENERATED';
-    isDefault: boolean;
-    isForced: boolean;
-    url: string | null;
-  }[];
+  subtitles: (SubtitleTrack & { url: string | null })[];
   thumbnails: {
     posterUrl: string | null;
     spriteUrl: string | null;
@@ -1814,4 +1806,30 @@ export interface TranslationJob {
   createdAt: string;
   startedAt: string | null;
   finishedAt: string | null;
+}
+
+// --- Subtitles of a video ---------------------------------------------------------------
+
+export interface SubtitleTrack {
+  id: string;
+  /** A language tag such as "de", or "und" when the language is not known. */
+  language: string;
+  /** The name the player shows. */
+  label: string | null;
+  /** EMBEDDED: taken from the source file. UPLOADED: added as a file of its own. */
+  source: 'EMBEDDED' | 'UPLOADED' | 'GENERATED';
+  isDefault: boolean;
+  /** Shown without being turned on: for the parts spoken in another language. */
+  isForced: boolean;
+}
+
+export interface AddedSubtitle {
+  track: SubtitleTrack;
+  /** How many subtitles the file holds. */
+  cues: number;
+  format: 'srt' | 'vtt' | 'ass';
+  /** What its bytes were read as, such as "utf-8" or "windows-1256". */
+  encoding: string;
+  /** Something to check, when the file looks as if it belonged to another video. */
+  warning: string | null;
 }

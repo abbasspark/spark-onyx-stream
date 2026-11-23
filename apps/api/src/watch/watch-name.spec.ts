@@ -94,6 +94,9 @@ describe('files of a location', () => {
   it('take their subtitles and notes with them', () => {
     expect(isSidecarOf('in/603_x.mkv', 'in/603_x.srt')).toBe(true);
     expect(isSidecarOf('in/603_x.mkv', 'in/603_x.en.srt')).toBe(true);
+    expect(isSidecarOf('in/603_x.mkv', 'in/603_x.en.forced.srt')).toBe(true);
+    expect(isSidecarOf('in/603_x.mkv', 'in/603_x.zh_hant.sdh.srt')).toBe(true);
+    expect(isSidecarOf('in/603_x.mkv', 'in/603_x.a.b.c.d.srt')).toBe(false);
     expect(isSidecarOf('in/603_x.mkv', 'in/603_x.pt-BR.vtt')).toBe(true);
     expect(isSidecarOf('in/603_x.mkv', 'in/603_x.nfo')).toBe(true);
     expect(isSidecarOf('in/603_x.mkv', 'in/603_x.mkv')).toBe(false);

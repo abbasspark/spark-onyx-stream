@@ -28,11 +28,14 @@ import { StorageService } from '../storage/storage.service.js';
 import {
   baseName,
   episodeCode,
+  extensionOf,
   importedPath,
   isCandidate,
   isSidecarOf,
   parseWatchedName,
 } from './watch-name.js';
+import { SUBTITLE_EXTENSIONS } from '../subtitles/subtitle-file.js';
+import { MAX_SUBTITLE_BYTES, SubtitlesService } from '../subtitles/subtitles.service.js';
 
 /** How often the runner looks for work. A look asked for by hand starts within this time. */
 const LOOK_EVERY_MS = 15_000;
@@ -108,6 +111,7 @@ export class WatchRunner implements OnApplicationBootstrap, OnApplicationShutdow
     @Inject(MetadataService) private readonly metadata: MetadataService,
     @Inject(TitlesService) private readonly titles: TitlesService,
     @Inject(PipelineService) private readonly pipeline: PipelineService,
+    @Inject(SubtitlesService) private readonly subtitles: SubtitlesService,
   ) {}
 
   onApplicationBootstrap(): void {
@@ -319,6 +323,7 @@ export class WatchRunner implements OnApplicationBootstrap, OnApplicationShutdow
       // A published title keeps its video until the new one plays. See settle().
       const attachNow = !target.hasVideo || !target.published;
       const assetId = await this.copyIntoLibrary(file, location, driver, target.assetName);
+      const subtitles = await this.importSubtitles(file, driver, assetId);
       if (attachNow) {
         await this.attach(target, assetId);
       }
@@ -333,14 +338,21 @@ export class WatchRunner implements OnApplicationBootstrap, OnApplicationShutdow
           publishPending: location.autoPublish,
           // Kept on while the video still has to take the place of the one before.
           replace: !attachNow,
-          note: null,
+          // The video is in. A subtitle file that could not be read is said, not hidden.
+          note:
+            subtitles.problems.length > 0 ? subtitles.problems.join(' ').slice(0, NOTE_KEPT) : null,
         },
       });
       await this.audit.record({
         action: 'watch.import',
         entityType: 'Title',
         entityId: target.titleId,
-        metadata: { location: location.name, path: file.path, assetId },
+        metadata: {
+          location: location.name,
+          path: file.path,
+          assetId,
+          ...(subtitles.added.length > 0 ? { subtitles: subtitles.added } : {}),
+        },
       });
       this.logger.log(`Imported ${file.path} of "${location.name}" as ${target.assetName}`);
       await this.clearAway(file, location, driver);
@@ -550,6 +562,60 @@ export class WatchRunner implements OnApplicationBootstrap, OnApplicationShutdow
     }
   }
 
+  /** The files beside a video that belong to it: subtitles and notes of the same name. */
+  private async companionsOf(file: WatchedFile, driver: StorageDriver): Promise<string[]> {
+    const folder = file.path.includes('/') ? file.path.slice(0, file.path.lastIndexOf('/')) : '';
+    const companions: string[] = [];
+    for await (const entry of folder ? driver.list(folder) : driver.listAll()) {
+      if (isSidecarOf(file.path, entry.key)) {
+        companions.push(entry.key);
+      }
+    }
+    return companions.sort();
+  }
+
+  /**
+   * Adds the subtitle files beside a video to it as tracks. The language is
+   * read from the name: "603_x.de.srt" is German. A file that cannot be read
+   * does not stop the import: it is named in the note of the video's row.
+   */
+  private async importSubtitles(
+    file: WatchedFile,
+    driver: StorageDriver,
+    assetId: string,
+  ): Promise<{ added: string[]; problems: string[] }> {
+    const added: string[] = [];
+    const problems: string[] = [];
+    let companions: string[] = [];
+    try {
+      companions = await this.companionsOf(file, driver);
+    } catch (error) {
+      problems.push(`The folder could not be looked through for subtitles: ${reasonOf(error)}.`);
+    }
+    for (const key of companions) {
+      if (!(SUBTITLE_EXTENSIONS as readonly string[]).includes(extensionOf(key))) {
+        continue;
+      }
+      try {
+        const info = await driver.stat(key);
+        if (!info || info.size > MAX_SUBTITLE_BYTES) {
+          throw new Error('it is too large to be a subtitle file');
+        }
+        const chunks: Buffer[] = [];
+        for await (const chunk of await driver.read(key)) {
+          chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk as Uint8Array));
+        }
+        const result = await this.subtitles.add(assetId, Buffer.concat(chunks), {
+          fileName: baseName(key),
+        });
+        added.push(result.track.label ?? result.track.language);
+      } catch (error) {
+        problems.push(`The subtitle file "${baseName(key)}" was not added: ${reasonOf(error)}.`);
+      }
+    }
+    return { added, problems };
+  }
+
   /** Does with an imported file what its location says: move it away, keep it or delete it. */
   private async clearAway(
     file: WatchedFile,
@@ -561,13 +627,7 @@ export class WatchRunner implements OnApplicationBootstrap, OnApplicationShutdow
     }
     try {
       // Subtitles and notes of the same name travel with their video.
-      const folder = file.path.includes('/') ? file.path.slice(0, file.path.lastIndexOf('/')) : '';
-      const companions: string[] = [];
-      for await (const entry of folder ? driver.list(folder) : driver.listAll()) {
-        if (isSidecarOf(file.path, entry.key)) {
-          companions.push(entry.key);
-        }
-      }
+      const companions = await this.companionsOf(file, driver);
       for (const key of [file.path, ...companions]) {
         if (location.afterImport === 'DELETE') {
           await driver.delete(key);

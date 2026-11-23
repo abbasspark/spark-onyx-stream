@@ -5,7 +5,10 @@ import {
   buildSubtitlePlaylist,
   planSubtitles,
   subtitleMediaLines,
+  withSubtitleTracks,
+  withUniqueLabels,
 } from './subtitles.js';
+import { buildMasterPlaylist } from './master-builder.js';
 
 function media(subtitles: Partial<SubtitleStreamInfo>[]): MediaInfo {
   return {
@@ -135,5 +138,46 @@ describe('subtitleMediaLines', () => {
     expect(lines).toHaveLength(1);
     expect(lines[0]).toContain('NAME="Eng lish #EXT-X-ENDLIST"');
     expect(lines[0]).not.toContain('\n');
+  });
+});
+
+describe('withSubtitleTracks', () => {
+  const variant = {
+    name: '720p',
+    width: 1280,
+    height: 720,
+    bitrates: { peak: 3_000_000, average: 2_500_000 },
+    codecs: ['avc1.64001f', 'mp4a.40.2'],
+    frameRate: 25,
+  };
+  const german = {
+    streamIndex: 0,
+    slug: '0-de',
+    language: 'de',
+    label: 'Deutsch',
+    isDefault: false,
+    isForced: false,
+  };
+  const arabic = { ...german, slug: 'u-1', language: 'ar', label: 'العربية' };
+
+  it('gives the same playlist as building it anew', () => {
+    const bare = buildMasterPlaylist([variant]);
+    const one = buildMasterPlaylist([variant], [german]);
+    const two = buildMasterPlaylist([variant], [german, arabic]);
+    expect(withSubtitleTracks(bare, [german])).toBe(one);
+    expect(withSubtitleTracks(one, [german, arabic])).toBe(two);
+    expect(withSubtitleTracks(two, [german])).toBe(one);
+    expect(withSubtitleTracks(two, [])).toBe(bare);
+    expect(withSubtitleTracks(bare, [])).toBe(bare);
+  });
+});
+
+describe('withUniqueLabels', () => {
+  it('numbers names that are taken', () => {
+    expect(
+      withUniqueLabels([{ label: 'English' }, { label: 'English' }, { label: 'English' }]).map(
+        (track) => track.label,
+      ),
+    ).toEqual(['English', 'English 2', 'English 3']);
   });
 });

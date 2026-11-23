@@ -11,15 +11,16 @@ import { PipelineService } from './pipeline.service.js';
 import { ProcessingSteps } from './processing-steps.js';
 import { ProcessingConsumer } from './processing.consumer.js';
 import { RunningJobs } from './running-jobs.js';
+import { SubtitlesService } from '../subtitles/subtitles.service.js';
 
 /**
- * What every role needs: creating jobs, reading encoding profiles and moving
- * assets through the pipeline. Loaded in all processes.
+ * What every role needs: creating jobs, reading encoding profiles, moving
+ * assets through the pipeline, and the subtitle tracks added to a video. Loaded in all processes.
  */
 @Global()
 @Module({
-  providers: [JobsService, EncodingProfilesService, PipelineService],
-  exports: [JobsService, EncodingProfilesService, PipelineService],
+  providers: [JobsService, EncodingProfilesService, PipelineService, SubtitlesService],
+  exports: [JobsService, EncodingProfilesService, PipelineService, SubtitlesService],
 })
 export class ProcessingCoreModule {}
 

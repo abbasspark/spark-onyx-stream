@@ -146,3 +146,38 @@ export function subtitleMediaLines(tracks: readonly SubtitleTrackPlan[]): string
     ].join(','),
   );
 }
+
+/**
+ * Puts a list of subtitle tracks into a multivariant playlist that exists,
+ * in place of the ones it lists. Used when tracks are added, renamed or
+ * removed after the video was processed: the qualities stay as they are.
+ */
+export function withSubtitleTracks(master: string, tracks: readonly SubtitleTrackPlan[]): string {
+  const group = `,SUBTITLES=${quoted(SUBTITLE_GROUP_ID)}`;
+  const lines = master
+    .split('\n')
+    .filter((line) => !line.startsWith('#EXT-X-MEDIA:TYPE=SUBTITLES'))
+    .map((line) => {
+      if (!line.startsWith('#EXT-X-STREAM-INF:')) {
+        return line;
+      }
+      const bare = line.replace(/,SUBTITLES="[^"]*"/, '');
+      return tracks.length > 0 ? `${bare}${group}` : bare;
+    });
+  const first = lines.findIndex((line) => line.startsWith('#EXT-X-STREAM-INF:'));
+  lines.splice(first === -1 ? lines.length : first, 0, ...subtitleMediaLines(tracks));
+  return lines.join('\n');
+}
+
+/** Gives every track a name no other has, as HLS requires inside a group. */
+export function withUniqueLabels<T extends { label: string }>(tracks: readonly T[]): T[] {
+  const used = new Set<string>();
+  return tracks.map((track) => {
+    let label = track.label;
+    for (let suffix = 2; used.has(label); suffix += 1) {
+      label = `${track.label} ${suffix}`;
+    }
+    used.add(label);
+    return { ...track, label };
+  });
+}

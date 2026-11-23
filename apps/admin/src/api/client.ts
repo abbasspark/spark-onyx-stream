@@ -197,3 +197,33 @@ export async function uploadFile<Result>(path: string, file: Blob): Promise<Resu
   }
   return (await response.json()) as Result;
 }
+
+/**
+ * Reads a text file from the API, such as the subtitles of a video.
+ *
+ * @throws ApiError when the server refuses the request.
+ */
+export async function requestText(path: string, signal?: AbortSignal): Promise<string> {
+  const token = readToken();
+  let response: Response;
+  try {
+    response = await fetch(`${API_ORIGIN}${path}`, {
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+      signal,
+    });
+  } catch (error) {
+    if (error instanceof DOMException && error.name === 'AbortError') {
+      throw error;
+    }
+    throw new Error('The server cannot be reached. Check that the API is running', {
+      cause: error,
+    });
+  }
+  if (!response.ok) {
+    if (response.status === 401 && token) {
+      onUnauthorized();
+    }
+    throw await toApiError(response);
+  }
+  return response.text();
+}
