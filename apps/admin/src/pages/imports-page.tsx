@@ -98,8 +98,9 @@ function NamingGuide() {
           {example('1399_S01E05_the-pointy-end.mp4', 'Season 1, episode 5 of the series 1399')}
           {example(
             '603_the-matrix.en.srt',
-            'Travels with its video. Not imported as a subtitle yet',
+            'English subtitles of that video. Added to it, and moved with it',
           )}
+          {example('603_the-matrix.de.forced.srt', 'The forced German track')}
         </ul>
         <p className="text-muted-foreground">
           You find the id in the address of the title at themoviedb.org. Dashes, dots and spaces

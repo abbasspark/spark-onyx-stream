@@ -41,7 +41,8 @@ A file whose name does not start that way is listed as **Not recognised**. An ad
 - **A video is never replaced silently.** A second file for a movie or episode that has a video waits for an admin. With "Replace the video", a draft gets the new video at once. A published title keeps the one viewers are watching until the new one plays. The old video stays in the library.
 - **The original is not touched before its copy is whole.** The file is copied into a storage pool, its size compared and a checksum taken. Only then is it moved, kept or deleted, as the location says.
 - **Nothing is imported twice.** A file kept where it is is recognised by its path, size and date. Another file under the same name is a new delivery, and asks before it replaces.
-- **Subtitles and notes of the same name travel with their video** to `imported`, or are deleted with it. They are not imported as subtitle tracks yet.
+- **Subtitle files beside a video become its subtitles.** A file with the name of the video and another ending belongs to it: `603_the-matrix.de.srt` is added to the video as German subtitles, `603_the-matrix.en.forced.srt` as the forced English track. `.srt`, `.vtt`, `.ass` and `.ssa` are read; without a language in the name the track is listed as "Subtitles". A file that cannot be read does not stop the import: the row of the video says which one it was.
+- **Subtitles and notes of the same name travel with their video** to `imported`, or are deleted with it.
 - A file that disappears before it was imported is forgotten. What was imported stays in the list as history.
 
 ## A location

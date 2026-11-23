@@ -105,7 +105,8 @@ export function stemOf(path: string): string {
 
 /**
  * Whether a file belongs to a video: the same name with another ending, with a
- * language in between when there is one. "603_x.en.srt" belongs to "603_x.mkv".
+ * language and a note in between when there are any. "603_x.en.srt" and
+ * "603_x.en.forced.srt" belong to "603_x.mkv".
  */
 export function isSidecarOf(video: string, other: string): boolean {
   if (other === video || !(SIDECAR_EXTENSIONS as readonly string[]).includes(extensionOf(other))) {
@@ -113,7 +114,7 @@ export function isSidecarOf(video: string, other: string): boolean {
   }
   const stem = stemOf(video);
   const rest = other.startsWith(`${stem}.`) ? other.slice(stem.length + 1) : null;
-  return rest !== null && /^([A-Za-z-]{2,10}\.)?[A-Za-z0-9]+$/.test(rest);
+  return rest !== null && /^([A-Za-z_-]{2,10}\.){0,3}[A-Za-z0-9]+$/.test(rest);
 }
 
 /** Where a file goes once it is imported: the same path under "imported". */

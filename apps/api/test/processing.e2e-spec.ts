@@ -334,6 +334,183 @@ describe.skipIf(!TEST_DATABASE_URL || !hasFfmpeg)('Processing pipeline (e2e, rea
     ]);
   }, 120_000);
 
+  describe('subtitle files added to a video', () => {
+    const SRT = '1\n00:00:01,000 --> 00:00:03,000\n<i>Guten</i> Abend\n\n';
+    const addSubtitle = (assetId: string, query: string, body: string | Buffer) =>
+      http()
+        .post(`/v1/assets/${assetId}/subtitles?${query}`)
+        .set(auth())
+        .set('Content-Type', 'application/octet-stream')
+        .send(Buffer.isBuffer(body) ? body : Buffer.from(body));
+    const masterOf = (assetId: string) =>
+      readFile(path.join(storageDirectory, 'assets', assetId, 'hls', 'master.m3u8'), 'utf8');
+    const mediaOf = async (assetId: string) =>
+      (await http().get(`/v1/assets/${assetId}/media`).set(auth()).expect(200)).body;
+
+    it('are converted, offered by the player at once, renamed and removed', async () => {
+      const assetId = await uploadSource(copyable);
+      await drainQueue();
+      const before = await masterOf(assetId);
+      expect(before).not.toContain('SUBTITLES');
+
+      const added = await addSubtitle(assetId, 'filename=film.de.srt', SRT).expect(201);
+      expect(added.body).toMatchObject({
+        track: { language: 'de', label: 'Deutsch', source: 'UPLOADED', isForced: false },
+        cues: 1,
+        format: 'srt',
+        encoding: 'utf-8',
+        warning: null,
+      });
+      const trackId = added.body.track.id as string;
+
+      // The playlist names the track, and its files are where the playlist says.
+      const master = await masterOf(assetId);
+      expect(master).toContain(
+        `#EXT-X-MEDIA:TYPE=SUBTITLES,GROUP-ID="subs",NAME="Deutsch",LANGUAGE="de",DEFAULT=NO,AUTOSELECT=YES,FORCED=NO,URI="subs/u-${trackId}/playlist.m3u8"`,
+      );
+      expect(master).toMatch(/#EXT-X-STREAM-INF:.*SUBTITLES="subs"/);
+      const folder = path.join(storageDirectory, 'assets', assetId, 'hls', 'subs', `u-${trackId}`);
+      expect(await readFile(path.join(folder, 'subtitles.vtt'), 'utf8')).toBe(
+        'WEBVTT\n\n00:00:01.000 --> 00:00:03.000\n<i>Guten</i> Abend\n',
+      );
+      expect(await readFile(path.join(folder, 'playlist.m3u8'), 'utf8')).toContain('subtitles.vtt');
+      const media = await mediaOf(assetId);
+      expect(media.subtitles).toHaveLength(1);
+      expect(media.subtitles[0].url).toContain(`subs/u-${trackId}/subtitles.vtt`);
+
+      // A second file in the same language gets a name of its own.
+      const second = await addSubtitle(assetId, 'language=de&forced=true', SRT).expect(201);
+      expect(second.body.track).toMatchObject({ label: 'Deutsch (Forced)', isForced: true });
+      const third = await addSubtitle(assetId, 'language=de&label=Deutsch', SRT).expect(201);
+      expect(third.body.track.label).toBe('Deutsch 2');
+      expect(await masterOf(assetId)).toContain(
+        'NAME="Deutsch (Forced)",LANGUAGE="de",DEFAULT=YES',
+      );
+
+      // Renamed, and given another language.
+      const renamed = await http()
+        .patch(`/v1/assets/${assetId}/subtitles/${trackId}`)
+        .set(auth())
+        .send({ label: 'Deutsch (Original)', language: 'de-AT' })
+        .expect(200);
+      expect(renamed.body).toMatchObject({ label: 'Deutsch (Original)', language: 'de-AT' });
+      expect(await masterOf(assetId)).toContain('NAME="Deutsch (Original)",LANGUAGE="de-AT"');
+      await http()
+        .patch(`/v1/assets/${assetId}/subtitles/${trackId}`)
+        .set(auth())
+        .send({ label: 'Deutsch 2' })
+        .expect(409);
+
+      // The file can be read back.
+      const file = await http()
+        .get(`/v1/assets/${assetId}/subtitles/${trackId}/file`)
+        .set(auth())
+        .expect(200);
+      expect(file.headers['content-type']).toContain('text/vtt');
+      expect(file.text).toContain('Guten</i> Abend');
+
+      // Removed: out of the playlist, and its files are gone.
+      for (const id of [trackId, second.body.track.id, third.body.track.id]) {
+        await http().delete(`/v1/assets/${assetId}/subtitles/${id}`).set(auth()).expect(204);
+      }
+      expect(await masterOf(assetId)).toBe(before);
+      await expect(stat(folder)).rejects.toThrow();
+      await expect(
+        stat(path.join(storageDirectory, 'subtitles', assetId, `${trackId}.vtt`)),
+      ).rejects.toThrow();
+      await http().delete(`/v1/assets/${assetId}/subtitles/${trackId}`).set(auth()).expect(404);
+
+      const actions = await testApp.prisma.auditLog.findMany({
+        where: { action: { startsWith: 'asset.subtitle.' } },
+      });
+      expect(new Set(actions.map((entry) => entry.action))).toEqual(
+        new Set(['asset.subtitle.add', 'asset.subtitle.update', 'asset.subtitle.remove']),
+      );
+    }, 120_000);
+
+    it('wait for a video that is not ready, and stay when it is processed again', async () => {
+      const assetId = await uploadSource(copyable);
+      // Before anything was processed.
+      const added = await addSubtitle(
+        assetId,
+        'language=ar&label=%D8%A7%D9%84%D8%B9%D8%B1%D8%A8%D9%8A%D8%A9',
+        SRT,
+      ).expect(201);
+      const trackId = added.body.track.id as string;
+      expect((await mediaOf(assetId)).subtitles[0].url).toBeNull();
+
+      await drainQueue();
+      expect((await getAsset(assetId)).status).toBe('READY');
+      const line = `NAME="العربية",LANGUAGE="ar",DEFAULT=NO,AUTOSELECT=YES,FORCED=NO,URI="subs/u-${trackId}/playlist.m3u8"`;
+      expect(await masterOf(assetId)).toContain(line);
+
+      await http()
+        .post(`/v1/assets/${assetId}/reprocess`)
+        .set(auth())
+        .send({ processingMode: 'TRANSCODE' })
+        .expect(202);
+      await drainQueue();
+      expect((await getAsset(assetId)).status).toBe('READY');
+      expect(await masterOf(assetId)).toContain(line);
+      expect(
+        await readFile(
+          path.join(
+            storageDirectory,
+            'assets',
+            assetId,
+            'hls',
+            'subs',
+            `u-${trackId}`,
+            'subtitles.vtt',
+          ),
+          'utf8',
+        ),
+      ).toContain('Guten');
+      expect(await testApp.prisma.subtitleTrack.count({ where: { assetId } })).toBe(1);
+
+      // Deleting the video takes the kept file with it.
+      await http().delete(`/v1/assets/${assetId}`).set(auth()).expect(204);
+      await drainQueue();
+      await expect(stat(path.join(storageDirectory, 'subtitles', assetId))).rejects.toThrow();
+    }, 180_000);
+
+    it('read old encodings by the language, and refuse what is no subtitle file', async () => {
+      const assetId = await uploadSource(copyable);
+      await drainQueue();
+
+      // "مرحبا" in Windows-1256.
+      const arabic = Buffer.concat([
+        Buffer.from('1\r\n00:00:01,000 --> 00:00:02,000\r\n', 'latin1'),
+        Buffer.from([0xe3, 0xd1, 0xcd, 0xc8, 0xc7]),
+      ]);
+      const added = await addSubtitle(assetId, 'filename=film.ara.srt', arabic).expect(201);
+      expect(added.body).toMatchObject({
+        track: { language: 'ar', label: 'العربية' },
+        encoding: 'windows-1256',
+      });
+      const file = await http()
+        .get(`/v1/assets/${assetId}/subtitles/${added.body.track.id}/file`)
+        .set(auth())
+        .expect(200);
+      expect(file.text).toContain('مرحبا');
+
+      // Subtitles that go on long after the video ends are taken, with a remark.
+      const late = await addSubtitle(
+        assetId,
+        'language=en',
+        '1\n01:30:00,000 --> 01:30:02,000\nMuch later\n',
+      ).expect(201);
+      expect(late.body.warning).toMatch(/after the end of the video/);
+
+      const refused = await addSubtitle(assetId, 'filename=notes.txt', 'just words').expect(400);
+      expect(refused.body.message).toMatch(/not a SubRip/);
+      await addSubtitle(assetId, 'language=german!', SRT).expect(400);
+      await addSubtitle(assetId, 'language=de', Buffer.alloc(5 * 1024 * 1024 + 1, 'a')).expect(413);
+      await addSubtitle('01a1fdfd-0000-7000-8000-000000000000', 'language=de', SRT).expect(404);
+      await http().post(`/v1/assets/${assetId}/subtitles?language=de`).send(SRT).expect(401);
+    }, 120_000);
+  });
+
   it('fails an asset whose file is not a video, without retrying', async () => {
     const notVideo = path.join(workDirectory, 'notes.txt');
     await writeFile(notVideo, 'This is plainly not a video file.\n'.repeat(50));

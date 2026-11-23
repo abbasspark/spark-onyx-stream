@@ -100,6 +100,15 @@ The API writes `master.m3u8` itself after FFmpeg has finished. It measures the s
 
 Text subtitles inside the source (SubRip, ASS, WebVTT, MOV text) are converted to WebVTT and listed in the multivariant playlist, so every HLS player offers them. Each track gets a language, a label and a row in `subtitle_tracks`. Picture-based subtitles (DVD, Blu-ray) cannot be converted to text and are skipped, which the job output reports. A forced track is on by default, other tracks are off until the viewer turns them on.
 
+**Subtitle files can be added to a video afterwards,** in the panel or by putting them beside a video in a [watched location](watched-locations.md).
+
+- **Formats:** SubRip (`.srt`), WebVTT (`.vtt`) and SubStation (`.ass`, `.ssa`), up to 5 MB. Whatever comes in is read into its subtitles and written out anew as WebVTT, in the order of their start: italics, bold and underline stay; fonts, colours, positions and styles go.
+- **Encodings:** Unicode is recognized. A file that is not Unicode is read in the encoding usual for its language (Windows-1256 for Arabic, Windows-1251 for Russian, and so on, Windows-1252 otherwise), and the uploader can name another.
+- **The name of a file says what it is:** `film.de.srt` is German, `film.en.forced.srt` the forced English track, `film.eng.sdh.srt` English for the hard of hearing. Only the words between the last dots are read. In the panel this fills in the form; in a watched location it decides.
+- **The video is not processed again.** The WebVTT file is written into the HLS output and the subtitle lines of the multivariant playlist are written anew from the rows in `subtitle_tracks`, which are the truth. A file added before the video is ready waits for processing, which includes it.
+- **Added tracks outlive processing.** Their converted file is also kept under `subtitles/{assetId}/`, outside the output that processing replaces, and is put back into every new output.
+- A track can be renamed, given another language, made forced, read line by line, downloaded and removed. A track that came from the video file comes back when the video is processed again.
+
 ### Seek-bar previews
 
 The thumbnail job writes a poster and one sprite sheet: up to 100 small pictures in a single JPEG, at least two seconds apart, with a WebVTT file that tells the player which part of the sheet belongs to which time span. The playback response gives its address as `thumbnailTrackUrl`.
@@ -129,7 +138,6 @@ The scheduler role repairs what a request could not finish, once a minute: uploa
 ### Not built yet
 
 - Several audio languages as separate HLS audio tracks.
-- Uploading subtitle files for an existing asset.
 - Hardware encoding.
 
 ## Storage
@@ -203,6 +211,8 @@ assets/{assetId}/hls/{quality}/seg-00000.m4s
 assets/{assetId}/hls/{quality}/seg-00000.ts           (encrypted assets, which have no init file)
 assets/{assetId}/hls/subs/{number}-{language}/playlist.m3u8
 assets/{assetId}/hls/subs/{number}-{language}/subtitles.vtt
+assets/{assetId}/hls/subs/u-{trackId}/subtitles.vtt     (a subtitle file added afterwards)
+subtitles/{assetId}/{trackId}.vtt                      (its copy that outlives processing)
 assets/{assetId}/thumbs/poster.jpg
 assets/{assetId}/thumbs/sprite.jpg
 assets/{assetId}/thumbs/sprite.vtt
@@ -251,44 +261,47 @@ All endpoints are under `/v1`. Every endpoint needs credentials unless marked pu
 
 Status shows what exists today.
 
-| Method                  | Path                               | Purpose                                                                                                      | Status |
-| ----------------------- | ---------------------------------- | ------------------------------------------------------------------------------------------------------------ | ------ |
-| `GET`                   | `/health`                          | Readiness with dependency status (public)                                                                    | Built  |
-| `GET`                   | `/health/live`                     | Liveness (public)                                                                                            | Built  |
-| `GET`                   | `/auth/setup`                      | Whether first-run setup is still required (public)                                                           | Built  |
-| `POST`                  | `/auth/setup`                      | Create the first owner. Works only while no admin exists (public)                                            | Built  |
-| `POST`                  | `/auth/login`                      | Start an admin session (public)                                                                              | Built  |
-| `POST`                  | `/auth/logout`                     | End the session                                                                                              | Built  |
-| `GET`                   | `/auth/me`                         | The authenticated caller and its permissions                                                                 | Built  |
-| `POST`                  | `/auth/password`                   | Change your own password                                                                                     | Built  |
-| `GET` `POST`            | `/admins`                          | List and create admins                                                                                       | Built  |
-| `GET` `PATCH` `DELETE`  | `/admins/{id}`                     | Read, update and deactivate an admin                                                                         | Built  |
-| `GET` `POST`            | `/api-keys`                        | List and create API keys                                                                                     | Built  |
-| `DELETE`                | `/api-keys/{id}`                   | Revoke an API key                                                                                            | Built  |
-| `GET`                   | `/audit-logs`                      | List audit entries with filters                                                                              | Built  |
-| `GET` `POST`            | `/storage-pools`                   | List and create storage pools                                                                                | Built  |
-| `GET` `PATCH`           | `/storage-pools/{id}`              | Read and update a storage pool                                                                               | Built  |
-| `POST`                  | `/storage-pools/{id}/test`         | Write, read and delete a test file to confirm the pool works                                                 | Built  |
-| `GET`                   | `/encoding-profiles`               | List encoding profiles                                                                                       | Built  |
-| `GET`                   | `/encoding-profiles/{id}`          | Read an encoding profile                                                                                     | Built  |
-| `POST`                  | `/encoding-profiles`               | Create an encoding profile                                                                                   | Built  |
-| `PATCH` `DELETE`        | `/encoding-profiles/{id}`          | Update and delete a profile                                                                                  | Built  |
-| `POST`                  | `/assets`                          | Create an asset and get an upload URL                                                                        | Built  |
-| `GET`                   | `/assets`                          | List assets with filters, ordering (`sort`, `order`) and pagination. Ready assets carry a signed `posterUrl` | Built  |
-| `GET` `PATCH` `DELETE`  | `/assets/{id}`                     | Read, update and soft-delete an asset                                                                        | Built  |
-| `POST`                  | `/uploads`                         | Start a resumable upload for an asset (tus)                                                                  | Built  |
-| `HEAD` `PATCH` `DELETE` | `/uploads/{assetId}`               | Check progress, send bytes, cancel (tus)                                                                     | Built  |
-| `POST`                  | `/assets/{id}/reprocess`           | Process again, optionally with another mode or profile                                                       | Built  |
-| `POST`                  | `/assets/{id}/playback`            | Get a signed manifest URL                                                                                    | Built  |
-| `GET` `HEAD`            | `/media/{assetId}/{token}/{file}`  | Generated files of an asset. The signed token is the authorization (public)                                  | Built  |
-| `GET`                   | `/jobs`                            | List jobs with filters                                                                                       | Built  |
-| `GET`                   | `/jobs/{id}`                       | Read a job                                                                                                   | Built  |
-| `POST`                  | `/jobs/{id}/cancel`                | Cancel a job                                                                                                 | Built  |
-| `POST`                  | `/jobs/{id}/retry`                 | Retry a failed job                                                                                           | Built  |
-| `GET`                   | `/media/{assetId}/{token}/hls/key` | AES-128 content key of an encrypted asset (signed token in the path)                                         | Built  |
-| `GET`                   | `/stats/overview`                  | Figures for the dashboard: assets, jobs, storage, uploads per day, recent failures                           | Built  |
-| `GET`                   | `/assets/{id}/media`               | Qualities, subtitle tracks and pictures of an asset, with signed addresses                                   | Built  |
-| `GET`                   | `/events`                          | Stream of live events for the admin panel (server-sent events)                                               | Built  |
+| Method                  | Path                                    | Purpose                                                                                                         | Status |
+| ----------------------- | --------------------------------------- | --------------------------------------------------------------------------------------------------------------- | ------ |
+| `GET`                   | `/health`                               | Readiness with dependency status (public)                                                                       | Built  |
+| `GET`                   | `/health/live`                          | Liveness (public)                                                                                               | Built  |
+| `GET`                   | `/auth/setup`                           | Whether first-run setup is still required (public)                                                              | Built  |
+| `POST`                  | `/auth/setup`                           | Create the first owner. Works only while no admin exists (public)                                               | Built  |
+| `POST`                  | `/auth/login`                           | Start an admin session (public)                                                                                 | Built  |
+| `POST`                  | `/auth/logout`                          | End the session                                                                                                 | Built  |
+| `GET`                   | `/auth/me`                              | The authenticated caller and its permissions                                                                    | Built  |
+| `POST`                  | `/auth/password`                        | Change your own password                                                                                        | Built  |
+| `GET` `POST`            | `/admins`                               | List and create admins                                                                                          | Built  |
+| `GET` `PATCH` `DELETE`  | `/admins/{id}`                          | Read, update and deactivate an admin                                                                            | Built  |
+| `GET` `POST`            | `/api-keys`                             | List and create API keys                                                                                        | Built  |
+| `DELETE`                | `/api-keys/{id}`                        | Revoke an API key                                                                                               | Built  |
+| `GET`                   | `/audit-logs`                           | List audit entries with filters                                                                                 | Built  |
+| `GET` `POST`            | `/storage-pools`                        | List and create storage pools                                                                                   | Built  |
+| `GET` `PATCH`           | `/storage-pools/{id}`                   | Read and update a storage pool                                                                                  | Built  |
+| `POST`                  | `/storage-pools/{id}/test`              | Write, read and delete a test file to confirm the pool works                                                    | Built  |
+| `GET`                   | `/encoding-profiles`                    | List encoding profiles                                                                                          | Built  |
+| `GET`                   | `/encoding-profiles/{id}`               | Read an encoding profile                                                                                        | Built  |
+| `POST`                  | `/encoding-profiles`                    | Create an encoding profile                                                                                      | Built  |
+| `PATCH` `DELETE`        | `/encoding-profiles/{id}`               | Update and delete a profile                                                                                     | Built  |
+| `POST`                  | `/assets`                               | Create an asset and get an upload URL                                                                           | Built  |
+| `GET`                   | `/assets`                               | List assets with filters, ordering (`sort`, `order`) and pagination. Ready assets carry a signed `posterUrl`    | Built  |
+| `GET` `PATCH` `DELETE`  | `/assets/{id}`                          | Read, update and soft-delete an asset                                                                           | Built  |
+| `POST`                  | `/uploads`                              | Start a resumable upload for an asset (tus)                                                                     | Built  |
+| `HEAD` `PATCH` `DELETE` | `/uploads/{assetId}`                    | Check progress, send bytes, cancel (tus)                                                                        | Built  |
+| `POST`                  | `/assets/{id}/reprocess`                | Process again, optionally with another mode or profile                                                          | Built  |
+| `POST`                  | `/assets/{id}/playback`                 | Get a signed manifest URL                                                                                       | Built  |
+| `GET` `HEAD`            | `/media/{assetId}/{token}/{file}`       | Generated files of an asset. The signed token is the authorization (public)                                     | Built  |
+| `GET`                   | `/jobs`                                 | List jobs with filters                                                                                          | Built  |
+| `GET`                   | `/jobs/{id}`                            | Read a job                                                                                                      | Built  |
+| `POST`                  | `/jobs/{id}/cancel`                     | Cancel a job                                                                                                    | Built  |
+| `POST`                  | `/jobs/{id}/retry`                      | Retry a failed job                                                                                              | Built  |
+| `GET`                   | `/media/{assetId}/{token}/hls/key`      | AES-128 content key of an encrypted asset (signed token in the path)                                            | Built  |
+| `GET`                   | `/stats/overview`                       | Figures for the dashboard: assets, jobs, storage, uploads per day, recent failures                              | Built  |
+| `GET`                   | `/assets/{id}/media`                    | Qualities, subtitle tracks and pictures of an asset, with signed addresses                                      | Built  |
+| `POST`                  | `/assets/{id}/subtitles`                | Add a subtitle file. The body is the file; `language`, `label`, `forced`, `filename`, `encoding` in the address | Built  |
+| `PATCH`, `DELETE`       | `/assets/{id}/subtitles/{trackId}`      | Rename a track, change its language or make it forced; remove it                                                | Built  |
+| `GET`                   | `/assets/{id}/subtitles/{trackId}/file` | The WebVTT file of a track                                                                                      | Built  |
+| `GET`                   | `/events`                               | Stream of live events for the admin panel (server-sent events)                                                  | Built  |
 
 ## Authentication and access control
 

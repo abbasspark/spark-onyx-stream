@@ -10,6 +10,7 @@ import { type ContentKey, ContentKeysService } from '../crypto/content-keys.serv
 import { EncodingProfilesService } from '../encoding-profiles/encoding-profiles.service.js';
 import type { StorageDriver } from '../storage/storage-driver.js';
 import { StorageService } from '../storage/storage.service.js';
+import { SubtitlesService } from '../subtitles/subtitles.service.js';
 import { FfmpegRunner } from './ffmpeg/ffmpeg-runner.js';
 import { toPercent } from './ffmpeg/progress.js';
 import { decideProcessingMode } from './media/decision.js';
@@ -116,6 +117,7 @@ export class ProcessingSteps {
     @Inject(FfmpegRunner) private readonly ffmpeg: FfmpegRunner,
     @Inject(AppConfig) private readonly config: AppConfig,
     @Inject(ContentKeysService) private readonly contentKeys: ContentKeysService,
+    @Inject(SubtitlesService) private readonly subtitleFiles: SubtitlesService,
   ) {}
 
   /** Runs the step for a job type and returns what is stored as the job's output. */
@@ -326,6 +328,13 @@ export class ProcessingSteps {
     // Subtitles are written into the same output and listed in the multivariant
     // playlist before anything is uploaded, so players never see a half-finished asset.
     const subtitles = await this.extractSubtitles(sourcePath, info, outputDirectory, context);
+    // Tracks an admin added, or that came beside the file, are put back into the new output.
+    const added = await this.subtitleFiles.restoreInto(
+      asset.id,
+      outputDirectory,
+      info.durationMs ?? 0,
+      subtitles.tracks,
+    );
 
     const audioCodec = audioStream
       ? aacCodecString(type === 'TRANSCODE' ? 'LC' : audioStream.profile)
@@ -345,7 +354,7 @@ export class ProcessingSteps {
     }
     await writeFile(
       path.join(outputDirectory, MASTER_PLAYLIST_NAME),
-      buildMasterPlaylist(variants, subtitles.tracks),
+      buildMasterPlaylist(variants, [...subtitles.tracks, ...added]),
     );
 
     if (contentKey) {
@@ -404,6 +413,11 @@ export class ProcessingSteps {
         data: { usedBytes: { increment: BigInt(totalBytes) } },
       }),
     ]);
+
+    // A track added while this ran is not in the playlist written above.
+    if ((await this.subtitleFiles.countAdded(asset.id)) !== added.length) {
+      await this.subtitleFiles.publish(asset.id);
+    }
 
     this.logger.log(
       `Asset ${asset.id}: ${type === 'TRANSCODE' ? 'transcoded' : 'repackaged'} into ${renditions.map((r) => r.name).join(', ')}`,

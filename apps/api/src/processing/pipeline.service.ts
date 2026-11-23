@@ -9,6 +9,7 @@ import {
 } from '@onyx/database';
 import { JobsService } from '../jobs/jobs.service.js';
 import { StorageService } from '../storage/storage.service.js';
+import { subtitlePrefix } from '../subtitles/subtitle-paths.js';
 
 /** Job types whose failure makes the asset unusable. Thumbnails, for example, are not among them. */
 export const ESSENTIAL_JOB_TYPES: readonly JobType[] = ['PROBE', 'REMUX', 'TRANSCODE', 'PACKAGE'];
@@ -198,7 +199,7 @@ export class PipelineService {
 
     const driver = await this.storage.getDriver(asset.storagePoolId);
     let bytes = 0n;
-    for (const prefix of [outputPrefix(assetId), sourcePrefix(assetId)]) {
+    for (const prefix of [outputPrefix(assetId), sourcePrefix(assetId), subtitlePrefix(assetId)]) {
       for await (const entry of driver.list(prefix)) {
         bytes += BigInt(entry.size);
       }

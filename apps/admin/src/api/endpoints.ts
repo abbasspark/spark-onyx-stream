@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-only
-import { download, request, uploadFile } from './client';
+import { download, request, requestText, uploadFile } from './client';
 import type {
   Credit,
   CreditInput,
@@ -56,8 +56,10 @@ import type {
   WatchPlaceInput,
   WatchPlaceTest,
   WatchSummary,
+  AddedSubtitle,
   BulkAction,
   BulkResult,
+  SubtitleTrack,
   Translation,
   TranslationJob,
   TranslationInput,
@@ -373,6 +375,44 @@ export const translationJobsApi = {
   list: (signal?: AbortSignal) => request<TranslationJob[]>('/v1/translation-jobs', { signal }),
   cancel: (id: string) =>
     request<TranslationJob>(`/v1/translation-jobs/${id}/cancel`, { method: 'POST' }),
+};
+
+export interface AddSubtitleOptions {
+  /** The name of the file. The language is read from it when none is given. */
+  filename: string;
+  language?: string;
+  label?: string;
+  forced?: boolean;
+  /** For files that are not Unicode, when the guess from the language is wrong. */
+  encoding?: string;
+}
+
+/** The subtitle tracks of a video. They are listed with its media. */
+export const subtitlesApi = {
+  add: (assetId: string, file: Blob, options: AddSubtitleOptions) => {
+    const query = new URLSearchParams();
+    for (const [key, value] of Object.entries(options)) {
+      if (value !== undefined && value !== '') {
+        query.set(key, String(value));
+      }
+    }
+    return uploadFile<AddedSubtitle>(`/v1/assets/${assetId}/subtitles?${query}`, file);
+  },
+  update: (
+    assetId: string,
+    trackId: string,
+    body: { language?: string; label?: string; isForced?: boolean },
+  ) =>
+    request<SubtitleTrack>(`/v1/assets/${assetId}/subtitles/${trackId}`, {
+      method: 'PATCH',
+      body,
+    }),
+  remove: (assetId: string, trackId: string) =>
+    request<void>(`/v1/assets/${assetId}/subtitles/${trackId}`, { method: 'DELETE' }),
+  /** The WebVTT file of a track, as text. */
+  file: (assetId: string, trackId: string, signal?: AbortSignal) =>
+    requestText(`/v1/assets/${assetId}/subtitles/${trackId}/file`, signal),
+  fileUrl: (assetId: string, trackId: string) => `/v1/assets/${assetId}/subtitles/${trackId}/file`,
 };
 
 export const metadataApi = {

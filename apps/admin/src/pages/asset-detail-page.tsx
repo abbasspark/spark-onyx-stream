@@ -23,14 +23,9 @@ import { toast } from 'sonner';
 import { ApiError } from '@/api/client';
 import { assetsApi, jobsApi } from '@/api/endpoints';
 import type { Asset, EncryptionMode } from '@/api/types';
+import { SubtitlesTab } from '@/components/asset-subtitles';
 import { useSession } from '@/auth/session';
-import {
-  ActivityTab,
-  QualitiesTab,
-  SubtitlesTab,
-  ThumbnailsTab,
-  useAssetMedia,
-} from '@/components/asset-tabs';
+import { ActivityTab, QualitiesTab, ThumbnailsTab, useAssetMedia } from '@/components/asset-tabs';
 import { useConfirm } from '@/components/confirm';
 import { JobTable } from '@/components/job-table';
 import { Player } from '@/components/player';
@@ -408,7 +403,7 @@ function AssetTabs({ asset, jobs, jobCount }: { asset: Asset; jobs: ReactNode; j
         <QualitiesTab media={media} />
       </TabsContent>
       <TabsContent value="subtitles">
-        <SubtitlesTab media={media} />
+        <SubtitlesTab asset={asset} media={media} mayWrite={can('assets:write')} />
       </TabsContent>
       <TabsContent value="thumbnails">
         <ThumbnailsTab media={media} />

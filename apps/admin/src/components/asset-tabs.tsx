@@ -1,15 +1,14 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 import { useQuery } from '@tanstack/react-query';
-import { Captions, Download, History, ImageOff, Layers } from 'lucide-react';
+import { Download, History, ImageOff, Layers } from 'lucide-react';
 import { apiUrl } from '@/api/client';
 import { adminsApi, assetsApi, auditApi } from '@/api/endpoints';
-import type { Asset, AssetMedia } from '@/api/types';
+import type { Asset } from '@/api/types';
 import { useSession } from '@/auth/session';
 import { describeAction } from '@/lib/audit';
 import { formatBitrate, formatBytes, formatDateTime, formatRelative } from '@/lib/format';
 import { Button } from './ui/button';
 import {
-  Badge,
   Card,
   CardContent,
   CardHeader,
@@ -22,24 +21,6 @@ import {
   Tr,
 } from './ui/display';
 import { Tooltip } from './ui/overlay';
-
-const languageNames = new Intl.DisplayNames(undefined, { type: 'language' });
-
-/** The name of a language code in the browser's language, for example "German" for "de". */
-function languageName(code: string): string {
-  try {
-    return languageNames.of(code) ?? code;
-  } catch {
-    // Not a valid language code, for example "und" variants some files carry.
-    return code;
-  }
-}
-
-const SUBTITLE_SOURCES: Record<AssetMedia['subtitles'][number]['source'], string> = {
-  EMBEDDED: 'From the source file',
-  UPLOADED: 'Uploaded',
-  GENERATED: 'Generated',
-};
 
 /** Reads the generated outputs of an asset. Asked again whenever the asset was processed anew. */
 export function useAssetMedia(asset: Asset) {
@@ -126,71 +107,6 @@ export function QualitiesTab({ media }: { media: MediaQuery }) {
         {media.data.renditions.length === 1 ? 'quality' : 'qualities'},{' '}
         {formatBytes(media.data.outputBytes)} in total
       </p>
-    </Card>
-  );
-}
-
-/** The subtitle tracks players offer. */
-export function SubtitlesTab({ media }: { media: MediaQuery }) {
-  if (media.isPending) {
-    return <Skeleton className="h-32 rounded-xl" />;
-  }
-  if (media.isError) {
-    return <ErrorNote error={media.error} />;
-  }
-  if (media.data.subtitles.length === 0) {
-    return (
-      <EmptyState icon={Captions} title="No subtitles">
-        Text subtitles inside a source file are taken over automatically when it is processed.
-      </EmptyState>
-    );
-  }
-
-  return (
-    <Card className="overflow-hidden">
-      <Table>
-        <thead>
-          <tr>
-            <Th>Language</Th>
-            <Th>Label</Th>
-            <Th>Origin</Th>
-            <Th className="w-10" aria-label="Download" />
-          </tr>
-        </thead>
-        <tbody>
-          {media.data.subtitles.map((track) => (
-            <Tr key={track.id}>
-              <Td>
-                <span className="font-medium">{languageName(track.language)}</span>{' '}
-                <code className="font-mono text-xs text-muted-foreground">{track.language}</code>
-              </Td>
-              <Td>
-                <span className="flex flex-wrap items-center gap-1.5">
-                  {track.label ?? '–'}
-                  {track.isDefault ? <Badge tone="primary">Default</Badge> : null}
-                  {track.isForced ? <Badge>Forced</Badge> : null}
-                </span>
-              </Td>
-              <Td className="text-muted-foreground">{SUBTITLE_SOURCES[track.source]}</Td>
-              <Td>
-                {track.url ? (
-                  <Tooltip content="Download as WebVTT">
-                    <Button variant="ghost" size="icon-sm" asChild>
-                      <a
-                        href={apiUrl(track.url)}
-                        download={`${track.language}.vtt`}
-                        aria-label={`Download the ${languageName(track.language)} subtitles`}
-                      >
-                        <Download />
-                      </a>
-                    </Button>
-                  </Tooltip>
-                ) : null}
-              </Td>
-            </Tr>
-          ))}
-        </tbody>
-      </Table>
     </Card>
   );
 }

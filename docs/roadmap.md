@@ -68,3 +68,4 @@ Before the apps, the panel becomes a fuller catalog system. This work is outside
 4. Genres, facts, people, extras, collections and a choice of language on the viewer website. **Done.**
 5. Watched folders and buckets that import files named by their TMDB id by themselves, with a page for what became of each file. **Done.** See [watched-locations.md](watched-locations.md).
 6. Actions on many movies or series at once, on a selection or on everything the filters match, including translating them into a language in the background. **Done.**
+7. Subtitle files for a video: added in the panel or found beside a video in a watched location, converted to WebVTT and offered by the player without processing the video again. **Done.**
