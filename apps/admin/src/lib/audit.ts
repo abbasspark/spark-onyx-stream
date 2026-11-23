@@ -51,6 +51,7 @@ const ACTION_LABELS: Record<string, string> = {
   'admin.two_factor_reset': 'Took two-factor sign-in off an admin',
   'terms.translation.save': 'Saved translations of names',
   'terms.translation.delete': 'Removed a language from names',
+  'title.duplicate': 'Duplicated a title',
   'role.create': 'Made a role',
   'role.update': 'Changed a role',
   'role.delete': 'Deleted a role',

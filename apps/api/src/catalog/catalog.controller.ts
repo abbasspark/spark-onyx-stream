@@ -59,6 +59,8 @@ import {
 } from './catalog.views.js';
 import { CategoriesService } from './categories.service.js';
 import { ImagesService } from './images.service.js';
+import { type DuplicateTitleInput, duplicateTitleSchema } from './title-duplicate.js';
+import { type DuplicateResult, TitleDuplicateService } from './title-duplicate.service.js';
 import { TitlesService } from './titles.service.js';
 
 /** What the audit log needs from a request. */
@@ -71,6 +73,7 @@ interface AuditContext {
 export class CatalogController {
   constructor(
     @Inject(TitlesService) private readonly titles: TitlesService,
+    @Inject(TitleDuplicateService) private readonly duplicates: TitleDuplicateService,
     @Inject(CategoriesService) private readonly categories: CategoriesService,
     @Inject(ImagesService) private readonly images: ImagesService,
     @Inject(AuditService) private readonly audit: AuditService,
@@ -184,6 +187,29 @@ export class CatalogController {
       },
     );
     return title;
+  }
+
+  /**
+   * Makes a copy of a title as a draft. The body says what comes along; the
+   * videos and pictures of the copy are the same ones, not new files.
+   */
+  @Post('titles/:id/duplicate')
+  @RequirePermissions('catalog:write')
+  async duplicateTitle(
+    @Param('id', ParseUUIDPipe) id: string,
+    @CurrentPrincipal() principal: Principal,
+    @Body(new ZodValidationPipe(duplicateTitleSchema)) body: DuplicateTitleInput,
+    @Req() request: Request,
+  ): Promise<DuplicateResult> {
+    const result = await this.duplicates.duplicate(id, body, principal.adminId);
+    await this.record(
+      'title.duplicate',
+      'Title',
+      result.title.id,
+      { principal, request },
+      { name: result.title.name, from: id, parts: body.parts },
+    );
+    return result;
   }
 
   @Get('titles/:id')

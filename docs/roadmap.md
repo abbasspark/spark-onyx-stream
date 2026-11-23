@@ -79,3 +79,4 @@ Before the apps, the panel becomes a fuller catalog system. This work is outside
 15. Two-factor sign-in for admins: a code from an authenticator app after the password, recovery codes, and an installation that can ask every admin for it. **Done.**
 16. Custom roles: roles made in the panel from the permission list, area by area, with rules that keep anyone from handing out more than they hold. **Done.**
 17. Translations of categories, genres, collections and people, worked on a language at a time in the panel, and read by viewers wherever these names show. **Done.**
+18. Duplicating a title: a draft copy with a choice of what comes along, sharing videos and pictures with the original. **Done.**

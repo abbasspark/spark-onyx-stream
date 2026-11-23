@@ -2,6 +2,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   Archive,
+  Copy,
   ArchiveRestore,
   ArrowLeft,
   Check,
@@ -23,6 +24,7 @@ import {
 import { type FormEvent, type ReactNode, useEffect, useMemo, useState } from 'react';
 import { Link, useLocation, useNavigate, useParams } from 'react-router';
 import { toast } from 'sonner';
+import { DuplicateTitleDialog } from '@/components/duplicate-title-dialog';
 import { ApiError, apiUrl } from '@/api/client';
 import {
   categoriesApi,
@@ -86,6 +88,7 @@ import {
   priceProblem,
   sectionPath,
   SERIES_STATUS_LOOKS,
+  titlePath,
   toForm,
   yearsOf,
 } from '@/lib/catalog';
@@ -129,6 +132,7 @@ export function TitleEditorPage() {
   });
   const title = query.data;
   const [metadataOpen, setMetadataOpen] = useState(false);
+  const [duplicating, setDuplicating] = useState(false);
 
   const refresh = () => {
     void queryClient.invalidateQueries({ queryKey: ['titles'] });
@@ -268,6 +272,20 @@ export function TitleEditorPage() {
       </Link>
 
       {mayWrite ? (
+        <DuplicateTitleDialog
+          titleId={duplicating ? title.id : null}
+          onClose={() => setDuplicating(false)}
+          onDone={(copy) => {
+            setDuplicating(false);
+            toast.success(`${copy.name} is ready as a draft`, {
+              description: 'It shares its pictures and videos with the original.',
+            });
+            void queryClient.invalidateQueries({ queryKey: ['titles', 'list'] });
+            void navigate(titlePath(copy));
+          }}
+        />
+      ) : null}
+      {mayWrite ? (
         <MetadataDialog
           open={metadataOpen}
           onOpenChange={setMetadataOpen}
@@ -366,6 +384,10 @@ export function TitleEditorPage() {
                   <DropdownMenuItem onSelect={() => setMetadataOpen(true)}>
                     <DownloadCloud />
                     {title.metadata ? 'Update details from TMDB' : 'Get details from TMDB'}
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onSelect={() => setDuplicating(true)}>
+                    <Copy />
+                    Duplicate
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
                   {title.status !== 'ARCHIVED' ? (
