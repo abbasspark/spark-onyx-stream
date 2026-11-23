@@ -165,7 +165,10 @@ import type {
   WebhookInput,
   WebhookReference,
   WebhookWithSecret,
+  AppVersionRule,
+  AppVersions,
 } from './types';
+import type { OpenApiDocument } from '@/lib/openapi';
 
 export const authApi = {
   setupStatus: () => request<{ required: boolean }>('/v1/auth/setup'),
@@ -414,6 +417,9 @@ export const viewersApi = {
     request<void>(`/v1/viewers/${id}/verification-email`, { method: 'POST' }),
   signOut: (id: string) =>
     request<{ sessionsEnded: number }>(`/v1/viewers/${id}/sign-out`, { method: 'POST' }),
+  /** Signs one device out and forgets it. */
+  removeDevice: (id: string, deviceId: string) =>
+    request<void>(`/v1/viewers/${id}/devices/${deviceId}`, { method: 'DELETE' }),
   remove: (id: string) => request<void>(`/v1/viewers/${id}`, { method: 'DELETE' }),
   /** What is open to the public. Needs no permission. */
   access: (signal?: AbortSignal) => request<ViewerAccessConfig>('/v1/viewer/config', { signal }),
@@ -966,4 +972,16 @@ export const webhooksApi = {
     request<WebhookDelivery>(`/v1/webhooks/${id}/deliveries/${deliveryId}/redeliver`, {
       method: 'POST',
     }),
+};
+
+export const referenceApi = {
+  /** The description the server gives of its own API. */
+  document: (signal?: AbortSignal) => request<OpenApiDocument>('/v1/openapi.json', { signal }),
+};
+
+export const appVersionsApi = {
+  get: (signal?: AbortSignal) => request<AppVersions>('/v1/app-versions', { signal }),
+  /** Sets all rules at once. */
+  save: (rules: AppVersionRule[]) =>
+    request<AppVersions>('/v1/app-versions', { method: 'PUT', body: { rules } }),
 };

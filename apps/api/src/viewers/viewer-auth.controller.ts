@@ -127,6 +127,7 @@ export class ViewerAuthController {
     };
   }
 
+  /** Creates a viewer account and signs it in. */
   @Public()
   @RateLimit(REGISTRATIONS)
   @Post('register')
@@ -139,6 +140,7 @@ export class ViewerAuthController {
     return this.signedIn(await this.auth.register(body, requestInfo(request)), request, response);
   }
 
+  /** Signs a viewer in. The answer holds the token an app sends from then on. */
   @Public()
   @RateLimit(SIGN_INS)
   @Post('login')
@@ -152,6 +154,7 @@ export class ViewerAuthController {
     return this.signedIn(await this.auth.login(body, requestInfo(request)), request, response);
   }
 
+  /** Signs this device out. */
   @ViewerOnly()
   @Post('logout')
   @HttpCode(HttpStatus.NO_CONTENT)
@@ -164,6 +167,7 @@ export class ViewerAuthController {
     response.clearCookie(VIEWER_COOKIE, viewerCookieOptions(request));
   }
 
+  /** The signed-in viewer. */
   @ViewerOnly()
   @Get('me')
   @Header('Cache-Control', 'no-store')
@@ -171,6 +175,7 @@ export class ViewerAuthController {
     return toViewerView(identity.viewer);
   }
 
+  /** Changes the viewer's own details. */
   @ViewerOnly()
   @Patch('me')
   updateOwn(
@@ -180,6 +185,7 @@ export class ViewerAuthController {
     return this.auth.updateOwn(identity, body);
   }
 
+  /** Sets a new password, given the current one. */
   @ViewerOnly()
   @Post('password')
   @HttpCode(HttpStatus.NO_CONTENT)
@@ -248,6 +254,7 @@ export class ViewerAuthController {
     return this.auth.listSessions(identity);
   }
 
+  /** Signs another device of the account out. */
   @ViewerOnly()
   @Delete('sessions/:id')
   @HttpCode(HttpStatus.NO_CONTENT)

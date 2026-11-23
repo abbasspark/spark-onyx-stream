@@ -40,6 +40,8 @@ import {
   Users,
   UsersRound,
   Webhook,
+  BookOpenText,
+  MonitorSmartphone,
 } from 'lucide-react';
 import type { Permission } from '@/api/types';
 
@@ -362,6 +364,20 @@ export const NAVIGATION: NavGroup[] = [
         icon: KeyRound,
         permission: 'api-keys:read',
         keywords: 'tokens integration',
+      },
+      {
+        to: '/api-reference',
+        label: 'API reference',
+        icon: BookOpenText,
+        permission: 'api-keys:read',
+        keywords: 'documentation docs endpoints openapi swagger rest developers integration curl',
+      },
+      {
+        to: '/apps',
+        label: 'Apps',
+        icon: MonitorSmartphone,
+        permission: 'settings:read',
+        keywords: 'android tv mobile ios version minimum update force upgrade old client',
       },
       {
         to: '/webhooks',

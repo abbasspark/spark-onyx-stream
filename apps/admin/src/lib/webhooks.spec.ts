@@ -25,7 +25,11 @@ import {
 } from './webhooks';
 
 const NOW = Date.parse('2026-11-23T12:00:00Z');
-const event = (name: string, group: string, label: string): WebhookEventInfo => ({
+const event = (
+  name: string,
+  group: WebhookEventInfo['group'],
+  label: string,
+): WebhookEventInfo => ({
   name,
   group,
   label,

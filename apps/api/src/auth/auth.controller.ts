@@ -63,6 +63,7 @@ export class AuthController {
     return this.auth.setup(body, requestInfo(request));
   }
 
+  /** Signs an admin in with email and password. */
   @Public()
   @Post('login')
   @HttpCode(HttpStatus.OK)

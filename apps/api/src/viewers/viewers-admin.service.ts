@@ -12,6 +12,7 @@ import {
   type ViewerPlanRef,
 } from './viewer.view.js';
 import { toProfileView, ViewerProfilesService } from './viewer-profiles.service.js';
+import { toDeviceRef, ViewerDevicesService, withoutCurrent } from './viewer-devices.service.js';
 import { ACTIVE_SESSION, ViewerSessionService } from './viewer-session.service.js';
 import { WebhookDeliveryService } from '../webhooks/webhook-delivery.service.js';
 
@@ -51,6 +52,7 @@ export class ViewersAdminService {
     @Inject(PrismaClient) private readonly prisma: PrismaClient,
     @Inject(WebhookDeliveryService) private readonly webhooks: WebhookDeliveryService,
     @Inject(ViewerSessionService) private readonly sessions: ViewerSessionService,
+    @Inject(ViewerDevicesService) private readonly devices: ViewerDevicesService,
     @Inject(ViewerProfilesService) private readonly profiles: ViewerProfilesService,
   ) {}
 
@@ -102,9 +104,10 @@ export class ViewersAdminService {
     if (!viewer) {
       throw new NotFoundException('Viewer not found');
     }
-    const [sessions, profiles] = await Promise.all([
+    const [sessions, profiles, devices] = await Promise.all([
       this.sessions.listActive(id),
       this.profiles.list(viewer),
+      this.devices.list(id),
     ]);
     return {
       ...toViewerAdminView(viewer, sessions.length, await this.planOf(id)),
@@ -116,8 +119,21 @@ export class ViewersAdminService {
         createdAt: session.createdAt,
         lastUsedAt: session.lastUsedAt,
         expiresAt: session.expiresAt,
+        device: session.device ? toDeviceRef(session.device) : null,
       })),
+      devices: devices.map(withoutCurrent),
     };
+  }
+
+  /**
+   * Signs a device of a viewer out and forgets it.
+   *
+   * @returns The name of the device, for the audit log.
+   * @throws NotFoundException
+   */
+  async removeDevice(id: string, deviceId: string): Promise<string> {
+    await this.find(id);
+    return (await this.devices.remove(id, deviceId)).name;
   }
 
   /** @throws ConflictException when the email address is taken. */

@@ -25,6 +25,7 @@ import {
 export class StripeWebhookController {
   constructor(@Inject(StripeWebhookService) private readonly webhooks: StripeWebhookService) {}
 
+  /** Takes the events Stripe reports. Only Stripe's signature opens it. */
   @Public()
   @Post(STRIPE_WEBHOOK_ROUTE)
   @HttpCode(HttpStatus.OK)

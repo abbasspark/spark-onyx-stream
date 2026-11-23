@@ -63,6 +63,7 @@ export class SharingReportController {
     @Inject(SharingStatsService) private readonly stats: SharingStatsService,
   ) {}
 
+  /** A player reports how much it got from other viewers and how much from servers. */
   @Post('report')
   @HttpCode(HttpStatus.NO_CONTENT)
   @RateLimit(REPORTS)

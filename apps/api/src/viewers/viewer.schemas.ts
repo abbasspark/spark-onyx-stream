@@ -2,6 +2,7 @@
 import { z } from 'zod';
 import { displayNameSchema, emailSchema, MAX_PASSWORD_LENGTH } from '../auth/auth.schemas.js';
 import { paginationSchema } from '../common/pagination.js';
+import { deviceInfoSchema } from './device.schemas.js';
 
 /** Shorter than for admins: a viewer protects their own account, not the installation. */
 export const MIN_VIEWER_PASSWORD_LENGTH = 8;
@@ -18,12 +19,16 @@ export const registerViewerSchema = z.object({
   email: emailSchema,
   displayName: displayNameSchema,
   password: viewerPasswordSchema,
+  /** Sent by apps, so the sign-in is known as that device. Browsers leave it out. */
+  device: deviceInfoSchema.optional(),
 });
 export type RegisterViewerInput = z.infer<typeof registerViewerSchema>;
 
 export const loginViewerSchema = z.object({
   email: emailSchema,
   password: z.string().min(1, 'Enter your password').max(MAX_PASSWORD_LENGTH),
+  /** Sent by apps, so the sign-in is known as that device. Browsers leave it out. */
+  device: deviceInfoSchema.optional(),
 });
 export type LoginViewerInput = z.infer<typeof loginViewerSchema>;
 

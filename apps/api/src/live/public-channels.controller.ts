@@ -62,6 +62,7 @@ const guideQuerySchema = z.object({
 export class PublicGuideController {
   constructor(@Inject(PublicChannelsService) private readonly channels: PublicChannelsService) {}
 
+  /** The programme guide of the channels. */
   @Get()
   @RateLimit(READS)
   @Header('Cache-Control', 'public, max-age=60')
@@ -85,6 +86,7 @@ export class PublicChannelsController {
     @Inject(ViewerSessionService) private readonly viewerSessions: ViewerSessionService,
   ) {}
 
+  /** The live channels viewers can watch. */
   @Get()
   @RateLimit(READS)
   @Header('Cache-Control', CACHE_READS)
@@ -92,6 +94,7 @@ export class PublicChannelsController {
     return this.channels.list();
   }
 
+  /** One live channel, by the name in its address. */
   @Get(':slug')
   @RateLimit(READS)
   @Header('Cache-Control', CACHE_READS)

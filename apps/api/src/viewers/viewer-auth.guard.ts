@@ -48,7 +48,10 @@ export class ViewerAuthGuard implements CanActivate {
       throw new ForbiddenException('This request did not come from this site');
     }
 
-    const identity = await this.sessions.validate(credentials.token);
+    const identity = await this.sessions.validate(
+      credentials.token,
+      this.sessions.appVersion(request),
+    );
     if (!identity) {
       throw new UnauthorizedException('Your session has ended. Sign in again.');
     }

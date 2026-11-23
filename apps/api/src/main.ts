@@ -98,7 +98,7 @@ async function bootstrap(): Promise<void> {
       callback(null, {
         origin: config.corsOrigins.length > 0 ? [...config.corsOrigins] : false,
         methods: ['GET', 'HEAD', 'POST', 'PATCH', 'DELETE', 'OPTIONS'],
-        allowedHeaders: ['Authorization', 'Content-Type', ...TUS_REQUEST_HEADERS],
+        allowedHeaders: ['Authorization', 'Content-Type', 'X-Onyx-Client', ...TUS_REQUEST_HEADERS],
         exposedHeaders: TUS_RESPONSE_HEADERS,
         maxAge: 600,
       });

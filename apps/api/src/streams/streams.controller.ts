@@ -36,6 +36,7 @@ interface OwnStream extends StreamView {
 export class ViewerStreamsController {
   constructor(@Inject(StreamsService) private readonly streams: StreamsService) {}
 
+  /** What plays on the account right now, and how many devices may play at once. */
   @ViewerOnly()
   @Get()
   @Header('Cache-Control', 'no-store')

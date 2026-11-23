@@ -151,6 +151,8 @@ model Viewer {
   updatedAt        DateTime     @updatedAt
 
   sessions      ViewerSession[]
+  devices       ViewerDevice[]
+  deviceCodes   DeviceCode[]
   profiles      ViewerProfile[]
   subscriptions Subscription[]
   payments      Payment[]
@@ -183,12 +185,86 @@ model ViewerSession {
   lastUsedAt DateTime       @default(now())
   revokedAt  DateTime?
   createdAt  DateTime       @default(now())
+  /// The app this sign-in belongs to. Empty for a browser, which has no identity of its own.
+  deviceId   String?        @db.Uuid
+  device     ViewerDevice?  @relation(fields: [deviceId], references: [id], onDelete: SetNull)
 
   streams ViewerStream[]
 
   @@index([viewerId])
   @@index([expiresAt])
+  @@index([deviceId])
   @@map("viewer_sessions")
+}
+
+/// An app on a television, a phone or a tablet that a viewer signed in on.
+/// It stays the same device when it is signed out and in again, which a
+/// session cannot say: what is sent to a device later is sent to this.
+model ViewerDevice {
+  id             String     @id @default(uuid(7)) @db.Uuid
+  viewerId       String     @db.Uuid
+  viewer         Viewer     @relation(fields: [viewerId], references: [id], onDelete: Cascade)
+  /// Made up by the app when it is installed, and kept until it is removed.
+  installationId String
+  /// What the viewer calls it: "Living room TV". The app proposes one.
+  name           String
+  kind           PlayDevice @default(OTHER)
+  /// The app, as it names itself in X-Onyx-Client: "android-tv".
+  platform       String
+  /// The make and model, as the device says: "Chromecast with Google TV".
+  model          String?
+  /// The version of the app it last connected with.
+  appVersion     String?
+  lastSeenAt     DateTime   @default(now())
+  createdAt      DateTime   @default(now())
+
+  sessions ViewerSession[]
+
+  @@unique([viewerId, installationId])
+  @@map("viewer_devices")
+}
+
+enum DeviceCodeStatus {
+  /// Shown on the device, waiting for the viewer.
+  PENDING
+  /// The viewer said yes. The device has not collected its sign-in yet.
+  APPROVED
+  /// The viewer said no.
+  DENIED
+  /// The device collected its sign-in. A code works once.
+  USED
+}
+
+/// A request of a device to be signed in without a keyboard: the device
+/// shows a short code, the viewer confirms it on their phone.
+model DeviceCode {
+  id             String           @id @default(uuid(7)) @db.Uuid
+  /// SHA-256 hash of the long secret the device asks with. Never shown to anyone.
+  deviceCodeHash String           @unique
+  /// What the viewer types, without the hyphen: "BDWK7XQM".
+  userCode       String           @unique
+  status         DeviceCodeStatus @default(PENDING)
+  /// Who said yes or no.
+  viewerId       String?          @db.Uuid
+  viewer         Viewer?          @relation(fields: [viewerId], references: [id], onDelete: Cascade)
+
+  /// What the device says about itself, shown to the viewer before they answer.
+  installationId String
+  name           String
+  kind           PlayDevice @default(TV)
+  platform       String
+  model          String?
+  appVersion     String?
+  ipAddress      String?
+  userAgent      String?
+
+  /// When the device last asked whether it may sign in.
+  lastPolledAt DateTime?
+  expiresAt    DateTime
+  createdAt    DateTime  @default(now())
+
+  @@index([expiresAt])
+  @@map("device_codes")
 }
 
 model ApiKey {

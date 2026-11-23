@@ -83,3 +83,20 @@ Before the apps, the panel becomes a fuller catalog system. This work is outside
 19. The history of a title: who changed what and when, shown as before and after, with a way to bring an earlier version back. **Done.**
 20. Site branding: the name, logo, icon, accent colour and footer of the website, set in the panel with a live sketch. **Done.**
 21. Outgoing webhooks: your own systems are told when a title goes live, a viewer signs up or a payment arrives, with signed requests, retries and a record of every delivery. **Done.**
+
+## Before the apps
+
+A comparison with other platforms named ten things that change what the API says to an app, or how videos are packaged. They are cheap before apps are installed on devices and expensive after.
+
+1. The API described for programs: an OpenAPI description produced from the code, types generated from it, an API reference in the panel, and a way to tell an app that it is too old. **Done.** See [api.md](api.md).
+2. Devices, and sign-in on a television with a code: a device has an identity that outlasts its sign-ins, and a television shows a code that the viewer confirms on their phone. **Done.** See [phase-2-viewers.md](phase-2-viewers.md#devices-and-signing-in-with-a-code).
+3. Parental controls: kids profiles, a rating limit and a PIN per profile. **Planned.**
+4. Several audio tracks per video, and the preferred languages of a profile. **Planned.**
+5. Skip intro and credits. **Planned.**
+6. Similar titles. **Planned.**
+7. Reports from players about how playback went. **Planned.**
+8. Push notifications. **Planned.**
+9. Prepaid codes that start or extend a subscription. **Planned.**
+10. Selling inside the apps, or sending viewers to the website. **To decide.**
+
+Content protection with DRM follows the first app release, as something an operator switches on with a licence service of their own.

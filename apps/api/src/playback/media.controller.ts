@@ -42,6 +42,7 @@ export class MediaController {
     @Inject(StorageService) private readonly storage: StorageService,
   ) {}
 
+  /** The playlists, segments and keys of a video. The token in the address is the permission. */
   @Get(':assetId/:token/*filePath')
   get(
     @Param('assetId') assetId: string,
