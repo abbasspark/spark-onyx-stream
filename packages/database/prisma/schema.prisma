@@ -47,6 +47,7 @@ model AdminUser {
   subscriptionsGranted Subscription[]
   paymentsRecorded     Payment[]
   purchasesGranted     Purchase[]
+  couponsCreated       Coupon[]
   backups              Backup[]
   translationJobs      TranslationJob[]
 
@@ -101,6 +102,7 @@ model Viewer {
   subscriptions Subscription[]
   payments      Payment[]
   purchases     Purchase[]
+  couponsUsed   CouponRedemption[]
   watching      WatchProgress[]
   saved         WatchlistItem[]
   plays         Play[]
@@ -1258,6 +1260,7 @@ model Plan {
   subscriptions Subscription[]
   payments      Payment[]
   packages      PlanPackage[]
+  coupons       CouponPlan[]
 
   @@index([position])
   @@map("plans")
@@ -1511,6 +1514,110 @@ model Purchase {
   @@index([viewerId, titleId])
   @@index([titleId])
   @@map("purchases")
+}
+
+enum CouponKind {
+  /// A share of the price.
+  PERCENT
+  /// A fixed sum, in the smallest unit of the installation's currency.
+  AMOUNT
+}
+
+enum CouponScope {
+  EVERYTHING
+  /// Plans only.
+  SUBSCRIPTIONS
+  /// Renting and buying single titles only.
+  TITLES
+}
+
+/// For how long a code lowers the price of a subscription.
+enum CouponDuration {
+  /// The first payment.
+  ONCE
+  /// The payments of a number of months.
+  REPEATING
+  /// Every payment, for as long as the subscription runs.
+  FOREVER
+}
+
+/// A code a viewer enters before paying, for a lower price.
+model Coupon {
+  id             String         @id @default(uuid(7)) @db.Uuid
+  /// What the viewer types. Capital letters, digits and hyphens.
+  code           String         @unique
+  /// What it is for, for the admins. Viewers do not see it.
+  note           String?
+  kind           CouponKind
+  /// 1 to 100. Set for PERCENT.
+  percentOff     Int?
+  /// Set for AMOUNT.
+  amountOff      Int?
+  scope          CouponScope    @default(EVERYTHING)
+  duration       CouponDuration @default(ONCE)
+  /// Set for REPEATING.
+  durationMonths Int?
+  /// The plans it is for. None: every plan.
+  plans          CouponPlan[]
+
+  /// From when and until when it can be entered. Empty: no limit on that side.
+  startsAt         DateTime?
+  endsAt           DateTime?
+  /// How often it can be used in all. Empty: without limit.
+  maxRedemptions   Int?
+  /// Whether one viewer can use it only once.
+  oncePerViewer    Boolean   @default(true)
+  /// Whether it is only for viewers who have not paid anything yet.
+  newCustomersOnly Boolean   @default(false)
+  /// Switched off by an admin: it is kept with its history and takes no more uses.
+  isActive         Boolean   @default(true)
+
+  createdById String?    @db.Uuid
+  createdBy   AdminUser? @relation(fields: [createdById], references: [id], onDelete: SetNull)
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+
+  redemptions CouponRedemption[]
+
+  @@map("coupons")
+}
+
+model CouponPlan {
+  couponId String @db.Uuid
+  coupon   Coupon @relation(fields: [couponId], references: [id], onDelete: Cascade)
+  planId   String @db.Uuid
+  plan     Plan   @relation(fields: [planId], references: [id], onDelete: Cascade)
+
+  @@id([couponId, planId])
+  @@index([planId])
+  @@map("coupon_plans")
+}
+
+/// One use of a code: a checkout that was completed with it.
+model CouponRedemption {
+  id             String      @id @default(uuid(7)) @db.Uuid
+  couponId       String      @db.Uuid
+  coupon         Coupon      @relation(fields: [couponId], references: [id], onDelete: Restrict)
+  /// Empty once the account is deleted. The use stays in the books.
+  viewerId       String?     @db.Uuid
+  viewer         Viewer?     @relation(fields: [viewerId], references: [id], onDelete: SetNull)
+  viewerEmail    String
+  /// What was paid for with it.
+  kind           PaymentKind
+  /// The name of the plan or the title, as it was then.
+  subject        String
+  /// The price without the code and what the code took off, for the first
+  /// payment, in the smallest unit of the currency.
+  listAmount     Int
+  discountAmount Int
+  currency       String
+  /// Id of the checkout at the payment provider. One use per checkout.
+  externalId     String      @unique
+  createdAt      DateTime    @default(now())
+
+  @@index([couponId, createdAt])
+  @@index([viewerId])
+  @@map("coupon_redemptions")
 }
 
 // ── Live ─────────────────────────────────────────────────────────────

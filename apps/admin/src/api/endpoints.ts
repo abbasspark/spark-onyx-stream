@@ -1,6 +1,9 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 import { download, request, requestText, uploadFile } from './client';
 import type {
+  Coupon,
+  CouponInput,
+  CouponRedemption,
   Credit,
   CreditInput,
   Genre,
@@ -251,6 +254,20 @@ export const billingApi = {
   checkStripe: () => request<StripeAccount>('/v1/billing/stripe/check', { method: 'POST' }),
   stripeEvents: (signal?: AbortSignal) =>
     request<StripeEvent[]>('/v1/billing/stripe/events', { signal }),
+};
+
+export const couponsApi = {
+  list: (signal?: AbortSignal) => request<Coupon[]>('/v1/coupons', { signal }),
+  create: (body: CouponInput) => request<Coupon>('/v1/coupons', { method: 'POST', body }),
+  update: (id: string, body: Partial<CouponInput>) =>
+    request<Coupon>(`/v1/coupons/${id}`, { method: 'PATCH', body }),
+  remove: (id: string) => request<void>(`/v1/coupons/${id}`, { method: 'DELETE' }),
+  /** Who used the code, the latest first. */
+  redemptions: (id: string, page: number, signal?: AbortSignal) =>
+    request<Page<CouponRedemption>>(`/v1/coupons/${id}/redemptions`, {
+      query: { page, pageSize: 10 },
+      signal,
+    }),
 };
 
 export const packagesApi = {

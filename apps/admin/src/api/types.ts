@@ -2039,3 +2039,71 @@ export interface WatchingNow {
 }
 
 export type TitleRanking = 'views' | 'viewers' | 'watchSeconds' | 'completion';
+
+export type CouponState = 'ACTIVE' | 'SCHEDULED' | 'ENDED' | 'USED_UP' | 'OFF';
+export type CouponKind = 'PERCENT' | 'AMOUNT';
+export type CouponScope = 'EVERYTHING' | 'SUBSCRIPTIONS' | 'TITLES';
+export type CouponDuration = 'ONCE' | 'REPEATING' | 'FOREVER';
+
+/** A code that lowers a price at checkout. */
+export interface Coupon {
+  id: string;
+  code: string;
+  /** What it is for. Viewers do not see it. */
+  note: string | null;
+  kind: CouponKind;
+  percentOff: number | null;
+  /** In the smallest unit of the currency. */
+  amountOff: number | null;
+  scope: CouponScope;
+  duration: CouponDuration;
+  durationMonths: number | null;
+  /** The plans it is for. Empty: every plan. */
+  plans: { id: string; name: string }[];
+  startsAt: string | null;
+  endsAt: string | null;
+  maxRedemptions: number | null;
+  oncePerViewer: boolean;
+  newCustomersOnly: boolean;
+  isActive: boolean;
+  /** Where it stands now: its switch, its dates and its uses taken together. */
+  state: CouponState;
+  used: number;
+  /** What it took off first payments in all. */
+  discountTotal: number;
+  lastUsedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CouponInput {
+  code: string;
+  note: string | null;
+  kind: CouponKind;
+  percentOff: number | null;
+  amountOff: number | null;
+  scope: CouponScope;
+  duration: CouponDuration;
+  durationMonths: number | null;
+  planIds: string[];
+  startsAt: string | null;
+  endsAt: string | null;
+  maxRedemptions: number | null;
+  oncePerViewer: boolean;
+  newCustomersOnly: boolean;
+  isActive: boolean;
+}
+
+/** One checkout that was completed with a code. */
+export interface CouponRedemption {
+  id: string;
+  /** The id is null once the account is deleted. */
+  viewer: { id: string | null; email: string };
+  kind: 'SUBSCRIPTION' | 'RENTAL' | 'PURCHASE';
+  /** The plan or the title, as it was called then. */
+  subject: string;
+  listAmount: number;
+  discountAmount: number;
+  currency: string;
+  createdAt: string;
+}

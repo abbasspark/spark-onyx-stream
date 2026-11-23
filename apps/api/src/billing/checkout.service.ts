@@ -13,10 +13,14 @@ import { visibleTitle } from '../catalog/playable.js';
 import { AppConfig } from '../config/app-config.js';
 import { PurchasesService } from '../purchases/purchases.service.js';
 import type { StartPurchaseInput } from '../purchases/purchases.schemas.js';
-import { StripeClient, StripeError } from '../stripe/stripe.client.js';
+import { type CheckoutDiscount, StripeClient, StripeError } from '../stripe/stripe.client.js';
 import { StripeSyncService } from '../stripe/stripe-sync.service.js';
 import { idOf } from '../stripe/stripe.types.js';
 import type { StartCheckoutInput } from './billing.schemas.js';
+import type { CheckCouponInput } from './coupons.schemas.js';
+import { type AcceptedCoupon, CouponsService, type CouponTarget } from './coupons.service.js';
+import type { CouponPlansQuote, CouponPrice, CouponQuote } from './coupons.views.js';
+import { describeDuration, stripeCouponId } from './coupon-rules.js';
 import type { StripeAccountView } from './billing.views.js';
 import { runningAt } from './entitlement.js';
 
@@ -34,6 +38,7 @@ export class CheckoutService {
     @Inject(StripeClient) private readonly stripe: StripeClient,
     @Inject(StripeSyncService) private readonly sync: StripeSyncService,
     @Inject(PurchasesService) private readonly purchases: PurchasesService,
+    @Inject(CouponsService) private readonly coupons: CouponsService,
   ) {}
 
   /**
@@ -60,6 +65,12 @@ export class CheckoutService {
       );
     }
     await this.purchases.assertNotOwned(viewer.id, title.id, input.kind);
+    const accepted = input.code
+      ? await this.coupons.accept(viewer.id, input.code, {
+          kind: input.kind === 'RENT' ? 'RENTAL' : 'PURCHASE',
+          amount,
+        })
+      : null;
 
     const page = `${this.config.siteUrl}/title/${title.slug}`;
     const hours = this.config.rental.watchHours;
@@ -86,6 +97,7 @@ export class CheckoutService {
         amount,
         successUrl: `${page}?paid={CHECKOUT_SESSION_ID}`,
         cancelUrl: page,
+        discount: accepted ? await this.discountOf(accepted, false) : undefined,
       });
       if (!session.url) {
         throw new StripeError('Stripe returned no address for the payment page', 502, null, null);
@@ -132,6 +144,14 @@ export class CheckoutService {
       });
     }
 
+    const accepted = input.code
+      ? await this.coupons.accept(viewer.id, input.code, {
+          kind: 'SUBSCRIPTION',
+          planId: plan.id,
+          amount,
+        })
+      : null;
+
     const siteUrl = this.config.siteUrl;
     return this.withStripe('open the payment page', async () => {
       const [customerId, productId] = await Promise.all([
@@ -151,6 +171,7 @@ export class CheckoutService {
         // Stripe replaces the placeholder with the id of the payment.
         successUrl: `${siteUrl}/plans/thanks?session={CHECKOUT_SESSION_ID}`,
         cancelUrl: `${siteUrl}/plans`,
+        discount: accepted ? await this.discountOf(accepted, true) : undefined,
       });
       if (!session.url) {
         throw new StripeError('Stripe returned no address for the payment page', 502, null, null);
@@ -178,6 +199,7 @@ export class CheckoutService {
       if (!session || session.client_reference_id !== viewer.id) {
         throw new NotFoundException('This payment was not found');
       }
+      await this.coupons.recordRedemption(session);
       if (session.mode === 'payment') {
         // A title was rented or bought.
         await this.sync.recordPurchase(session);
@@ -188,6 +210,50 @@ export class CheckoutService {
         await this.sync.syncById(subscriptionId);
       }
     });
+  }
+
+  /**
+   * Says what a code does to the price of a plan or of a title, before the
+   * viewer goes to pay. Nothing is used up by asking.
+   *
+   * @throws NotFoundException when the plan, the title or the code is not there.
+   * @throws BadRequestException when the plan or the title is not sold this way.
+   * @throws ConflictException when the code is not for this viewer or this purchase.
+   */
+  async quote(viewer: Viewer, input: CheckCouponInput): Promise<CouponQuote | CouponPlansQuote> {
+    let target: CouponTarget;
+    if ('plans' in input) {
+      return this.quotePlans(viewer, input.code);
+    }
+    if ('planId' in input) {
+      const plan = await this.prisma.plan.findUnique({ where: { id: input.planId } });
+      const amount = input.interval === 'MONTH' ? plan?.monthlyAmount : plan?.yearlyAmount;
+      if (!plan || !plan.isOffered) {
+        throw new NotFoundException('This plan is not on offer');
+      }
+      if (amount === null || amount === undefined) {
+        throw new BadRequestException(
+          `This plan is not sold per ${input.interval === 'MONTH' ? 'month' : 'year'}`,
+        );
+      }
+      target = { kind: 'SUBSCRIPTION', planId: plan.id, amount };
+    } else {
+      const title = await this.prisma.title.findFirst({
+        where: { id: input.titleId, ...visibleTitle() },
+        select: { access: true, rentAmount: true, buyAmount: true },
+      });
+      if (!title) {
+        throw new NotFoundException('Title not found');
+      }
+      const amount = input.kind === 'RENT' ? title.rentAmount : title.buyAmount;
+      if (title.access !== 'PAID' || amount === null) {
+        throw new BadRequestException(
+          input.kind === 'RENT' ? 'This title is not for rent' : 'This title is not for sale',
+        );
+      }
+      target = { kind: input.kind === 'RENT' ? 'RENTAL' : 'PURCHASE', amount };
+    }
+    return (await this.coupons.accept(viewer.id, input.code, target)).quote;
   }
 
   /**
@@ -243,6 +309,90 @@ export class CheckoutService {
       },
       true,
     );
+  }
+
+  /**
+   * What a code does to every plan on offer.
+   *
+   * @throws ConflictException when it fits none of them.
+   */
+  private async quotePlans(viewer: Viewer, code: string): Promise<CouponPlansQuote> {
+    const [coupon, plans] = await Promise.all([
+      this.coupons.usable(viewer.id, code),
+      this.prisma.plan.findMany({ where: { isOffered: true }, orderBy: { position: 'asc' } }),
+    ]);
+    const price = (planId: string, amount: number | null): CouponPrice | null => {
+      if (amount === null) {
+        return null;
+      }
+      try {
+        const { quote } = this.coupons.applyTo(coupon, { kind: 'SUBSCRIPTION', planId, amount });
+        return {
+          listAmount: quote.listAmount,
+          discountAmount: quote.discountAmount,
+          finalAmount: quote.finalAmount,
+        };
+      } catch (error) {
+        // Not for this plan, or too much for this price: the plan keeps its price.
+        if (error instanceof ConflictException) {
+          return null;
+        }
+        throw error;
+      }
+    };
+    const quoted = plans.map((plan) => ({
+      planId: plan.id,
+      month: price(plan.id, plan.monthlyAmount),
+      year: price(plan.id, plan.yearlyAmount),
+    }));
+    if (!quoted.some((plan) => plan.month || plan.year)) {
+      throw new ConflictException({
+        statusCode: 409,
+        error: 'Conflict',
+        code: 'coupon_not_for_this',
+        message:
+          coupon.scope === 'TITLES'
+            ? 'This code is for renting or buying a title, not for subscriptions.'
+            : 'This code is not for any of these plans.',
+      });
+    }
+    return {
+      code: coupon.code,
+      kind: coupon.kind,
+      percentOff: coupon.percentOff,
+      amountOff: coupon.amountOff,
+      currency: this.config.billingCurrency,
+      duration: coupon.duration,
+      durationMonths: coupon.durationMonths,
+      lasts: describeDuration(coupon),
+      plans: quoted,
+    };
+  }
+
+  /** The accepted code as the checkout carries it: the coupon at Stripe, and what to write down. */
+  private async discountOf(
+    { coupon, quote }: AcceptedCoupon,
+    recurring: boolean,
+  ): Promise<CheckoutDiscount> {
+    const currency = this.config.billingCurrency;
+    const duration = recurring ? coupon.duration : 'ONCE';
+    return {
+      stripeCouponId: await this.stripe.ensureCoupon({
+        id: stripeCouponId(coupon, currency, recurring),
+        name: coupon.code,
+        percentOff: coupon.kind === 'PERCENT' ? coupon.percentOff : null,
+        amountOff: coupon.kind === 'AMOUNT' ? coupon.amountOff : null,
+        currency,
+        duration: duration.toLowerCase() as 'once' | 'repeating' | 'forever',
+        durationMonths: duration === 'REPEATING' ? coupon.durationMonths : null,
+      }),
+      metadata: {
+        couponId: coupon.id,
+        couponCode: coupon.code,
+        couponListAmount: String(quote.listAmount),
+        couponDiscount: String(quote.discountAmount),
+      },
+    };
   }
 
   /** The viewer as a customer at Stripe, made on the first checkout. */

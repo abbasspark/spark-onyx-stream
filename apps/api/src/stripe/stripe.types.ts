@@ -32,7 +32,7 @@ export interface StripeCheckoutSession {
   /** What was paid, tax included, in the smallest unit of the currency. */
   amount_total?: number | null;
   currency?: string | null;
-  total_details?: { amount_tax?: number | null } | null;
+  total_details?: { amount_tax?: number | null; amount_discount?: number | null } | null;
   metadata?: Record<string, string> | null;
   created?: number;
 }

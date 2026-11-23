@@ -158,8 +158,9 @@ export const viewerApi = {
   /** The viewer's own payments, newest first. */
   payments: () => call<{ items: OwnPayment[] }>('GET', '/payments'),
   /** Opens the payment page for a plan. Answers with the address to go to. */
-  checkout: (planId: string, interval: 'MONTH' | 'YEAR') =>
-    call<{ url: string }>('POST', '/checkout', { planId, interval }),
+  /** @param code A coupon code that was checked for this plan. */
+  checkout: (planId: string, interval: 'MONTH' | 'YEAR', code?: string) =>
+    call<{ url: string }>('POST', '/checkout', { planId, interval, code }),
   /** Tells the site that the viewer is back from paying. */
   confirmCheckout: (sessionId: string) =>
     call<{
@@ -171,8 +172,8 @@ export const viewerApi = {
       sessionId,
     }),
   /** Opens the payment page for renting or buying a title. Answers with the address to go to. */
-  purchase: (titleId: string, kind: 'RENT' | 'BUY') =>
-    call<{ url: string }>('POST', '/purchases/checkout', { titleId, kind }),
+  purchase: (titleId: string, kind: 'RENT' | 'BUY', code?: string) =>
+    call<{ url: string }>('POST', '/purchases/checkout', { titleId, kind, code }),
   /** The viewer's rented and bought titles, newest first. */
   purchases: () => call<{ items: OwnPurchase[] }>('GET', '/purchases'),
   /** Opens the page for changing the card, reading invoices and cancelling. */

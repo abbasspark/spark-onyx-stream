@@ -1,10 +1,16 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 import { z } from 'zod';
+import { couponCode } from '../billing/coupons.schemas.js';
 
 const kind = z.enum(['RENT', 'BUY']);
 
 /** What a viewer chooses on the page of a title. */
-export const startPurchaseSchema = z.object({ titleId: z.uuid(), kind });
+export const startPurchaseSchema = z.object({
+  titleId: z.uuid(),
+  kind,
+  /** A coupon code of this site. */
+  code: couponCode.optional(),
+});
 export type StartPurchaseInput = z.infer<typeof startPurchaseSchema>;
 
 /** A title an admin gives to a viewer by hand. */

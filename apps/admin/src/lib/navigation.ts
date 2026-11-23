@@ -31,6 +31,7 @@ import {
   SlidersHorizontal,
   Stethoscope,
   Shapes,
+  Tag,
   Tags,
   Tv,
   Users,
@@ -216,6 +217,13 @@ export const NAVIGATION: NavGroup[] = [
         icon: Boxes,
         permission: 'catalog:read',
         keywords: 'bouquets bundles groups tiers what a plan opens includes kids sports',
+      },
+      {
+        to: '/coupons',
+        label: 'Coupons',
+        icon: Tag,
+        permission: 'billing:read',
+        keywords: 'codes discounts vouchers promotions promo offers percent off campaign',
       },
       {
         to: '/revenue',

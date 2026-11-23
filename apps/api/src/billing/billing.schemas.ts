@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 import { z } from 'zod';
+import { couponCode } from './coupons.schemas.js';
 
 /** The highest price of a plan, in the smallest unit of the currency. */
 const MAX_AMOUNT = 100_000_000;
@@ -112,6 +113,8 @@ export type ChangeSubscriptionInput = z.infer<typeof changeSubscriptionSchema>;
 export const startCheckoutSchema = z.object({
   planId: z.uuid(),
   interval: z.enum(['MONTH', 'YEAR']),
+  /** A coupon code of this site. */
+  code: couponCode.optional(),
 });
 export type StartCheckoutInput = z.infer<typeof startCheckoutSchema>;
 
