@@ -183,6 +183,7 @@ describe.skipIf(!TEST_DATABASE_URL)('Metadata import (e2e)', () => {
       cast: 2,
       crew: 2,
       leads: ['Keanu Reeves', 'Carrie-Anne Moss'],
+      collection: 'The Matrix Collection',
     });
     expect(tmdb.requests[0]).toBe(
       'GET /3/movie/603?language=en-US&append_to_response=release_dates%2Cimages%2Ccredits%2Ckeywords%2Cexternal_ids&include_image_language=en%2Cnull',
@@ -253,6 +254,7 @@ describe.skipIf(!TEST_DATABASE_URL)('Metadata import (e2e)', () => {
         ]),
         categoriesCreated: ['Action', 'Science Fiction'],
         genresCreated: ['Action', 'Science Fiction'],
+        collection: 'The Matrix Collection',
         peopleCreated: 3,
         credits: 4,
         seasonsCreated: 0,
@@ -362,6 +364,7 @@ describe.skipIf(!TEST_DATABASE_URL)('Metadata import (e2e)', () => {
       expect(title.credits[1].person.portrait).toBeNull();
       expect(response.body.report).toMatchObject({
         genresCreated: ['Action', 'Science Fiction'],
+        collection: 'The Matrix Collection',
         peopleCreated: 3,
         credits: 4,
       });
@@ -376,6 +379,7 @@ describe.skipIf(!TEST_DATABASE_URL)('Metadata import (e2e)', () => {
       expect(series.body.report).toMatchObject({
         peopleCreated: 2,
         genresCreated: ['Documentary'],
+        collection: null,
       });
       expect(pictureRequests().filter((line) => line.includes('keanu'))).toHaveLength(before);
       const keanu = await testApp.prisma.person.findFirstOrThrow({
@@ -808,6 +812,38 @@ describe.skipIf(!TEST_DATABASE_URL)('Metadata import (e2e)', () => {
   });
 
   describe('permissions', () => {
+    it('puts a movie into the series of films it is part of, once', async () => {
+      const first = await importNew({ id: 'movie:603' }).expect(201);
+      expect(first.body.title.collections).toMatchObject([{ name: 'The Matrix Collection' }]);
+      const collections = await http().get('/v1/collections').set(admin()).expect(200);
+      expect(collections.body).toMatchObject([
+        { name: 'The Matrix Collection', slug: 'the-matrix-collection', metadataSource: 'tmdb' },
+      ]);
+
+      // A copy of the film joins the same collection and makes no second one.
+      const copy = await importNew({ id: 'movie:603', allowDuplicate: true }).expect(201);
+      expect(copy.body.report.collection).toBe('The Matrix Collection');
+      expect(await testApp.prisma.collection.count()).toBe(1);
+      const detail = await http()
+        .get(`/v1/collections/${collections.body[0].id}`)
+        .set(admin())
+        .expect(200);
+      expect(detail.body.titles).toHaveLength(2);
+
+      // Updating a title that is in it already changes nothing there.
+      const again = await apply(first.body.title.id, { id: 'movie:603' }).expect(201);
+      expect(again.body.report.collection).toBeNull();
+
+      // And the part can be left out.
+      await testApp.prisma.collection.deleteMany();
+      const without = await importNew({
+        id: 'movie:603',
+        allowDuplicate: true,
+        collection: false,
+      }).expect(201);
+      expect(without.body.title.collections).toEqual([]);
+    });
+
     it('lets only people who edit the catalog search and import', async () => {
       await http().get('/v1/metadata/search?type=MOVIE&q=matrix').expect(401);
       await http().post('/v1/metadata/import').send({ id: 'movie:603' }).expect(401);

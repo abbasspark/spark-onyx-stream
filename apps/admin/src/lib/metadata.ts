@@ -89,6 +89,9 @@ export function describeReport(report: ImportReport): string {
   if (report.episodesUpdated > 0) {
     sentences.push(`Updated ${count(report.episodesUpdated, 'episode')}.`);
   }
+  if (report.collection) {
+    sentences.push(`Put into the collection ${report.collection}.`);
+  }
   if (report.peopleCreated > 0) {
     sentences.push(`${count(report.peopleCreated, 'person', 'people')} new to the catalog.`);
   }

@@ -293,8 +293,9 @@ model Asset {
   jobs           Job[]
 
   // Catalog entries that play this asset. The asset itself does not depend on them.
-  titles        Title[]   @relation("TitleMainAsset")
-  trailerTitles Title[]   @relation("TitleTrailerAsset")
+  titles        Title[]      @relation("TitleMainAsset")
+  trailerTitles Title[]      @relation("TitleTrailerAsset")
+  extras        TitleExtra[]
   episodes      Episode[]
 
   @@index([status])
@@ -561,12 +562,14 @@ model Image {
   createdById   String?     @db.Uuid
   createdAt     DateTime    @default(now())
 
-  posterOf       Title[]   @relation("TitlePoster")
-  backdropOf     Title[]   @relation("TitleBackdrop")
-  logoOf         Title[]   @relation("TitleLogo")
-  stillOf        Episode[]
-  seasonPosterOf Season[]
-  portraitOf     Person[]
+  posterOf             Title[]      @relation("TitlePoster")
+  backdropOf           Title[]      @relation("TitleBackdrop")
+  logoOf               Title[]      @relation("TitleLogo")
+  stillOf              Episode[]
+  seasonPosterOf       Season[]
+  portraitOf           Person[]
+  collectionPosterOf   Collection[] @relation("CollectionPoster")
+  collectionBackdropOf Collection[] @relation("CollectionBackdrop")
 
   @@map("images")
 }
@@ -619,6 +622,11 @@ model Title {
   status      PublishStatus @default(DRAFT)
   publishedAt DateTime?
 
+  /// A published title is shown to viewers from this moment on. Empty: at once.
+  availableFrom  DateTime?
+  /// And until this moment. Empty: without an end.
+  availableUntil DateTime?
+
   /// The film itself. Only used for movies.
   assetId        String? @db.Uuid
   asset          Asset?  @relation("TitleMainAsset", fields: [assetId], references: [id], onDelete: SetNull)
@@ -644,17 +652,21 @@ model Title {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  categories TitleCategory[]
-  genres     TitleGenre[]
-  credits    Credit[]
-  packages   TitlePackage[]
-  purchases  Purchase[]
-  payments   Payment[]
-  seasons    Season[]
-  watching   WatchProgress[]
+  categories  TitleCategory[]
+  genres      TitleGenre[]
+  credits     Credit[]
+  extras      TitleExtra[]
+  collections CollectionTitle[]
+  packages    TitlePackage[]
+  purchases   Purchase[]
+  payments    Payment[]
+  seasons     Season[]
+  watching    WatchProgress[]
 
   @@index([type, status])
   @@index([type, releaseDate])
+  @@index([availableFrom])
+  @@index([availableUntil])
   @@index([metadataSource, metadataId])
   @@index([status, publishedAt])
   @@index([createdAt])
@@ -687,6 +699,80 @@ model TitleCategory {
   @@id([titleId, categoryId])
   @@index([categoryId])
   @@map("title_categories")
+}
+
+enum ExtraKind {
+  TRAILER
+  TEASER
+  CLIP
+  FEATURETTE
+  BEHIND_THE_SCENES
+  INTERVIEW
+  BLOOPERS
+}
+
+/// A video that goes with a title beside the film itself: a second trailer, a
+/// clip, a look behind the scenes. Extras are free to watch, like the trailer.
+model TitleExtra {
+  id        String    @id @default(uuid(7)) @db.Uuid
+  titleId   String    @db.Uuid
+  title     Title     @relation(fields: [titleId], references: [id], onDelete: Cascade)
+  kind      ExtraKind @default(TRAILER)
+  name      String
+  assetId   String    @db.Uuid
+  asset     Asset     @relation(fields: [assetId], references: [id], onDelete: Cascade)
+  /// Order among the extras of the title, from 0.
+  position  Int       @default(0)
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  @@unique([titleId, assetId])
+  @@index([titleId, position])
+  @@map("title_extras")
+}
+
+/// Titles that belong together in an order: the films of a franchise, or a
+/// selection an admin puts together. A title can be in several collections.
+model Collection {
+  id       String  @id @default(uuid(7)) @db.Uuid
+  slug     String  @unique
+  name     String
+  synopsis String  @default("")
+  /// A hidden collection is kept in the panel and not offered to viewers.
+  visible  Boolean @default(true)
+  /// Order among the collections, from 0.
+  position Int     @default(0)
+
+  posterId   String? @db.Uuid
+  poster     Image?  @relation("CollectionPoster", fields: [posterId], references: [id], onDelete: SetNull)
+  backdropId String? @db.Uuid
+  backdrop   Image?  @relation("CollectionBackdrop", fields: [backdropId], references: [id], onDelete: SetNull)
+
+  /// Where the collection was imported from, and its id there.
+  metadataSource String?
+  metadataId     String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  titles CollectionTitle[]
+
+  @@unique([metadataSource, metadataId])
+  @@index([position])
+  @@map("collections")
+}
+
+model CollectionTitle {
+  collectionId String     @db.Uuid
+  collection   Collection @relation(fields: [collectionId], references: [id], onDelete: Cascade)
+  titleId      String     @db.Uuid
+  title        Title      @relation(fields: [titleId], references: [id], onDelete: Cascade)
+  /// Order inside the collection, from 0.
+  position     Int        @default(0)
+
+  @@id([collectionId, titleId])
+  @@index([titleId])
+  @@map("collection_titles")
 }
 
 /// What kind of story a title is: drama, comedy, documentary. Genres come with

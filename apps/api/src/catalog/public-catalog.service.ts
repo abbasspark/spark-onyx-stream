@@ -16,10 +16,18 @@ import { AppConfig } from '../config/app-config.js';
 import { type PlaybackInfo, PlaybackService } from '../playback/playback.service.js';
 import { opensTitle } from '../billing/entitlement.js';
 import { PurchasesService } from '../purchases/purchases.service.js';
-import { isPlayable, VISIBLE_EPISODE, VISIBLE_TITLE } from './playable.js';
+import {
+  availableAt,
+  isPlayable,
+  PLAYABLE_ASSET,
+  VISIBLE_EPISODE,
+  visibleTitle,
+} from './playable.js';
 import type { ListPublicTitlesInput } from './public-catalog.schemas.js';
 import {
   type PublicCategory,
+  type PublicCollection,
+  type PublicCollectionDetail,
   type PublicHome,
   type PublicRow,
   type PublicTitleCard,
@@ -74,7 +82,7 @@ const ORDER_BY: Record<ListPublicTitlesInput['sort'], Prisma.TitleOrderByWithRel
 
 /**
  * The catalog as viewers see it: only published titles that have something to
- * play. Every query here goes through the VISIBLE_TITLE filter, so a draft
+ * play. Every query here goes through the visibleTitle filter, so a draft
  * can never leak, whatever is asked for.
  */
 @Injectable()
@@ -90,7 +98,7 @@ export class PublicCatalogService {
   async list(input: ListPublicTitlesInput): Promise<Page<PublicTitleCard>> {
     const where: Prisma.TitleWhereInput = {
       AND: [
-        VISIBLE_TITLE,
+        visibleTitle(),
         {
           type: input.type,
           isFeatured: input.featured ? true : undefined,
@@ -128,10 +136,19 @@ export class PublicCatalogService {
   /** @throws NotFoundException when no visible title has this slug. */
   async get(slug: string): Promise<PublicTitleDetail> {
     const title = await this.prisma.title.findFirst({
-      where: { slug, ...VISIBLE_TITLE },
+      where: { slug, ...visibleTitle() },
       include: {
         ...CARD_INCLUDE,
         trailerAsset: { select: { status: true, manifestPath: true } },
+        extras: {
+          where: { asset: PLAYABLE_ASSET },
+          orderBy: [{ position: 'asc' }, { id: 'asc' }],
+          select: { id: true, kind: true, name: true, asset: { select: { durationMs: true } } },
+        },
+        collections: {
+          where: { collection: { visible: true } },
+          select: { collection: { select: { slug: true, name: true, position: true } } },
+        },
       },
     });
     if (!title) {
@@ -159,6 +176,16 @@ export class PublicCatalogService {
       synopsis: title.synopsis,
       originalLanguage: title.originalLanguage,
       hasTrailer: isPlayable(title.trailerAsset),
+      extras: title.extras.map((extra) => ({
+        id: extra.id,
+        kind: extra.kind,
+        name: extra.name,
+        durationMs: extra.asset.durationMs,
+      })),
+      collections: title.collections
+        .map(({ collection }) => collection)
+        .sort((a, b) => a.position - b.position || a.name.localeCompare(b.name))
+        .map(({ slug: collectionSlug, name }) => ({ slug: collectionSlug, name })),
       metadataSource: title.metadataSource,
       seasons: seasons.map((season) => ({
         number: season.number,
@@ -179,9 +206,9 @@ export class PublicCatalogService {
   /** Categories that have at least one visible title, in their order. */
   async categories(): Promise<PublicCategory[]> {
     const categories = await this.prisma.category.findMany({
-      where: { titles: { some: { title: VISIBLE_TITLE } } },
+      where: { titles: { some: { title: visibleTitle() } } },
       orderBy: [{ sortOrder: 'asc' }, { name: 'asc' }],
-      include: { _count: { select: { titles: { where: { title: VISIBLE_TITLE } } } } },
+      include: { _count: { select: { titles: { where: { title: visibleTitle() } } } } },
     });
     return categories.map((category) => ({
       slug: category.slug,
@@ -191,11 +218,60 @@ export class PublicCatalogService {
     }));
   }
 
+  /** Collections shown to viewers that hold at least one visible title, in their order. */
+  async collections(): Promise<PublicCollection[]> {
+    const collections = await this.prisma.collection.findMany({
+      where: { visible: true, titles: { some: { title: visibleTitle() } } },
+      orderBy: [{ position: 'asc' }, { name: 'asc' }],
+      include: {
+        poster: true,
+        backdrop: true,
+        _count: { select: { titles: { where: { title: visibleTitle() } } } },
+      },
+    });
+    return collections.map((collection) => ({
+      slug: collection.slug,
+      name: collection.name,
+      synopsis: collection.synopsis,
+      poster: toPublicImage(collection.poster, this.config.mediaBaseUrl),
+      backdrop: toPublicImage(collection.backdrop, this.config.mediaBaseUrl),
+      titleCount: collection._count.titles,
+    }));
+  }
+
+  /** @throws NotFoundException when no collection shown to viewers has this slug. */
+  async collection(slug: string): Promise<PublicCollectionDetail> {
+    const collection = await this.prisma.collection.findFirst({
+      where: { slug, visible: true },
+      include: {
+        poster: true,
+        backdrop: true,
+        titles: {
+          where: { title: visibleTitle() },
+          orderBy: [{ position: 'asc' }, { titleId: 'asc' }],
+          select: { title: { include: CARD_INCLUDE } },
+        },
+      },
+    });
+    if (!collection) {
+      throw new NotFoundException('Collection not found');
+    }
+    return {
+      slug: collection.slug,
+      name: collection.name,
+      synopsis: collection.synopsis,
+      poster: toPublicImage(collection.poster, this.config.mediaBaseUrl),
+      backdrop: toPublicImage(collection.backdrop, this.config.mediaBaseUrl),
+      titleCount: collection.titles.length,
+      titles: collection.titles.map(({ title }) => toPublicCard(title, this.config.mediaBaseUrl)),
+    };
+  }
+
   /** The rows of the home page: featured titles, the newest, then one row per category. */
   async home(): Promise<PublicHome> {
     const row = (where: Prisma.TitleWhereInput) =>
       this.prisma.title.findMany({
-        where: { AND: [VISIBLE_TITLE, where] },
+        where: { AND: [visibleTitle(), where] },
         orderBy: NEWEST_FIRST,
         include: CARD_INCLUDE,
         take: ROW_SIZE,
@@ -234,7 +310,7 @@ export class PublicCatalogService {
   async playTitle(slug: string, watcher: Watcher): Promise<PlaybackInfo> {
     this.assertOpen();
     const title = await this.prisma.title.findFirst({
-      where: { slug, ...VISIBLE_TITLE },
+      where: { slug, ...visibleTitle() },
       select: { id: true, type: true, assetId: true, ...GATE_SELECT },
     });
     if (!title) {
@@ -252,7 +328,7 @@ export class PublicCatalogService {
     // A trailer is an invitation, also to a paid title.
     await this.assertMayPlay(watcher, null);
     const title = await this.prisma.title.findFirst({
-      where: { slug, ...VISIBLE_TITLE },
+      where: { slug, ...visibleTitle() },
       select: { trailerAsset: { select: { id: true, status: true, manifestPath: true } } },
     });
     if (!title?.trailerAsset || !isPlayable(title.trailerAsset)) {
@@ -261,11 +337,29 @@ export class PublicCatalogService {
     return this.playback.createPlayback(title.trailerAsset.id, 'viewer');
   }
 
+  /** Signed addresses for playing one of the extras of a title. */
+  async playExtra(slug: string, extraId: string, watcher: Watcher): Promise<PlaybackInfo> {
+    // Extras are invitations like the trailer, also to a paid title.
+    await this.assertMayPlay(watcher, null);
+    const extra = await this.prisma.titleExtra.findFirst({
+      where: { id: extraId, asset: PLAYABLE_ASSET, title: { slug, ...visibleTitle() } },
+      select: { assetId: true },
+    });
+    if (!extra) {
+      throw new NotFoundException('This title has no such video');
+    }
+    return this.playback.createPlayback(extra.assetId, 'viewer');
+  }
+
   /** Signed addresses for playing an episode of a visible series. */
   async playEpisode(episodeId: string, watcher: Watcher): Promise<PlaybackInfo> {
     this.assertOpen();
     const episode = await this.prisma.episode.findFirst({
-      where: { id: episodeId, ...VISIBLE_EPISODE, season: { title: { status: 'PUBLISHED' } } },
+      where: {
+        id: episodeId,
+        ...VISIBLE_EPISODE,
+        season: { title: { status: 'PUBLISHED', AND: availableAt() } },
+      },
       select: {
         assetId: true,
         season: { select: { title: { select: { id: true, ...GATE_SELECT } } } },

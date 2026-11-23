@@ -35,6 +35,7 @@ export interface FakeTmdb {
 
 const MATRIX = {
   id: 603,
+  belongs_to_collection: { id: 2344, name: 'The Matrix Collection', poster_path: null },
   title: 'The Matrix',
   original_title: 'The Matrix',
   tagline: 'Free your mind.',

@@ -66,6 +66,13 @@ export interface TmdbDetails extends TmdbSearchItem {
   /** Series: age ratings per country. */
   content_ratings?: { results?: { iso_3166_1?: string; rating?: string }[] };
   seasons?: TmdbSeasonSummary[];
+  /** Movies: the series of films it is part of. */
+  belongs_to_collection?: {
+    id?: number;
+    name?: string;
+    poster_path?: string | null;
+    backdrop_path?: string | null;
+  } | null;
   /** Movies: minutes. */
   runtime?: number | null;
   /** Series: the usual lengths of an episode, in minutes. */

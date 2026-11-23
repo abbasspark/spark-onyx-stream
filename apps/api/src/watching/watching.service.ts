@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 import { Inject, Injectable, NotFoundException } from '@nestjs/common';
 import { type Prisma, PrismaClient } from '@onyx/database';
-import { VISIBLE_EPISODE, VISIBLE_TITLE } from '../catalog/playable.js';
+import { VISIBLE_EPISODE, visibleTitle } from '../catalog/playable.js';
 import { toPublicImage } from '../catalog/public-catalog.views.js';
 import { AppConfig } from '../config/app-config.js';
 import { clampWatchedAt, judgePosition } from './watch-rules.js';
@@ -14,11 +14,12 @@ export const WATCHING_LIMIT = 30;
 export const ADMIN_WATCHING_LIMIT = 25;
 
 /** Rows a viewer can go on with: begun, and still there to be watched. */
-const RESUMABLE = {
-  positionSeconds: { gt: 0 },
-  title: VISIBLE_TITLE,
-  OR: [{ episodeId: null }, { episode: VISIBLE_EPISODE }],
-} satisfies Prisma.WatchProgressWhereInput;
+const resumable = () =>
+  ({
+    positionSeconds: { gt: 0 },
+    title: visibleTitle(),
+    OR: [{ episodeId: null }, { episode: VISIBLE_EPISODE }],
+  }) satisfies Prisma.WatchProgressWhereInput;
 
 /** Whose history: a profile, and the account it belongs to. */
 export interface WatchScope {
@@ -46,7 +47,7 @@ export class WatchingService {
   /** What the profile began and did not finish, the latest first. */
   async list({ profileId }: WatchScope): Promise<WatchingItem[]> {
     const rows = await this.prisma.watchProgress.findMany({
-      where: { profileId, ...RESUMABLE },
+      where: { profileId, ...resumable() },
       orderBy: [{ watchedAt: 'desc' }, { id: 'desc' }],
       take: WATCHING_LIMIT,
       include: {
@@ -80,7 +81,7 @@ export class WatchingService {
    */
   async forTitle({ profileId }: WatchScope, slug: string): Promise<TitleWatchState[]> {
     const title = await this.prisma.title.findFirst({
-      where: { slug, ...VISIBLE_TITLE },
+      where: { slug, ...visibleTitle() },
       select: { id: true },
     });
     if (!title) {
@@ -253,7 +254,7 @@ export class WatchingService {
 
     const [titles, episodes] = await Promise.all([
       this.prisma.title.findMany({
-        where: { slug: { in: slugs }, ...VISIBLE_TITLE },
+        where: { slug: { in: slugs }, ...visibleTitle() },
         select: { id: true, slug: true, type: true },
       }),
       episodeIds.length > 0

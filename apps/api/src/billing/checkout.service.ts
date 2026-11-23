@@ -9,7 +9,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { PrismaClient, type Viewer } from '@onyx/database';
-import { VISIBLE_TITLE } from '../catalog/playable.js';
+import { visibleTitle } from '../catalog/playable.js';
 import { AppConfig } from '../config/app-config.js';
 import { PurchasesService } from '../purchases/purchases.service.js';
 import type { StartPurchaseInput } from '../purchases/purchases.schemas.js';
@@ -47,7 +47,7 @@ export class CheckoutService {
    */
   async startPurchase(viewer: Viewer, input: StartPurchaseInput): Promise<{ url: string }> {
     const title = await this.prisma.title.findFirst({
-      where: { id: input.titleId, ...VISIBLE_TITLE },
+      where: { id: input.titleId, ...visibleTitle() },
       select: { id: true, slug: true, name: true, access: true, rentAmount: true, buyAmount: true },
     });
     if (!title) {

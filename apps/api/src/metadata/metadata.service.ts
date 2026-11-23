@@ -22,6 +22,7 @@ import type {
   SearchMetadataInput,
 } from './metadata.schemas.js';
 import {
+  type ImportedCollection,
   type ImportedCredit,
   type ImportedFacts,
   type ImportedText,
@@ -77,6 +78,7 @@ function emptyReport(): ImportReport {
     fields: [],
     categoriesCreated: [],
     genresCreated: [],
+    collection: null,
     peopleCreated: 0,
     credits: 0,
     seasonsCreated: 0,
@@ -148,7 +150,7 @@ export class MetadataService {
     const language = input.language ?? this.config.metadataLanguage;
     const imported = await this.fetchTitle(input.id, language);
     const categories = await this.categoryIndex();
-    const { artwork, genres, seasons, credits, ...rest } = imported;
+    const { artwork, genres, seasons, credits, collection, ...rest } = imported;
     const cast = credits.filter((credit) => credit.kind === 'CAST');
     return {
       ...rest,
@@ -156,6 +158,7 @@ export class MetadataService {
       cast: cast.length,
       crew: credits.length - cast.length,
       leads: cast.slice(0, 4).map((credit) => credit.name),
+      collection: collection?.name ?? null,
       genres: genres.map((name) => ({
         name,
         categoryId: categories.get(slugify(name)) ?? null,
@@ -302,6 +305,10 @@ export class MetadataService {
       await this.applyCredits(titleId, imported.credits, parts.portraits, overwrite, report);
     }
 
+    if (parts.collection && imported.collection) {
+      await this.applyCollection(titleId, imported.collection, parts.artwork, report);
+    }
+
     if (parts.categories && imported.genres.length > 0) {
       await this.applyGenres(
         titleId,
@@ -316,6 +323,80 @@ export class MetadataService {
       await this.applySeasons(titleId, imported, language, parts, overwrite, report);
     }
     return report;
+  }
+
+  /**
+   * Puts the title into the series of films it belongs to.
+   *
+   * The collection is found again by its id at the source, so the second film
+   * of a series joins the collection the first one made. A title that is in
+   * it already keeps its place.
+   */
+  private async applyCollection(
+    titleId: string,
+    imported: ImportedCollection,
+    withArtwork: boolean,
+    report: ImportReport,
+  ): Promise<void> {
+    const key = { metadataSource: METADATA_SOURCE, metadataId: imported.id };
+    let collection = await this.prisma.collection.findUnique({
+      where: { metadataSource_metadataId: key },
+      select: { id: true, name: true },
+    });
+    if (!collection) {
+      const slug = await uniqueSlug(slugify(imported.name) || 'collection', async (value) =>
+        Boolean(
+          await this.prisma.collection.findUnique({ where: { slug: value }, select: { id: true } }),
+        ),
+      );
+      const last = await this.prisma.collection.aggregate({ _max: { position: true } });
+      const posterId =
+        withArtwork && imported.poster
+          ? await this.fetchPicture('POSTER', imported.poster, report, false)
+          : null;
+      const backdropId =
+        withArtwork && imported.backdrop
+          ? await this.fetchPicture('BACKDROP', imported.backdrop, report, false)
+          : null;
+      try {
+        collection = await this.prisma.collection.create({
+          data: {
+            ...key,
+            name: imported.name,
+            slug,
+            posterId,
+            backdropId,
+            position: (last._max.position ?? -1) + 1,
+          },
+          select: { id: true, name: true },
+        });
+      } catch {
+        // Created by another import at the same moment.
+        collection = await this.prisma.collection.findUnique({
+          where: { metadataSource_metadataId: key },
+          select: { id: true, name: true },
+        });
+        await this.removeUnused([posterId, backdropId].filter((id) => id !== null));
+      }
+    }
+    if (!collection) {
+      return;
+    }
+    const link = { collectionId: collection.id, titleId };
+    const there = await this.prisma.collectionTitle.findUnique({
+      where: { collectionId_titleId: link },
+    });
+    if (there) {
+      return;
+    }
+    const last = await this.prisma.collectionTitle.aggregate({
+      where: { collectionId: collection.id },
+      _max: { position: true },
+    });
+    await this.prisma.collectionTitle.create({
+      data: { ...link, position: (last._max.position ?? -1) + 1 },
+    });
+    report.collection = collection.name;
   }
 
   /** Links the title to its genres, creating the ones that are new. */

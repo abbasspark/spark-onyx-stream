@@ -152,6 +152,8 @@ export class ImagesService {
             stillOf: true,
             seasonPosterOf: true,
             portraitOf: true,
+            collectionPosterOf: true,
+            collectionBackdropOf: true,
           },
         },
       },

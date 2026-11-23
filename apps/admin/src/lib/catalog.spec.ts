@@ -2,7 +2,12 @@
 import { describe, expect, it } from 'vitest';
 import type { TitleDetail } from '@/api/types';
 import {
+  availabilityOf,
+  availabilityProblem,
   changedFields,
+  fromLocalInput,
+  moved,
+  toLocalInput,
   countStates,
   creditsProblem,
   describeContent,
@@ -44,6 +49,10 @@ const title: TitleDetail = {
   seasonCount: 0,
   episodeCount: 0,
   readyEpisodeCount: 0,
+  availableFrom: null,
+  availableUntil: null,
+  extras: [],
+  collections: [],
   releaseDate: null,
   runtimeMinutes: null,
   rating: null,
@@ -321,5 +330,58 @@ describe('credits', () => {
     ] as const;
     expect(creditsProblem(twice)).toContain('twice');
     expect(creditsProblem([twice[0], { ...twice[1], role: 'Writer' }])).toBeNull();
+  });
+});
+
+describe('availability', () => {
+  const now = Date.parse('2026-06-15T12:00:00Z');
+  const at = (hours: number) => new Date(now + hours * 3_600_000).toISOString();
+
+  it('tells where a title stands between its dates', () => {
+    expect(availabilityOf({ availableFrom: null, availableUntil: null }, now)).toBe('always');
+    expect(availabilityOf({ availableFrom: at(2), availableUntil: null }, now)).toBe('scheduled');
+    expect(availabilityOf({ availableFrom: at(-2), availableUntil: null }, now)).toBe('current');
+    expect(availabilityOf({ availableFrom: null, availableUntil: at(5) }, now)).toBe('current');
+    expect(availabilityOf({ availableFrom: at(-9), availableUntil: at(-1) }, now)).toBe('ended');
+    // The end itself is outside, as the server has it.
+    expect(availabilityOf({ availableFrom: null, availableUntil: at(0) }, now)).toBe('ended');
+  });
+
+  it('takes a moment to a date field and back', () => {
+    const iso = '2026-12-24T18:30:00.000Z';
+    expect(fromLocalInput(toLocalInput(iso))).toBe(iso);
+    expect(toLocalInput(null)).toBe('');
+    expect(toLocalInput('soon')).toBe('');
+    expect(fromLocalInput('')).toBeNull();
+  });
+
+  it('wants the end after the start', () => {
+    expect(availabilityProblem('2026-12-24T18:00', '2026-12-24T17:00')).toContain('after');
+    expect(availabilityProblem('2026-12-24T18:00', '2026-12-24T18:00')).toContain('after');
+    expect(availabilityProblem('2026-12-24T18:00', '2026-12-25T18:00')).toBeNull();
+    expect(availabilityProblem('', '2026-12-25T18:00')).toBeNull();
+  });
+
+  it('sends the collections of a title only when they changed', () => {
+    const saved = toForm({
+      ...title,
+      collections: [
+        { id: 'c2', name: 'B' },
+        { id: 'c1', name: 'A' },
+      ],
+    });
+    expect(changedFields(saved, { ...saved, collectionIds: ['c2', 'c1'] })).toEqual({});
+    expect(changedFields(saved, { ...saved, collectionIds: ['c1'] })).toEqual({
+      collectionIds: ['c1'],
+    });
+  });
+});
+
+describe('moved', () => {
+  it('moves an entry one step and leaves the list alone at its ends', () => {
+    expect(moved(['a', 'b', 'c'], 0, 1)).toEqual(['b', 'a', 'c']);
+    expect(moved(['a', 'b', 'c'], 2, -1)).toEqual(['a', 'c', 'b']);
+    expect(moved(['a', 'b', 'c'], 0, -1)).toEqual(['a', 'b', 'c']);
+    expect(moved(['a', 'b', 'c'], 2, 1)).toEqual(['a', 'b', 'c']);
   });
 });

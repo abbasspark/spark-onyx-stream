@@ -6,19 +6,21 @@ import type {
   Credit,
   CreditKind,
   Episode,
+  ExtraKind,
   Genre,
   Image,
   ImageKind,
   Person,
   PublishStatus,
   Season,
+  TitleExtra,
   SeriesStatus,
   Title,
   TitleAccess,
   TitleType,
 } from '@onyx/database';
 
-import { isPlayable } from './playable.js';
+import { isAvailable, isPlayable } from './playable.js';
 
 /** Route under which artwork is served, relative to the API prefix. */
 export const ARTWORK_ROUTE = 'artwork';
@@ -118,6 +120,9 @@ export interface TitleSummary {
   releaseYear: number | null;
   status: PublishStatus;
   publishedAt: Date | null;
+  /** A published title is shown to viewers between these moments. Null leaves that end open. */
+  availableFrom: Date | null;
+  availableUntil: Date | null;
   isFeatured: boolean;
   /** FREE, or PAID when watching needs a subscription. */
   access: TitleAccess;
@@ -259,6 +264,10 @@ export interface TitleDetail extends TitleSummary {
   /** The cast in order, then the crew in order. */
   credits: CreditView[];
   trailerAsset: AssetRef | null;
+  /** More videos around the title, in their order: further trailers, clips, a look behind the scenes. */
+  extras: ExtraView[];
+  /** The collections the title is in, by name. */
+  collections: { id: string; name: string }[];
   /** Where the details were imported from. Null for a title typed by hand. */
   metadata: TitleMetadataRef | null;
   seasons: SeasonView[];
@@ -327,9 +336,66 @@ export type TitleDetailRecord = Title & {
   categories: { category: Category }[];
   genres: { genre: Genre }[];
   credits: CreditRecord[];
+  extras: ExtraRecord[];
+  collections: { collection: { id: string; name: string } }[];
   packages: PackageLink[];
   seasons: SeasonRecord[];
 };
+
+export type ExtraRecord = TitleExtra & { asset: Asset };
+
+export interface ExtraView {
+  id: string;
+  kind: ExtraKind;
+  name: string;
+  position: number;
+  asset: AssetRef | null;
+}
+
+export function toExtraViews(extras: readonly ExtraRecord[]): ExtraView[] {
+  return [...extras]
+    .sort((a, b) => a.position - b.position || a.id.localeCompare(b.id))
+    .map((extra) => ({
+      id: extra.id,
+      kind: extra.kind,
+      name: extra.name,
+      position: extra.position,
+      asset: toAssetRef(extra.asset),
+    }));
+}
+
+/** A collection in a list. */
+export interface CollectionView {
+  id: string;
+  slug: string;
+  name: string;
+  synopsis: string;
+  visible: boolean;
+  position: number;
+  poster: ImageView | null;
+  backdrop: ImageView | null;
+  titleCount: number;
+  /** Posters of its first titles, for a picture of the collection without a poster of its own. */
+  covers: ImageView[];
+  /** Where it was imported from, or null for one made by hand. */
+  metadataSource: string | null;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+/** A title as a collection shows it. */
+export interface CollectionTitleView {
+  id: string;
+  type: TitleType;
+  name: string;
+  releaseYear: number | null;
+  status: PublishStatus;
+  poster: ImageView | null;
+}
+
+export interface CollectionDetail extends CollectionView {
+  titles: CollectionTitleView[];
+}
 
 export function toEpisodeView(episode: EpisodeRecord, mediaBaseUrl: string): EpisodeView {
   return {
@@ -377,6 +443,8 @@ export function toTitleSummary(
     releaseYear: title.releaseYear,
     status: title.status,
     publishedAt: title.publishedAt,
+    availableFrom: title.availableFrom,
+    availableUntil: title.availableUntil,
     isFeatured: title.isFeatured,
     access: title.access,
     rentAmount: title.rentAmount,
@@ -446,9 +514,9 @@ export function buildChecklist(title: TitleDetailRecord): ChecklistItem[] {
   ];
 }
 
-/** Whether viewers can see a title right now. The same rule as the VISIBLE_TITLE filter. */
+/** Whether viewers can see a title right now. The same rule as the visibleTitle filter. */
 export function isTitleVisible(title: TitleDetailRecord): boolean {
-  if (title.status !== 'PUBLISHED') {
+  if (title.status !== 'PUBLISHED' || !isAvailable(title)) {
     return false;
   }
   if (title.type === 'MOVIE') {
@@ -488,6 +556,8 @@ export function toTitleDetail(title: TitleDetailRecord, mediaBaseUrl: string): T
     originalLanguage: title.originalLanguage,
     status: title.status,
     publishedAt: title.publishedAt,
+    availableFrom: title.availableFrom,
+    availableUntil: title.availableUntil,
     isFeatured: title.isFeatured,
     access: title.access,
     rentAmount: title.rentAmount,
@@ -512,6 +582,10 @@ export function toTitleDetail(title: TitleDetailRecord, mediaBaseUrl: string): T
     packages: sortedPackages(title.packages),
     asset: title.type === 'MOVIE' ? toAssetRef(title.asset) : null,
     trailerAsset: toAssetRef(title.trailerAsset),
+    extras: toExtraViews(title.extras),
+    collections: title.collections
+      .map(({ collection }) => ({ id: collection.id, name: collection.name }))
+      .sort((a, b) => a.name.localeCompare(b.name)),
     metadata:
       title.metadataSource && title.metadataId
         ? {
