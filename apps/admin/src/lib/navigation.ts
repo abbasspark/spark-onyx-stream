@@ -2,6 +2,8 @@
 import {
   Activity,
   BarChart3,
+  Clapperboard,
+  MonitorPlay,
   Database,
   DatabaseBackup,
   Film,
@@ -81,13 +83,6 @@ export const NAVIGATION: NavGroup[] = [
         keywords: 'shows titles seasons episodes catalog',
       },
       {
-        to: '/home-page',
-        label: 'Home page',
-        icon: LayoutTemplate,
-        permission: 'catalog:read',
-        keywords: 'website start front rows hero opening sections builder layout carousel',
-      },
-      {
         to: '/collections',
         label: 'Collections',
         icon: Library,
@@ -114,6 +109,32 @@ export const NAVIGATION: NavGroup[] = [
         icon: Tags,
         permission: 'catalog:read',
         keywords: 'shelves groups tags rows',
+      },
+    ],
+  },
+  {
+    label: 'Layout',
+    items: [
+      {
+        to: '/layout/home',
+        label: 'Home page',
+        icon: LayoutTemplate,
+        permission: 'catalog:read',
+        keywords: 'website start front rows hero opening sections builder carousel',
+      },
+      {
+        to: '/layout/movies',
+        label: 'Movies page',
+        icon: Clapperboard,
+        permission: 'catalog:read',
+        keywords: 'website films rows hero opening sections builder',
+      },
+      {
+        to: '/layout/series',
+        label: 'Series page',
+        icon: MonitorPlay,
+        permission: 'catalog:read',
+        keywords: 'website shows rows hero opening sections builder',
       },
     ],
   },

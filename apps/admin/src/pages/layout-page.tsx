@@ -28,9 +28,10 @@ import {
   X,
 } from 'lucide-react';
 import { type DragEvent, type FormEvent, type ReactNode, useEffect, useState } from 'react';
+import { Link, Navigate, useParams } from 'react-router';
 import { toast } from 'sonner';
 import { apiUrl } from '@/api/client';
-import { categoriesApi, collectionsApi, genresApi, homeApi, titlesApi } from '@/api/endpoints';
+import { categoriesApi, collectionsApi, genresApi, layoutApi, titlesApi } from '@/api/endpoints';
 import type {
   HomeLayout,
   HomeSection,
@@ -38,6 +39,7 @@ import type {
   HomeSectionKind,
   HomeSort,
   HomeSource,
+  LayoutPageSlug,
 } from '@/api/types';
 import { useSession } from '@/auth/session';
 import { useConfirm } from '@/components/confirm';
@@ -77,7 +79,9 @@ import {
   MIN_ROW_TITLES,
   moved,
   placedAt,
-  SECTION_PRESETS,
+  isLayoutPage,
+  LAYOUT_PAGES,
+  presetsFor,
   type SectionForm,
   type SectionPreset,
   sectionState,
@@ -104,8 +108,19 @@ type Editing =
   | { mode: 'new'; kind: HomeSectionKind; preset: HomeSectionInput }
   | { mode: 'edit'; section: HomeSection };
 
-/** The home page of the website: its opening and its rows, arranged by hand or left to itself. */
-export function HomePageBuilder() {
+/** Reads the page from the address, and sends unknown ones to the home page. */
+export function LayoutPage() {
+  const { page } = useParams();
+  if (!isLayoutPage(page)) {
+    return <Navigate to="/layout/home" replace />;
+  }
+  // Each page starts with a clean builder: nothing of another page is carried over.
+  return <LayoutBuilder key={page} page={page} />;
+}
+
+/** One page of the website: its opening and its rows, arranged by hand or left to itself. */
+function LayoutBuilder({ page }: { page: LayoutPageSlug }) {
+  const about = LAYOUT_PAGES[page];
   const { can } = useSession();
   const mayWrite = can('catalog:write');
   const confirm = useConfirm();
@@ -116,31 +131,46 @@ export function HomePageBuilder() {
   // The order shown while a new one is being saved.
   const [pending, setPending] = useState<HomeSection[] | null>(null);
 
-  const home = useQuery({ queryKey: ['home'], queryFn: ({ signal }) => homeApi.get(signal) });
-  const refresh = () => queryClient.invalidateQueries({ queryKey: ['home'] });
+  const key = ['layout', page];
+  const home = useQuery({ queryKey: key, queryFn: ({ signal }) => layoutApi.get(page, signal) });
+  const pages = useQuery({
+    queryKey: ['layout'],
+    queryFn: ({ signal }) => layoutApi.pages(signal),
+  });
+  const refresh = () => queryClient.invalidateQueries({ queryKey: ['layout'] });
   const failed = (error: Error) => {
     toast.error(error.message);
     void refresh();
   };
 
   const start = useMutation({
-    mutationFn: homeApi.start,
-    onSuccess: (page) => {
-      queryClient.setQueryData(['home'], page);
-      toast.success('The page is yours to arrange. It shows what it showed before');
+    mutationFn: () => layoutApi.start(page),
+    onSuccess: (answer) => {
+      queryClient.setQueryData(key, answer);
+      void queryClient.invalidateQueries({ queryKey: ['layout'], exact: true });
+      toast.success(
+        page === 'home'
+          ? 'The page is yours to arrange. It shows what it showed before'
+          : 'The page is yours to arrange. Here is a first version of it',
+      );
     },
     onError: failed,
   });
   const reset = useMutation({
-    mutationFn: homeApi.reset,
+    mutationFn: () => layoutApi.reset(page),
     onSuccess: () => {
-      toast.success('The page puts itself together again');
+      toast.success(
+        page === 'home'
+          ? 'The page puts itself together again'
+          : `${about.label}: back to the list`,
+      );
       void refresh();
     },
     onError: failed,
   });
   const create = useMutation({
-    mutationFn: homeApi.create,
+    mutationFn: (body: HomeSectionInput & { kind: HomeSectionKind }) =>
+      layoutApi.create(page, body),
     onSuccess: (section) => {
       toast.success(`"${section.name ?? section.defaultName}" added`);
       void refresh();
@@ -148,12 +178,13 @@ export function HomePageBuilder() {
     onError: failed,
   });
   const toggle = useMutation({
-    mutationFn: (section: HomeSection) => homeApi.update(section.id, { visible: !section.visible }),
+    mutationFn: (section: HomeSection) =>
+      layoutApi.update(section.id, { visible: !section.visible }),
     onSuccess: () => void refresh(),
     onError: failed,
   });
   const remove = useMutation({
-    mutationFn: (section: HomeSection) => homeApi.remove(section.id),
+    mutationFn: (section: HomeSection) => layoutApi.remove(section.id),
     onSuccess: () => {
       toast.success('Section removed');
       void refresh();
@@ -161,8 +192,12 @@ export function HomePageBuilder() {
     onError: failed,
   });
   const reorder = useMutation({
-    mutationFn: (sections: HomeSection[]) => homeApi.reorder(sections.map((entry) => entry.id)),
-    onSuccess: (page) => queryClient.setQueryData(['home'], page),
+    mutationFn: (sections: HomeSection[]) =>
+      layoutApi.reorder(
+        page,
+        sections.map((entry) => entry.id),
+      ),
+    onSuccess: (answer) => queryClient.setQueryData(key, answer),
     onError: failed,
     onSettled: () => setPending(null),
   });
@@ -201,8 +236,14 @@ export function HomePageBuilder() {
   };
   const askReset = async () => {
     const confirmed = await confirm({
-      title: 'Let the page put itself together again?',
-      description: `All ${all.length} sections are deleted. The page then shows the featured titles, the newest, and a row for each category, as it did before.`,
+      title:
+        page === 'home'
+          ? 'Let the page put itself together again?'
+          : `Give "${about.label}" back to the list?`,
+      description:
+        page === 'home'
+          ? `All ${all.length} sections are deleted. The page then shows the featured titles, the newest, and a row for each category, as it did before.`
+          : `All ${all.length} sections are deleted. ${about.automatic.text.replace('Right now ', '').replace(' Nothing to maintain.', '')}`,
       confirmLabel: 'Delete the sections',
       destructive: true,
     });
@@ -230,7 +271,7 @@ export function HomePageBuilder() {
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-72">
         <DropdownMenuLabel>Rows of titles</DropdownMenuLabel>
-        {SECTION_PRESETS.map((preset) => (
+        {presetsFor(page).map((preset) => (
           <DropdownMenuItem key={preset.key} onSelect={() => add(preset)}>
             <span className="grid">
               {preset.label}
@@ -270,13 +311,13 @@ export function HomePageBuilder() {
   return (
     <>
       <PageHeader
-        title="Home page"
-        description="What visitors of the website see first: the opening, and the rows under it."
+        title={about.label}
+        description={about.description}
         actions={
           <>
             {SITE_URL !== null ? (
               <Button asChild>
-                <a href={`${SITE_URL}/`} target="_blank" rel="noreferrer">
+                <a href={`${SITE_URL}${about.path}`} target="_blank" rel="noreferrer">
                   <ExternalLink />
                   View the site
                 </a>
@@ -292,7 +333,7 @@ export function HomePageBuilder() {
                 <DropdownMenuContent align="end">
                   <DropdownMenuItem destructive onSelect={() => void askReset()}>
                     <RotateCcw />
-                    Back to the automatic page
+                    {page === 'home' ? 'Back to the automatic page' : 'Back to the list'}
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
@@ -301,6 +342,42 @@ export function HomePageBuilder() {
           </>
         }
       />
+
+      <nav aria-label="Page" className="mb-4 flex flex-wrap gap-2">
+        {(Object.keys(LAYOUT_PAGES) as LayoutPageSlug[]).map((slug) => {
+          const summary = pages.data?.find((entry) => entry.page.toLowerCase() === slug);
+          const current = slug === page;
+          return (
+            <Link
+              key={slug}
+              to={`/layout/${slug}`}
+              aria-current={current ? 'page' : undefined}
+              className={cn(
+                'grid min-w-40 gap-0.5 rounded-xl border bg-card px-4 py-2.5 text-sm shadow-xs transition-colors hover:border-primary/50',
+                current && 'border-primary ring-1 ring-primary',
+              )}
+            >
+              <span className="font-medium">{LAYOUT_PAGES[slug].label}</span>
+              <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                <span
+                  className={cn(
+                    'size-1.5 rounded-full',
+                    summary?.custom ? 'bg-success' : 'bg-muted-foreground/40',
+                  )}
+                  aria-hidden="true"
+                />
+                {summary
+                  ? summary.custom
+                    ? `Arranged, ${summary.sections} ${summary.sections === 1 ? 'section' : 'sections'}`
+                    : slug === 'home'
+                      ? 'Puts itself together'
+                      : 'The list of all of them'
+                  : ' '}
+              </span>
+            </Link>
+          );
+        })}
+      </nav>
 
       <ErrorNote error={home.error} className="mb-4" />
       {home.isPending ? (
@@ -318,17 +395,9 @@ export function HomePageBuilder() {
               <span className="flex size-11 items-center justify-center rounded-xl bg-primary/10 text-primary">
                 <Wand2 className="size-5" aria-hidden="true" />
               </span>
-              <h2 className="text-lg font-semibold">The page puts itself together</h2>
-              <p className="max-w-xl text-sm text-muted-foreground">
-                Right now the website opens with a featured title, then shows what each viewer
-                started, the featured titles, the newest, and one row for each category, in the
-                order of your categories. Nothing to maintain.
-              </p>
-              <p className="max-w-xl text-sm text-muted-foreground">
-                Arrange it yourself to choose the rows and their order, pick titles by hand, show a
-                top ten or a row for a season, and let several titles take turns in the opening. You
-                start with the page as it is now, and can go back at any time.
-              </p>
+              <h2 className="text-lg font-semibold">{about.automatic.title}</h2>
+              <p className="max-w-xl text-sm text-muted-foreground">{about.automatic.text}</p>
+              <p className="max-w-xl text-sm text-muted-foreground">{about.arranged}</p>
               {mayWrite ? (
                 <div>
                   <Button
@@ -342,15 +411,17 @@ export function HomePageBuilder() {
                 </div>
               ) : null}
             </div>
-            {/* A sketch of the automatic page, not a picture of the real one. */}
+            {/* A sketch of what the page is now, not a picture of the real one. */}
             <div
               aria-hidden="true"
               className="hidden gap-2 rounded-xl border bg-muted/40 p-3 md:grid"
             >
-              <div className="flex h-20 items-end rounded-lg bg-linear-to-br from-primary/30 to-primary/5 p-2">
-                <span className="h-2 w-16 rounded-full bg-foreground/40" />
-              </div>
-              {['Continue watching', 'Featured', 'New', 'Your categories'].map((label) => (
+              {page === 'home' ? (
+                <div className="flex h-20 items-end rounded-lg bg-linear-to-br from-primary/30 to-primary/5 p-2">
+                  <span className="h-2 w-16 rounded-full bg-foreground/40" />
+                </div>
+              ) : null}
+              {about.automatic.rows.map((label) => (
                 <div key={label} className="grid gap-1">
                   <span className="text-[10px] font-medium text-muted-foreground">{label}</span>
                   <div className="flex gap-1">
@@ -442,6 +513,7 @@ export function HomePageBuilder() {
 
       {editing ? (
         <SectionEditor
+          page={page}
           editing={editing}
           onClose={() => setEditing(null)}
           onSaved={() => {
@@ -686,7 +758,7 @@ function SectionCard({
   );
 }
 
-function toForm(editing: Editing): SectionForm {
+function toForm(editing: Editing, page: LayoutPageSlug): SectionForm {
   if (editing.mode === 'edit') {
     const { section } = editing;
     return {
@@ -713,7 +785,8 @@ function toForm(editing: Editing): SectionForm {
     categoryId: '',
     genreId: '',
     collectionId: '',
-    titleType: preset.titleType ?? 'ALL',
+    // A new section of the page for movies is about movies, until it is told otherwise.
+    titleType: preset.titleType ?? LAYOUT_PAGES[page].titleType ?? 'ALL',
     sort: preset.sort ?? (source === 'MANUAL' || source === 'COLLECTION' ? 'CURATED' : 'NEWEST'),
     limit: preset.limit ?? (kind === 'HERO' ? 5 : 20),
     layout: preset.layout ?? 'POSTER',
@@ -744,16 +817,18 @@ function toInput(form: SectionForm): HomeSectionInput {
 
 /** Makes or changes a section, in a panel at the side so the page stays in view. */
 function SectionEditor({
+  page,
   editing,
   onClose,
   onSaved,
 }: {
+  page: LayoutPageSlug;
   editing: Editing;
   onClose: () => void;
   onSaved: () => void;
 }) {
   const kind = editing.mode === 'edit' ? editing.section.kind : editing.kind;
-  const [form, setForm] = useState<SectionForm>(() => toForm(editing));
+  const [form, setForm] = useState<SectionForm>(() => toForm(editing, page));
   const set = (change: Partial<SectionForm>) => setForm((current) => ({ ...current, ...change }));
   const isHero = kind === 'HERO';
   const isContinue = kind === 'CONTINUE_WATCHING';
@@ -777,8 +852,8 @@ function SectionEditor({
   const save = useMutation({
     mutationFn: () =>
       editing.mode === 'edit'
-        ? homeApi.update(editing.section.id, toInput(form))
-        : homeApi.create({ kind, ...toInput(form) }),
+        ? layoutApi.update(editing.section.id, toInput(form))
+        : layoutApi.create(page, { kind, ...toInput(form) }),
     onSuccess: (section) => {
       toast.success(
         editing.mode === 'edit'

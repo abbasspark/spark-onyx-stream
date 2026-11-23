@@ -1857,6 +1857,15 @@ model Backup {
 // The home page of the website
 // ---------------------------------------------------------------------------
 
+/// A page of the website that can be arranged in the panel.
+enum LayoutPage {
+  HOME
+  /// The page "Movies" leads to.
+  MOVIES
+  /// The page "Series" leads to.
+  SERIES
+}
+
 enum HomeSectionKind {
   /// The opening of the page: one title shown large, or a few that take turns.
   HERO
@@ -1900,9 +1909,11 @@ enum HomeLayout {
   NUMBERED
 }
 
-/// One part of the home page. Without any, the page is put together by itself.
+/// One part of a page of the website. A page without any is put together by itself.
 model HomeSection {
   id       String          @id @default(uuid(7)) @db.Uuid
+  /// The page the section is on.
+  page     LayoutPage      @default(HOME)
   /// Order on the page, from 0. The hero opens the page wherever it stands.
   position Int             @default(0)
   kind     HomeSectionKind
@@ -1933,7 +1944,7 @@ model HomeSection {
   createdAt DateTime           @default(now())
   updatedAt DateTime           @updatedAt
 
-  @@index([position])
+  @@index([page, position])
   @@map("home_sections")
 }
 

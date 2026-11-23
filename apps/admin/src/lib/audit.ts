@@ -85,6 +85,13 @@ const ACTION_LABELS: Record<string, string> = {
   'title.extra.remove': 'Took an extra out of a title',
   'title.translation.save': 'Saved a translation of a title',
   'title.translation.delete': 'Removed a translation of a title',
+  'layout.start': 'Started arranging a page of the website',
+  'layout.reset': 'Gave a page of the website back to itself',
+  'layout.section.create': 'Added a section to a page of the website',
+  'layout.section.update': 'Changed a section of a page of the website',
+  'layout.section.delete': 'Removed a section from a page of the website',
+  'layout.reorder': 'Changed the order of a page of the website',
+  // From before other pages than the home page could be arranged.
   'home.start': 'Started arranging the home page',
   'home.reset': 'Gave the home page back to the automatic one',
   'home.section.create': 'Added a section to the home page',

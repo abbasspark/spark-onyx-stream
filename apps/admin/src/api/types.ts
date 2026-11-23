@@ -1882,8 +1882,21 @@ export interface HomeSection {
   count: number;
 }
 
+/** A page of the website that is arranged in the panel, as the API names it. */
+export type LayoutPageName = 'HOME' | 'MOVIES' | 'SERIES';
+/** The same, as it stands in addresses. */
+export type LayoutPageSlug = 'home' | 'movies' | 'series';
+
+export interface LayoutPageSummary {
+  page: LayoutPageName;
+  /** True when it has sections. */
+  custom: boolean;
+  sections: number;
+}
+
 export interface HomePage {
-  /** False while the page puts itself together. */
+  page: LayoutPageName;
+  /** False while the page has no sections and is what it is by itself. */
   custom: boolean;
   sections: HomeSection[];
 }

@@ -4,8 +4,10 @@ import type { HomeSection } from '@/api/types';
 import {
   describeSection,
   formProblem,
+  isLayoutPage,
   moved,
   placedAt,
+  presetsFor,
   type SectionForm,
   sectionState,
   sortsFor,
@@ -126,5 +128,25 @@ describe('moved and placedAt', () => {
     expect(ids(placedAt(items, 'c', 'a'))).toBe('cab');
     expect(ids(placedAt(items, 'a', 'a'))).toBe('abc');
     expect(ids(placedAt(items, 'x', 'a'))).toBe('abc');
+  });
+});
+
+describe('pages', () => {
+  it('are known by their name in addresses', () => {
+    expect(isLayoutPage('movies')).toBe(true);
+    expect(isLayoutPage('live')).toBe(false);
+    expect(isLayoutPage(undefined)).toBe(false);
+    expect(isLayoutPage('toString')).toBe(false);
+  });
+  it('offer rows about their own kind of title', () => {
+    expect(presetsFor('home').map((preset) => preset.key)).toContain('movies');
+    const movies = presetsFor('movies');
+    expect(movies.map((preset) => preset.key)).not.toContain('series');
+    expect(movies.map((preset) => preset.key)).not.toContain('movies');
+    expect(movies.every((preset) => preset.input.titleType === 'MOVIE')).toBe(true);
+    expect(presetsFor('series').find((preset) => preset.key === 'top')?.input).toMatchObject({
+      titleType: 'SERIES',
+      layout: 'NUMBERED',
+    });
   });
 });
