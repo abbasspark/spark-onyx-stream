@@ -1,6 +1,10 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 import { download, request, requestText, uploadFile } from './client';
 import type {
+  TermKind,
+  TermRow,
+  TermSaveItem,
+  TermsOverview,
   Role,
   RoleDetail,
   RoleInput,
@@ -668,6 +672,29 @@ export const collectionsApi = {
   reorder: (ids: string[]) =>
     request<Collection[]>('/v1/collections/order', { method: 'PUT', body: { ids } }),
   remove: (id: string) => request<void>(`/v1/collections/${id}`, { method: 'DELETE' }),
+};
+
+export const termsApi = {
+  overview: (signal?: AbortSignal) => request<TermsOverview>('/v1/translations/terms', { signal }),
+  list: (
+    kind: TermKind,
+    query: { language: string; page: number; pageSize: number; q?: string; missing?: boolean },
+    signal?: AbortSignal,
+  ) =>
+    request<Page<TermRow>>(`/v1/translations/terms/${kind}`, {
+      query: { ...query, missing: query.missing ? 'true' : undefined },
+      signal,
+    }),
+  save: (kind: TermKind, language: string, items: TermSaveItem[]) =>
+    request<{ saved: number; cleared: number }>(`/v1/translations/terms/${kind}/${language}`, {
+      method: 'PUT',
+      body: { items },
+    }),
+  /** Takes a language away from every term of a kind. */
+  removeLanguage: (kind: TermKind, language: string) =>
+    request<{ removed: number }>(`/v1/translations/terms/${kind}/${language}`, {
+      method: 'DELETE',
+    }),
 };
 
 export const translationsApi = {

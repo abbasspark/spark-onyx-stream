@@ -14,6 +14,8 @@ import { PublicCatalogController } from './public-catalog.controller.js';
 import { PublicCatalogService } from './public-catalog.service.js';
 import { TranslationsController } from './translations.controller.js';
 import { TranslationsService } from './translations.service.js';
+import { TermTranslationsController } from './term-translations.controller.js';
+import { TermTranslationsService } from './term-translations.service.js';
 import { TitlesService } from './titles.service.js';
 import { HomeController } from '../home/home.controller.js';
 import { HomeService } from '../home/home.service.js';
@@ -31,6 +33,7 @@ import { HomeService } from '../home/home.service.js';
     PeopleController,
     CollectionsController,
     TranslationsController,
+    TermTranslationsController,
     HomeController,
     PublicCatalogController,
   ],
@@ -41,6 +44,7 @@ import { HomeService } from '../home/home.service.js';
     PeopleService,
     CollectionsService,
     TranslationsService,
+    TermTranslationsService,
     HomeService,
     PublicCatalogService,
   ],
@@ -51,6 +55,7 @@ import { HomeService } from '../home/home.service.js';
     PeopleService,
     CollectionsService,
     TranslationsService,
+    TermTranslationsService,
     HomeService,
   ],
 })

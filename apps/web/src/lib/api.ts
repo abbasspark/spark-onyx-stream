@@ -165,7 +165,7 @@ export async function getSubjectPage(
 /** The genres that have something to watch. An API older than genres has none. */
 export async function getGenres(): Promise<Genre[]> {
   try {
-    return await read<Genre[]>('/genres');
+    return await readLocal<Genre[]>('/genres');
   } catch (error) {
     if (error instanceof CatalogError && error.status === 404) {
       return [];
@@ -212,7 +212,7 @@ export async function getPlans(): Promise<Plans> {
 }
 
 export function getCategories(): Promise<Category[]> {
-  return read<Category[]>('/categories');
+  return readLocal<Category[]>('/categories');
 }
 
 export interface TitleQuery {

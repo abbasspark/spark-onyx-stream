@@ -278,6 +278,9 @@ Status shows what exists today.
 | `DELETE`                | `/admins/{id}/two-factor`               | Take two-factor sign-in off another admin who is locked out                                                     | Built  |
 | `GET` `POST`            | `/admins`                               | List and create admins                                                                                          | Built  |
 | `GET` `PATCH` `DELETE`  | `/admins/{id}`                          | Read, update and deactivate an admin                                                                            | Built  |
+| `GET`                   | `/translations/terms`                   | Categories, genres, collections and people: what there is to translate and how far each language is             | Built  |
+| `GET`                   | `/translations/terms/{kind}`            | The terms of a kind with their translation into `?language=`, searchable, or only what is `missing`             | Built  |
+| `PUT` `DELETE`          | `/translations/terms/{kind}/{language}` | Save the translations of up to 200 terms at once; take a language away from a kind                              | Built  |
 | `GET` `POST`            | `/roles`                                | The roles, built in and custom, with every permission explained; make a custom role                             | Built  |
 | `GET` `PATCH` `DELETE`  | `/roles/{id}`                           | Read a custom role with its holders, change it, delete it (`?moveTo=` says where its holders go)                | Built  |
 | `GET` `POST`            | `/api-keys`                             | List and create API keys                                                                                        | Built  |

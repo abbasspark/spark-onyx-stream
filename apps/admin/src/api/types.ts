@@ -2255,3 +2255,45 @@ export interface RoleInput {
   color: string;
   permissions: Permission[];
 }
+
+/** The kinds of things, besides titles, whose names viewers read. */
+export const TERM_KINDS = ['categories', 'genres', 'collections', 'people'] as const;
+export type TermKind = (typeof TERM_KINDS)[number];
+
+/** A text of a term that can be translated. */
+export interface TermField {
+  key: string;
+  label: string;
+  /** A text of several lines. */
+  long: boolean;
+  maxLength: number;
+}
+
+/** Texts by field. Null: there is none. */
+export type TermTexts = Record<string, string | null>;
+
+export interface TermRow {
+  id: string;
+  slug: string;
+  original: TermTexts;
+  /** Null: nothing of this term is translated into the language. */
+  translation: TermTexts | null;
+  /** How many titles the term is on. */
+  titles: number;
+  updatedAt: string | null;
+}
+
+export interface TermsOverview {
+  kinds: { kind: TermKind; label: string; fields: TermField[]; total: number }[];
+  languages: {
+    language: string;
+    /** Per kind, how many terms have a text in this language. */
+    translated: Record<TermKind, number>;
+    titles: number;
+  }[];
+}
+
+export interface TermSaveItem {
+  id: string;
+  texts: Record<string, string | null>;
+}

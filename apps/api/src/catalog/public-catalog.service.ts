@@ -39,6 +39,7 @@ import {
   toPublicCard,
   toPublicImage,
 } from './public-catalog.views.js';
+import { TermTranslationsService } from './term-translations.service.js';
 import { TranslationsService } from './translations.service.js';
 import { CARD_INCLUDE } from './card-include.js';
 import { HomeService, type LayoutPage, type PageScope } from '../home/home.service.js';
@@ -122,10 +123,39 @@ export class PublicCatalogService {
     @Inject(SubscriptionsService) private readonly subscriptions: SubscriptionsService,
     @Inject(PurchasesService) private readonly purchases: PurchasesService,
     @Inject(TranslationsService) private readonly translations: TranslationsService,
+    @Inject(TermTranslationsService) private readonly terms: TermTranslationsService,
     @Inject(HomeService) private readonly homeLayout: HomeService,
     @Inject(PlaysService) private readonly plays: PlaysService,
     @Inject(StreamsService) private readonly streams: StreamsService,
   ) {}
+
+  /**
+   * Cards in a language: the names and taglines of the titles, and the names
+   * of the categories they carry. What is not translated stays as it is.
+   */
+  private async cards<T extends PublicTitleCard>(
+    cards: readonly T[],
+    language: string | undefined,
+  ): Promise<T[]> {
+    if (!language || cards.length === 0) {
+      return [...cards];
+    }
+    const [localized, categories] = await Promise.all([
+      this.translations.localizeCards(cards, language),
+      this.terms.names('category', language),
+    ]);
+    if (categories.size === 0) {
+      return localized;
+    }
+    return localized.map((card) => ({
+      ...card,
+      // The order is that of the catalog, whatever the names are in this language.
+      categories: card.categories.map((category) => ({
+        ...category,
+        name: categories.get(category.slug) ?? category.name,
+      })),
+    }));
+  }
 
   async list(input: ListPublicTitlesInput): Promise<Page<PublicTitleCard>> {
     const where: Prisma.TitleWhereInput = {
@@ -177,7 +207,7 @@ export class PublicCatalogService {
       this.prisma.title.count({ where }),
     ]);
     return toPage(
-      await this.translations.localizeCards(
+      await this.cards(
         titles.map((title) => toPublicCard(title, this.config.mediaBaseUrl)),
         input.language,
       ),
@@ -212,12 +242,6 @@ export class PublicCatalogService {
     if (!title) {
       throw new NotFoundException('Title not found');
     }
-    const credit = (entry: (typeof title.credits)[number]): PublicCredit => ({
-      slug: entry.person.slug,
-      name: entry.person.name,
-      role: entry.role,
-      portrait: toPublicImage(entry.person.portrait, this.config.mediaBaseUrl),
-    });
 
     const seasons =
       title.type === 'SERIES'
@@ -234,8 +258,27 @@ export class PublicCatalogService {
           })
         : [];
 
-    const translated = await this.translations.forTitle(title.id, language);
-    const card = toPublicCard(title, this.config.mediaBaseUrl);
+    const [translated, [card], genreNames, collectionNames, people] = await Promise.all([
+      this.translations.forTitle(title.id, language),
+      this.cards([toPublicCard(title, this.config.mediaBaseUrl)], language),
+      this.terms.names('genre', language),
+      this.terms.names('collection', language),
+      this.terms.localize(
+        'person',
+        title.credits.map((entry) => ({ id: entry.person.id, name: entry.person.name })),
+        language,
+      ),
+    ]);
+    if (!card) {
+      throw new NotFoundException('Title not found');
+    }
+    const personNames = new Map(people.map((person) => [person.id, person.name]));
+    const credit = (entry: (typeof title.credits)[number]): PublicCredit => ({
+      slug: entry.person.slug,
+      name: personNames.get(entry.person.id) ?? entry.person.name,
+      role: entry.role,
+      portrait: toPublicImage(entry.person.portrait, this.config.mediaBaseUrl),
+    });
     return {
       ...card,
       name: translated.title?.name ?? card.name,
@@ -244,7 +287,9 @@ export class PublicCatalogService {
       synopsis: translated.title?.synopsis ?? title.synopsis,
       originalLanguage: title.originalLanguage,
       hasTrailer: isPlayable(title.trailerAsset),
-      genres: title.genres.map(({ genre }) => genre).sort((a, b) => a.name.localeCompare(b.name)),
+      genres: title.genres
+        .map(({ genre }) => ({ slug: genre.slug, name: genreNames.get(genre.slug) ?? genre.name }))
+        .sort((a, b) => a.name.localeCompare(b.name)),
       releaseDate: title.releaseDate ? title.releaseDate.toISOString().slice(0, 10) : null,
       runtimeMinutes: title.runtimeMinutes,
       countries: title.countries,
@@ -269,7 +314,10 @@ export class PublicCatalogService {
       collections: title.collections
         .map(({ collection }) => collection)
         .sort((a, b) => a.position - b.position || a.name.localeCompare(b.name))
-        .map(({ slug: collectionSlug, name }) => ({ slug: collectionSlug, name })),
+        .map(({ slug: collectionSlug, name }) => ({
+          slug: collectionSlug,
+          name: collectionNames.get(collectionSlug) ?? name,
+        })),
       metadataSource: title.metadataSource,
       seasons: seasons.map((season) => ({
         number: season.number,
@@ -288,12 +336,13 @@ export class PublicCatalogService {
   }
 
   /** Categories that have at least one visible title, in their order. */
-  async categories(): Promise<PublicCategory[]> {
-    const categories = await this.prisma.category.findMany({
+  async categories(language?: string): Promise<PublicCategory[]> {
+    const found = await this.prisma.category.findMany({
       where: { titles: { some: { title: visibleTitle() } } },
       orderBy: [{ sortOrder: 'asc' }, { name: 'asc' }],
       include: { _count: { select: { titles: { where: { title: visibleTitle() } } } } },
     });
+    const categories = await this.terms.localize('category', found, language);
     return categories.map((category) => ({
       slug: category.slug,
       name: category.name,
@@ -303,21 +352,25 @@ export class PublicCatalogService {
   }
 
   /** Genres that have something to watch, by name. */
-  async genres(): Promise<PublicGenre[]> {
-    const genres = await this.prisma.genre.findMany({
+  async genres(language?: string): Promise<PublicGenre[]> {
+    const found = await this.prisma.genre.findMany({
       where: { titles: { some: { title: visibleTitle() } } },
       orderBy: { name: 'asc' },
       select: {
+        id: true,
         slug: true,
         name: true,
         _count: { select: { titles: { where: { title: visibleTitle() } } } },
       },
     });
-    return genres.map((genre) => ({
-      slug: genre.slug,
-      name: genre.name,
-      titleCount: genre._count.titles,
-    }));
+    const genres = await this.terms.localize('genre', found, language);
+    return genres
+      .map((genre) => ({
+        slug: genre.slug,
+        name: genre.name,
+        titleCount: genre._count.titles,
+      }))
+      .sort((a, b) => a.name.localeCompare(b.name));
   }
 
   /**
@@ -327,7 +380,7 @@ export class PublicCatalogService {
    *   a page about somebody with nothing to watch would lead nowhere.
    */
   async person(slug: string, language?: string): Promise<PublicPerson> {
-    const person = await this.prisma.person.findUnique({
+    const found = await this.prisma.person.findUnique({
       where: { slug },
       include: {
         portrait: true,
@@ -338,9 +391,10 @@ export class PublicCatalogService {
         },
       },
     });
-    if (!person || person.credits.length === 0) {
+    if (!found || found.credits.length === 0) {
       throw new NotFoundException('Person not found');
     }
+    const person = await this.terms.localizeOne('person', found, language);
     // Somebody who wrote and directed a film has two parts in it, and one card.
     const parts = new Map<string, (typeof person.credits)[number]>();
     for (const entry of person.credits) {
@@ -351,7 +405,7 @@ export class PublicCatalogService {
     const newestFirst = [...parts.values()].sort(
       (a, b) => (b.title.releaseYear ?? 0) - (a.title.releaseYear ?? 0),
     );
-    const cards = await this.translations.localizeCards(
+    const cards = await this.cards(
       newestFirst.map((entry) => toPublicCard(entry.title, this.config.mediaBaseUrl)),
       language,
     );
@@ -381,8 +435,8 @@ export class PublicCatalogService {
   }
 
   /** Collections shown to viewers that hold at least one visible title, in their order. */
-  async collections(): Promise<PublicCollection[]> {
-    const collections = await this.prisma.collection.findMany({
+  async collections(language?: string): Promise<PublicCollection[]> {
+    const found = await this.prisma.collection.findMany({
       where: { visible: true, titles: { some: { title: visibleTitle() } } },
       orderBy: [{ position: 'asc' }, { name: 'asc' }],
       include: {
@@ -391,6 +445,7 @@ export class PublicCatalogService {
         _count: { select: { titles: { where: { title: visibleTitle() } } } },
       },
     });
+    const collections = await this.terms.localize('collection', found, language);
     return collections.map((collection) => ({
       slug: collection.slug,
       name: collection.name,
@@ -403,7 +458,7 @@ export class PublicCatalogService {
 
   /** @throws NotFoundException when no collection shown to viewers has this slug. */
   async collection(slug: string, language?: string): Promise<PublicCollectionDetail> {
-    const collection = await this.prisma.collection.findFirst({
+    const found = await this.prisma.collection.findFirst({
       where: { slug, visible: true },
       include: {
         poster: true,
@@ -415,9 +470,10 @@ export class PublicCatalogService {
         },
       },
     });
-    if (!collection) {
+    if (!found) {
       throw new NotFoundException('Collection not found');
     }
+    const collection = await this.terms.localizeOne('collection', found, language);
     return {
       slug: collection.slug,
       name: collection.name,
@@ -425,7 +481,7 @@ export class PublicCatalogService {
       poster: toPublicImage(collection.poster, this.config.mediaBaseUrl),
       backdrop: toPublicImage(collection.backdrop, this.config.mediaBaseUrl),
       titleCount: collection.titles.length,
-      titles: await this.translations.localizeCards(
+      titles: await this.cards(
         collection.titles.map(({ title }) => toPublicCard(title, this.config.mediaBaseUrl)),
         language,
       ),
@@ -446,9 +502,9 @@ export class PublicCatalogService {
    * list of all movies or series, as before.
    */
   async page(page: LayoutPage, language?: string, scope?: PageScope): Promise<PublicHome> {
-    const layout = await this.homeLayout.layout(page, new Date(), scope);
+    const layout = await this.homeLayout.layout(page, new Date(), scope, language);
     // One look-up serves the whole page: a title is often in several rows.
-    const all = await this.translations.localizeCards(
+    const all = await this.cards(
       [layout.hero ?? [], ...layout.rows.map((row) => row.titles)]
         .flat()
         .map((title) => toPublicCard(title, this.config.mediaBaseUrl)),
@@ -478,10 +534,13 @@ export class PublicCatalogService {
     if (!scope) {
       throw new NotFoundException(kind === 'category' ? 'Category not found' : 'Genre not found');
     }
-    const page = await this.page(kind === 'category' ? 'CATEGORY' : 'GENRE', language, scope);
+    const [page, subject] = await Promise.all([
+      this.page(kind === 'category' ? 'CATEGORY' : 'GENRE', language, scope),
+      this.terms.localizeOne(kind, scope, language),
+    ]);
     return {
       ...page,
-      subject: { slug: scope.slug, name: scope.name, description: scope.description },
+      subject: { slug: subject.slug, name: subject.name, description: subject.description },
     };
   }
 
