@@ -39,6 +39,7 @@ import {
   Tv,
   Users,
   UsersRound,
+  Webhook,
 } from 'lucide-react';
 import type { Permission } from '@/api/types';
 
@@ -361,6 +362,14 @@ export const NAVIGATION: NavGroup[] = [
         icon: KeyRound,
         permission: 'api-keys:read',
         keywords: 'tokens integration',
+      },
+      {
+        to: '/webhooks',
+        label: 'Webhooks',
+        icon: Webhook,
+        permission: 'settings:read',
+        keywords:
+          'events notify callback integration automation zapier n8n hook signature deliveries',
       },
       {
         to: '/audit',

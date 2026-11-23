@@ -2376,3 +2376,83 @@ export interface Branding {
   /** How light the accent has to be against black. */
   minimumContrast: number;
 }
+
+// --- Webhooks ------------------------------------------------------------------------
+
+export type WebhookDeliveryStatus = 'PENDING' | 'DELIVERED' | 'FAILED';
+
+/** A webhook: an address of another system that is told when something happens. */
+export interface Webhook {
+  id: string;
+  name: string;
+  url: string;
+  /** Names of events, or "*" alone for all of them. */
+  events: string[];
+  isActive: boolean;
+  /** Since when nothing got through. Null while the last delivery did. */
+  failingSince: string | null;
+  /** Why the system switched it off, when it did. */
+  disabledReason: string | null;
+  createdAt: string;
+  updatedAt: string;
+  lastDelivery: { status: WebhookDeliveryStatus; at: string; event: string } | null;
+  /** Deliveries of the last 24 hours, by what became of them. */
+  recent: { delivered: number; failed: number; pending: number };
+}
+
+/** A webhook with its signing secret: shown once. */
+export interface WebhookWithSecret extends Webhook {
+  secret: string;
+}
+
+export interface WebhookInput {
+  name: string;
+  url: string;
+  events: string[];
+}
+
+export interface WebhookDelivery {
+  id: string;
+  event: string;
+  status: WebhookDeliveryStatus;
+  attempts: number;
+  maxAttempts: number;
+  nextAttemptAt: string | null;
+  responseStatus: number | null;
+  error: string | null;
+  durationMs: number | null;
+  createdAt: string;
+  attemptedAt: string | null;
+  deliveredAt: string | null;
+}
+
+export interface WebhookDeliveryDetail extends WebhookDelivery {
+  /** The body as it is sent and signed. */
+  payload: { id: string; event: string; createdAt: string; data: Record<string, unknown> };
+  responseBody: string | null;
+}
+
+export interface WebhookActivityHour {
+  start: string;
+  delivered: number;
+  failed: number;
+  pending: number;
+}
+
+export interface WebhookEventInfo {
+  name: string;
+  group: string;
+  label: string;
+  description: string;
+  /** An example of the "data" of the event. */
+  sample: Record<string, unknown>;
+}
+
+export interface WebhookReference {
+  events: WebhookEventInfo[];
+  retryDelaysSeconds: number[];
+  signatureToleranceSeconds: number;
+  /** Whether webhooks may go to private and local addresses. */
+  targets: 'any' | 'public';
+  maxWebhooks: number;
+}

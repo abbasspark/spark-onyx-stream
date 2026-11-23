@@ -13,6 +13,7 @@ import {
 } from './viewer.view.js';
 import { toProfileView, ViewerProfilesService } from './viewer-profiles.service.js';
 import { ACTIVE_SESSION, ViewerSessionService } from './viewer-session.service.js';
+import { WebhookDeliveryService } from '../webhooks/webhook-delivery.service.js';
 
 /** What changing a viewer did, for the audit log. */
 export interface ViewerChange {
@@ -48,6 +49,7 @@ function toPlanRef(
 export class ViewersAdminService {
   constructor(
     @Inject(PrismaClient) private readonly prisma: PrismaClient,
+    @Inject(WebhookDeliveryService) private readonly webhooks: WebhookDeliveryService,
     @Inject(ViewerSessionService) private readonly sessions: ViewerSessionService,
     @Inject(ViewerProfilesService) private readonly profiles: ViewerProfilesService,
   ) {}
@@ -128,6 +130,10 @@ export class ViewersAdminService {
           passwordHash: await hashPassword(input.password),
           emailVerifiedAt: input.emailVerified ? new Date() : null,
         },
+      });
+      await this.webhooks.emit('viewer.created', {
+        viewer: { id: viewer.id, email: viewer.email, displayName: viewer.displayName },
+        by: 'admin',
       });
       return toViewerAdminView(viewer, 0, null);
     } catch (error) {

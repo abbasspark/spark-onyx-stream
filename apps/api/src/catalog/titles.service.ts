@@ -32,6 +32,7 @@ import {
 } from './catalog.views.js';
 import { availableAt, isPlayable, PLAYABLE_ASSET, visibleTitle } from './playable.js';
 import { slugify, uniqueSlug } from './slug.js';
+import { WebhookDeliveryService } from '../webhooks/webhook-delivery.service.js';
 
 const SUMMARY_INCLUDE = {
   poster: true,
@@ -120,6 +121,7 @@ export class TitlesService {
   constructor(
     @Inject(PrismaClient) private readonly prisma: PrismaClient,
     @Inject(AppConfig) private readonly config: AppConfig,
+    @Inject(WebhookDeliveryService) private readonly webhooks: WebhookDeliveryService,
   ) {}
 
   // --- Titles ----------------------------------------------------------------
@@ -429,6 +431,9 @@ export class TitlesService {
       throw new ConflictException('Unpublish the title before deleting it');
     }
     await this.prisma.title.delete({ where: { id } });
+    await this.webhooks.emit('title.deleted', {
+      title: { id: title.id, type: title.type, name: title.name, slug: title.slug },
+    });
     return toTitleDetail(title, this.config.mediaBaseUrl);
   }
 

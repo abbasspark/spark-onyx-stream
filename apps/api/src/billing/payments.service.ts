@@ -22,6 +22,7 @@ import {
   type ViewerPaymentView,
 } from './payments.views.js';
 import { csvLine, decimalAmount, monthlyValue, monthOf, monthsUpTo } from './revenue.js';
+import { WebhookDeliveryService } from '../webhooks/webhook-delivery.service.js';
 
 const FOR_ADMIN = {
   viewer: { select: { id: true, displayName: true } },
@@ -50,6 +51,7 @@ interface MonthRow {
 export class PaymentsService {
   constructor(
     @Inject(PrismaClient) private readonly prisma: PrismaClient,
+    @Inject(WebhookDeliveryService) private readonly webhooks: WebhookDeliveryService,
     @Inject(AppConfig) private readonly config: AppConfig,
     @Inject(StripeSyncService) private readonly sync: StripeSyncService,
   ) {}
@@ -203,6 +205,7 @@ export class PaymentsService {
       },
       include: FOR_ADMIN,
     });
+    await this.webhooks.announcePayment(created.id);
     return this.view(created);
   }
 

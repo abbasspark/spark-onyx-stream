@@ -81,6 +81,7 @@ model AdminUser {
   couponsCreated       Coupon[]
   recoveryCodes        AdminRecoveryCode[]
   backups              Backup[]
+  webhooks             Webhook[]
   titleRevisions       TitleRevision[]
   translationJobs      TranslationJob[]
 
@@ -232,6 +233,74 @@ model Setting {
   updatedAt DateTime @updatedAt
 
   @@map("settings")
+}
+
+// ---------------------------------------------------------------------------
+// Outgoing webhooks
+// ---------------------------------------------------------------------------
+
+/// An address of the operator's own that is told when something happens here.
+model Webhook {
+  id             String     @id @default(uuid(7)) @db.Uuid
+  name           String
+  url            String
+  /// The signing secret, encrypted. Every request is signed with it.
+  secret         String
+  /// The events it is told about, by name. "*" stands for all of them.
+  events         String[]
+  isActive       Boolean    @default(true)
+  /// Since when no delivery got through. Empty while the last one did.
+  failingSince   DateTime?
+  /// Why it was switched off by the system, when it was.
+  disabledReason String?
+  createdById    String?    @db.Uuid
+  createdBy      AdminUser? @relation(fields: [createdById], references: [id], onDelete: SetNull)
+  createdAt      DateTime   @default(now())
+  updatedAt      DateTime   @updatedAt
+
+  deliveries WebhookDelivery[]
+
+  @@map("webhooks")
+}
+
+enum WebhookDeliveryStatus {
+  /// Waiting for its first try, or for the next one after a failure.
+  PENDING
+  /// The address answered with success.
+  DELIVERED
+  /// Given up after the last try.
+  FAILED
+}
+
+/// One message to one webhook, with what became of it.
+model WebhookDelivery {
+  id             String                @id @default(uuid(7)) @db.Uuid
+  webhookId      String                @db.Uuid
+  webhook        Webhook               @relation(fields: [webhookId], references: [id], onDelete: Cascade)
+  event          String
+  /// What is sent, without the envelope around it.
+  data           Json
+  status         WebhookDeliveryStatus @default(PENDING)
+  /// How often it was tried.
+  attempts       Int                   @default(0)
+  /// When it is tried next. Empty once it is delivered or given up.
+  nextAttemptAt  DateTime?
+  /// The status the address answered with at the last try.
+  responseStatus Int?
+  /// The start of what it answered.
+  responseBody   String?
+  /// Why the last try failed, when it did not get an answer.
+  error          String?
+  /// How long the last try took, in milliseconds.
+  durationMs     Int?
+  createdAt      DateTime              @default(now())
+  /// When the last try was made.
+  attemptedAt    DateTime?
+  deliveredAt    DateTime?
+
+  @@index([status, nextAttemptAt])
+  @@index([webhookId, createdAt])
+  @@map("webhook_deliveries")
 }
 
 // ---------------------------------------------------------------------------

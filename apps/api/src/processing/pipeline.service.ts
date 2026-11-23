@@ -10,6 +10,7 @@ import {
 import { JobsService } from '../jobs/jobs.service.js';
 import { StorageService } from '../storage/storage.service.js';
 import { subtitlePrefix } from '../subtitles/subtitle-paths.js';
+import { WebhookDeliveryService } from '../webhooks/webhook-delivery.service.js';
 
 /** Job types whose failure makes the asset unusable. Thumbnails, for example, are not among them. */
 export const ESSENTIAL_JOB_TYPES: readonly JobType[] = ['PROBE', 'REMUX', 'TRANSCODE', 'PACKAGE'];
@@ -45,6 +46,7 @@ export class PipelineService {
 
   constructor(
     @Inject(PrismaClient) private readonly prisma: PrismaClient,
+    @Inject(WebhookDeliveryService) private readonly webhooks: WebhookDeliveryService,
     @Inject(JobsService) private readonly jobs: JobsService,
     @Inject(StorageService) private readonly storage: StorageService,
   ) {}
@@ -132,6 +134,7 @@ export class PipelineService {
         where: { id: assetId },
         data: { status: 'READY', readyAt: new Date() },
       });
+      await this.webhooks.announceAsset(assetId);
     } else {
       await this.jobs.enqueue({ type: mode === 'COPY' ? 'REMUX' : 'TRANSCODE', assetId });
     }
@@ -144,10 +147,13 @@ export class PipelineService {
     if (!assetId || !ESSENTIAL_JOB_TYPES.includes(type)) {
       return;
     }
-    await this.prisma.asset.updateMany({
+    const failed = await this.prisma.asset.updateMany({
       where: { id: assetId, status: 'PROCESSING' },
       data: { status: 'FAILED' },
     });
+    if (failed.count > 0) {
+      await this.webhooks.announceAsset(assetId);
+    }
   }
 
   /**

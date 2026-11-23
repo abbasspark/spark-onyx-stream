@@ -49,6 +49,7 @@ import {
   type SubtitleTrackPlan,
 } from './media/subtitles.js';
 import { outputPrefix, PipelineService } from './pipeline.service.js';
+import { WebhookDeliveryService } from '../webhooks/webhook-delivery.service.js';
 
 /**
  * An error that trying again cannot fix, such as a file without video.
@@ -111,6 +112,7 @@ export class ProcessingSteps {
 
   constructor(
     @Inject(PrismaClient) private readonly prisma: PrismaClient,
+    @Inject(WebhookDeliveryService) private readonly webhooks: WebhookDeliveryService,
     @Inject(StorageService) private readonly storage: StorageService,
     @Inject(EncodingProfilesService) private readonly profiles: EncodingProfilesService,
     @Inject(PipelineService) private readonly pipelineService: PipelineService,
@@ -418,6 +420,7 @@ export class ProcessingSteps {
     if ((await this.subtitleFiles.countAdded(asset.id)) !== added.length) {
       await this.subtitleFiles.publish(asset.id);
     }
+    await this.webhooks.announceAsset(asset.id);
 
     this.logger.log(
       `Asset ${asset.id}: ${type === 'TRANSCODE' ? 'transcoded' : 'repackaged'} into ${renditions.map((r) => r.name).join(', ')}`,
