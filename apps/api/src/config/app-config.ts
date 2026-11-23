@@ -109,6 +109,8 @@ export class AppConfig {
   readonly siteName: string;
   /** Whether every admin has to use two-factor sign-in. */
   readonly adminTwoFactorRequired: boolean;
+  /** Whether webhooks may go to private and local addresses ("any") or not ("public"). */
+  readonly webhookTargets: 'any' | 'public';
   /** Whether a viewer must confirm their email address before they can watch. */
   readonly viewerVerificationRequired: boolean;
 
@@ -193,6 +195,7 @@ export class AppConfig {
     this.siteUrl = env.SITE_URL;
     this.siteName = env.SITE_NAME;
     this.adminTwoFactorRequired = env.ADMIN_TWO_FACTOR === 'required';
+    this.webhookTargets = env.WEBHOOK_TARGETS;
     this.viewerVerificationRequired = env.VIEWER_EMAIL_VERIFICATION === 'required';
   }
 

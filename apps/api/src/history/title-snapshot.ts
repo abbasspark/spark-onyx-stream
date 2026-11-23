@@ -62,6 +62,8 @@ export interface SnapshotFields {
 export interface TitleSnapshot {
   /** The shape of this record, should it ever change. */
   v: 1;
+  /** MOVIE or SERIES. Never changes; missing in snapshots from before it was kept. */
+  type?: string;
   fields: SnapshotFields;
   countries: string[];
   studios: string[];

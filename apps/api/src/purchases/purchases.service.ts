@@ -21,6 +21,7 @@ import {
 
 export type { OwnedTitle };
 import type { GrantPurchaseInput } from './purchases.schemas.js';
+import { WebhookDeliveryService } from '../webhooks/webhook-delivery.service.js';
 
 /** A rented or bought title in the viewer's own list. */
 export interface ViewerPurchaseView extends OwnedTitle {
@@ -91,6 +92,7 @@ const SESSION_LIMIT = 500;
 export class PurchasesService {
   constructor(
     @Inject(PrismaClient) private readonly prisma: PrismaClient,
+    @Inject(WebhookDeliveryService) private readonly webhooks: WebhookDeliveryService,
     @Inject(AppConfig) private readonly config: AppConfig,
   ) {}
 
@@ -228,6 +230,10 @@ export class PurchasesService {
         include: FOR_ADMIN,
       });
     });
+    await this.webhooks.announcePurchase(created.id);
+    if (created.paymentId) {
+      await this.webhooks.announcePayment(created.paymentId);
+    }
     return toAdminView(created, now);
   }
 

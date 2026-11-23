@@ -7,13 +7,14 @@ import { LiveSupervisorModule } from '../live/live.module.js';
 import { RecordingSupervisorModule } from '../recordings/recordings.module.js';
 import { MaintenanceModule } from '../maintenance/maintenance.module.js';
 import { ProcessingWorkerModule } from '../processing/processing.module.js';
+import { WebhooksSchedulerModule } from '../webhooks/webhooks.module.js';
 
 /**
  * Role modules are loaded only when the process runs the matching role.
  *
  * - WorkerRoleModule:    runs processing jobs with FFmpeg
  * - LiveRoleModule:      keeps live channels running
- * - SchedulerRoleModule: periodic repairs, the programme guide, backups
+ * - SchedulerRoleModule: periodic repairs, the programme guide, backups, webhooks
  */
 
 @Module({ imports: [ProcessingWorkerModule] })
@@ -40,6 +41,7 @@ export class LiveRoleModule implements OnModuleInit {
     GuideSchedulerModule,
     DeliverySchedulerModule,
     BackupsSchedulerModule,
+    WebhooksSchedulerModule,
   ],
 })
 export class SchedulerRoleModule implements OnModuleInit {

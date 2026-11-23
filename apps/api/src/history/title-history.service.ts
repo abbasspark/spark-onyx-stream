@@ -2,6 +2,7 @@
 import { Inject, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { type Prisma, PrismaClient } from '@onyx/database';
 import { type Page, type PaginationInput, toPage, toSkipTake } from '../common/pagination.js';
+import { WebhookDeliveryService } from '../webhooks/webhook-delivery.service.js';
 import { diffSnapshots } from './title-diff.js';
 import {
   type Change,
@@ -88,7 +89,10 @@ const byName = (a: { name: string }, b: { name: string }) => a.name.localeCompar
 export class TitleHistoryService {
   private readonly logger = new Logger(TitleHistoryService.name);
 
-  constructor(@Inject(PrismaClient) private readonly prisma: PrismaClient) {}
+  constructor(
+    @Inject(PrismaClient) private readonly prisma: PrismaClient,
+    @Inject(WebhookDeliveryService) private readonly webhooks: WebhookDeliveryService,
+  ) {}
 
   /** The title as history follows it, or null when it does not exist. */
   async snapshot(titleId: string): Promise<TitleSnapshot | null> {
@@ -101,6 +105,7 @@ export class TitleHistoryService {
     }
     return {
       v: 1,
+      type: title.type,
       fields: {
         name: title.name,
         slug: title.slug,
@@ -248,6 +253,44 @@ export class TitleHistoryService {
       },
     });
     await this.prune(titleId);
+    await this.announce(titleId, snapshot, changes, action);
+  }
+
+  /**
+   * Tells webhooks what a revision means to the outside: that the title went
+   * on or off the site, and that something else about it changed. History
+   * sees every change whichever way it came, so this is the one place.
+   */
+  private async announce(
+    titleId: string,
+    snapshot: TitleSnapshot,
+    changes: Change[],
+    action: string,
+  ): Promise<void> {
+    if (changes.length === 0) {
+      return;
+    }
+    const title = {
+      id: titleId,
+      type: snapshot.type,
+      name: snapshot.fields.name,
+      slug: snapshot.fields.slug,
+      status: snapshot.fields.status,
+    };
+    const status = changes.find((change) => change.field === 'status');
+    if (status?.after === 'PUBLISHED') {
+      await this.webhooks.emit('title.published', { title });
+    } else if (status?.before === 'PUBLISHED') {
+      await this.webhooks.emit('title.unpublished', { title });
+    }
+    const others = changes.filter((change) => change.field !== 'status');
+    if (others.length > 0) {
+      await this.webhooks.emit('title.updated', {
+        title,
+        action,
+        changed: [...new Set(others.map((change) => change.label))],
+      });
+    }
   }
 
   /** Removes the revisions of a title beyond the newest hundred. */

@@ -100,6 +100,12 @@ export const envSchema = z
      * admin without it can sign in and do nothing but set it up.
      */
     ADMIN_TWO_FACTOR: z.enum(['optional', 'required']).default('optional'),
+    /**
+     * Where outgoing webhooks may be sent. "any" includes private and local
+     * addresses, for a receiver on the same network. "public" allows only
+     * addresses on the internet.
+     */
+    WEBHOOK_TARGETS: z.enum(['any', 'public']).default('any'),
     VIEWER_REGISTRATION: z.enum(['open', 'closed']).default('open'),
     /**
      * Whether a viewer must confirm their email address before they can watch.

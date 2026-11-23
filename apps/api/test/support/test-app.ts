@@ -18,6 +18,7 @@ import type { QueuedJobData } from '../../src/jobs/jobs.service.js';
 import { ProcessingCoreModule } from '../../src/processing/processing.module.js';
 import { PlaysModule } from '../../src/analytics/analytics.module.js';
 import { TitleHistoryCoreModule } from '../../src/history/title-history.module.js';
+import { WebhooksCoreModule } from '../../src/webhooks/webhooks.module.js';
 import { StreamsCoreModule } from '../../src/streams/streams.module.js';
 import { PROCESSING_QUEUE } from '../../src/queue/queue.constants.js';
 import { BrandingModule } from '../../src/branding/branding.module.js';
@@ -300,6 +301,7 @@ export async function createTestApp(
       ProcessingCoreModule,
       PlaysModule,
       TitleHistoryCoreModule,
+      WebhooksCoreModule,
       StreamsCoreModule,
       DeliveryCoreModule,
       MailModule,
@@ -375,6 +377,7 @@ export async function createTestApp(
       await prisma.asset.deleteMany();
       await prisma.encodingProfile.deleteMany();
       await prisma.storagePool.deleteMany();
+      await prisma.webhook.deleteMany();
       await prisma.adminUser.deleteMany();
       await prisma.adminCustomRole.deleteMany();
       await prisma.viewer.deleteMany();

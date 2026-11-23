@@ -34,6 +34,7 @@ import { WatchlistModule } from './watchlist/watchlist.module.js';
 import type { AppRole } from './roles/app-role.js';
 import { AnalyticsModule, PlaysModule } from './analytics/analytics.module.js';
 import { TitleHistoryCoreModule } from './history/title-history.module.js';
+import { WebhooksCoreModule, WebhooksModule } from './webhooks/webhooks.module.js';
 import { StreamsCoreModule, StreamsModule } from './streams/streams.module.js';
 import { GuideModule } from './guide/guide.module.js';
 import { LiveModule } from './live/live.module.js';
@@ -70,6 +71,7 @@ const ROLE_MODULES: Record<AppRole, Type[]> = {
     DeliveryCoreModule,
     DeliveryModule,
     BackupsModule,
+    WebhooksModule,
     DiagnosticsModule,
     EventStreamModule,
     HealthModule,
@@ -102,6 +104,7 @@ export class AppModule {
         ProcessingCoreModule,
         PlaysModule,
         TitleHistoryCoreModule,
+        WebhooksCoreModule,
         StreamsCoreModule,
         ProcessBeaconModule,
         ...roleModules,
