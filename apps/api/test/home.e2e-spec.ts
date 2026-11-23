@@ -116,6 +116,7 @@ describe.skipIf(!TEST_DATABASE_URL)('Home page (e2e)', () => {
 
       expect((await get('/v1/layout/home').expect(200)).body).toEqual({
         page: 'HOME',
+        example: null,
         custom: false,
         sections: [],
       });
@@ -376,13 +377,16 @@ describe.skipIf(!TEST_DATABASE_URL)('Home page (e2e)', () => {
       expect(await page('series')).toEqual({ custom: false, hero: null, rows: [] });
       // The home page is a page like the others, under its own name as well.
       expect((await page('home')).rows.map((row) => row.key)).toEqual(['continue', 'latest']);
-      await http().get('/v1/catalog/pages/live').expect(404);
+      await http().get('/v1/catalog/pages/channels').expect(404);
       await http().get('/v1/catalog/pages/MOVIES').expect(404);
 
       expect((await get('/v1/layout').expect(200)).body).toEqual([
         { page: 'HOME', custom: false, sections: 0 },
         { page: 'MOVIES', custom: false, sections: 0 },
         { page: 'SERIES', custom: false, sections: 0 },
+        { page: 'LIVE', custom: false, sections: 0 },
+        { page: 'CATEGORY', custom: false, sections: 0 },
+        { page: 'GENRE', custom: false, sections: 0 },
       ]);
     });
 
@@ -429,7 +433,7 @@ describe.skipIf(!TEST_DATABASE_URL)('Home page (e2e)', () => {
       // The other pages are untouched.
       expect((await page('series')).custom).toBe(false);
       expect((await home()).custom).toBe(false);
-      expect((await get('/v1/layout').expect(200)).body).toEqual([
+      expect((await get('/v1/layout').expect(200)).body.slice(0, 3)).toEqual([
         { page: 'HOME', custom: false, sections: 0 },
         { page: 'MOVIES', custom: true, sections: 5 },
         { page: 'SERIES', custom: false, sections: 0 },
@@ -480,7 +484,155 @@ describe.skipIf(!TEST_DATABASE_URL)('Home page (e2e)', () => {
       expect((await page('series')).custom).toBe(false);
       expect((await page('movies')).custom).toBe(true);
       expect((await home()).custom).toBe(true);
-      await get('/v1/layout/live').expect(404);
+      await get('/v1/layout/channels').expect(404);
+    });
+  });
+
+  describe('the pages of categories and of genres', () => {
+    interface SubjectPage {
+      custom: boolean;
+      subject: { slug: string; name: string; description: string | null };
+      hero: { titles: { name: string }[] } | null;
+      rows: Row[];
+    }
+    const subjectPage = async (kind: string, slug: string) =>
+      (await http().get(`/v1/catalog/pages/${kind}/${slug}`).expect(200)).body as SubjectPage;
+
+    it('are arranged once and show each category its own titles', async () => {
+      const drama = await named('categories', 'Drama');
+      const nature = await named('categories', 'Nature');
+      const crime = await named('genres', 'Crime');
+      await patch(`/v1/categories/${drama}`, { description: 'Stories that stay.' }).expect(200);
+      await movie('Dark Drama', { categoryIds: [drama], genreIds: [crime], isFeatured: true });
+      await movie('Light Drama', { categoryIds: [drama] });
+      await movie('Forest', { categoryIds: [nature] });
+      const show = await series('Drama Series');
+      await patch(`/v1/titles/${show}`, { categoryIds: [drama] }).expect(200);
+
+      // Not arranged: the page says what it is the page of, and has no rows.
+      const before = await subjectPage('category', 'drama');
+      expect(before).toMatchObject({
+        custom: false,
+        hero: null,
+        rows: [],
+        subject: { slug: 'drama', name: 'Drama', description: 'Stories that stay.' },
+      });
+
+      const started = (await post('/v1/layout/category/start').expect(201)).body;
+      expect(started.example).toEqual({ id: drama, slug: 'drama', name: 'Drama' });
+      expect(
+        started.sections.map((entry: { kind: string; defaultName: string; count: number }) => [
+          entry.kind,
+          entry.defaultName,
+          entry.count,
+        ]),
+      ).toEqual([
+        ['HERO', 'New', 3],
+        ['TITLES', 'Featured', 1],
+        ['TITLES', 'New', 3],
+        ['TITLES', 'Top rated', 3],
+        ['TITLES', 'New movies', 2],
+        ['TITLES', 'New series', 1],
+      ]);
+      // The panel can show the same sections with another category.
+      const other = (await get(`/v1/layout/category?example=${nature}`).expect(200)).body;
+      expect(other.example).toEqual({ id: nature, slug: 'nature', name: 'Nature' });
+      expect(other.sections.map((entry: { count: number }) => entry.count)).toEqual([
+        1,
+        1 - 1,
+        1,
+        1,
+        1,
+        0,
+      ]);
+
+      const dramaPage = await subjectPage('category', 'drama');
+      expect(dramaPage.custom).toBe(true);
+      expect(names(dramaPage.hero?.titles ?? [])).toEqual([
+        'Drama Series',
+        'Light Drama',
+        'Dark Drama',
+      ]);
+      expect(dramaPage.rows.map((row) => [row.name, row.browse, names(row.titles)])).toEqual([
+        ['Featured', '/browse?category=drama&featured=true', ['Dark Drama']],
+        ['New', '/browse?category=drama', ['Drama Series', 'Light Drama', 'Dark Drama']],
+        [
+          'Top rated',
+          '/browse?category=drama&sort=rating',
+          ['Drama Series', 'Light Drama', 'Dark Drama'],
+        ],
+        ['New movies', '/browse?type=MOVIE&category=drama', ['Light Drama', 'Dark Drama']],
+        ['New series', '/browse?type=SERIES&category=drama', ['Drama Series']],
+      ]);
+      const naturePage = await subjectPage('category', 'nature');
+      expect(naturePage.rows.map((row) => [row.name, names(row.titles)])).toEqual([
+        ['New', ['Forest']],
+        ['Top rated', ['Forest']],
+        ['New movies', ['Forest']],
+      ]);
+
+      // A row about a genre, on the page of a category, shows what is in both.
+      await post('/v1/layout/category/sections', {
+        kind: 'TITLES',
+        source: 'GENRE',
+        genreId: crime,
+      }).expect(201);
+      const withGenre = await subjectPage('category', 'drama');
+      expect(withGenre.rows.at(-1)).toMatchObject({
+        name: 'Crime',
+        browse: '/browse?genre=crime&category=drama',
+      });
+      expect(names(withGenre.rows.at(-1)?.titles ?? [])).toEqual(['Dark Drama']);
+
+      // Genres have a page of their own, arranged by itself.
+      expect((await subjectPage('genre', 'crime')).custom).toBe(false);
+      await post('/v1/layout/genre/sections', { kind: 'TITLES' }).expect(201);
+      const genrePage = await subjectPage('genre', 'crime');
+      expect(genrePage.subject).toEqual({ slug: 'crime', name: 'Crime', description: null });
+      expect(genrePage.rows.map((row) => [row.browse, names(row.titles)])).toEqual([
+        ['/browse?genre=crime', ['Dark Drama']],
+      ]);
+    });
+
+    it('do not exist for what has nothing to watch, and are not pages by themselves', async () => {
+      await named('categories', 'Empty');
+      await http().get('/v1/catalog/pages/category/empty').expect(404);
+      await http().get('/v1/catalog/pages/category/nothing').expect(404);
+      await http().get('/v1/catalog/pages/genre/nothing').expect(404);
+      await http().get('/v1/catalog/pages/category').expect(404);
+      await http().get('/v1/catalog/pages/genre').expect(404);
+      // Without any category the panel has nothing to show the sections with.
+      const page = (await get('/v1/layout/genre').expect(200)).body;
+      expect(page).toMatchObject({ page: 'GENRE', example: null, custom: false });
+    });
+  });
+
+  describe('the live page', () => {
+    it('has rows under its channels, and no opening', async () => {
+      await movie('Alpha', { isFeatured: true });
+      const page = async () => (await http().get('/v1/catalog/pages/live').expect(200)).body;
+      expect(await page()).toEqual({ custom: false, hero: null, rows: [] });
+
+      const started = (await post('/v1/layout/live/start').expect(201)).body;
+      expect(
+        started.sections.map((entry: { kind: string; defaultName: string; layout: string }) => [
+          entry.kind,
+          entry.defaultName,
+          entry.layout,
+        ]),
+      ).toEqual([
+        ['TITLES', 'Featured', 'LANDSCAPE'],
+        ['TITLES', 'New', 'POSTER'],
+      ]);
+      const refused = await post('/v1/layout/live/sections', { kind: 'HERO' }).expect(400);
+      expect(refused.body.message).toMatch(/opens with its channels/);
+
+      const arranged = await page();
+      expect(arranged).toMatchObject({ custom: true, hero: null });
+      expect(arranged.rows.map((row: Row) => [row.name, row.layout, names(row.titles)])).toEqual([
+        ['Featured', 'landscape', ['Alpha']],
+        ['New', 'poster', ['Alpha']],
+      ]);
     });
   });
 

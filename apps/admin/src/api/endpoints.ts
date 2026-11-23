@@ -430,8 +430,9 @@ export const subtitlesApi = {
 export const layoutApi = {
   /** Every page, with whether it is arranged. */
   pages: (signal?: AbortSignal) => request<LayoutPageSummary[]>('/v1/layout', { signal }),
-  get: (page: LayoutPageSlug, signal?: AbortSignal) =>
-    request<HomePage>(`/v1/layout/${page}`, { signal }),
+  /** `example`: on the page of categories or genres, the one to show the sections with. */
+  get: (page: LayoutPageSlug, example?: string, signal?: AbortSignal) =>
+    request<HomePage>(`/v1/layout/${page}`, { query: { example }, signal }),
   /** Takes the page over, starting with sections made for it. */
   start: (page: LayoutPageSlug) =>
     request<HomePage>(`/v1/layout/${page}/start`, { method: 'POST' }),

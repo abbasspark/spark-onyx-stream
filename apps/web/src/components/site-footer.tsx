@@ -66,7 +66,7 @@ export function SiteFooter({
             <ul className="grid grid-flow-col grid-rows-4 content-start gap-x-12 gap-y-2">
               {categories.slice(0, 12).map((category) => (
                 <li key={category.slug}>
-                  <Link href={`/browse?category=${category.slug}`} className="hover:text-vein">
+                  <Link href={`/category/${category.slug}`} className="hover:text-vein">
                     {category.name}
                   </Link>
                 </li>

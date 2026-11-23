@@ -240,7 +240,7 @@ export default async function TitlePage({ params }: TitlePageProps) {
                 {genres.map((genre) => (
                   <Link
                     key={genre.slug}
-                    href={`/browse?genre=${genre.slug}`}
+                    href={`/genre/${genre.slug}`}
                     className="underline decoration-line underline-offset-4 hover:decoration-vein"
                   >
                     {genre.name}
@@ -288,7 +288,7 @@ export default async function TitlePage({ params }: TitlePageProps) {
                 {title.categories.map((category) => (
                   <Link
                     key={category.slug}
-                    href={`/browse?category=${category.slug}`}
+                    href={`/category/${category.slug}`}
                     className="underline decoration-line underline-offset-4 hover:decoration-vein"
                   >
                     {category.name}
@@ -391,7 +391,7 @@ export default async function TitlePage({ params }: TitlePageProps) {
         <div className="mt-20">
           <StripRow
             heading={`More in ${firstCategory.name}`}
-            href={`/browse?category=${firstCategory.slug}`}
+            href={`/category/${firstCategory.slug}`}
           >
             {related.map((item) => (
               <li key={item.id} className="w-[clamp(8.5rem,38vw,12.5rem)]">

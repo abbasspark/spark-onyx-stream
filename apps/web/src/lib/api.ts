@@ -119,18 +119,47 @@ export async function getHome(): Promise<Home> {
 }
 
 /**
- * The page for movies or for series, as it is arranged in the panel.
+ * The page for movies, for series, or the rows of the live page, as arranged
+ * in the panel.
  *
  * @returns Null while nobody arranged it, or when the API is from before
- *   pages could be arranged: the list of all movies or series is the page then.
+ *   pages could be arranged: the page is then what it was before.
  */
-export async function getArrangedPage(page: 'movies' | 'series'): Promise<Home | null> {
+export async function getArrangedPage(page: 'movies' | 'series' | 'live'): Promise<Home | null> {
   const raw = await findLocal<RawHome & { custom?: boolean }>(`/pages/${page}`);
   if (!raw?.custom) {
     return null;
   }
   const arranged = normalizeHome({ ...raw, hero: raw.hero ?? null });
   return isEmptyHome(arranged) ? null : arranged;
+}
+
+/** What a page of a category or genre is the page of. */
+export interface PageSubject {
+  slug: string;
+  name: string;
+  description: string | null;
+}
+
+/**
+ * The page of one category or genre, as the page of categories or genres is
+ * arranged in the panel.
+ *
+ * @returns Null while that page was not arranged, when the API is older than
+ *   it, or when there is no such category or genre: the list is the page then.
+ */
+export async function getSubjectPage(
+  kind: 'category' | 'genre',
+  slug: string,
+): Promise<{ subject: PageSubject; page: Home } | null> {
+  const raw = await findLocal<RawHome & { custom?: boolean; subject?: PageSubject }>(
+    `/pages/${kind}/${encodeURIComponent(slug)}`,
+  );
+  if (!raw?.custom || !raw.subject) {
+    return null;
+  }
+  const page = normalizeHome({ ...raw, hero: raw.hero ?? null });
+  return isEmptyHome(page) ? null : { subject: raw.subject, page };
 }
 
 /** The genres that have something to watch. An API older than genres has none. */

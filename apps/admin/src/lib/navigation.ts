@@ -4,6 +4,9 @@ import {
   BarChart3,
   Clapperboard,
   MonitorPlay,
+  PanelsTopLeft,
+  PanelTop,
+  RadioTower,
   Database,
   DatabaseBackup,
   Film,
@@ -113,6 +116,32 @@ export const NAVIGATION: NavGroup[] = [
     ],
   },
   {
+    label: 'Live',
+    items: [
+      {
+        to: '/channels',
+        label: 'Channels',
+        icon: Radio,
+        permission: 'live:read',
+        keywords: 'live tv streams broadcast iptv linear sources rtmp srt hls udp on air',
+      },
+      {
+        to: '/guide',
+        label: 'Guide',
+        icon: CalendarClock,
+        permission: 'live:read',
+        keywords: 'epg programme program schedule xmltv now next tv guide listings',
+      },
+      {
+        to: '/recordings',
+        label: 'Recordings',
+        icon: Disc,
+        permission: 'live:read',
+        keywords: 'record recording dvr catch-up keep save programme library',
+      },
+    ],
+  },
+  {
     label: 'Layout',
     items: [
       {
@@ -135,6 +164,27 @@ export const NAVIGATION: NavGroup[] = [
         icon: MonitorPlay,
         permission: 'catalog:read',
         keywords: 'website shows rows hero opening sections builder',
+      },
+      {
+        to: '/layout/live',
+        label: 'Live page',
+        icon: RadioTower,
+        permission: 'catalog:read',
+        keywords: 'website channels rows sections builder',
+      },
+      {
+        to: '/layout/category',
+        label: 'Category pages',
+        icon: PanelsTopLeft,
+        permission: 'catalog:read',
+        keywords: 'website shelves rows hero opening sections builder template',
+      },
+      {
+        to: '/layout/genre',
+        label: 'Genre pages',
+        icon: PanelTop,
+        permission: 'catalog:read',
+        keywords: 'website kinds rows hero opening sections builder template',
       },
     ],
   },
@@ -173,32 +223,6 @@ export const NAVIGATION: NavGroup[] = [
         icon: Receipt,
         permission: 'billing:read',
         keywords: 'payments money income invoices refunds mrr export csv books accounting',
-      },
-    ],
-  },
-  {
-    label: 'Live',
-    items: [
-      {
-        to: '/channels',
-        label: 'Channels',
-        icon: Radio,
-        permission: 'live:read',
-        keywords: 'live tv streams broadcast iptv linear sources rtmp srt hls udp on air',
-      },
-      {
-        to: '/guide',
-        label: 'Guide',
-        icon: CalendarClock,
-        permission: 'live:read',
-        keywords: 'epg programme program schedule xmltv now next tv guide listings',
-      },
-      {
-        to: '/recordings',
-        label: 'Recordings',
-        icon: Disc,
-        permission: 'live:read',
-        keywords: 'record recording dvr catch-up keep save programme library',
       },
     ],
   },

@@ -86,14 +86,22 @@ export function describeSection(
     | 'limit'
     | 'layout'
   >,
+  /** Set on the page of categories or genres: 'category' or 'genre'. */
+  within?: string,
 ): string {
   if (section.kind === 'CONTINUE_WATCHING') {
     return 'What each viewer started and did not finish. Shown only to those who have something.';
   }
   const what = section.titleType ? KIND_WORD[section.titleType] : 'titles';
   const from: Record<HomeSource, string> = {
-    ALL: section.titleType ? `All ${what}` : 'The whole catalog',
-    FEATURED: `Featured ${what}`,
+    ALL: within
+      ? section.titleType
+        ? `All ${what} of the ${within}`
+        : `Everything in the ${within}`
+      : section.titleType
+        ? `All ${what}`
+        : 'The whole catalog',
+    FEATURED: within ? `Featured ${what} of the ${within}` : `Featured ${what}`,
     CATEGORY: `${cap(what)} of the category ${section.category?.name ?? '…'}`,
     GENRE: `${cap(what)} of the genre ${section.genre?.name ?? '…'}`,
     COLLECTION: `${cap(what)} of the collection ${section.collection?.name ?? '…'}`,
@@ -134,6 +142,13 @@ export const LAYOUT_PAGES: Record<
     automatic: { title: string; text: string; rows: string[] };
     /** What arranging it gives. */
     arranged: string;
+    /** False for a page that opens with something of its own, and so has no opening to arrange. */
+    opening?: false;
+    /**
+     * Set for a page that is arranged once and serves every category or
+     * genre: the sections show the titles of the one a visitor opened.
+     */
+    each?: { one: string; many: string };
   }
 > = {
   home: {
@@ -175,6 +190,48 @@ export const LAYOUT_PAGES: Record<
     arranged:
       'Arrange it to give series a page of their own: an opening, then rows such as the newest, the best rated, a genre or your own picks. You start with a first page made for you, the full list stays one click away, and you can go back at any time.',
   },
+  live: {
+    label: 'Live page',
+    titleType: null,
+    path: '/live',
+    description: 'What stands under the channels on the live page of the website.',
+    opening: false,
+    automatic: {
+      title: 'The live page ends with its channels',
+      text: 'Right now the live page of the website lists the channels with what is on air, and nothing after them. Nothing to maintain.',
+      rows: ['Your channels'],
+    },
+    arranged:
+      'Arrange it to put rows of movies and series under the channels: something to watch when nothing on air appeals. The channels stay on top, as they are. You start with two rows made for you and can go back at any time.',
+  },
+  category: {
+    label: 'Category pages',
+    titleType: null,
+    path: '/browse',
+    description: 'The page a visitor gets when they open one of your categories.',
+    each: { one: 'category', many: 'categories' },
+    automatic: {
+      title: 'A category is the list of its titles',
+      text: 'Right now a category on the website opens the list of everything in it, with its filters. Nothing to maintain.',
+      rows: ['Everything in the category, newest first'],
+    },
+    arranged:
+      'Arrange it once, and every category gets a page of its own: an opening and rows that hold only titles of the category a visitor opened. The full list stays one click away, and you can go back at any time.',
+  },
+  genre: {
+    label: 'Genre pages',
+    titleType: null,
+    path: '/browse',
+    description: 'The page a visitor gets when they open a genre.',
+    each: { one: 'genre', many: 'genres' },
+    automatic: {
+      title: 'A genre is the list of its titles',
+      text: 'Right now a genre on the website opens the list of everything in it, with its filters. Nothing to maintain.',
+      rows: ['Everything in the genre, newest first'],
+    },
+    arranged:
+      'Arrange it once, and every genre gets a page of its own: an opening and rows that hold only titles of the genre a visitor opened. The full list stays one click away, and you can go back at any time.',
+  },
 };
 
 export const isLayoutPage = (value: string | undefined): value is LayoutPageSlug =>
@@ -186,7 +243,11 @@ export const isLayoutPage = (value: string | undefined): value is LayoutPageSlug
  * left out there.
  */
 export function presetsFor(page: LayoutPageSlug): SectionPreset[] {
-  const { titleType } = LAYOUT_PAGES[page];
+  const { titleType, each } = LAYOUT_PAGES[page];
+  if (each) {
+    // The page of a category is inside a category already: a row for another one would be empty.
+    return SECTION_PRESETS.filter((preset) => preset.needs !== each.one);
+  }
   if (!titleType) {
     return SECTION_PRESETS;
   }
