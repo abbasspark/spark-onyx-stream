@@ -59,3 +59,61 @@ export function truncate(text: string, maxLength: number): string {
   const lastSpace = cut.lastIndexOf(' ');
   return `${(lastSpace > maxLength * 0.6 ? cut.slice(0, lastSpace) : cut).replace(/[.,;:!?-]+$/, '')}…`;
 }
+
+/** "14 March 2024" for "2024-03-14". The day stays the same in every time zone. */
+export function formatDay(day: string | null | undefined): string | null {
+  if (!day || !/^\d{4}-\d{2}-\d{2}$/.test(day)) {
+    return null;
+  }
+  const date = new Date(`${day}T00:00:00Z`);
+  return Number.isNaN(date.getTime())
+    ? null
+    : new Intl.DateTimeFormat('en', { dateStyle: 'long', timeZone: 'UTC' }).format(date);
+}
+
+/** A running time given in minutes: "1 h 58 min", "52 min". */
+export function formatMinutes(minutes: number | null | undefined): string | null {
+  return minutes && minutes > 0 ? formatRuntime(minutes * 60_000) : null;
+}
+
+/** "7.6" for a rating out of ten. */
+export function formatRating(rating: number | null | undefined): string | null {
+  return typeof rating === 'number' && rating > 0 ? rating.toFixed(1) : null;
+}
+
+export const EXTRA_KIND_LABELS = {
+  TRAILER: 'Trailer',
+  TEASER: 'Teaser',
+  CLIP: 'Clip',
+  FEATURETTE: 'Featurette',
+  BEHIND_THE_SCENES: 'Behind the scenes',
+  INTERVIEW: 'Interview',
+  BLOOPERS: 'Bloopers',
+} as const;
+
+export const SERIES_STATUS_LABELS = {
+  UPCOMING: 'Coming soon',
+  RUNNING: 'New episodes are coming',
+  ENDED: 'Complete',
+  CANCELLED: 'Ended early',
+} as const;
+
+/**
+ * The crew of a title by what they did: everybody who directed in one line,
+ * everybody who wrote in the next. Jobs keep the order they first appear in,
+ * and a person is named once per job.
+ */
+export function groupCrew<Person extends { slug: string; role: string | null }>(
+  crew: readonly Person[],
+): { job: string; people: Person[] }[] {
+  const groups = new Map<string, Person[]>();
+  for (const person of crew) {
+    const job = person.role?.trim() || 'Crew';
+    const people = groups.get(job) ?? [];
+    if (!people.some((other) => other.slug === person.slug)) {
+      people.push(person);
+    }
+    groups.set(job, people);
+  }
+  return [...groups].map(([job, people]) => ({ job, people }));
+}

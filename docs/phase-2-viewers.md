@@ -169,6 +169,10 @@ On the website the list is also kept in the browser. For a visitor that is the o
 - **Forgot your password?** on the sign-in page, and the pages the emailed links open: set a new password, and confirm the address. The account page shows whether the address is confirmed.
 - Pages stay the same for everyone when they leave the server. Who is signed in is asked by the browser, so pages can still be shared and cached.
 - With sign-up closed, the sign-up page says so and the buttons that lead to it are not shown.
+- **A title's page** shows its genres, rating, release date, countries and studios, who directed and wrote it, its cast with portraits, its extras ("Trailers and more", played like the trailer), and the other titles of its collection.
+- **A page per person** (`/person/{slug}`) with their portrait, biography and everything of theirs there is to watch, and **a page per collection** (`/collection/{slug}`) with its titles in order. Both are found by search engines. Somebody with nothing to watch has no page.
+- **Browsing by genre**, beside kind, order and category.
+- **"Titles in"** in the footer chooses the language names and descriptions are shown in, when at least one visible title is translated. The choice is kept in a cookie for a year and reaches the home page, lists, title pages, collections, people and the search. The site around the titles stays in English. This is the one thing that makes a page differ between two visitors when it leaves the server.
 
 ## Not built yet
 

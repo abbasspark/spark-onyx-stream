@@ -28,6 +28,10 @@ import type { ListPublicTitlesInput } from './public-catalog.schemas.js';
 import {
   type PublicCategory,
   type PublicCollection,
+  type PublicCredit,
+  type PublicGenre,
+  type PublicLanguages,
+  type PublicPerson,
   type PublicCollectionDetail,
   type PublicHome,
   type PublicRow,
@@ -87,6 +91,10 @@ const ORDER_BY: Record<ListPublicTitlesInput['sort'], Prisma.TitleOrderByWithRel
  * play. Every query here goes through the visibleTitle filter, so a draft
  * can never leak, whatever is asked for.
  */
+/** How many of the cast and of the crew a title's page gets. The rest is on the people's own pages. */
+const MAX_CAST_SHOWN = 16;
+const MAX_CREW_SHOWN = 8;
+
 @Injectable()
 export class PublicCatalogService {
   constructor(
@@ -107,6 +115,11 @@ export class PublicCatalogService {
           isFeatured: input.featured ? true : undefined,
           ...(input.category
             ? { categories: { some: { category: { slug: input.category } } } }
+            : {}),
+          ...(input.genre ? { genres: { some: { genre: { slug: input.genre } } } } : {}),
+          ...(input.person ? { credits: { some: { person: { slug: input.person } } } } : {}),
+          ...(input.collection
+            ? { collections: { some: { collection: { slug: input.collection, visible: true } } } }
             : {}),
         },
         input.q
@@ -168,11 +181,22 @@ export class PublicCatalogService {
           where: { collection: { visible: true } },
           select: { collection: { select: { slug: true, name: true, position: true } } },
         },
+        genres: { select: { genre: { select: { slug: true, name: true } } } },
+        credits: {
+          orderBy: [{ position: 'asc' }, { id: 'asc' }],
+          include: { person: { include: { portrait: true } } },
+        },
       },
     });
     if (!title) {
       throw new NotFoundException('Title not found');
     }
+    const credit = (entry: (typeof title.credits)[number]): PublicCredit => ({
+      slug: entry.person.slug,
+      name: entry.person.name,
+      role: entry.role,
+      portrait: toPublicImage(entry.person.portrait, this.config.mediaBaseUrl),
+    });
 
     const seasons =
       title.type === 'SERIES'
@@ -199,6 +223,22 @@ export class PublicCatalogService {
       synopsis: translated.title?.synopsis ?? title.synopsis,
       originalLanguage: title.originalLanguage,
       hasTrailer: isPlayable(title.trailerAsset),
+      genres: title.genres.map(({ genre }) => genre).sort((a, b) => a.name.localeCompare(b.name)),
+      releaseDate: title.releaseDate ? title.releaseDate.toISOString().slice(0, 10) : null,
+      runtimeMinutes: title.runtimeMinutes,
+      countries: title.countries,
+      studios: title.studios,
+      rating: title.rating,
+      ratingCount: title.ratingCount,
+      seriesStatus: title.seriesStatus,
+      cast: title.credits
+        .filter((entry) => entry.kind === 'CAST')
+        .slice(0, MAX_CAST_SHOWN)
+        .map(credit),
+      crew: title.credits
+        .filter((entry) => entry.kind === 'CREW')
+        .slice(0, MAX_CREW_SHOWN)
+        .map(credit),
       extras: title.extras.map((extra) => ({
         id: extra.id,
         kind: extra.kind,
@@ -239,6 +279,84 @@ export class PublicCatalogService {
       description: category.description,
       titleCount: category._count.titles,
     }));
+  }
+
+  /** Genres that have something to watch, by name. */
+  async genres(): Promise<PublicGenre[]> {
+    const genres = await this.prisma.genre.findMany({
+      where: { titles: { some: { title: visibleTitle() } } },
+      orderBy: { name: 'asc' },
+      select: {
+        slug: true,
+        name: true,
+        _count: { select: { titles: { where: { title: visibleTitle() } } } },
+      },
+    });
+    return genres.map((genre) => ({
+      slug: genre.slug,
+      name: genre.name,
+      titleCount: genre._count.titles,
+    }));
+  }
+
+  /**
+   * A person with the titles of theirs that viewers can see.
+   *
+   * @throws NotFoundException when nobody has this slug, or nothing of theirs can be seen:
+   *   a page about somebody with nothing to watch would lead nowhere.
+   */
+  async person(slug: string, language?: string): Promise<PublicPerson> {
+    const person = await this.prisma.person.findUnique({
+      where: { slug },
+      include: {
+        portrait: true,
+        credits: {
+          where: { title: visibleTitle() },
+          orderBy: [{ kind: 'asc' }, { position: 'asc' }],
+          select: { role: true, title: { include: CARD_INCLUDE } },
+        },
+      },
+    });
+    if (!person || person.credits.length === 0) {
+      throw new NotFoundException('Person not found');
+    }
+    // Somebody who wrote and directed a film has two parts in it, and one card.
+    const parts = new Map<string, (typeof person.credits)[number]>();
+    for (const entry of person.credits) {
+      if (!parts.has(entry.title.id)) {
+        parts.set(entry.title.id, entry);
+      }
+    }
+    const newestFirst = [...parts.values()].sort(
+      (a, b) => (b.title.releaseYear ?? 0) - (a.title.releaseYear ?? 0),
+    );
+    const cards = await this.translations.localizeCards(
+      newestFirst.map((entry) => toPublicCard(entry.title, this.config.mediaBaseUrl)),
+      language,
+    );
+    return {
+      slug: person.slug,
+      name: person.name,
+      knownFor: person.knownFor,
+      biography: person.biography,
+      portrait: toPublicImage(person.portrait, this.config.mediaBaseUrl),
+      titles: cards.map((card, index) => ({ ...card, role: newestFirst[index]?.role ?? null })),
+    };
+  }
+
+  /** The languages titles can be read in: the catalog's own, and those visible titles are translated into. */
+  async languages(): Promise<PublicLanguages> {
+    const groups = await this.prisma.titleTranslation.groupBy({
+      by: ['language'],
+      where: { title: visibleTitle() },
+      _count: { _all: true },
+    });
+    return {
+      default: this.config.metadataLanguage.split('-')[0] ?? 'en',
+      translated: groups
+        .map((group) => ({ language: group.language, titles: group._count._all }))
+        .sort((a, b) => b.titles - a.titles || a.language.localeCompare(b.language)),
+    };
   }
 
   /** Collections shown to viewers that hold at least one visible title, in their order. */

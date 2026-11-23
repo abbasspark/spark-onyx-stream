@@ -1,5 +1,12 @@
 // SPDX-License-Identifier: AGPL-3.0-only
-import type { Category, ExtraKind, Image, TitleAccess, TitleType } from '@onyx/database';
+import type {
+  Category,
+  ExtraKind,
+  Image,
+  SeriesStatus,
+  TitleAccess,
+  TitleType,
+} from '@onyx/database';
 import { toImageView } from './catalog.views.js';
 
 /**
@@ -84,6 +91,23 @@ export interface PublicTitleDetail extends PublicTitleCard {
   synopsis: string | null;
   originalLanguage: string | null;
   hasTrailer: boolean;
+  /** What kind of story it is, by name. */
+  genres: PublicGenreRef[];
+  /** The day of the premiere, such as "1999-03-31". */
+  releaseDate: string | null;
+  /** Movies: the length. Series: what an episode usually runs. In minutes. */
+  runtimeMinutes: number | null;
+  /** Where it was made, as codes of two letters. */
+  countries: string[];
+  studios: string[];
+  /** From 0 to 10 at the source, with the number of votes. */
+  rating: number | null;
+  ratingCount: number | null;
+  /** Series: UPCOMING, RUNNING, ENDED or CANCELLED. */
+  seriesStatus: SeriesStatus | null;
+  /** Who plays in it, in the order of the title, and the first of those who made it. */
+  cast: PublicCredit[];
+  crew: PublicCredit[];
   /** More videos around the title that can be played, in their order. Free to watch, like the trailer. */
   extras: PublicExtra[];
   /** Collections the title belongs to, such as the films of a series of films. */
@@ -95,6 +119,44 @@ export interface PublicTitleDetail extends PublicTitleCard {
   metadataSource: string | null;
   /** Series: seasons that have something to watch, in order. Movies: empty. */
   seasons: PublicSeason[];
+}
+
+export interface PublicGenreRef {
+  slug: string;
+  name: string;
+}
+
+export interface PublicGenre extends PublicGenreRef {
+  /** Titles of this genre that viewers can see. */
+  titleCount: number;
+}
+
+/** One person's part in a title. */
+export interface PublicCredit {
+  /** Of the person, for the address of their page. */
+  slug: string;
+  name: string;
+  /** The character played, or the job. */
+  role: string | null;
+  portrait: PublicImage | null;
+}
+
+export interface PublicPerson {
+  slug: string;
+  name: string;
+  knownFor: string | null;
+  biography: string | null;
+  portrait: PublicImage | null;
+  /** The titles viewers can see that the person has a part in, newest first, each once. */
+  titles: (PublicTitleCard & { role: string | null })[];
+}
+
+/** The languages titles can be read in. */
+export interface PublicLanguages {
+  /** The language the catalog is written in, such as "en". */
+  default: string;
+  /** Other languages at least one visible title is translated into, the most used first. */
+  translated: { language: string; titles: number }[];
 }
 
 export interface PublicExtra {

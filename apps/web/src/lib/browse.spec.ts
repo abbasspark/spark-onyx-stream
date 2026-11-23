@@ -39,3 +39,13 @@ describe('browseHref', () => {
     expect(browseHref(state, { page: 1 })).toBe('/browse?type=MOVIE&category=drama');
   });
 });
+
+describe('browsing by genre', () => {
+  it('reads the genre and keeps it in the address', () => {
+    const state = parseBrowseParams({ genre: 'thriller', type: 'MOVIE' });
+    expect(state.genre).toBe('thriller');
+    expect(browseHref(state)).toBe('/browse?type=MOVIE&genre=thriller');
+    expect(browseHref(state, { genre: undefined })).toBe('/browse?type=MOVIE');
+    expect(parseBrowseParams({ genre: '  ' }).genre).toBeUndefined();
+  });
+});

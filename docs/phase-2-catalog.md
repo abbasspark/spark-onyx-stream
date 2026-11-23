@@ -82,7 +82,7 @@ The texts of a title are written in one language, the language of the catalog. A
 | `GET /titles/{id}/translations/{language}/source` | What TMDB says in that language. Changes nothing                         |
 | `GET /translations/languages`                     | The languages in use, with their number of titles                        |
 
-On the public side, `language` is accepted by `GET /catalog/home`, `/catalog/titles`, `/catalog/titles/{slug}` and `/catalog/collections/{slug}`.
+On the public side, `language` is accepted by `GET /catalog/home`, `/catalog/titles`, `/catalog/titles/{slug}`, `/catalog/collections/{slug}` and `/catalog/people/{slug}`. `GET /catalog/languages` says which languages are on offer: the catalog's own, and those at least one visible title is translated into.
 
 ## Artwork
 
@@ -137,18 +137,21 @@ Changes to the catalog are written to the audit log.
 
 The viewer website and the apps read the catalog through `/v1/catalog`. No sign-in is needed.
 
-| Method and path                                    | Purpose                                                                                              |
-| -------------------------------------------------- | ---------------------------------------------------------------------------------------------------- |
-| `GET /catalog/home`                                | Rows for the home page: featured, new, then one row per category                                     |
-| `GET /catalog/categories`                          | Categories that have something to show, with the number of titles                                    |
-| `GET /catalog/titles`                              | Page of titles. Filters: `type`, `category` (slug), `featured`, `q`. Sorts: `newest`, `name`, `year` |
-| `GET /catalog/titles/{slug}`                       | One title, for a series with its seasons and episodes                                                |
-| `POST /catalog/titles/{slug}/playback`             | Signed addresses for playing a movie                                                                 |
-| `POST /catalog/titles/{slug}/trailer/playback`     | The same for the trailer                                                                             |
-| `POST /catalog/titles/{slug}/extras/{id}/playback` | The same for one of the extras                                                                       |
-| `GET /catalog/collections`                         | Collections that are shown and hold at least one visible title                                       |
-| `GET /catalog/collections/{slug}`                  | A collection with its visible titles, in its order                                                   |
-| `POST /catalog/episodes/{id}/playback`             | The same for an episode                                                                              |
+| Method and path                                    | Purpose                                                                                                                                    |
+| -------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| `GET /catalog/home`                                | Rows for the home page: featured, new, then one row per category                                                                           |
+| `GET /catalog/categories`                          | Categories that have something to show, with the number of titles                                                                          |
+| `GET /catalog/titles`                              | Page of titles. Filters: `type`, `category`, `genre`, `person`, `collection` (all slugs), `featured`, `q`. Sorts: `newest`, `name`, `year` |
+| `GET /catalog/titles/{slug}`                       | One title, for a series with its seasons and episodes                                                                                      |
+| `POST /catalog/titles/{slug}/playback`             | Signed addresses for playing a movie                                                                                                       |
+| `POST /catalog/titles/{slug}/trailer/playback`     | The same for the trailer                                                                                                                   |
+| `POST /catalog/titles/{slug}/extras/{id}/playback` | The same for one of the extras                                                                                                             |
+| `GET /catalog/collections`                         | Collections that are shown and hold at least one visible title                                                                             |
+| `GET /catalog/collections/{slug}`                  | A collection with its visible titles, in its order                                                                                         |
+| `GET /catalog/genres`                              | Genres that have something to watch, with the number of titles                                                                             |
+| `GET /catalog/people/{slug}`                       | A person with the visible titles they have a part in. 404 for somebody with nothing to watch                                               |
+| `GET /catalog/languages`                           | The languages titles can be read in                                                                                                        |
+| `POST /catalog/episodes/{id}/playback`             | The same for an episode                                                                                                                    |
 
 - **Only what can be watched is returned.** Every query uses one filter: the title is published, and a movie's video can be played, or a series has at least one published episode whose video can be played. Seasons and episodes without something to watch are left out, and the counts follow.
 - **A draft answers exactly like a title that does not exist.** A request cannot find out which slugs are in use.
@@ -216,8 +219,7 @@ All need `catalog:write`, except the first, which needs `catalog:read`.
 ## Not built yet
 
 - Renting or buying a single title. Subscriptions are in `phase-3-billing.md`
-- Genres, facts, people, extras and collections on the viewer website. The public catalog API has extras and collections; genres, facts and people are not in it yet
-- A language switch on the viewer website, and translated names of categories, genres and collections
+- Translated names of categories, genres and collections, and the website's own words in other languages
 - Translated names in what a viewer is watching (the "continue watching" row)
 - Extras from the source: an import brings no trailers
 - Collections and rows for the home page

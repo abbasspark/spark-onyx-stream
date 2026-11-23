@@ -23,6 +23,12 @@ export const listPublicTitlesSchema = paginationSchema.extend({
   type: z.enum(TITLE_TYPES).optional(),
   /** Slug of a category. */
   category: slug.optional(),
+  /** Slug of a genre. */
+  genre: slug.optional(),
+  /** Slug of a person who has a part in the title. */
+  person: slug.optional(),
+  /** Slug of a collection. */
+  collection: slug.optional(),
   /** "true" keeps only featured titles. */
   featured: z
     .enum(['true', 'false'])
