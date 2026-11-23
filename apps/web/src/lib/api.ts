@@ -17,6 +17,7 @@ import type {
   Languages,
   Page,
   Person,
+  Site,
   TitleCard,
   TitleDetail,
   TitleSort,
@@ -175,6 +176,28 @@ export async function getGenres(): Promise<Genre[]> {
 }
 
 /** The languages on offer. An API older than translations offers only its own. */
+/**
+ * How the site presents itself. Never fails: when the API cannot say (it is
+ * older, or not there), the site shows as it ships, under the name from its
+ * own settings. A page must not break over its header.
+ */
+export async function getSite(): Promise<Site> {
+  try {
+    return await read<Site>('/site');
+  } catch {
+    return {
+      name: siteConfig.name,
+      description: siteConfig.description,
+      logo: null,
+      logoShowsName: false,
+      icon: null,
+      accent: null,
+      footerText: null,
+      footerLinks: [],
+    };
+  }
+}
+
 export async function getLanguages(): Promise<Languages> {
   try {
     return await read<Languages>('/languages');

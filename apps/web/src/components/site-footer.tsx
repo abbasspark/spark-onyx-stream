@@ -2,16 +2,43 @@
 import Link from 'next/link';
 import type { ReactNode } from 'react';
 import type { Category } from '@/lib/types';
-import { BandMark } from './brand';
+import { SiteBrand } from './brand';
+
+/** A link of the footer: inside the site with the router, anything else as a plain link. */
+function FooterLink({ label, url }: { label: string; url: string }) {
+  return url.startsWith('/') ? (
+    <Link href={url} className="hover:text-vein">
+      {label}
+    </Link>
+  ) : (
+    <a
+      href={url}
+      className="hover:text-vein"
+      {...(url.startsWith('mailto:') ? {} : { rel: 'noopener noreferrer' })}
+    >
+      {label}
+    </a>
+  );
+}
 
 export function SiteFooter({
   siteName,
+  logo = null,
+  logoShowsName = false,
+  footerText = null,
+  footerLinks = [],
   categories,
   hasPlans = false,
   hasLive = false,
   languageSwitch = null,
 }: {
   siteName: string;
+  logo?: { url: string; width: number; height: number } | null;
+  logoShowsName?: boolean;
+  /** A line of the site's own: a copyright, a company name. */
+  footerText?: string | null;
+  /** Links of the site's own: an imprint, a privacy notice. */
+  footerLinks?: { label: string; url: string }[];
   categories: Category[];
   hasPlans?: boolean;
   hasLive?: boolean;
@@ -21,9 +48,8 @@ export function SiteFooter({
   return (
     <footer className="gutter mt-24 border-t border-line pt-10 pb-12 text-sm text-smoke">
       <div className="flex flex-wrap items-start justify-between gap-x-16 gap-y-8">
-        <div className="flex items-center gap-2.5 text-vein">
-          <BandMark className="size-6" />
-          <span className="heading text-base">{siteName}</span>
+        <div className="flex items-center gap-2.5 text-vein" aria-label={siteName}>
+          <SiteBrand name={siteName} logo={logo} showName={logoShowsName} size="footer" />
         </div>
         <nav aria-label="Footer" className="flex flex-wrap gap-x-16 gap-y-8">
           <ul className="grid content-start gap-2">
@@ -76,6 +102,20 @@ export function SiteFooter({
         </nav>
       </div>
       {languageSwitch ? <div className="mt-10">{languageSwitch}</div> : null}
+      {footerText || footerLinks.length > 0 ? (
+        <div className="mt-10 flex flex-wrap items-baseline justify-between gap-x-10 gap-y-3 border-t border-line pt-6">
+          {footerText ? <p className="max-w-2xl whitespace-pre-line">{footerText}</p> : <span />}
+          {footerLinks.length > 0 ? (
+            <ul className="flex flex-wrap gap-x-6 gap-y-2">
+              {footerLinks.map((link) => (
+                <li key={`${link.label} ${link.url}`}>
+                  <FooterLink label={link.label} url={link.url} />
+                </li>
+              ))}
+            </ul>
+          ) : null}
+        </div>
+      ) : null}
       <p className="mt-10 text-xs text-dust">
         Runs on{' '}
         <a

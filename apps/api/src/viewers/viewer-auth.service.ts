@@ -35,6 +35,7 @@ import {
   ViewerProfilesService,
 } from './viewer-profiles.service.js';
 import { type ViewerIdentity, ViewerSessionService } from './viewer-session.service.js';
+import { WebhookDeliveryService } from '../webhooks/webhook-delivery.service.js';
 
 /**
  * A valid hash of a random password. Verifying against it when the email is
@@ -73,6 +74,7 @@ export type OwnedTitleRef = OwnedTitle;
 export class ViewerAuthService {
   constructor(
     @Inject(PrismaClient) private readonly prisma: PrismaClient,
+    @Inject(WebhookDeliveryService) private readonly webhooks: WebhookDeliveryService,
     @Inject(ViewerSessionService) private readonly sessions: ViewerSessionService,
     @Inject(LoginThrottleService) private readonly throttle: LoginThrottleService,
     @Inject(AppConfig) private readonly config: AppConfig,
@@ -139,6 +141,10 @@ export class ViewerAuthService {
     }
 
     await this.emails.sendWelcomeVerification(viewer);
+    await this.webhooks.emit('viewer.created', {
+      viewer: { id: viewer.id, email: viewer.email, displayName: viewer.displayName },
+      by: 'signup',
+    });
     const { token, session } = await this.sessions.create(viewer.id, info);
     return {
       viewer: toViewerView(viewer),

@@ -9,7 +9,7 @@ import { PersonCard } from '@/components/person-card';
 import { PosterCard } from '@/components/poster-card';
 import { TitleActions } from '@/components/title-actions';
 import { StripRow } from '@/components/title-row';
-import { getCollection, getPlans, getTitle, getTitles } from '@/lib/api';
+import { getCollection, getPlans, getSite, getTitle, getTitles } from '@/lib/api';
 import { DEFAULT_RENTAL, NO_PLANS, subscribable } from '@/lib/plans';
 import { absoluteUrl, siteConfig } from '@/lib/config';
 import {
@@ -33,12 +33,12 @@ interface TitlePageProps {
 
 export async function generateMetadata({ params }: TitlePageProps): Promise<Metadata> {
   const { slug } = await params;
-  const title = await getTitle(slug);
+  const [title, site] = await Promise.all([getTitle(slug), getSite()]);
   if (!title) {
     return { title: 'Not found' };
   }
 
-  const description = truncate(title.synopsis ?? title.tagline ?? siteConfig.description, 160);
+  const description = truncate(title.synopsis ?? title.tagline ?? site.description, 160);
   const image = title.backdrop ?? title.poster;
   return {
     title: title.releaseYear ? `${title.name} (${title.releaseYear})` : title.name,

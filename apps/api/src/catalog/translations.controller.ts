@@ -18,6 +18,7 @@ import { CurrentPrincipal, RequirePermissions } from '../auth/auth.decorators.js
 import type { Principal } from '../auth/principal.js';
 import { requestInfo } from '../auth/request-info.js';
 import { ZodValidationPipe } from '../common/zod-validation.pipe.js';
+import { TitleHistoryService } from '../history/title-history.service.js';
 import { type TranslationInput, translationSchema } from './catalog.schemas.js';
 import {
   type LanguageUse,
@@ -31,6 +32,7 @@ export class TranslationsController {
   constructor(
     @Inject(TranslationsService) private readonly translations: TranslationsService,
     @Inject(AuditService) private readonly audit: AuditService,
+    @Inject(TitleHistoryService) private readonly history: TitleHistoryService,
   ) {}
 
   /** The languages in use, to offer them first when a title gets a new one. */
@@ -56,6 +58,7 @@ export class TranslationsController {
     @Req() request: Request,
   ): Promise<TranslationView[]> {
     const translations = await this.translations.put(id, language, body);
+    await this.history.capture(id, principal.adminId, 'translation');
     await this.audit.record({
       action: 'title.translation.save',
       adminId: principal.adminId,
@@ -77,6 +80,7 @@ export class TranslationsController {
     @Req() request: Request,
   ): Promise<void> {
     await this.translations.remove(id, language);
+    await this.history.capture(id, principal.adminId, 'translation');
     await this.audit.record({
       action: 'title.translation.delete',
       adminId: principal.adminId,

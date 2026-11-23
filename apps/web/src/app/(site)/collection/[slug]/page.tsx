@@ -2,8 +2,8 @@
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import { PosterCard } from '@/components/poster-card';
-import { getCollection } from '@/lib/api';
-import { absoluteUrl, siteConfig } from '@/lib/config';
+import { getCollection, getSite } from '@/lib/api';
+import { absoluteUrl } from '@/lib/config';
 import { truncate } from '@/lib/format';
 
 interface CollectionPageProps {
@@ -12,13 +12,13 @@ interface CollectionPageProps {
 
 export async function generateMetadata({ params }: CollectionPageProps): Promise<Metadata> {
   const { slug } = await params;
-  const collection = await getCollection(slug);
+  const [collection, site] = await Promise.all([getCollection(slug), getSite()]);
   if (!collection) {
     return { title: 'Not found' };
   }
   const description = truncate(
     collection.synopsis ||
-      `${collection.titles.length} ${collection.titles.length === 1 ? 'title' : 'titles'} on ${siteConfig.name}.`,
+      `${collection.titles.length} ${collection.titles.length === 1 ? 'title' : 'titles'} on ${site.name}.`,
     160,
   );
   const image = collection.backdrop ?? collection.poster;

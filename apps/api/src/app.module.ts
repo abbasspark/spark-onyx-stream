@@ -23,6 +23,7 @@ import { BackupsModule } from './backups/backups.module.js';
 import { DiagnosticsModule } from './diagnostics/diagnostics.module.js';
 import { ProcessBeaconModule } from './diagnostics/process-beacon.service.js';
 import { BillingModule } from './billing/billing.module.js';
+import { BrandingModule } from './branding/branding.module.js';
 import { MailModule } from './mail/mail.module.js';
 import { WatchModule } from './watch/watch.module.js';
 import { BulkModule } from './bulk/bulk.module.js';
@@ -32,6 +33,8 @@ import { WatchingModule } from './watching/watching.module.js';
 import { WatchlistModule } from './watchlist/watchlist.module.js';
 import type { AppRole } from './roles/app-role.js';
 import { AnalyticsModule, PlaysModule } from './analytics/analytics.module.js';
+import { TitleHistoryCoreModule } from './history/title-history.module.js';
+import { WebhooksCoreModule, WebhooksModule } from './webhooks/webhooks.module.js';
 import { StreamsCoreModule, StreamsModule } from './streams/streams.module.js';
 import { GuideModule } from './guide/guide.module.js';
 import { LiveModule } from './live/live.module.js';
@@ -54,6 +57,7 @@ const ROLE_MODULES: Record<AppRole, Type[]> = {
     StreamsModule,
     CatalogModule,
     MailModule,
+    BrandingModule,
     BillingModule,
     MetadataModule,
     WatchModule,
@@ -67,6 +71,7 @@ const ROLE_MODULES: Record<AppRole, Type[]> = {
     DeliveryCoreModule,
     DeliveryModule,
     BackupsModule,
+    WebhooksModule,
     DiagnosticsModule,
     EventStreamModule,
     HealthModule,
@@ -98,6 +103,8 @@ export class AppModule {
         StorageModule,
         ProcessingCoreModule,
         PlaysModule,
+        TitleHistoryCoreModule,
+        WebhooksCoreModule,
         StreamsCoreModule,
         ProcessBeaconModule,
         ...roleModules,

@@ -34,6 +34,7 @@ import {
   toolProblem,
   toolVersion,
 } from './pg-tools.js';
+import { WebhookDeliveryService } from '../webhooks/webhook-delivery.service.js';
 
 /** How often the runner looks for work. A backup asked for by hand starts within this time. */
 const LOOK_EVERY_MS = 20_000;
@@ -80,6 +81,7 @@ export class BackupRunner implements OnApplicationBootstrap, OnApplicationShutdo
 
   constructor(
     @Inject(PrismaClient) private readonly prisma: PrismaClient,
+    @Inject(WebhookDeliveryService) private readonly webhooks: WebhookDeliveryService,
     @Inject(REDIS_CLIENT) private readonly redis: Redis,
     @Inject(StorageService) private readonly storage: StorageService,
     @Inject(AppConfig) private readonly config: AppConfig,
@@ -289,6 +291,7 @@ export class BackupRunner implements OnApplicationBootstrap, OnApplicationShutdo
         .catch(() => undefined);
     }
     this.events.publish({ type: 'backup', backupId: backup.id });
+    await this.webhooks.announceBackup(backup.id);
   }
 
   private async newestMigration(): Promise<string | null> {

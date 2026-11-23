@@ -3,9 +3,15 @@ import { type ReactNode, Suspense } from 'react';
 import { SiteFooter } from '@/components/site-footer';
 import { SiteHeader } from '@/components/site-header';
 import { LanguageSwitch } from '@/components/language-switch';
-import { currentLanguage, getCategories, getChannels, getLanguages, getPlans } from '@/lib/api';
+import {
+  currentLanguage,
+  getCategories,
+  getChannels,
+  getLanguages,
+  getPlans,
+  getSite,
+} from '@/lib/api';
 import { nativeLanguageName } from '@/lib/language';
-import { siteConfig } from '@/lib/config';
 import type { Category } from '@/lib/types';
 
 /** The categories for the menus. Without them the page still works. */
@@ -20,7 +26,8 @@ async function loadCategories(): Promise<Category[]> {
 /** The frame of every page except the player: header, content, footer. */
 export default async function SiteLayout({ children }: { children: ReactNode }) {
   // Asked for together. A site without plans or live channels shows no link to them.
-  const [categories, hasPlans, hasLive, languages, language] = await Promise.all([
+  const [site, categories, hasPlans, hasLive, languages, language] = await Promise.all([
+    getSite(),
     loadCategories(),
     getPlans()
       .then((offer) => offer.plans.length > 0)
@@ -46,7 +53,9 @@ export default async function SiteLayout({ children }: { children: ReactNode }) 
       {/* The header reads the address, which for some pages is only known in the browser. */}
       <Suspense fallback={<div className="h-16" />}>
         <SiteHeader
-          siteName={siteConfig.name}
+          siteName={site.name}
+          logo={site.logo}
+          logoShowsName={site.logoShowsName}
           categories={categories}
           hasPlans={hasPlans}
           hasLive={hasLive}
@@ -56,7 +65,11 @@ export default async function SiteLayout({ children }: { children: ReactNode }) 
         {children}
       </main>
       <SiteFooter
-        siteName={siteConfig.name}
+        siteName={site.name}
+        logo={site.logo}
+        logoShowsName={site.logoShowsName}
+        footerText={site.footerText}
+        footerLinks={site.footerLinks}
         categories={categories}
         hasPlans={hasPlans}
         hasLive={hasLive}

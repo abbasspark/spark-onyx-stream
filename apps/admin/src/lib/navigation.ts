@@ -27,6 +27,7 @@ import {
   Network,
   Share2,
   Mail,
+  Palette,
   Radio,
   ScrollText,
   ShieldHalf,
@@ -38,6 +39,7 @@ import {
   Tv,
   Users,
   UsersRound,
+  Webhook,
 } from 'lucide-react';
 import type { Permission } from '@/api/types';
 
@@ -299,6 +301,13 @@ export const NAVIGATION: NavGroup[] = [
     label: 'Settings',
     items: [
       {
+        to: '/branding',
+        label: 'Branding',
+        icon: Palette,
+        permission: 'settings:read',
+        keywords: 'logo name colour color accent icon favicon footer imprint site look theme',
+      },
+      {
         to: '/encoding-profiles',
         label: 'Encoding profiles',
         icon: SlidersHorizontal,
@@ -353,6 +362,14 @@ export const NAVIGATION: NavGroup[] = [
         icon: KeyRound,
         permission: 'api-keys:read',
         keywords: 'tokens integration',
+      },
+      {
+        to: '/webhooks',
+        label: 'Webhooks',
+        icon: Webhook,
+        permission: 'settings:read',
+        keywords:
+          'events notify callback integration automation zapier n8n hook signature deliveries',
       },
       {
         to: '/audit',

@@ -16,6 +16,7 @@ import { CurrentPrincipal, RequirePermissions } from '../auth/auth.decorators.js
 import type { Principal } from '../auth/principal.js';
 import { requestInfo } from '../auth/request-info.js';
 import { ZodValidationPipe } from '../common/zod-validation.pipe.js';
+import { TitleHistoryService } from '../history/title-history.service.js';
 import { RateLimit } from '../rate-limit/rate-limit.guard.js';
 import {
   type ApplyMetadataInput,
@@ -49,6 +50,7 @@ export class MetadataController {
     @Inject(MetadataService) private readonly metadata: MetadataService,
     @Inject(TranslationsService) private readonly translations: TranslationsService,
     @Inject(AuditService) private readonly audit: AuditService,
+    @Inject(TitleHistoryService) private readonly history: TitleHistoryService,
   ) {}
 
   /** Whether the import is set up, so the panel can show or explain it. */
@@ -88,6 +90,7 @@ export class MetadataController {
   ): Promise<ImportResult> {
     const result = await this.metadata.importNew(body, principal.adminId);
     await this.record('title.import', result, principal, request);
+    await this.history.capture(result.title.id, principal.adminId, 'import');
     return result;
   }
 
@@ -102,6 +105,7 @@ export class MetadataController {
     @Req() request: Request,
   ): Promise<ImportResult> {
     const result = await this.metadata.applyTo(id, body);
+    await this.history.capture(id, principal.adminId, 'metadata_update');
     await this.record('title.metadata_update', result, principal, request, {
       overwrite: body.overwrite,
     });

@@ -25,6 +25,7 @@ import {
   STRIPE_WEBHOOK_ROUTE,
   toStripeEventView,
 } from './stripe-webhook.service.js';
+import { WebhookDeliveryService } from '../webhooks/webhook-delivery.service.js';
 
 const FOR_ADMIN = {
   plan: { select: { id: true, name: true } },
@@ -42,6 +43,7 @@ const DAY_MS = 24 * 60 * 60 * 1000;
 export class SubscriptionsService {
   constructor(
     @Inject(PrismaClient) private readonly prisma: PrismaClient,
+    @Inject(WebhookDeliveryService) private readonly webhooks: WebhookDeliveryService,
     @Inject(AppConfig) private readonly config: AppConfig,
     @Inject(StripeClient) private readonly stripe: StripeClient,
     @Inject(StripeSyncService) private readonly sync: StripeSyncService,
@@ -133,6 +135,7 @@ export class SubscriptionsService {
       },
       include: FOR_ADMIN,
     });
+    await this.webhooks.announceSubscription('subscription.started', created.id);
     return this.view(created);
   }
 
@@ -193,6 +196,7 @@ export class SubscriptionsService {
       data: { status: 'CANCELED', canceledAt: now, endsAt: now, cancelAtPeriodEnd: false },
       include: FOR_ADMIN,
     });
+    await this.webhooks.announceSubscription('subscription.ended', ended.id);
     return this.view(ended, now);
   }
 

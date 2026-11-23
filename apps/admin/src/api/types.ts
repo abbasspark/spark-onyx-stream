@@ -2297,3 +2297,162 @@ export interface TermSaveItem {
   id: string;
   texts: Record<string, string | null>;
 }
+
+/** The parts of a title a change belongs to, for filtering its history. */
+export const CHANGE_GROUPS = [
+  'texts',
+  'facts',
+  'publishing',
+  'access',
+  'artwork',
+  'classification',
+  'people',
+  'videos',
+  'translations',
+  'episodes',
+] as const;
+export type ChangeGroup = (typeof CHANGE_GROUPS)[number];
+
+/** One thing that differs between two moments of a title. */
+export interface TitleChange {
+  group: ChangeGroup;
+  /** Stable, for keys: "synopsis", "genres", "season:1:episode:3:name". */
+  field: string;
+  label: string;
+  kind: 'text' | 'value' | 'list';
+  /** How `before` and `after` are shown: as they are, or as a price, a date and so on. */
+  format?: 'money' | 'date' | 'datetime' | 'status' | 'yesno' | 'picture';
+  before?: string | null;
+  after?: string | null;
+  added?: string[];
+  removed?: string[];
+  reordered?: boolean;
+}
+
+export interface TitleRevision {
+  id: string;
+  /** What was done, as a word: "update", "publish", "import", "restore". */
+  action: string;
+  createdAt: string;
+  admin: { id: string; displayName: string } | null;
+  changes: TitleChange[];
+  /** More than `changes` holds when the list was cut. */
+  changeCount: number;
+  /** The first revision of the title: nothing to compare it with. */
+  first: boolean;
+}
+
+export interface TitleRevisionDetail extends TitleRevision {
+  /** What bringing this version back would change now. */
+  restore: TitleChange[];
+}
+
+/** A link in the footer of the website. */
+export interface FooterLink {
+  label: string;
+  url: string;
+}
+
+/** How the website presents itself. Null means: as it ships. */
+export interface BrandingSettings {
+  name: string | null;
+  description: string | null;
+  logoId: string | null;
+  /** Whether the name is written next to the logo, or the logo stands for it. */
+  logoShowsName: boolean;
+  iconId: string | null;
+  /** The one colour of the interface, as "#rrggbb". */
+  accent: string | null;
+  footerText: string | null;
+  footerLinks: FooterLink[];
+}
+
+export interface Branding {
+  settings: BrandingSettings;
+  logo: CatalogImage | null;
+  icon: CatalogImage | null;
+  /** What shows where a setting is left empty. */
+  defaults: { name: string; description: string; accent: string };
+  /** How light the accent has to be against black. */
+  minimumContrast: number;
+}
+
+// --- Webhooks ------------------------------------------------------------------------
+
+export type WebhookDeliveryStatus = 'PENDING' | 'DELIVERED' | 'FAILED';
+
+/** A webhook: an address of another system that is told when something happens. */
+export interface Webhook {
+  id: string;
+  name: string;
+  url: string;
+  /** Names of events, or "*" alone for all of them. */
+  events: string[];
+  isActive: boolean;
+  /** Since when nothing got through. Null while the last delivery did. */
+  failingSince: string | null;
+  /** Why the system switched it off, when it did. */
+  disabledReason: string | null;
+  createdAt: string;
+  updatedAt: string;
+  lastDelivery: { status: WebhookDeliveryStatus; at: string; event: string } | null;
+  /** Deliveries of the last 24 hours, by what became of them. */
+  recent: { delivered: number; failed: number; pending: number };
+}
+
+/** A webhook with its signing secret: shown once. */
+export interface WebhookWithSecret extends Webhook {
+  secret: string;
+}
+
+export interface WebhookInput {
+  name: string;
+  url: string;
+  events: string[];
+}
+
+export interface WebhookDelivery {
+  id: string;
+  event: string;
+  status: WebhookDeliveryStatus;
+  attempts: number;
+  maxAttempts: number;
+  nextAttemptAt: string | null;
+  responseStatus: number | null;
+  error: string | null;
+  durationMs: number | null;
+  createdAt: string;
+  attemptedAt: string | null;
+  deliveredAt: string | null;
+}
+
+export interface WebhookDeliveryDetail extends WebhookDelivery {
+  /** The body as it is sent and signed. */
+  payload: { id: string; event: string; createdAt: string; data: Record<string, unknown> };
+  responseBody: string | null;
+}
+
+export interface WebhookActivityHour {
+  start: string;
+  delivered: number;
+  failed: number;
+  pending: number;
+}
+
+export interface WebhookEventInfo {
+  name: string;
+  group: string;
+  label: string;
+  description: string;
+  /** An example of the "data" of the event. */
+  sample: Record<string, unknown>;
+}
+
+export interface WebhookReference {
+  events: WebhookEventInfo[];
+  retryDelaysSeconds: number[];
+  signatureToleranceSeconds: number;
+  /** Whether webhooks may go to private and local addresses. */
+  targets: 'any' | 'public';
+  maxWebhooks: number;
+}

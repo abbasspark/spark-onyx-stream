@@ -2,6 +2,12 @@
 import type { DuplicateParts } from '@/lib/duplicate';
 import { download, request, requestText, uploadFile } from './client';
 import type {
+  Branding,
+  BrandingSettings,
+  ChangeGroup,
+  TitleChange,
+  TitleRevision,
+  TitleRevisionDetail,
   TermKind,
   TermRow,
   TermSaveItem,
@@ -151,6 +157,14 @@ import type {
   ViewerSaved,
   ViewerStreams,
   ViewerWatching,
+  Webhook,
+  WebhookActivityHour,
+  WebhookDelivery,
+  WebhookDeliveryDetail,
+  WebhookDeliveryStatus,
+  WebhookInput,
+  WebhookReference,
+  WebhookWithSecret,
 } from './types';
 
 export const authApi = {
@@ -681,6 +695,29 @@ export const collectionsApi = {
   remove: (id: string) => request<void>(`/v1/collections/${id}`, { method: 'DELETE' }),
 };
 
+export const brandingApi = {
+  get: (signal?: AbortSignal) => request<Branding>('/v1/branding', { signal }),
+  save: (body: BrandingSettings) => request<Branding>('/v1/branding', { method: 'PUT', body }),
+  /** Back to how the site ships. */
+  reset: () => request<Branding>('/v1/branding', { method: 'DELETE' }),
+};
+
+export const titleHistoryApi = {
+  list: (
+    titleId: string,
+    query: { page: number; pageSize: number; group?: ChangeGroup },
+    signal?: AbortSignal,
+  ) => request<Page<TitleRevision>>(`/v1/titles/${titleId}/history`, { query, signal }),
+  get: (titleId: string, revisionId: string, signal?: AbortSignal) =>
+    request<TitleRevisionDetail>(`/v1/titles/${titleId}/history/${revisionId}`, { signal }),
+  /** Brings a version back. `left` is what of it no longer exists. */
+  restore: (titleId: string, revisionId: string) =>
+    request<{ restored: number; left: TitleChange[] }>(
+      `/v1/titles/${titleId}/history/${revisionId}/restore`,
+      { method: 'POST' },
+    ),
+};
+
 export const termsApi = {
   overview: (signal?: AbortSignal) => request<TermsOverview>('/v1/translations/terms', { signal }),
   list: (
@@ -898,4 +935,35 @@ export const diagnosticsApi = {
     request<{ summary: DiagnosticsSummary | null }>('/v1/diagnostics/summary', { signal }),
   saveSettings: (body: { emailAlerts: boolean }) =>
     request<{ emailAlerts: boolean }>('/v1/diagnostics/settings', { method: 'PUT', body }),
+};
+
+export const webhooksApi = {
+  list: (signal?: AbortSignal) => request<Webhook[]>('/v1/webhooks', { signal }),
+  reference: (signal?: AbortSignal) =>
+    request<WebhookReference>('/v1/webhooks/reference', { signal }),
+  get: (id: string, signal?: AbortSignal) => request<Webhook>(`/v1/webhooks/${id}`, { signal }),
+  activity: (id: string, signal?: AbortSignal) =>
+    request<WebhookActivityHour[]>(`/v1/webhooks/${id}/activity`, { signal }),
+  create: (body: WebhookInput) =>
+    request<WebhookWithSecret>('/v1/webhooks', { method: 'POST', body }),
+  update: (id: string, body: Partial<WebhookInput> & { isActive?: boolean }) =>
+    request<Webhook>(`/v1/webhooks/${id}`, { method: 'PATCH', body }),
+  remove: (id: string) => request<void>(`/v1/webhooks/${id}`, { method: 'DELETE' }),
+  /** Replaces the signing secret. The old one stops working at once. */
+  rollSecret: (id: string) =>
+    request<WebhookWithSecret>(`/v1/webhooks/${id}/secret`, { method: 'POST' }),
+  /** Sends a test event now and says what the address answered. */
+  test: (id: string) =>
+    request<WebhookDeliveryDetail>(`/v1/webhooks/${id}/test`, { method: 'POST' }),
+  deliveries: (
+    id: string,
+    query: { page: number; pageSize: number; status?: WebhookDeliveryStatus; event?: string },
+    signal?: AbortSignal,
+  ) => request<Page<WebhookDelivery>>(`/v1/webhooks/${id}/deliveries`, { query, signal }),
+  delivery: (id: string, deliveryId: string, signal?: AbortSignal) =>
+    request<WebhookDeliveryDetail>(`/v1/webhooks/${id}/deliveries/${deliveryId}`, { signal }),
+  redeliver: (id: string, deliveryId: string) =>
+    request<WebhookDelivery>(`/v1/webhooks/${id}/deliveries/${deliveryId}/redeliver`, {
+      method: 'POST',
+    }),
 };

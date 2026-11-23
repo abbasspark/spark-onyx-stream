@@ -80,3 +80,6 @@ Before the apps, the panel becomes a fuller catalog system. This work is outside
 16. Custom roles: roles made in the panel from the permission list, area by area, with rules that keep anyone from handing out more than they hold. **Done.**
 17. Translations of categories, genres, collections and people, worked on a language at a time in the panel, and read by viewers wherever these names show. **Done.**
 18. Duplicating a title: a draft copy with a choice of what comes along, sharing videos and pictures with the original. **Done.**
+19. The history of a title: who changed what and when, shown as before and after, with a way to bring an earlier version back. **Done.**
+20. Site branding: the name, logo, icon, accent colour and footer of the website, set in the panel with a live sketch. **Done.**
+21. Outgoing webhooks: your own systems are told when a title goes live, a viewer signs up or a payment arrives, with signed requests, retries and a record of every delivery. **Done.**

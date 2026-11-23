@@ -146,6 +146,22 @@ export interface Collection extends CollectionRef {
   titles: TitleCard[];
 }
 
+/** How the site presents itself: set in the panel, shown on every page. */
+export interface Site {
+  name: string;
+  description: string;
+  /** A picture in place of the mark. Null: the mark the website ships with. */
+  logo: { url: string; width: number; height: number } | null;
+  /** Whether the name is written next to the logo, or the logo stands for it. */
+  logoShowsName: boolean;
+  /** The picture of the browser tab. Null: the one the website ships with. */
+  icon: { url: string; width: number; height: number } | null;
+  /** The one colour of the interface. Null: the amber the website ships with. */
+  accent: { color: string; deep: string } | null;
+  footerText: string | null;
+  footerLinks: { label: string; url: string }[];
+}
+
 /** The languages titles can be read in. */
 export interface Languages {
   /** The language the catalog is written in, such as "en". */

@@ -13,6 +13,8 @@ import {
   type StripeInvoice,
   type StripeSubscription,
 } from './stripe.types.js';
+import { RUNNING_STATUSES } from '../billing/entitlement.js';
+import { WebhookDeliveryService } from '../webhooks/webhook-delivery.service.js';
 
 /** A renewal Stripe has not reported this long after it was due is asked for. */
 const OVERDUE_MS = 60 * 60 * 1000;
@@ -37,6 +39,7 @@ export class StripeSyncService {
 
   constructor(
     @Inject(PrismaClient) private readonly prisma: PrismaClient,
+    @Inject(WebhookDeliveryService) private readonly webhooks: WebhookDeliveryService,
     @Inject(StripeClient) private readonly stripe: StripeClient,
     @Inject(AppConfig) private readonly config: AppConfig,
   ) {}
@@ -111,6 +114,14 @@ export class StripeSyncService {
         data: { stripeCustomerId: customerId },
       });
     }
+    // Told to webhooks when it begins, and when it stops giving access.
+    const ran = (status: string | undefined) =>
+      status !== undefined && (RUNNING_STATUSES as readonly string[]).includes(status);
+    if (!existing) {
+      await this.webhooks.announceSubscription('subscription.started', saved.id);
+    } else if (ran(existing.status) && !ran(saved.status)) {
+      await this.webhooks.announceSubscription('subscription.ended', saved.id);
+    }
     return saved;
   }
 
@@ -184,12 +195,18 @@ export class StripeSyncService {
           planName: subscription?.plan.name ?? null,
         },
       });
-    return write().catch((error: unknown) => {
+    const known = await this.prisma.payment.count({ where: { externalId: paid.externalId } });
+    const payment = await write().catch((error: unknown) => {
       if (isUniqueViolation(error)) {
         return write();
       }
       throw error;
     });
+    // An invoice is heard of more than once. Its payment is announced the first time.
+    if (known === 0) {
+      await this.webhooks.announcePayment(payment.id);
+    }
+    return payment;
   }
 
   /**
@@ -278,7 +295,7 @@ export class StripeSyncService {
     const amount = session.amount_total ?? 0;
     const tax = session.total_details?.amount_tax ?? 0;
     try {
-      return await this.prisma.$transaction(async (tx) => {
+      const purchase = await this.prisma.$transaction(async (tx) => {
         const payment =
           amount > 0
             ? await tx.payment.create({
@@ -313,6 +330,11 @@ export class StripeSyncService {
           },
         });
       });
+      await this.webhooks.announcePurchase(purchase.id);
+      if (purchase.paymentId) {
+        await this.webhooks.announcePayment(purchase.paymentId);
+      }
+      return purchase;
     } catch (error) {
       // The message from Stripe and the viewer's return can record it at the same moment.
       if (isUniqueViolation(error)) {
@@ -392,6 +414,7 @@ export class StripeSyncService {
             where: { id: subscription.id },
             data: { status: 'EXPIRED', renewsAt: null },
           });
+          await this.webhooks.announceSubscription('subscription.ended', subscription.id);
           continue;
         }
         this.logger.warn(

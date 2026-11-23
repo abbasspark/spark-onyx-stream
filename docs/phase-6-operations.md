@@ -264,6 +264,162 @@ The tool works on the database directly and needs only `DATABASE_URL`, not a run
 
 Signing in at the API directly: `POST /auth/login` takes `code` beside `email` and `password`. Without it, an account with two-factor sign-in answers `401` with the code `two_factor_required`; a wrong one answers `401` with `two_factor_invalid`.
 
+## Branding
+
+**Settings > Branding** in the panel is where the site gets its own face. Nothing here needs a restart or a new build: the website shows a change within about a minute.
+
+- **Name and a sentence about the site.** The name is in the header, the browser tab and link previews, signs every email, and is what an authenticator app shows beside an admin's sign-in code. Left empty, it is the `SITE_NAME` of the installation.
+- **Logo.** A picture in place of the built-in mark, in the header and the footer. It can stand for the name or sit next to it. Wide, on a transparent background and light enough for a black page works best.
+- **Icon.** A square PNG of at least 64 pixels, better 512, for the browser tab and home screens.
+- **Colour.** The website has one colour: it marks what can be played, links, progress and focus. Choose one of eight ready-made colours or type your own.
+- **Footer.** A line of your own and up to eight links: the imprint, the privacy notice, a contact address. A link leads to a page of the site (`/imprint`), to another site (`https://…`) or to an email address (`mailto:…`).
+
+The page shows a sketch of the site beside the form, with what is typed, before it is saved.
+
+### The colour has to be readable
+
+The website is black. Its accent is used two ways: as text on the black page, and as buttons with black text on them. Both are the same pair of colours, so one number decides both: the accent needs a contrast of at least 4.5 to 1 against black, which is what the accessibility guidelines ask of text. A darker colour is refused, and the panel offers the nearest lighter shade of the same colour that passes, so a dark brand colour keeps its hue.
+
+### What it does not do
+
+- It does not change the layout, the typeface or the black background. The look of the website is a design, not a theme; the accent, the logo and the name are the parts that are yours.
+- The footer links lead to pages, they do not make them. An imprint or privacy page is written elsewhere and linked here.
+- The admin panel keeps its own look.
+- The line "Runs on Spark Onyx Stream" with the link to the source stays. The licence asks for the source to be offered to the people who use the site.
+
+### API
+
+| Method and path     | Purpose                                                                              |
+| ------------------- | ------------------------------------------------------------------------------------ |
+| `GET /catalog/site` | Public. The name, sentence, logo, icon, accent and footer, as the website reads them |
+| `GET /branding`     | What is set, the pictures, and what shows where a setting is empty                   |
+| `PUT /branding`     | Set all of it. `422` with `code: accent_too_dark` names a `suggestion`               |
+| `DELETE /branding`  | Back to how the site ships                                                           |
+
+Reading needs `settings:read`, changing `settings:write`. A picture the branding shows cannot be deleted from under it.
+
+## Webhooks
+
+A webhook tells another system when something happens here: a newsletter tool learns about a new viewer, a chat channel hears that a title went live, an accounting script gets every payment. Each event is sent as a `POST` request with a JSON body to an address you enter under **Settings > Webhooks**. An installation can have up to 20.
+
+### Events
+
+| Event                  | When                                                                     |
+| ---------------------- | ------------------------------------------------------------------------ |
+| `title.published`      | A movie or series became visible to viewers                              |
+| `title.unpublished`    | A published title went back to draft or was archived                     |
+| `title.updated`        | Anything the history of a title follows changed. Says which parts        |
+| `title.deleted`        | A title was removed for good                                             |
+| `asset.ready`          | Processing of an uploaded video finished                                 |
+| `asset.failed`         | Processing of an uploaded video failed for good                          |
+| `viewer.created`       | A viewer account was made, by signing up or by an admin                  |
+| `subscription.started` | A viewer got a subscription, paid online or granted by an admin          |
+| `subscription.ended`   | A subscription was canceled with immediate effect or ran out             |
+| `purchase.completed`   | A viewer rented or bought a single title, or was given one by an admin   |
+| `payment.received`     | Money came in, for a subscription or a title, online or recorded by hand |
+| `backup.completed`     | A backup of the database was made                                        |
+| `backup.failed`        | A backup of the database failed                                          |
+
+A webhook listens to the events you choose, or to everything, which includes events that later versions add. The panel shows an example of each event while you choose.
+
+### What a request looks like
+
+```json
+{
+  "id": "0193a5d3-1f20-7a55-8c1b-6d2e9f0a4b17",
+  "event": "title.published",
+  "createdAt": "2026-01-15T09:30:00.000Z",
+  "data": {
+    "title": {
+      "id": "0193a5d2-7c1e-7b3a-9f4e-2b6c8d1e5a70",
+      "type": "MOVIE",
+      "name": "Harbour Lights",
+      "slug": "harbour-lights",
+      "status": "PUBLISHED"
+    }
+  }
+}
+```
+
+| Header             | Meaning                                                                   |
+| ------------------ | ------------------------------------------------------------------------- |
+| `X-Onyx-Event`     | The name of the event                                                     |
+| `X-Onyx-Delivery`  | The id of the delivery, the same as `id` in the body and on every retry   |
+| `X-Onyx-Timestamp` | When this request was sent, in seconds since 1970                         |
+| `X-Onyx-Signature` | `v1=` and the HMAC-SHA256 of `<timestamp>.<body>` with the signing secret |
+
+The body holds ids and the few facts most receivers need. For more, the receiver asks the API with an API key.
+
+### Checking the signature
+
+A webhook gets a signing secret when it is made, starting with `whsec_`. It is shown once. The receiver uses it to tell that a request is from this installation and was not changed on the way:
+
+```js
+import { createHmac, timingSafeEqual } from 'node:crypto';
+
+// rawBody: the body exactly as it arrived, before JSON.parse.
+export function isFromOnyx(rawBody, headers, secret) {
+  const timestamp = headers['x-onyx-timestamp'] ?? '';
+  const signature = headers['x-onyx-signature'] ?? '';
+  // Refuse old requests, so a recorded one cannot be sent again later.
+  if (!/^\d+$/.test(timestamp) || Math.abs(Date.now() / 1000 - Number(timestamp)) > 300) {
+    return false;
+  }
+  const expected =
+    'v1=' + createHmac('sha256', secret).update(`${timestamp}.${rawBody}`).digest('hex');
+  const a = Buffer.from(expected);
+  const b = Buffer.from(signature);
+  return a.length === b.length && timingSafeEqual(a, b);
+}
+```
+
+The Setup tab of a webhook has the same for Python and PHP. Two things go wrong most often: the body was parsed and written out again before the check, which changes it, and the comparison is made on the header without its `v1=`.
+
+A lost secret is replaced from the menu of the webhook. The old one stops working at once.
+
+### Retries and switching off
+
+Any answer with a status from 200 to 299 within 10 seconds counts as delivered. Anything else is tried again after 1 minute, 5 minutes, 30 minutes, 2 hours, 6 hours and 12 hours: seven tries over about 21 hours, then the delivery is given up as failed. Redirects are not followed.
+
+- **A retry carries the same delivery id.** A receiver that remembers the ids it has handled can skip repeats, which happen when its answer was lost on the way back.
+- **Order is kept per webhook where it can be,** but a retry arrives after newer events. Use `createdAt` when the order matters.
+- **After three days in which nothing got through, the webhook is switched off** and what still waited is given up. The panel says so on the webhook, and it is switched on again there.
+- **While a webhook is off, events are not kept for it.** It does not catch up later.
+
+### In the panel
+
+The list shows each webhook with how it is doing, how much was sent in the last 24 hours and what share got through. A webhook opens to its deliveries: a chart of the last day, and every request with what the address answered, how long it took and how often it was tried. A delivery opens to the exact body that was sent and the start of the answer, and **Send again** queues the same content as a new delivery. **Send a test** sends a `webhook.test` event at once and shows the answer; it is tried once and does not count towards the health of the webhook. Deliveries are kept for 30 days.
+
+### Addresses inside your own network
+
+By default a webhook may go anywhere the server can reach, including `localhost` and private addresses, because a script on the same machine is a common receiver. An installation whose admins should not be able to make the server call into its own network sets `WEBHOOK_TARGETS=public`: private and local addresses are then refused, when a webhook is saved and again at every request, after the name is looked up. The address range of cloud metadata services (`169.254.0.0/16`) is refused either way.
+
+In the Docker installation `localhost` means the API container, not the server it runs on. A receiver that runs beside the installation is reached by the server's own name or address.
+
+### API
+
+| Method and path                                         | Purpose                                                        |
+| ------------------------------------------------------- | -------------------------------------------------------------- |
+| `GET /webhooks`                                         | Every webhook with its health and the counts of the last day   |
+| `GET /webhooks/reference`                               | The events with an example each, and the retry schedule        |
+| `POST /webhooks`                                        | Make one. The answer holds the signing secret, once            |
+| `GET` `PATCH` `DELETE /webhooks/{id}`                   | Read, change (also on and off) and delete one                  |
+| `POST /webhooks/{id}/secret`                            | Replace the signing secret. The answer holds the new one, once |
+| `POST /webhooks/{id}/test`                              | Send a test now and get what the address answered              |
+| `GET /webhooks/{id}/activity`                           | Deliveries of the last 24 hours, hour by hour                  |
+| `GET /webhooks/{id}/deliveries`                         | The deliveries, newest first. Filters: `status`, `event`       |
+| `GET /webhooks/{id}/deliveries/{deliveryId}`            | One delivery with the body sent and the answer                 |
+| `POST /webhooks/{id}/deliveries/{deliveryId}/redeliver` | Send the same content again as a new delivery                  |
+
+Reading needs `settings:read`, changing `settings:write`. Making a webhook and replacing its secret need a signed-in admin: an API key cannot do either, so a leaked key cannot point events at an address of its own.
+
+### Limits
+
+- Requests are made by processes with the scheduler role, which look for work every two seconds. An event reaches its receiver a few seconds after it happened, not at the same instant.
+- An event that happens while the database cannot be written to is not announced. Webhooks are for keeping other systems informed, not a ledger: a system that must not miss anything also asks the API now and then.
+- Changes that Stripe reports are announced when Stripe's own webhook arrives here.
+- There are no events for live channels, coupons or admins yet.
+
 ## What phase 6 leaves for later
 
 - Published images and releases, which would turn the build step of an installation and of an update into a download.

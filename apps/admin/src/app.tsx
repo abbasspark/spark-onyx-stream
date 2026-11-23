@@ -31,6 +31,9 @@ import { PackagesPage } from './pages/packages-page';
 import { PlansPage } from './pages/plans-page';
 import { RevenuePage } from './pages/revenue-page';
 import { AdminsPage } from './pages/admins-page';
+import { BrandingPage } from './pages/branding-page';
+import { WebhookPage } from './pages/webhook-page';
+import { WebhooksPage } from './pages/webhooks-page';
 import { RolesPage } from './pages/roles-page';
 import { TranslationsPage } from './pages/translations-page';
 import { ApiKeysPage } from './pages/api-keys-page';
@@ -159,6 +162,9 @@ function Pages() {
             <Route path="diagnostics" element={<DiagnosticsPage />} />
             <Route path="admins" element={<AdminsPage />} />
             <Route path="roles" element={<RolesPage />} />
+            <Route path="branding" element={<BrandingPage />} />
+            <Route path="webhooks" element={<WebhooksPage />} />
+            <Route path="webhooks/:id" element={<WebhookPage />} />
             <Route path="translations" element={<TranslationsPage />} />
             <Route path="api-keys" element={<ApiKeysPage />} />
             <Route path="audit" element={<AuditPage />} />

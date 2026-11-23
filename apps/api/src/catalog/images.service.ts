@@ -9,6 +9,7 @@ import {
   PayloadTooLargeException,
 } from '@nestjs/common';
 import { type Image, type ImageKind, PrismaClient } from '@onyx/database';
+import { BrandingService } from '../branding/branding.service.js';
 import { AppConfig } from '../config/app-config.js';
 import { StorageService } from '../storage/storage.service.js';
 import { type ImageView, toImageView } from './catalog.views.js';
@@ -35,6 +36,7 @@ export class ImagesService {
     @Inject(PrismaClient) private readonly prisma: PrismaClient,
     @Inject(StorageService) private readonly storage: StorageService,
     @Inject(AppConfig) private readonly config: AppConfig,
+    @Inject(BrandingService) private readonly branding: BrandingService,
   ) {}
 
   /**
@@ -162,7 +164,7 @@ export class ImagesService {
       throw new NotFoundException('Picture not found');
     }
     const uses = Object.values(image._count).reduce((total, count) => total + count, 0);
-    if (uses > 0) {
+    if (uses > 0 || (await this.branding.usesImage(id))) {
       throw new ConflictException('The picture is still in use');
     }
 

@@ -11,6 +11,7 @@ import { type AdminUser, PrismaClient } from '@onyx/database';
 import { manageDenialReason } from '../admins/admin.rules.js';
 import { subjectOfAdmin, subjectOfPrincipal } from '../admins/admin.view.js';
 import { AuditService } from '../audit/audit.service.js';
+import { BrandingService } from '../branding/branding.service.js';
 import { AppConfig } from '../config/app-config.js';
 import { SecretBox } from '../crypto/secret-box.js';
 import { verifyPassword } from './password-hasher.js';
@@ -65,6 +66,7 @@ export class TwoFactorService {
   constructor(
     @Inject(PrismaClient) private readonly prisma: PrismaClient,
     @Inject(AppConfig) private readonly config: AppConfig,
+    @Inject(BrandingService) private readonly branding: BrandingService,
     @Inject(SecretBox) private readonly secrets: SecretBox,
     @Inject(SessionService) private readonly sessions: SessionService,
     @Inject(AuditService) private readonly audit: AuditService,
@@ -99,7 +101,8 @@ export class TwoFactorService {
       where: { id: admin.id },
       data: { totpSecret: this.secrets.encrypt(secret), totpLastStep: null },
     });
-    return { secret, uri: otpauthUri(secret, this.config.siteName, admin.email) };
+    // The name the authenticator app shows beside the code.
+    return { secret, uri: otpauthUri(secret, await this.branding.siteName(), admin.email) };
   }
 
   /**
