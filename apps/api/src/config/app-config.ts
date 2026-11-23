@@ -25,6 +25,10 @@ export class AppConfig {
   readonly uploadMaxBytes: number;
   /** How long a file in a watched folder must have been left alone before it is imported. */
   readonly watchSettleSeconds: number;
+  /** Whether plays are recorded for the figures in the panel. */
+  readonly viewingStatistics: boolean;
+  /** Days a record of a play is kept. 0: for good. */
+  readonly viewingStatisticsDays: number;
   readonly corsOrigins: readonly string[];
   /** Reverse proxies in front of the API whose X-Forwarded-For entry is trusted. */
   readonly trustProxyHops: number;
@@ -123,6 +127,8 @@ export class AppConfig {
     this.uploadTempPath = path.resolve(baseDirectory, env.UPLOAD_TEMP_PATH);
     this.uploadMaxBytes = env.UPLOAD_MAX_BYTES;
     this.watchSettleSeconds = env.WATCH_SETTLE_SECONDS;
+    this.viewingStatistics = env.VIEWING_STATISTICS === 'on';
+    this.viewingStatisticsDays = env.VIEWING_STATISTICS_DAYS;
     this.corsOrigins = env.CORS_ORIGINS;
     this.trustProxyHops = env.TRUST_PROXY_HOPS;
     this.ffmpegPath = env.FFMPEG_PATH;

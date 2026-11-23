@@ -22,6 +22,7 @@ export type Permission =
   | 'catalog:write'
   | 'viewers:read'
   | 'viewers:write'
+  | 'analytics:read'
   | 'billing:read'
   | 'billing:write'
   | 'live:read'
@@ -1903,3 +1904,85 @@ export interface HomeSectionInput {
   /** For the source MANUAL: the titles, in their order. */
   titleIds?: string[];
 }
+
+// --- What is watched ----------------------------------------------------------------------
+
+export type PlayDevice = 'DESKTOP' | 'MOBILE' | 'TABLET' | 'TV' | 'OTHER';
+
+/** The figures of a stretch of time. */
+export interface ViewFigures {
+  /** Plays that counted: at least half a minute watched. */
+  views: number;
+  /** Different viewers among them. A visitor who is not signed in counts once per day. */
+  viewers: number;
+  /** Seconds played, also in plays too short to count as a view. */
+  watchSeconds: number;
+  /** Views watched to the end, of all views, from 0 to 1. */
+  completionRate: number;
+  /** Seconds watched per view. */
+  averageSeconds: number;
+}
+
+export interface ViewDay {
+  /** "2026-12-24" */
+  day: string;
+  views: number;
+  viewers: number;
+  watchSeconds: number;
+}
+
+export interface AnalyticsTitleRef {
+  id: string;
+  name: string;
+  type: TitleType;
+  poster: { url: string } | null;
+}
+
+export interface DeviceFigures {
+  device: PlayDevice;
+  views: number;
+  watchSeconds: number;
+}
+
+export interface AnalyticsSummary {
+  /** False when the installation records nothing. */
+  recording: boolean;
+  totals: ViewFigures;
+  /** The same number of days right before. */
+  previous: ViewFigures;
+  days: ViewDay[];
+  devices: DeviceFigures[];
+  audience: { signedIn: number; visitors: number; paid: number; free: number };
+  /** Views by the hour of the day they began in, 0 to 23. */
+  hours: number[];
+}
+
+export interface TitleViewFigures extends ViewFigures {
+  /** Null for plays whose title was deleted since. */
+  title: AnalyticsTitleRef | null;
+}
+
+export interface TitleAnalytics {
+  title: AnalyticsTitleRef;
+  totals: ViewFigures;
+  previous: ViewFigures;
+  days: ViewDay[];
+  episodes: (ViewFigures & {
+    id: string;
+    seasonNumber: number;
+    number: number;
+    name: string | null;
+  })[];
+  /** The share of views that reached at least 10 %, 20 % ... 100 % of the video. */
+  reach: number[];
+  devices: DeviceFigures[];
+  trailerPlays: number;
+  extraPlays: number;
+}
+
+export interface WatchingNow {
+  watching: number;
+  titles: { title: AnalyticsTitleRef; watching: number }[];
+}
+
+export type TitleRanking = 'views' | 'viewers' | 'watchSeconds' | 'completion';

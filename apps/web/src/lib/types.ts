@@ -207,6 +207,11 @@ export interface Playback {
   expiresAt: string;
   /** What the player needs to share the video with other viewers. Null when P2P is off. */
   p2p: P2pInfo | null;
+  /**
+   * Where the player reports how the video is watched, for the figures of the
+   * operator. Missing or null when the installation records nothing.
+   */
+  playId?: string | null;
 }
 
 /** A live channel as viewers see it. */

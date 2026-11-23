@@ -28,14 +28,22 @@ interface CardHeaderProps {
 
 export function CardHeader({ title, description, actions, className }: CardHeaderProps) {
   return (
-    <header className={cn('flex items-start justify-between gap-4 px-5 pt-5', className)}>
-      <div className="grid min-w-0 gap-1">
+    // On a narrow screen the controls go under the words instead of squeezing them.
+    <header
+      className={cn(
+        'flex flex-wrap items-start justify-between gap-x-4 gap-y-3 px-5 pt-5',
+        className,
+      )}
+    >
+      <div className="grid min-w-[min(100%,14rem)] flex-1 gap-1">
         <h2 className="flex flex-wrap items-center gap-2 text-[15px] leading-tight font-semibold">
           {title}
         </h2>
         {description ? <p className="text-sm text-muted-foreground">{description}</p> : null}
       </div>
-      {actions ? <div className="flex shrink-0 items-center gap-2">{actions}</div> : null}
+      {actions ? (
+        <div className="flex max-w-full shrink-0 items-center gap-2">{actions}</div>
+      ) : null}
     </header>
   );
 }

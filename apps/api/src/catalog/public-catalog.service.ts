@@ -42,6 +42,19 @@ import {
 import { TranslationsService } from './translations.service.js';
 import { CARD_INCLUDE } from './card-include.js';
 import { HomeService } from '../home/home.service.js';
+import { PlaysService } from '../analytics/plays.service.js';
+
+/** What is known of the device that asks, to count it. Neither is stored. */
+export interface PlayClient {
+  ipAddress: string | null;
+  userAgent: string | null;
+}
+
+/** The addresses for playing, and where the player reports how it is watched. */
+export type PlayAnswer = PlaybackInfo & {
+  /** For `POST /catalog/plays/{playId}/beat`. Null when the installation records nothing. */
+  playId: string | null;
+};
 
 /** Who asks for playback: a signed-in viewer, or null for a visitor. */
 export type Watcher = { viewerId: string; emailVerified: boolean } | null;
@@ -93,6 +106,7 @@ export class PublicCatalogService {
     @Inject(PurchasesService) private readonly purchases: PurchasesService,
     @Inject(TranslationsService) private readonly translations: TranslationsService,
     @Inject(HomeService) private readonly homeLayout: HomeService,
+    @Inject(PlaysService) private readonly plays: PlaysService,
   ) {}
 
   async list(input: ListPublicTitlesInput): Promise<Page<PublicTitleCard>> {
@@ -429,7 +443,7 @@ export class PublicCatalogService {
    * @param signedIn Whether the request comes from a signed-in viewer.
    * @throws ConflictException for a series, which is played per episode.
    */
-  async playTitle(slug: string, watcher: Watcher): Promise<PlaybackInfo> {
+  async playTitle(slug: string, watcher: Watcher, client?: PlayClient): Promise<PlayAnswer> {
     this.assertOpen();
     const title = await this.prisma.title.findFirst({
       where: { slug, ...visibleTitle() },
@@ -442,39 +456,69 @@ export class PublicCatalogService {
     if (title.type !== 'MOVIE' || !title.assetId) {
       throw new ConflictException('A series is played episode by episode');
     }
-    return this.playback.createPlayback(title.assetId, 'viewer');
+    return this.recorded(await this.playback.createPlayback(title.assetId, 'viewer'), {
+      kind: 'MAIN',
+      titleId: title.id,
+      assetId: title.assetId,
+      paid: title.access === 'PAID',
+      watcher,
+      client,
+    });
   }
 
   /** Signed addresses for playing the trailer of a title. */
-  async playTrailer(slug: string, watcher: Watcher): Promise<PlaybackInfo> {
+  async playTrailer(slug: string, watcher: Watcher, client?: PlayClient): Promise<PlayAnswer> {
     // A trailer is an invitation, also to a paid title.
     await this.assertMayPlay(watcher, null);
     const title = await this.prisma.title.findFirst({
       where: { slug, ...visibleTitle() },
-      select: { trailerAsset: { select: { id: true, status: true, manifestPath: true } } },
+      select: {
+        id: true,
+        access: true,
+        trailerAsset: { select: { id: true, status: true, manifestPath: true } },
+      },
     });
     if (!title?.trailerAsset || !isPlayable(title.trailerAsset)) {
       throw new NotFoundException('This title has no trailer');
     }
-    return this.playback.createPlayback(title.trailerAsset.id, 'viewer');
+    return this.recorded(await this.playback.createPlayback(title.trailerAsset.id, 'viewer'), {
+      kind: 'TRAILER',
+      titleId: title.id,
+      assetId: title.trailerAsset.id,
+      paid: title.access === 'PAID',
+      watcher,
+      client,
+    });
   }
 
   /** Signed addresses for playing one of the extras of a title. */
-  async playExtra(slug: string, extraId: string, watcher: Watcher): Promise<PlaybackInfo> {
+  async playExtra(
+    slug: string,
+    extraId: string,
+    watcher: Watcher,
+    client?: PlayClient,
+  ): Promise<PlayAnswer> {
     // Extras are invitations like the trailer, also to a paid title.
     await this.assertMayPlay(watcher, null);
     const extra = await this.prisma.titleExtra.findFirst({
       where: { id: extraId, asset: PLAYABLE_ASSET, title: { slug, ...visibleTitle() } },
-      select: { assetId: true },
+      select: { assetId: true, title: { select: { id: true, access: true } } },
     });
     if (!extra) {
       throw new NotFoundException('This title has no such video');
     }
-    return this.playback.createPlayback(extra.assetId, 'viewer');
+    return this.recorded(await this.playback.createPlayback(extra.assetId, 'viewer'), {
+      kind: 'EXTRA',
+      titleId: extra.title.id,
+      assetId: extra.assetId,
+      paid: extra.title.access === 'PAID',
+      watcher,
+      client,
+    });
   }
 
   /** Signed addresses for playing an episode of a visible series. */
-  async playEpisode(episodeId: string, watcher: Watcher): Promise<PlaybackInfo> {
+  async playEpisode(episodeId: string, watcher: Watcher, client?: PlayClient): Promise<PlayAnswer> {
     this.assertOpen();
     const episode = await this.prisma.episode.findFirst({
       where: {
@@ -492,7 +536,44 @@ export class PublicCatalogService {
     }
     // An episode is as open as its series.
     await this.assertMayPlay(watcher, episode.season.title);
-    return this.playback.createPlayback(episode.assetId, 'viewer');
+    return this.recorded(await this.playback.createPlayback(episode.assetId, 'viewer'), {
+      kind: 'MAIN',
+      titleId: episode.season.title.id,
+      episodeId,
+      assetId: episode.assetId,
+      paid: episode.season.title.access === 'PAID',
+      watcher,
+      client,
+    });
+  }
+
+  /**
+   * Notes the play, and tells the player where to report. The addresses are
+   * handed out whether or not that worked.
+   */
+  private async recorded(
+    info: PlaybackInfo,
+    play: {
+      kind: 'MAIN' | 'TRAILER' | 'EXTRA';
+      titleId: string;
+      episodeId?: string;
+      assetId: string;
+      paid: boolean;
+      watcher: Watcher;
+      client: PlayClient | undefined;
+    },
+  ): Promise<PlayAnswer> {
+    const playId = await this.plays.start({
+      kind: play.kind,
+      titleId: play.titleId,
+      episodeId: play.episodeId,
+      assetId: play.assetId,
+      paid: play.paid,
+      viewerId: play.watcher?.viewerId ?? null,
+      ipAddress: play.client?.ipAddress ?? null,
+      userAgent: play.client?.userAgent ?? null,
+    });
+    return { ...info, playId };
   }
 
   /**

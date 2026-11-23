@@ -57,6 +57,11 @@ import type {
   WatchPlaceTest,
   WatchSummary,
   AddedSubtitle,
+  AnalyticsSummary,
+  TitleAnalytics,
+  TitleRanking,
+  TitleViewFigures,
+  WatchingNow,
   HomePage,
   HomeSection,
   HomeSectionInput,
@@ -433,6 +438,27 @@ export const homeApi = {
   remove: (id: string) => request<void>(`/v1/home/sections/${id}`, { method: 'DELETE' }),
   reorder: (ids: string[]) =>
     request<HomePage>('/v1/home/sections/order', { method: 'PUT', body: { ids } }),
+};
+
+/** The days asked about, both included, and the time zone days are counted in. */
+export interface AnalyticsRange {
+  from: string;
+  to: string;
+  timezone: string;
+  type?: TitleType;
+}
+
+/** What is watched. Figures only: no viewer is named. */
+export const analyticsApi = {
+  summary: (range: AnalyticsRange, signal?: AbortSignal) =>
+    request<AnalyticsSummary>('/v1/analytics/summary', { query: { ...range }, signal }),
+  now: (signal?: AbortSignal) => request<WatchingNow>('/v1/analytics/now', { signal }),
+  titles: (
+    range: AnalyticsRange & { sort: TitleRanking; page: number; pageSize: number },
+    signal?: AbortSignal,
+  ) => request<Page<TitleViewFigures>>('/v1/analytics/titles', { query: { ...range }, signal }),
+  title: (id: string, range: Omit<AnalyticsRange, 'type'>, signal?: AbortSignal) =>
+    request<TitleAnalytics>(`/v1/analytics/titles/${id}`, { query: { ...range }, signal }),
 };
 
 export const metadataApi = {

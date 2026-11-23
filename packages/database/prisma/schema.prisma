@@ -102,6 +102,7 @@ model Viewer {
   payments      Payment[]
   purchases     Purchase[]
   watching      WatchProgress[]
+  plays         Play[]
   tokens        ViewerToken[]
 
   @@index([createdAt])
@@ -770,6 +771,7 @@ model Title {
 
   categories   TitleCategory[]
   homeSections HomeSectionTitle[]
+  plays        Play[]
   genres       TitleGenre[]
   credits      Credit[]
   extras       TitleExtra[]
@@ -1106,6 +1108,8 @@ model Episode {
 
   translations EpisodeTranslation[]
   watchedFiles WatchedFile[]
+
+  plays Play[]
 
   @@unique([seasonId, number])
   @@index([assetId])
@@ -1944,4 +1948,62 @@ model HomeSectionTitle {
   @@id([sectionId, titleId])
   @@index([titleId])
   @@map("home_section_titles")
+}
+
+// ---------------------------------------------------------------------------
+// What is watched
+// ---------------------------------------------------------------------------
+
+enum PlayKind {
+  /// The movie or the episode itself.
+  MAIN
+  TRAILER
+  EXTRA
+}
+
+enum PlayDevice {
+  DESKTOP
+  MOBILE
+  TABLET
+  TV
+  OTHER
+}
+
+/// One time a video was asked for and, if it was, watched. Made when the
+/// addresses for playing are handed out, and filled in by the player while it
+/// plays. Holds no address and no description of the device.
+model Play {
+  id   String   @id @default(uuid(7)) @db.Uuid
+  kind PlayKind @default(MAIN)
+
+  /// Emptied when the title or episode is deleted. The figures stay.
+  titleId   String?  @db.Uuid
+  title     Title?   @relation(fields: [titleId], references: [id], onDelete: SetNull)
+  episodeId String?  @db.Uuid
+  episode   Episode? @relation(fields: [episodeId], references: [id], onDelete: SetNull)
+
+  /// The signed-in viewer. Emptied when the account is deleted.
+  viewerId   String? @db.Uuid
+  viewer     Viewer? @relation(fields: [viewerId], references: [id], onDelete: SetNull)
+  /// For visitors who are not signed in: a mark that is the same for one
+  /// device during one day, and from which nothing about it can be read back.
+  visitorKey String?
+
+  device          PlayDevice @default(OTHER)
+  /// Whether the title needed a subscription or a purchase when it was played.
+  paid            Boolean    @default(false)
+  /// Length of the video.
+  durationSeconds Int        @default(0)
+  /// How long it actually played, counted by the player.
+  watchedSeconds  Int        @default(0)
+  /// The furthest point reached.
+  positionSeconds Int        @default(0)
+
+  startedAt  DateTime @default(now())
+  lastBeatAt DateTime @default(now())
+
+  @@index([startedAt])
+  @@index([titleId, startedAt])
+  @@index([lastBeatAt])
+  @@map("plays")
 }

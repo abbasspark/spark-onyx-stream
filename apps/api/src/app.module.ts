@@ -30,6 +30,7 @@ import { MetadataModule } from './metadata/metadata.module.js';
 import { ViewersModule } from './viewers/viewers.module.js';
 import { WatchingModule } from './watching/watching.module.js';
 import type { AppRole } from './roles/app-role.js';
+import { AnalyticsModule, PlaysModule } from './analytics/analytics.module.js';
 import { GuideModule } from './guide/guide.module.js';
 import { LiveModule } from './live/live.module.js';
 import { DeliveryCoreModule, DeliveryModule } from './delivery/delivery.module.js';
@@ -47,6 +48,7 @@ const ROLE_MODULES: Record<AppRole, Type[]> = {
     AssetsModule,
     ProcessingApiModule,
     StatsModule,
+    AnalyticsModule,
     CatalogModule,
     MailModule,
     BillingModule,
@@ -91,6 +93,7 @@ export class AppModule {
         CryptoModule,
         StorageModule,
         ProcessingCoreModule,
+        PlaysModule,
         ProcessBeaconModule,
         ...roleModules,
       ],

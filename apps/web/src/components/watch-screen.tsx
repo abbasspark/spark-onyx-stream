@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 'use client';
 
+import { BeatMeter, sendBeat } from '@/lib/beats';
 import { loadSharing } from '@/lib/p2p';
 import { MAX_FAILOVERS, otherServerOf, withAvoid } from '@/lib/delivery';
 import { Loader2, Lock, Mail, Play, RotateCcw, SkipForward } from 'lucide-react';
@@ -211,15 +212,49 @@ export function WatchScreen({
     [progress, heading, detail],
   );
 
+  // --- Telling the server what is watched -------------------------------------
+  // For the figures in the panel: how long the video really played. Nothing
+  // here is needed for watching, so nothing here may get in its way.
+
+  const playId = loaded.state === 'ready' ? (loaded.playback.playId ?? null) : null;
+  const meter = useRef(new BeatMeter());
+  useEffect(() => {
+    meter.current = new BeatMeter();
+  }, [playId]);
+  const report = useCallback(() => {
+    const beat = playId ? meter.current.take() : null;
+    if (playId && beat) {
+      sendBeat(playId, beat);
+    }
+  }, [playId]);
+  useEffect(() => {
+    const onHide = () => {
+      if (document.visibilityState === 'hidden') {
+        report();
+      }
+    };
+    window.addEventListener('pagehide', report);
+    document.addEventListener('visibilitychange', onHide);
+    return () => {
+      window.removeEventListener('pagehide', report);
+      document.removeEventListener('visibilitychange', onHide);
+      report();
+    };
+  }, [report]);
+
   const onTime = useCallback(
     (time: number, duration: number) => {
+      meter.current.tick(time);
+      if (meter.current.due) {
+        report();
+      }
       position.current.time = time;
       position.current.duration = duration;
       if (Date.now() - position.current.savedAt >= SAVE_EVERY_MS) {
         save();
       }
     },
-    [save],
+    [save, report],
   );
 
   // Leaving the page, or putting the phone away, saves the exact position.
@@ -244,6 +279,7 @@ export function WatchScreen({
   // --- The end --------------------------------------------------------------
 
   const onEnded = useCallback(() => {
+    report();
     if (progress) {
       recordFinished(progress, position.current.duration);
     }
@@ -251,7 +287,7 @@ export function WatchScreen({
     position.current.duration = 0;
     setEnded(true);
     setCountdown(next ? NEXT_AFTER_SECONDS : null);
-  }, [progress, next]);
+  }, [progress, next, report]);
 
   useEffect(() => {
     if (countdown === null || !next) {
