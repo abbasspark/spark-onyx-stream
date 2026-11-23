@@ -114,6 +114,11 @@ export const updateViewerSchema = z
     status: z.enum(VIEWER_STATUSES),
     /** Marks the address as confirmed, or as not confirmed. */
     emailVerified: z.boolean(),
+    /**
+     * Devices this account plays on at the same time, whatever its plan says.
+     * Null: the limit of the plan or the installation.
+     */
+    maxStreams: z.number().int().min(1).max(20).nullable(),
   })
   .partial()
   .refine((value) => Object.keys(value).length > 0, 'Nothing to change');

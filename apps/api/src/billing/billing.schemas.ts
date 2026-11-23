@@ -38,6 +38,8 @@ const planFields = {
   isRecommended: z.boolean(),
   /** Whether the plan opens every paid title. Otherwise it opens its packages. */
   includesAll: z.boolean(),
+  /** Devices a subscriber plays on at the same time. Null: the limit of the installation. */
+  maxStreams: z.number().int().min(1).max(20).nullable(),
   /** Replaces the packages of the plan. They count while it does not open everything. */
   packageIds: z.array(z.uuid()).max(100),
 };
@@ -63,6 +65,7 @@ export const createPlanSchema = z
     isOffered: planFields.isOffered.default(true),
     isRecommended: planFields.isRecommended.default(false),
     includesAll: planFields.includesAll.default(true),
+    maxStreams: planFields.maxStreams.default(null),
     packageIds: planFields.packageIds.default([]),
   })
   .refine((plan) => plan.monthlyAmount !== null || plan.yearlyAmount !== null, NEEDS_PRICE)

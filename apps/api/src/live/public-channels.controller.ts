@@ -22,8 +22,9 @@ import type { Watcher } from '../catalog/public-catalog.service.js';
 import { ZodValidationPipe } from '../common/zod-validation.pipe.js';
 import { RateLimit } from '../rate-limit/rate-limit.guard.js';
 import { ViewerSessionService } from '../viewers/viewer-session.service.js';
-import type { LivePlaybackInfo } from './live-playback.service.js';
+import { requestInfo } from '../auth/request-info.js';
 import {
+  type LiveAnswer,
   type PublicChannel,
   PublicChannelsService,
   type PublicGuideRow,
@@ -104,14 +105,16 @@ export class PublicChannelsController {
   @RateLimit(PLAYBACK)
   @HttpCode(HttpStatus.OK)
   @Header('Cache-Control', 'no-store')
-  async play(
-    @Param('slug', slugPipe) slug: string,
-    @Req() request: Request,
-  ): Promise<LivePlaybackInfo> {
+  async play(@Param('slug', slugPipe) slug: string, @Req() request: Request): Promise<LiveAnswer> {
     const identity = await this.viewerSessions.identify(request);
     const watcher: Watcher = identity
-      ? { viewerId: identity.viewer.id, emailVerified: identity.viewer.emailVerifiedAt !== null }
+      ? {
+          viewerId: identity.viewer.id,
+          emailVerified: identity.viewer.emailVerifiedAt !== null,
+          sessionId: identity.session.id,
+          profileId: identity.session.profileId,
+        }
       : null;
-    return this.channels.play(slug, watcher);
+    return this.channels.play(slug, watcher, requestInfo(request).userAgent);
   }
 }

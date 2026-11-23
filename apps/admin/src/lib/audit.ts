@@ -43,6 +43,7 @@ const ACTION_LABELS: Record<string, string> = {
   'asset.subtitle.add': 'Added subtitles to a video',
   'asset.subtitle.update': 'Changed subtitles of a video',
   'asset.subtitle.remove': 'Removed subtitles from a video',
+  'viewer.stream_stop': 'Stopped what a viewer was playing',
   'coupon.create': 'Made a coupon',
   'coupon.update': 'Changed a coupon',
   'coupon.delete': 'Deleted a coupon',

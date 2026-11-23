@@ -254,7 +254,12 @@ export class PublicCatalogController {
   private async watcher(request: Request): Promise<Watcher> {
     const identity = await this.viewerSessions.identify(request);
     return identity
-      ? { viewerId: identity.viewer.id, emailVerified: identity.viewer.emailVerifiedAt !== null }
+      ? {
+          viewerId: identity.viewer.id,
+          emailVerified: identity.viewer.emailVerifiedAt !== null,
+          sessionId: identity.session.id,
+          profileId: identity.session.profileId,
+        }
       : null;
   }
 }

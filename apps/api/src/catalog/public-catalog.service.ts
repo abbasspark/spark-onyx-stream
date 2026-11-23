@@ -43,6 +43,7 @@ import { TranslationsService } from './translations.service.js';
 import { CARD_INCLUDE } from './card-include.js';
 import { HomeService, type LayoutPage, type PageScope } from '../home/home.service.js';
 import { PlaysService } from '../analytics/plays.service.js';
+import { StreamsService, type StreamTicket } from '../streams/streams.service.js';
 
 /** The page of one category or genre: its rows, and what it is the page of. */
 export type PublicSubjectPage = PublicHome & {
@@ -59,10 +60,21 @@ export interface PlayClient {
 export type PlayAnswer = PlaybackInfo & {
   /** For `POST /catalog/plays/{playId}/beat`. Null when the installation records nothing. */
   playId: string | null;
+  /**
+   * The place this device holds among the streams of the account, for
+   * `POST /viewer/streams/{id}/beat`. Null for a visitor, a trailer or an extra.
+   */
+  stream: StreamTicket | null;
 };
 
-/** Who asks for playback: a signed-in viewer, or null for a visitor. */
-export type Watcher = { viewerId: string; emailVerified: boolean } | null;
+/** Who asks for playback: a signed-in viewer on one of their devices, or null for a visitor. */
+export type Watcher = {
+  viewerId: string;
+  emailVerified: boolean;
+  /** The sign-in of the device, and the profile chosen on it. */
+  sessionId: string;
+  profileId: string | null;
+} | null;
 
 const PACKAGE_IDS = { select: { packageId: true } } as const;
 
@@ -112,6 +124,7 @@ export class PublicCatalogService {
     @Inject(TranslationsService) private readonly translations: TranslationsService,
     @Inject(HomeService) private readonly homeLayout: HomeService,
     @Inject(PlaysService) private readonly plays: PlaysService,
+    @Inject(StreamsService) private readonly streams: StreamsService,
   ) {}
 
   async list(input: ListPublicTitlesInput): Promise<Page<PublicTitleCard>> {
@@ -482,7 +495,7 @@ export class PublicCatalogService {
     this.assertOpen();
     const title = await this.prisma.title.findFirst({
       where: { slug, ...visibleTitle() },
-      select: { id: true, type: true, assetId: true, ...GATE_SELECT },
+      select: { id: true, name: true, type: true, assetId: true, ...GATE_SELECT },
     });
     if (!title) {
       throw new NotFoundException('Title not found');
@@ -493,6 +506,7 @@ export class PublicCatalogService {
     }
     return this.recorded(await this.playback.createPlayback(title.assetId, 'viewer'), {
       kind: 'MAIN',
+      subject: title.name,
       titleId: title.id,
       assetId: title.assetId,
       paid: title.access === 'PAID',
@@ -563,7 +577,10 @@ export class PublicCatalogService {
       },
       select: {
         assetId: true,
-        season: { select: { title: { select: { id: true, ...GATE_SELECT } } } },
+        number: true,
+        season: {
+          select: { number: true, title: { select: { id: true, name: true, ...GATE_SELECT } } },
+        },
       },
     });
     if (!episode?.assetId) {
@@ -573,6 +590,7 @@ export class PublicCatalogService {
     await this.assertMayPlay(watcher, episode.season.title);
     return this.recorded(await this.playback.createPlayback(episode.assetId, 'viewer'), {
       kind: 'MAIN',
+      subject: `${episode.season.title.name} S${episode.season.number} E${episode.number}`,
       titleId: episode.season.title.id,
       episodeId,
       assetId: episode.assetId,
@@ -590,6 +608,8 @@ export class PublicCatalogService {
     info: PlaybackInfo,
     play: {
       kind: 'MAIN' | 'TRAILER' | 'EXTRA';
+      /** What is played, for the list of what an account is playing. Set for the main video. */
+      subject?: string;
       titleId: string;
       episodeId?: string;
       assetId: string;
@@ -598,6 +618,16 @@ export class PublicCatalogService {
       client: PlayClient | undefined;
     },
   ): Promise<PlayAnswer> {
+    // A trailer or an extra is an invitation and takes no place. The main
+    // video of a signed-in viewer does, and is refused here when all are taken.
+    const stream =
+      play.watcher && play.kind === 'MAIN'
+        ? await this.streams.open(play.watcher, {
+            kind: 'VIDEO',
+            subject: play.subject ?? 'A video',
+            userAgent: play.client?.userAgent ?? null,
+          })
+        : null;
     const playId = await this.plays.start({
       kind: play.kind,
       titleId: play.titleId,
@@ -608,7 +638,7 @@ export class PublicCatalogService {
       ipAddress: play.client?.ipAddress ?? null,
       userAgent: play.client?.userAgent ?? null,
     });
-    return { ...info, playId };
+    return { ...info, playId, stream };
   }
 
   /**

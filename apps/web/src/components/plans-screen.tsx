@@ -9,6 +9,7 @@ import {
   bestYearlySaving,
   describeEnd,
   describeOpens,
+  describeStreams,
   formatMoney,
   type Interval,
   intervalsOf,
@@ -194,6 +195,9 @@ export function PlansScreen({ offer }: { offer: Plans }) {
           const price = priceOf(plan, interval) as number;
           const planSaving = interval === 'year' ? yearlySaving(plan) : null;
           const isOwn = own?.plan.id === plan.id;
+          // On how many devices the plan plays is a fact of the plan, said before what the operator wrote.
+          const streams = describeStreams(plan);
+          const lines = streams ? [streams, ...plan.features] : plan.features;
           const reduced = own ? null : planPrice(coupon, plan.id, interval);
           const afterwards =
             coupon && reduced ? describeAfterwards(coupon, reduced, interval) : null;
@@ -244,9 +248,9 @@ export function PlansScreen({ offer }: { offer: Plans }) {
                   </span>
                 </p>
               ) : null}
-              {plan.features.length > 0 ? (
+              {lines.length > 0 ? (
                 <ul className="mt-6 grid gap-2.5">
-                  {plan.features.map((feature) => (
+                  {lines.map((feature) => (
                     <li key={feature} className="flex items-start gap-3">
                       <Check className="mt-0.5 size-4 shrink-0 text-sard" aria-hidden="true" />
                       {feature}

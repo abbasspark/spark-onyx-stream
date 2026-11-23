@@ -72,6 +72,12 @@ export const envSchema = z
     /** How long a record of a play is kept, in days. 0 keeps them for good. */
     VIEWING_STATISTICS_DAYS: z.coerce.number().int().min(0).max(3650).default(730),
 
+    /**
+     * On how many devices one viewer account plays at the same time. 0: no
+     * limit. A plan, and an admin for a single viewer, can say otherwise.
+     */
+    STREAM_LIMIT: z.coerce.number().int().min(0).max(20).default(0),
+
     /** How long a playback URL stays valid, in seconds. Long videos get more time automatically. */
     PLAYBACK_URL_TTL_SECONDS: z.coerce
       .number()

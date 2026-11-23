@@ -12,6 +12,7 @@ import { PipelineService } from '../processing/pipeline.service.js';
 import { REDIS_CLIENT } from '../redis/redis.module.js';
 import { StripeSyncService } from '../stripe/stripe-sync.service.js';
 import { PlaysService } from '../analytics/plays.service.js';
+import { StreamsService } from '../streams/streams.service.js';
 
 /** How often the repairs run. */
 export const SWEEP_INTERVAL_MS = 60_000;
@@ -54,6 +55,7 @@ export class MaintenanceService implements OnApplicationBootstrap, OnApplication
     @Inject(REDIS_CLIENT) private readonly redis: Redis,
     @Inject(StripeSyncService) private readonly stripeSync: StripeSyncService,
     @Inject(PlaysService) private readonly plays: PlaysService,
+    @Inject(StreamsService) private readonly streams: StreamsService,
   ) {}
 
   onApplicationBootstrap(): void {
@@ -77,6 +79,7 @@ export class MaintenanceService implements OnApplicationBootstrap, OnApplication
 
       await this.purgeEndedViewerSessions();
       await this.plays.purge();
+      await this.streams.purge();
       await this.purgeExpiredViewerTokens();
       await this.expireSubscriptions();
       // Asks Stripe about renewals it has not reported: the net under a lost message.

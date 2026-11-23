@@ -28,6 +28,13 @@ import { type Profile, profilesApi } from '@/lib/profiles';
 import { clearHistory } from '@/lib/watch-sync';
 import { FormField } from './form-field';
 import { ProfileAvatar } from './profile-avatar';
+import {
+  describePlaying,
+  describeStreamDevice,
+  devicesPhrase,
+  type OwnStreams,
+  streamsApi,
+} from '@/lib/streams';
 import { useViewerSession } from './viewer-session';
 
 const MIN_PASSWORD_LENGTH = 8;
@@ -120,6 +127,7 @@ export function AccountScreen() {
       <PaymentsSection />
       <ProfilesSection />
       <DevicesSection />
+      <PlayingSection />
       <HistorySection />
       <Section heading="Sign out">
         <p className="mb-5 text-smoke">Signs you out on this device only.</p>
@@ -417,6 +425,87 @@ function DevicesSection() {
                   Sign out
                 </button>
               )}
+            </li>
+          ))}
+        </ul>
+      ) : null}
+    </Section>
+  );
+}
+
+/** What the devices of the account are playing right now, and how many may. */
+function PlayingSection() {
+  const [playing, setPlaying] = useState<OwnStreams | null>(null);
+  const [failed, setFailed] = useState(false);
+  const [busyId, setBusyId] = useState<string | null>(null);
+
+  const load = useCallback(async () => {
+    try {
+      setPlaying(await streamsApi.list());
+      setFailed(false);
+    } catch {
+      setFailed(true);
+    }
+  }, []);
+  useEffect(() => {
+    void load();
+    // What plays changes without this page doing anything.
+    const timer = window.setInterval(() => void load(), 30_000);
+    return () => window.clearInterval(timer);
+  }, [load]);
+
+  const stop = async (id: string) => {
+    setBusyId(id);
+    await streamsApi.stop(id);
+    await load();
+    setBusyId(null);
+  };
+
+  return (
+    <Section heading="Playing now">
+      <p className="mb-5 text-smoke">
+        {playing?.limit
+          ? `Your account plays ${devicesPhrase(playing.limit)} at the same time.`
+          : 'What your account is playing right now.'}{' '}
+        Stop a device to free its place. It stops within half a minute.
+      </p>
+      {failed ? (
+        <p role="alert" className="mb-4 text-alarm">
+          What is playing could not be loaded. Reload the page to try again.
+        </p>
+      ) : null}
+      {playing === null && !failed ? <Spinner /> : null}
+      {playing && playing.streams.length === 0 ? (
+        <p className="border-y border-line py-4 text-smoke">Nothing is playing.</p>
+      ) : null}
+      {playing && playing.streams.length > 0 ? (
+        <ul className="border-t border-line">
+          {playing.streams.map((stream) => (
+            <li key={stream.id} className="flex items-center gap-4 border-b border-line py-4">
+              <MonitorSmartphone className="size-5 shrink-0 text-smoke" aria-hidden="true" />
+              <div className="min-w-0 flex-1">
+                <p className="truncate font-medium">
+                  {describePlaying(stream)}
+                  {stream.here ? (
+                    <span className="ml-2 rounded-[2px] bg-sard px-1.5 py-0.5 text-xs font-semibold text-onyx">
+                      This device
+                    </span>
+                  ) : null}
+                </p>
+                <p className="truncate text-sm text-smoke">
+                  {describeStreamDevice(stream)}
+                  {stream.profile ? `, ${stream.profile.name}` : ''}
+                </p>
+              </div>
+              <button
+                type="button"
+                className="text-sm text-smoke underline underline-offset-4 hover:text-vein disabled:opacity-50"
+                disabled={busyId === stream.id}
+                aria-label={`Stop ${describePlaying(stream).toLowerCase()}`}
+                onClick={() => void stop(stream.id)}
+              >
+                Stop
+              </button>
             </li>
           ))}
         </ul>

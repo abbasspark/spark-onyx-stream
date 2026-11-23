@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-only
-import type { ViewerWatchingItem } from '@/api/types';
+import type { ViewerStream, ViewerStreams, ViewerWatchingItem } from '@/api/types';
 import { formatDuration } from './format';
 
 const BROWSERS: readonly (readonly [pattern: RegExp, name: string])[] = [
@@ -126,4 +126,48 @@ const PROFILE_COLORS: Record<string, string> = {
 /** A colour this panel does not know yet is drawn as slate. */
 export function profileColor(name: string): string {
   return PROFILE_COLORS[name] ?? (PROFILE_COLORS.slate as string);
+}
+
+const STREAM_DEVICES: Record<ViewerStream['device'], string> = {
+  DESKTOP: 'Computer',
+  MOBILE: 'Phone',
+  TABLET: 'Tablet',
+  TV: 'TV',
+  OTHER: 'Device',
+};
+
+/** "Phone, Safari on iOS": the kind of device, and what it said it is. */
+export function describeStreamDevice(stream: Pick<ViewerStream, 'device' | 'userAgent'>): string {
+  const kind = STREAM_DEVICES[stream.device] ?? STREAM_DEVICES.OTHER;
+  return stream.userAgent ? `${kind}, ${describeDevice(stream.userAgent)}` : kind;
+}
+
+/**
+ * On how many devices a viewer may play at once, and where that comes from:
+ * "Up to 2 devices at once, from the plan".
+ */
+export function describeStreamLimit(view: Pick<ViewerStreams, 'limit' | 'source'>): string {
+  const from = {
+    VIEWER: 'set for this viewer',
+    PLAN: 'from the plan',
+    SITE: 'the limit of the installation',
+  }[view.source];
+  if (view.limit === null) {
+    return 'On any number of devices at once';
+  }
+  return `Up to ${view.limit} ${view.limit === 1 ? 'device' : 'devices'} at once, ${from}`;
+}
+
+/**
+ * Reads the field for a number of devices. Empty is "not set".
+ *
+ * @returns The number, null for empty, or "invalid".
+ */
+export function parseStreamLimit(text: string): number | null | 'invalid' {
+  const trimmed = text.trim();
+  if (trimmed === '') {
+    return null;
+  }
+  const value = Number(trimmed);
+  return /^\d+$/.test(trimmed) && value >= 1 && value <= 20 ? value : 'invalid';
 }

@@ -7,6 +7,9 @@ import {
   initialsOf,
   profileColor,
   summarizeWatching,
+  describeStreamDevice,
+  describeStreamLimit,
+  parseStreamLimit,
 } from './viewers';
 
 describe('describeDevice', () => {
@@ -134,5 +137,40 @@ describe('profileColor', () => {
   it('draws a known colour, and an unknown one as slate', () => {
     expect(profileColor('amber')).toBe('#e6a85c');
     expect(profileColor('ultraviolet')).toBe(profileColor('slate'));
+  });
+});
+
+describe('stream limits', () => {
+  it('names the device of a stream', () => {
+    expect(describeStreamDevice({ device: 'TV', userAgent: null })).toBe('TV');
+    expect(
+      describeStreamDevice({
+        device: 'DESKTOP',
+        userAgent: 'Mozilla/5.0 (X11; Linux x86_64) Gecko/20100101 Firefox/130.0',
+      }),
+    ).toBe('Computer, Firefox on Linux');
+  });
+
+  it('says how many devices may play, and where that comes from', () => {
+    expect(describeStreamLimit({ limit: null, source: 'SITE' })).toBe(
+      'On any number of devices at once',
+    );
+    expect(describeStreamLimit({ limit: 1, source: 'PLAN' })).toBe(
+      'Up to 1 device at once, from the plan',
+    );
+    expect(describeStreamLimit({ limit: 4, source: 'VIEWER' })).toBe(
+      'Up to 4 devices at once, set for this viewer',
+    );
+    expect(describeStreamLimit({ limit: 2, source: 'SITE' })).toBe(
+      'Up to 2 devices at once, the limit of the installation',
+    );
+  });
+
+  it('reads the field for a number of devices', () => {
+    expect(parseStreamLimit('')).toBeNull();
+    expect(parseStreamLimit(' 3 ')).toBe(3);
+    expect(parseStreamLimit('0')).toBe('invalid');
+    expect(parseStreamLimit('21')).toBe('invalid');
+    expect(parseStreamLimit('two')).toBe('invalid');
   });
 });
