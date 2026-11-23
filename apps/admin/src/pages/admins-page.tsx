@@ -1,6 +1,14 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { KeyRound, MoreHorizontal, Plus, UserCheck, UserX } from 'lucide-react';
+import {
+  KeyRound,
+  MoreHorizontal,
+  Plus,
+  ShieldCheck,
+  ShieldOff,
+  UserCheck,
+  UserX,
+} from 'lucide-react';
 import { type FormEvent, useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import { adminsApi } from '@/api/endpoints';
@@ -84,6 +92,29 @@ export function AdminsPage() {
     onError: (error: Error) => toast.error(error.message),
   });
 
+  const resetTwoFactor = useMutation({
+    mutationFn: (admin: Admin) => adminsApi.resetTwoFactor(admin.id),
+    onSuccess: (_result, admin) => {
+      toast.success(`${admin.displayName} signs in with the password alone again`, {
+        description: 'They were signed out, and can set it up again under their account.',
+      });
+      void refresh();
+    },
+    onError: (error: Error) => toast.error(error.message),
+  });
+  const takeOffTwoFactor = async (admin: Admin) => {
+    const confirmed = await confirm({
+      title: `Take two-factor sign-in off ${admin.displayName}?`,
+      description:
+        'For an admin who lost their phone and their recovery codes. Their password alone opens the panel again until they set it up anew, and they are signed out everywhere. Be sure it is really them who asks.',
+      confirmLabel: 'Take it off',
+      destructive: true,
+    });
+    if (confirmed) {
+      resetTwoFactor.mutate(admin);
+    }
+  };
+
   const toggleActive = async (admin: Admin) => {
     if (admin.isActive) {
       const confirmed = await confirm({
@@ -132,6 +163,7 @@ export function AdminsPage() {
                 <Th>Name</Th>
                 <Th>Role</Th>
                 <Th>Status</Th>
+                <Th>Two-factor</Th>
                 <Th>Last sign-in</Th>
                 <Th className="w-10" aria-label="Actions" />
               </tr>
@@ -181,6 +213,16 @@ export function AdminsPage() {
                         {admin.isActive ? 'Active' : 'Deactivated'}
                       </Badge>
                     </Td>
+                    <Td>
+                      {admin.twoFactorEnabled ? (
+                        <span className="inline-flex items-center gap-1.5 text-success">
+                          <ShieldCheck className="size-4" aria-hidden="true" />
+                          On
+                        </span>
+                      ) : (
+                        <span className="text-muted-foreground">Off</span>
+                      )}
+                    </Td>
                     <Td className="whitespace-nowrap text-muted-foreground">
                       {admin.lastLoginAt ? (
                         <Tooltip content={formatDateTime(admin.lastLoginAt)}>
@@ -207,6 +249,12 @@ export function AdminsPage() {
                               <KeyRound />
                               Set a new password
                             </DropdownMenuItem>
+                            {admin.twoFactorEnabled ? (
+                              <DropdownMenuItem onSelect={() => void takeOffTwoFactor(admin)}>
+                                <ShieldOff />
+                                Take off two-factor sign-in
+                              </DropdownMenuItem>
+                            ) : null}
                             <DropdownMenuSeparator />
                             <DropdownMenuItem
                               destructive={admin.isActive}

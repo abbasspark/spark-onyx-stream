@@ -6,7 +6,9 @@ import { AuthController } from './auth.controller.js';
 import { AuthGuard } from './auth.guard.js';
 import { AuthService } from './auth.service.js';
 import { LoginThrottleService } from './login-throttle.service.js';
+import { CryptoModule } from '../crypto/crypto.module.js';
 import { SessionService } from './session.service.js';
+import { TwoFactorService } from './two-factor.service.js';
 
 /**
  * Authentication for the admin API.
@@ -16,14 +18,16 @@ import { SessionService } from './session.service.js';
  */
 @Global()
 @Module({
+  imports: [CryptoModule],
   controllers: [AuthController],
   providers: [
     AuthService,
+    TwoFactorService,
     SessionService,
     LoginThrottleService,
     ApiKeyAuthService,
     { provide: APP_GUARD, useClass: AuthGuard },
   ],
-  exports: [SessionService, LoginThrottleService],
+  exports: [SessionService, LoginThrottleService, TwoFactorService],
 })
 export class AuthModule {}

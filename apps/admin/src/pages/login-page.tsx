@@ -2,11 +2,14 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Info, ShieldCheck } from 'lucide-react';
 import { type FormEvent, useState } from 'react';
+import { toast } from 'sonner';
+import { ApiError } from '@/api/client';
 import { authApi } from '@/api/endpoints';
 import { useSession } from '@/auth/session';
 import { Button } from '@/components/ui/button';
 import { ErrorNote, Spinner } from '@/components/ui/display';
 import { Field, Input } from '@/components/ui/form';
+import { isCompleteCode, tidyCode } from '@/lib/two-factor';
 
 /** Sign-in screen. On a fresh installation it asks for the first owner instead. */
 export function LoginPage() {
@@ -19,6 +22,9 @@ export function LoginPage() {
   const [password, setPassword] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<unknown>(null);
+  // The second step, for an admin with two-factor sign-in: null until it is asked for.
+  const [codeKind, setCodeKind] = useState<'app' | 'recovery' | null>(null);
+  const [code, setCode] = useState('');
 
   const needsSetup = setup.data?.required === true;
 
@@ -31,12 +37,39 @@ export function LoginPage() {
         await authApi.setup({ email, displayName, password });
         await queryClient.invalidateQueries({ queryKey: ['setup-status'] });
       }
-      await signIn(email, password);
+      const left = await signIn(email, password, codeKind ? tidyCode(code) : undefined);
+      if (left !== undefined) {
+        toast.warning(
+          left === 0
+            ? 'That was your last recovery code'
+            : `You signed in with a recovery code. ${left} ${left === 1 ? 'is' : 'are'} left`,
+          {
+            description: 'Make new ones under My account, or set up your authenticator app again.',
+            duration: 12_000,
+          },
+        );
+      }
     } catch (caught) {
-      setError(caught);
+      if (caught instanceof ApiError && caught.code === 'two_factor_required') {
+        // The password was right. The form now asks for the code.
+        setCodeKind('app');
+        setCode('');
+      } else {
+        setError(caught);
+        if (caught instanceof ApiError && caught.code === 'two_factor_invalid') {
+          setCode('');
+        }
+      }
     } finally {
       setBusy(false);
     }
+  };
+
+  const startOver = () => {
+    setCodeKind(null);
+    setCode('');
+    setPassword('');
+    setError(null);
   };
 
   return (
@@ -69,8 +102,19 @@ export function LoginPage() {
             <>
               <div className="grid gap-1">
                 <h1 className="text-lg font-semibold">
-                  {needsSetup ? 'Create the first admin' : 'Sign in'}
+                  {needsSetup ? 'Create the first admin' : codeKind ? 'Enter your code' : 'Sign in'}
                 </h1>
+                {codeKind ? (
+                  <p className="flex items-start gap-2 text-sm text-muted-foreground">
+                    <ShieldCheck
+                      className="mt-0.5 size-4 shrink-0 text-primary"
+                      aria-hidden="true"
+                    />
+                    {codeKind === 'app'
+                      ? `Open your authenticator app and enter the code it shows for ${email}.`
+                      : 'Enter one of the recovery codes you kept when you set this up. Each works once.'}
+                  </p>
+                ) : null}
                 {needsSetup ? (
                   <p className="flex items-start gap-2 text-sm text-muted-foreground">
                     <ShieldCheck
@@ -92,51 +136,116 @@ export function LoginPage() {
                 </p>
               ) : null}
 
-              <Field label="Email">
-                {(id) => (
-                  <Input
-                    id={id}
-                    type="email"
-                    autoComplete="username"
-                    required
-                    autoFocus
-                    value={email}
-                    onChange={(event) => setEmail(event.target.value)}
-                  />
-                )}
-              </Field>
-              {needsSetup ? (
-                <Field label="Name">
-                  {(id) => (
-                    <Input
-                      id={id}
-                      autoComplete="name"
-                      required
-                      maxLength={100}
-                      value={displayName}
-                      onChange={(event) => setDisplayName(event.target.value)}
-                    />
-                  )}
-                </Field>
-              ) : null}
-              <Field label="Password" hint={needsSetup ? 'At least 12 characters.' : undefined}>
-                {(id) => (
-                  <Input
-                    id={id}
-                    type="password"
-                    autoComplete={needsSetup ? 'new-password' : 'current-password'}
-                    required
-                    minLength={needsSetup ? 12 : 1}
-                    value={password}
-                    onChange={(event) => setPassword(event.target.value)}
-                  />
-                )}
-              </Field>
+              {codeKind ? (
+                <>
+                  <Field label={codeKind === 'app' ? 'Code from your app' : 'Recovery code'}>
+                    {(id) => (
+                      <Input
+                        key={codeKind}
+                        id={id}
+                        required
+                        autoFocus
+                        autoComplete="one-time-code"
+                        inputMode={codeKind === 'app' ? 'numeric' : 'text'}
+                        spellCheck={false}
+                        maxLength={codeKind === 'app' ? 7 : 20}
+                        placeholder={codeKind === 'app' ? '123 456' : 'XXXX-XXXX-XXXX'}
+                        className={
+                          codeKind === 'app'
+                            ? 'font-mono text-lg tracking-[0.3em] placeholder:tracking-[0.3em]'
+                            : 'font-mono tracking-widest uppercase placeholder:tracking-widest'
+                        }
+                        value={code}
+                        onChange={(event) => setCode(event.target.value)}
+                      />
+                    )}
+                  </Field>
+                  <ErrorNote error={error} />
+                  <Button
+                    type="submit"
+                    variant="primary"
+                    size="lg"
+                    loading={busy}
+                    disabled={!isCompleteCode(code, codeKind)}
+                  >
+                    Sign in
+                  </Button>
+                  <div className="flex flex-wrap justify-between gap-x-4 gap-y-2 text-sm">
+                    <button
+                      type="button"
+                      className="text-muted-foreground underline underline-offset-4 hover:text-foreground"
+                      onClick={() => {
+                        setCodeKind(codeKind === 'app' ? 'recovery' : 'app');
+                        setCode('');
+                        setError(null);
+                      }}
+                    >
+                      {codeKind === 'app' ? 'Use a recovery code' : 'Use a code from the app'}
+                    </button>
+                    <button
+                      type="button"
+                      className="text-muted-foreground underline underline-offset-4 hover:text-foreground"
+                      onClick={startOver}
+                    >
+                      Start over
+                    </button>
+                  </div>
+                  {codeKind === 'recovery' ? (
+                    <p className="text-xs text-muted-foreground">
+                      No phone and no recovery codes? Another admin can take two-factor sign-in off
+                      your account under Admins. The only owner uses the command line of the server.
+                    </p>
+                  ) : null}
+                </>
+              ) : (
+                <>
+                  <Field label="Email">
+                    {(id) => (
+                      <Input
+                        id={id}
+                        type="email"
+                        autoComplete="username"
+                        required
+                        autoFocus
+                        value={email}
+                        onChange={(event) => setEmail(event.target.value)}
+                      />
+                    )}
+                  </Field>
+                  {needsSetup ? (
+                    <Field label="Name">
+                      {(id) => (
+                        <Input
+                          id={id}
+                          autoComplete="name"
+                          required
+                          maxLength={100}
+                          value={displayName}
+                          onChange={(event) => setDisplayName(event.target.value)}
+                        />
+                      )}
+                    </Field>
+                  ) : null}
+                  <Field label="Password" hint={needsSetup ? 'At least 12 characters.' : undefined}>
+                    {(id) => (
+                      <Input
+                        id={id}
+                        type="password"
+                        autoComplete={needsSetup ? 'new-password' : 'current-password'}
+                        required
+                        minLength={needsSetup ? 12 : 1}
+                        value={password}
+                        onChange={(event) => setPassword(event.target.value)}
+                      />
+                    )}
+                  </Field>
 
-              <ErrorNote error={error} />
-              <Button type="submit" variant="primary" size="lg" loading={busy}>
-                {needsSetup ? 'Create admin and sign in' : 'Sign in'}
-              </Button>
+                  <ErrorNote error={error} />
+                  <Button type="submit" variant="primary" size="lg" loading={busy}>
+                    {needsSetup ? 'Create admin and sign in' : 'Sign in'}
+                  </Button>
+                </>
+              )}
             </>
           ) : null}
         </form>

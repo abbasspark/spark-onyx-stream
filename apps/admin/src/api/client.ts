@@ -18,6 +18,8 @@ export class ApiError extends Error {
     message: string,
     /** Per-field messages of a validation error. */
     readonly issues: readonly { field: string; message: string }[] = [],
+    /** What went wrong, as a word a program can act on, such as "two_factor_required". */
+    readonly code: string | null = null,
   ) {
     super(message);
     this.name = 'ApiError';
@@ -64,12 +66,15 @@ export function toQueryString(query: RequestOptions['query']): string {
 export async function toApiError(response: Response): Promise<ApiError> {
   let message = `The server answered with status ${response.status}`;
   let issues: { field: string; message: string }[] = [];
+  let code: string | null = null;
 
   try {
     const body = (await response.json()) as {
+      code?: unknown;
       message?: string | string[];
       issues?: { field: string; message: string }[];
     };
+    code = typeof body.code === 'string' ? body.code : null;
     if (Array.isArray(body.issues) && body.issues.length > 0) {
       issues = body.issues;
       message = body.issues.map((issue) => issue.message).join('. ');
@@ -82,7 +87,7 @@ export async function toApiError(response: Response): Promise<ApiError> {
     // Not JSON, for example an error page of a proxy. The status message stands.
   }
 
-  return new ApiError(response.status, message, issues);
+  return new ApiError(response.status, message, issues, code);
 }
 
 /**

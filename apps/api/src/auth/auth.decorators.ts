@@ -19,6 +19,14 @@ export const Public = () => SetMetadata(IS_PUBLIC_KEY, true);
 export const RequirePermissions = (...permissions: Permission[]) =>
   SetMetadata(REQUIRED_PERMISSIONS_KEY, permissions);
 
+export const ALLOW_WITHOUT_TWO_FACTOR_KEY = 'onyx:allowWithoutTwoFactor';
+
+/**
+ * Leaves an endpoint open to an admin who still has to set up two-factor
+ * sign-in on an installation that asks for it: what is needed to do exactly that.
+ */
+export const AllowWithoutTwoFactor = () => SetMetadata(ALLOW_WITHOUT_TWO_FACTOR_KEY, true);
+
 /** Restricts an endpoint to signed-in admins. API keys are rejected. */
 export const AdminSessionOnly = () => SetMetadata(ADMIN_SESSION_ONLY_KEY, true);
 

@@ -39,6 +39,7 @@ import { DashboardPage } from './pages/dashboard-page';
 import { EncodingProfilesPage } from './pages/encoding-profiles-page';
 import { JobsPage } from './pages/jobs-page';
 import { LoginPage } from './pages/login-page';
+import { TwoFactorRequiredScreen } from './components/two-factor';
 import { StoragePage } from './pages/storage-page';
 import { TitleEditorPage } from './pages/title-editor-page';
 import { MoviesPage, SeriesPage } from './pages/titles-page';
@@ -98,6 +99,10 @@ function Pages() {
   }
   if (state.status === 'signedOut') {
     return <LoginPage />;
+  }
+  // The API opens nothing else to this admin yet: neither does the panel.
+  if (state.me.twoFactorSetupRequired) {
+    return <TwoFactorRequiredScreen />;
   }
 
   return (

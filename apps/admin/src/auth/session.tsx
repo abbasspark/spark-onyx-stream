@@ -20,7 +20,13 @@ type SessionState =
 
 interface SessionContextValue {
   state: SessionState;
-  signIn: (email: string, password: string) => Promise<void>;
+  /**
+   * @param code For an admin with two-factor sign-in: a code from the app, or a recovery code.
+   * @returns How many recovery codes are left, when one was used to sign in.
+   */
+  signIn: (email: string, password: string, code?: string) => Promise<number | undefined>;
+  /** Asks again who is signed in, after something about them changed. */
+  refresh: () => Promise<void>;
   signOut: () => Promise<void>;
   /** Whether the signed-in admin holds a permission. */
   can: (permission: Permission) => boolean;
@@ -77,10 +83,16 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     return () => controller.abort();
   }, []);
 
-  const signIn = useCallback(async (email: string, password: string) => {
-    const result = await authApi.login({ email, password });
+  const signIn = useCallback(async (email: string, password: string, code?: string) => {
+    const result = await authApi.login({ email, password, ...(code ? { code } : {}) });
     tokenRef.current = result.token;
     tokenStore.write(result.token);
+    const me = await authApi.me();
+    setState({ status: 'signedIn', me });
+    return result.recoveryCodesLeft;
+  }, []);
+
+  const refresh = useCallback(async () => {
     const me = await authApi.me();
     setState({ status: 'signedIn', me });
   }, []);
@@ -95,10 +107,11 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     () => ({
       state,
       signIn,
+      refresh,
       signOut,
       can: (permission) => state.status === 'signedIn' && state.me.permissions.includes(permission),
     }),
-    [state, signIn, signOut],
+    [state, signIn, refresh, signOut],
   );
 
   return <SessionContext.Provider value={value}>{children}</SessionContext.Provider>;

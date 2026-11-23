@@ -17,6 +17,7 @@ import { hashPassword, needsRehash, verifyPassword } from './password-hasher.js'
 import type { AdminPrincipal } from './principal.js';
 import type { RequestInfo } from './request-info.js';
 import { SessionService } from './session.service.js';
+import { TwoFactorService } from './two-factor.service.js';
 
 /** Arbitrary constant that identifies the first-run setup lock in PostgreSQL. */
 const SETUP_ADVISORY_LOCK_ID = 727_274_001;
@@ -32,6 +33,11 @@ export interface LoginResult {
   token: string;
   expiresAt: Date;
   admin: AdminView;
+  /**
+   * Set when the admin signed in with a recovery code: how many are left.
+   * A reason to make new ones, or to set the app up again.
+   */
+  recoveryCodesLeft?: number;
 }
 
 @Injectable()
@@ -41,6 +47,7 @@ export class AuthService {
     @Inject(SessionService) private readonly sessions: SessionService,
     @Inject(LoginThrottleService) private readonly throttle: LoginThrottleService,
     @Inject(AuditService) private readonly audit: AuditService,
+    @Inject(TwoFactorService) private readonly twoFactor: TwoFactorService,
   ) {}
 
   /** True while no admin exists and the first owner still has to be created. */
@@ -115,6 +122,38 @@ export class AuthService {
       throw new UnauthorizedException('Email or password is incorrect');
     }
 
+    // The second step, for an admin who switched it on. It is asked for only
+    // once the password was right, and a wrong code counts like a wrong password.
+    let usedRecoveryCode = false;
+    if (admin.totpEnabledAt) {
+      if (!input.code) {
+        throw new UnauthorizedException({
+          statusCode: 401,
+          error: 'Unauthorized',
+          code: 'two_factor_required',
+          message: 'Enter the code from your authenticator app',
+        });
+      }
+      const factor = await this.twoFactor.check(admin, input.code);
+      if (!factor) {
+        await this.throttle.recordFailure(input.email, info.ipAddress);
+        await this.audit.record({
+          action: 'auth.login_failed',
+          adminId: admin.id,
+          metadata: { email: input.email, reason: 'two_factor' },
+          ipAddress: info.ipAddress,
+        });
+        throw new UnauthorizedException({
+          statusCode: 401,
+          error: 'Unauthorized',
+          code: 'two_factor_invalid',
+          message:
+            'This code is not right. Codes change every 30 seconds: enter the one shown now.',
+        });
+      }
+      usedRecoveryCode = factor === 'recovery';
+    }
+
     await this.throttle.reset(input.email, info.ipAddress);
 
     const updated = await this.prisma.adminUser.update({
@@ -138,7 +177,24 @@ export class AuthService {
       ipAddress: info.ipAddress,
     });
 
-    return { token, expiresAt: session.expiresAt, admin: toAdminView(updated) };
+    if (!usedRecoveryCode) {
+      return { token, expiresAt: session.expiresAt, admin: toAdminView(updated) };
+    }
+    const recoveryCodesLeft = await this.twoFactor.recoveryCodesLeft(admin.id);
+    await this.audit.record({
+      action: 'auth.recovery_code_used',
+      adminId: admin.id,
+      entityType: 'AdminUser',
+      entityId: admin.id,
+      metadata: { left: recoveryCodesLeft },
+      ipAddress: info.ipAddress,
+    });
+    return {
+      token,
+      expiresAt: session.expiresAt,
+      admin: toAdminView(updated),
+      recoveryCodesLeft,
+    };
   }
 
   async logout(principal: AdminPrincipal, info: RequestInfo): Promise<void> {
