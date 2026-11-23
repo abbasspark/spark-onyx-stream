@@ -23,6 +23,7 @@ import type { Principal } from '../auth/principal.js';
 import { requestInfo } from '../auth/request-info.js';
 import type { Page } from '../common/pagination.js';
 import { ZodValidationPipe } from '../common/zod-validation.pipe.js';
+import { TitleHistoryService } from '../history/title-history.service.js';
 import {
   type CreateCategoryInput,
   createCategorySchema,
@@ -77,6 +78,7 @@ export class CatalogController {
     @Inject(CategoriesService) private readonly categories: CategoriesService,
     @Inject(ImagesService) private readonly images: ImagesService,
     @Inject(AuditService) private readonly audit: AuditService,
+    @Inject(TitleHistoryService) private readonly history: TitleHistoryService,
   ) {}
 
   // --- Categories ----------------------------------------------------------------
@@ -176,6 +178,7 @@ export class CatalogController {
     @Req() request: Request,
   ): Promise<TitleDetail> {
     const title = await this.titles.create(body, principal.adminId);
+    await this.history.capture(title.id, principal.adminId, 'create');
     await this.record(
       'title.create',
       'Title',
@@ -202,6 +205,7 @@ export class CatalogController {
     @Req() request: Request,
   ): Promise<DuplicateResult> {
     const result = await this.duplicates.duplicate(id, body, principal.adminId);
+    await this.history.capture(result.title.id, principal.adminId, 'duplicate');
     await this.record(
       'title.duplicate',
       'Title',
@@ -227,6 +231,7 @@ export class CatalogController {
     @Req() request: Request,
   ): Promise<TitleDetail> {
     const title = await this.titles.update(id, body);
+    await this.history.capture(id, principal.adminId, 'update');
     await this.record(
       'title.update',
       'Title',
@@ -257,6 +262,7 @@ export class CatalogController {
           ? 'title.archive'
           : 'title.unpublish';
     await this.record(action, 'Title', id, { principal, request }, { name: title.name });
+    await this.history.capture(id, principal.adminId, action.slice('title.'.length));
     return title;
   }
 
@@ -286,20 +292,26 @@ export class CatalogController {
 
   @Post('titles/:id/seasons')
   @RequirePermissions('catalog:write')
-  createSeason(
+  async createSeason(
+    @CurrentPrincipal() principal: Principal,
     @Param('id', ParseUUIDPipe) id: string,
     @Body(new ZodValidationPipe(createSeasonSchema)) body: CreateSeasonInput,
   ): Promise<TitleDetail> {
-    return this.titles.createSeason(id, body);
+    const title = await this.titles.createSeason(id, body);
+    await this.history.capture(title.id, principal.adminId, 'season');
+    return title;
   }
 
   @Patch('seasons/:id')
   @RequirePermissions('catalog:write')
-  updateSeason(
+  async updateSeason(
+    @CurrentPrincipal() principal: Principal,
     @Param('id', ParseUUIDPipe) id: string,
     @Body(new ZodValidationPipe(updateSeasonSchema)) body: UpdateSeasonInput,
   ): Promise<TitleDetail> {
-    return this.titles.updateSeason(id, body);
+    const title = await this.titles.updateSeason(id, body);
+    await this.history.capture(title.id, principal.adminId, 'season');
+    return title;
   }
 
   @Delete('seasons/:id')
@@ -310,6 +322,7 @@ export class CatalogController {
     @Req() request: Request,
   ): Promise<TitleDetail> {
     const title = await this.titles.removeSeason(id);
+    await this.history.capture(title.id, principal.adminId, 'season');
     await this.record(
       'season.delete',
       'Title',
@@ -324,11 +337,14 @@ export class CatalogController {
 
   @Post('seasons/:id/episodes')
   @RequirePermissions('catalog:write')
-  createEpisode(
+  async createEpisode(
+    @CurrentPrincipal() principal: Principal,
     @Param('id', ParseUUIDPipe) id: string,
     @Body(new ZodValidationPipe(createEpisodeSchema)) body: CreateEpisodeInput,
   ): Promise<EpisodeView> {
-    return this.titles.createEpisode(id, body);
+    const episode = await this.titles.createEpisode(id, body);
+    await this.history.captureForSeason(episode.seasonId, principal.adminId, 'episode');
+    return episode;
   }
 
   @Patch('episodes/:id')
@@ -340,6 +356,7 @@ export class CatalogController {
     @Req() request: Request,
   ): Promise<EpisodeView> {
     const episode = await this.titles.updateEpisode(id, body);
+    await this.history.captureForSeason(episode.seasonId, principal.adminId, 'episode');
     if (body.status) {
       await this.record(
         body.status === 'PUBLISHED' ? 'episode.publish' : 'episode.unpublish',
@@ -354,8 +371,13 @@ export class CatalogController {
 
   @Delete('episodes/:id')
   @RequirePermissions('catalog:write')
-  removeEpisode(@Param('id', ParseUUIDPipe) id: string): Promise<TitleDetail> {
-    return this.titles.removeEpisode(id);
+  async removeEpisode(
+    @CurrentPrincipal() principal: Principal,
+    @Param('id', ParseUUIDPipe) id: string,
+  ): Promise<TitleDetail> {
+    const title = await this.titles.removeEpisode(id);
+    await this.history.capture(title.id, principal.adminId, 'episode');
+    return title;
   }
 
   // --- Artwork -------------------------------------------------------------------------

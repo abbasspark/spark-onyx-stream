@@ -13,6 +13,7 @@ import {
 import { type Prisma, PrismaClient, type TranslationJob } from '@onyx/database';
 import type { Redis } from 'ioredis';
 import { TranslationsService } from '../catalog/translations.service.js';
+import { TitleHistoryService } from '../history/title-history.service.js';
 import { AppConfig } from '../config/app-config.js';
 import { EventPublisher } from '../events/event-publisher.js';
 import { MetadataService } from '../metadata/metadata.service.js';
@@ -119,6 +120,7 @@ export class TranslationJobsService implements OnApplicationBootstrap, OnApplica
     @Inject(EventPublisher) private readonly events: EventPublisher,
     @Inject(MetadataService) private readonly metadata: MetadataService,
     @Inject(TranslationsService) private readonly translations: TranslationsService,
+    @Inject(TitleHistoryService) private readonly history: TitleHistoryService,
   ) {}
 
   onApplicationBootstrap(): void {
@@ -240,6 +242,7 @@ export class TranslationJobsService implements OnApplicationBootstrap, OnApplica
       let failure: JobFailure | null = null;
       try {
         outcome = await this.translate(titleId, job.language, job.overwrite);
+        await this.history.capture(titleId, job.createdById, 'translation');
         this.sourceDown.delete(job.id);
       } catch (error) {
         if (isSourceDown(error)) {

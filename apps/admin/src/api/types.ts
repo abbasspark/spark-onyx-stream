@@ -2297,3 +2297,52 @@ export interface TermSaveItem {
   id: string;
   texts: Record<string, string | null>;
 }
+
+/** The parts of a title a change belongs to, for filtering its history. */
+export const CHANGE_GROUPS = [
+  'texts',
+  'facts',
+  'publishing',
+  'access',
+  'artwork',
+  'classification',
+  'people',
+  'videos',
+  'translations',
+  'episodes',
+] as const;
+export type ChangeGroup = (typeof CHANGE_GROUPS)[number];
+
+/** One thing that differs between two moments of a title. */
+export interface TitleChange {
+  group: ChangeGroup;
+  /** Stable, for keys: "synopsis", "genres", "season:1:episode:3:name". */
+  field: string;
+  label: string;
+  kind: 'text' | 'value' | 'list';
+  /** How `before` and `after` are shown: as they are, or as a price, a date and so on. */
+  format?: 'money' | 'date' | 'datetime' | 'status' | 'yesno' | 'picture';
+  before?: string | null;
+  after?: string | null;
+  added?: string[];
+  removed?: string[];
+  reordered?: boolean;
+}
+
+export interface TitleRevision {
+  id: string;
+  /** What was done, as a word: "update", "publish", "import", "restore". */
+  action: string;
+  createdAt: string;
+  admin: { id: string; displayName: string } | null;
+  changes: TitleChange[];
+  /** More than `changes` holds when the list was cut. */
+  changeCount: number;
+  /** The first revision of the title: nothing to compare it with. */
+  first: boolean;
+}
+
+export interface TitleRevisionDetail extends TitleRevision {
+  /** What bringing this version back would change now. */
+  restore: TitleChange[];
+}

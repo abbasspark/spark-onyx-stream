@@ -17,6 +17,7 @@ import { DatabaseModule } from '../../src/database/database.module.js';
 import type { QueuedJobData } from '../../src/jobs/jobs.service.js';
 import { ProcessingCoreModule } from '../../src/processing/processing.module.js';
 import { PlaysModule } from '../../src/analytics/analytics.module.js';
+import { TitleHistoryCoreModule } from '../../src/history/title-history.module.js';
 import { StreamsCoreModule } from '../../src/streams/streams.module.js';
 import { PROCESSING_QUEUE } from '../../src/queue/queue.constants.js';
 import { MailModule } from '../../src/mail/mail.module.js';
@@ -297,6 +298,7 @@ export async function createTestApp(
       StorageModule,
       ProcessingCoreModule,
       PlaysModule,
+      TitleHistoryCoreModule,
       StreamsCoreModule,
       DeliveryCoreModule,
       MailModule,

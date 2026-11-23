@@ -20,6 +20,7 @@ import { CurrentPrincipal, RequirePermissions } from '../auth/auth.decorators.js
 import type { Principal } from '../auth/principal.js';
 import { requestInfo } from '../auth/request-info.js';
 import { ZodValidationPipe } from '../common/zod-validation.pipe.js';
+import { TitleHistoryService } from '../history/title-history.service.js';
 import {
   type CollectionTitlesInput,
   collectionTitlesSchema,
@@ -45,6 +46,7 @@ export class CollectionsController {
   constructor(
     @Inject(CollectionsService) private readonly collections: CollectionsService,
     @Inject(AuditService) private readonly audit: AuditService,
+    @Inject(TitleHistoryService) private readonly history: TitleHistoryService,
   ) {}
 
   private record(
@@ -161,6 +163,7 @@ export class CollectionsController {
     @Req() request: Request,
   ): Promise<ExtraView[]> {
     const extras = await this.collections.addExtra(id, body);
+    await this.history.capture(id, principal.adminId, 'extras');
     await this.record('title.extra.add', 'Title', id, principal, request, {
       name: body.name,
       kind: body.kind,
@@ -170,11 +173,14 @@ export class CollectionsController {
 
   @Put('titles/:id/extras/order')
   @RequirePermissions('catalog:write')
-  orderExtras(
+  async orderExtras(
     @Param('id', ParseUUIDPipe) id: string,
     @Body(new ZodValidationPipe(orderExtrasSchema)) body: OrderExtrasInput,
+    @CurrentPrincipal() principal: Principal,
   ): Promise<ExtraView[]> {
-    return this.collections.orderExtras(id, body);
+    const extras = await this.collections.orderExtras(id, body);
+    await this.history.capture(id, principal.adminId, 'extras');
+    return extras;
   }
 
   @Patch('extras/:id')
@@ -186,6 +192,7 @@ export class CollectionsController {
     @Req() request: Request,
   ): Promise<ExtraView[]> {
     const { titleId, extras } = await this.collections.updateExtra(id, body);
+    await this.history.capture(titleId, principal.adminId, 'extras');
     await this.record('title.extra.update', 'Title', titleId, principal, request, {
       fields: Object.keys(body),
     });
@@ -201,6 +208,7 @@ export class CollectionsController {
     @Req() request: Request,
   ): Promise<void> {
     const { titleId, name } = await this.collections.removeExtra(id);
+    await this.history.capture(titleId, principal.adminId, 'extras');
     await this.record('title.extra.remove', 'Title', titleId, principal, request, { name });
   }
 }

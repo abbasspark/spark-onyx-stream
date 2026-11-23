@@ -22,6 +22,7 @@ import type { Principal } from '../auth/principal.js';
 import { requestInfo } from '../auth/request-info.js';
 import type { Page } from '../common/pagination.js';
 import { ZodValidationPipe } from '../common/zod-validation.pipe.js';
+import { TitleHistoryService } from '../history/title-history.service.js';
 import {
   type CreateGenreInput,
   createGenreSchema,
@@ -45,6 +46,7 @@ export class PeopleController {
   constructor(
     @Inject(PeopleService) private readonly people: PeopleService,
     @Inject(AuditService) private readonly audit: AuditService,
+    @Inject(TitleHistoryService) private readonly history: TitleHistoryService,
   ) {}
 
   private record(
@@ -186,6 +188,7 @@ export class PeopleController {
     @Req() request: Request,
   ): Promise<CreditView[]> {
     const credits = await this.people.replaceCredits(id, body);
+    await this.history.capture(id, principal.adminId, 'credits');
     await this.record('title.credits', 'Title', id, principal, request, {
       cast: credits.filter((credit) => credit.kind === 'CAST').length,
       crew: credits.filter((credit) => credit.kind === 'CREW').length,

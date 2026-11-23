@@ -81,6 +81,7 @@ model AdminUser {
   couponsCreated       Coupon[]
   recoveryCodes        AdminRecoveryCode[]
   backups              Backup[]
+  titleRevisions       TitleRevision[]
   translationJobs      TranslationJob[]
 
   @@index([customRoleId])
@@ -840,6 +841,7 @@ model Title {
   seasons      Season[]
   watching     WatchProgress[]
   saved        WatchlistItem[]
+  revisions    TitleRevision[]
   watchedFiles WatchedFile[]
 
   @@index([type, status])
@@ -925,6 +927,30 @@ model TranslationJob {
 
   @@index([status, createdAt])
   @@map("translation_jobs")
+}
+
+/// One step in the history of a title: what it looked like after a change,
+/// and what that change was. Kept so an earlier state can be read and brought back.
+model TitleRevision {
+  id          String     @id @default(uuid(7)) @db.Uuid
+  titleId     String     @db.Uuid
+  title       Title      @relation(fields: [titleId], references: [id], onDelete: Cascade)
+  /// Who made the change. Empty for a change the system made, or an admin who is gone.
+  adminId     String?    @db.Uuid
+  admin       AdminUser? @relation(fields: [adminId], references: [id], onDelete: SetNull)
+  /// What was done, as a word: "update", "publish", "import", "restore".
+  action      String
+  /// What differs from the revision before, as a list for people to read.
+  /// Empty for the first revision of a title.
+  changes     Json
+  /// How many things changed, also when the list was cut short.
+  changeCount Int        @default(0)
+  /// The title after the change: its texts, facts, people and structure.
+  snapshot    Json
+  createdAt   DateTime   @default(now())
+
+  @@index([titleId, createdAt])
+  @@map("title_revisions")
 }
 
 /// The texts of a title in one more language. The title's own fields hold the

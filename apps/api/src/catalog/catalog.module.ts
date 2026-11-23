@@ -18,6 +18,8 @@ import { TermTranslationsController } from './term-translations.controller.js';
 import { TermTranslationsService } from './term-translations.service.js';
 import { TitleDuplicateService } from './title-duplicate.service.js';
 import { TitlesService } from './titles.service.js';
+import { TitleHistoryBackfill } from '../history/title-history.backfill.js';
+import { TitleHistoryController } from '../history/title-history.controller.js';
 import { HomeController } from '../home/home.controller.js';
 import { HomeService } from '../home/home.service.js';
 
@@ -34,11 +36,13 @@ import { HomeService } from '../home/home.service.js';
     PeopleController,
     CollectionsController,
     TranslationsController,
+    TitleHistoryController,
     TermTranslationsController,
     HomeController,
     PublicCatalogController,
   ],
   providers: [
+    TitleHistoryBackfill,
     TitlesService,
     TitleDuplicateService,
     CategoriesService,
