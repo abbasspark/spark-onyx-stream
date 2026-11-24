@@ -126,6 +126,8 @@ WORKDIR /app
 COPY --from=web-build --chown=node:node /repo/apps/web/.next/standalone ./
 # The server does not include the files browsers download. They go next to it.
 COPY --from=web-build --chown=node:node /repo/apps/web/.next/static apps/web/.next/static
+# Files served as they are, such as the service worker that shows notifications.
+COPY --from=web-build --chown=node:node /repo/apps/web/public apps/web/public
 
 USER node
 EXPOSE 3001

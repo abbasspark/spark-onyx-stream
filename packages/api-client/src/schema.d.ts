@@ -2828,6 +2828,207 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/notifications/automatic": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Turns on or off what viewers are told by themselves
+         * @description For an admin or an API key. Needs viewers:write.
+         */
+        patch: operations["PushAdmin_setAutomatic"];
+        trace?: never;
+    };
+    "/v1/notifications/campaigns": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description For an admin or an API key. Needs viewers:read. */
+        get: operations["PushAdmin_list"];
+        put?: never;
+        /**
+         * Writes a message as a draft
+         * @description Nothing is sent. For an admin or an API key. Needs viewers:write.
+         */
+        post: operations["PushAdmin_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/notifications/campaigns/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description For an admin or an API key. Needs viewers:read. */
+        get: operations["PushAdmin_get"];
+        put?: never;
+        post?: never;
+        /** @description For an admin or an API key. Needs viewers:write. */
+        delete: operations["PushAdmin_remove"];
+        options?: never;
+        head?: never;
+        /** @description For an admin or an API key. Needs viewers:write. */
+        patch: operations["PushAdmin_update"];
+        trace?: never;
+    };
+    "/v1/notifications/campaigns/{id}/cancel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Holds back a message that waits for its time
+         * @description For an admin or an API key. Needs viewers:write.
+         */
+        post: operations["PushAdmin_cancel"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/notifications/campaigns/{id}/send": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Sends a message: at once, or at its time when that is still to come
+         * @description For an admin or an API key. Needs viewers:write.
+         */
+        post: operations["PushAdmin_send"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/notifications/campaigns/{id}/test": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Sends a message to one viewer only, to see how it arrives
+         * @description For an admin or an API key. Needs viewers:write.
+         */
+        post: operations["PushAdmin_test"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/notifications/campaigns/reach": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * How many viewers an audience is right now, and how many of them have a device that takes notifications
+         * @description For an admin or an API key. Needs viewers:read.
+         */
+        get: operations["PushAdmin_reach"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/notifications/firebase": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Stores the key of a Firebase service account, after trying it
+         * @description With it, apps on Android and iOS can be reached. The key itself is never answered back. For an admin or an API key. Needs settings:write.
+         */
+        put: operations["PushAdmin_setFirebase"];
+        post?: never;
+        /**
+         * Forgets the Firebase key, and with it every app that registered
+         * @description For an admin or an API key. Needs settings:write.
+         */
+        delete: operations["PushAdmin_removeFirebase"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/notifications/setup": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description For an admin or an API key. Needs viewers:read. */
+        get: operations["PushAdmin_overview"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/notifications/web-key/renew": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Makes a new key pair for browsers
+         * @description Every browser that allowed notifications is forgotten and subscribes again at its next visit. For an admin or an API key. Needs settings:write.
+         */
+        post: operations["PushAdmin_renewWebKey"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/openapi.json": {
         parameters: {
             query?: never;
@@ -3186,6 +3387,26 @@ export interface paths {
          * @description For an admin or an API key. Needs billing:write.
          */
         post: operations["PurchasesAdmin_revoke"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/push/config": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * How this installation sends notifications: the key a browser subscribes with, the Firebase project an app registers with, and the kinds of notification a viewer can turn on and off
+         * @description Open to everyone.
+         */
+        get: operations["PushConfig_config"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -4413,6 +4634,130 @@ export interface paths {
         patch: operations["ViewerAuth_updateOwn"];
         trace?: never;
     };
+    "/v1/viewer/notifications": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * What was sent to the account, the newest first, thirty at a time
+         * @description For a signed-in viewer.
+         */
+        get: operations["ViewerNotifications_list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/viewer/notifications/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Takes a notification out of the list
+         * @description Safe to repeat. For a signed-in viewer.
+         */
+        delete: operations["ViewerNotifications_remove"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/viewer/notifications/{id}/opened": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Says that the viewer opened a notification, from the list or by tapping it on a device
+         * @description For a signed-in viewer.
+         */
+        post: operations["ViewerNotifications_opened"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/viewer/notifications/read": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Marks notifications as seen: the ones named, or all of them
+         * @description For a signed-in viewer.
+         */
+        post: operations["ViewerNotifications_read"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/viewer/notifications/settings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Which kinds of notification the account wants, and whether this device is registered
+         * @description For a signed-in viewer.
+         */
+        get: operations["ViewerNotifications_settings"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Turns kinds of notification on or off, for the whole account
+         * @description For a signed-in viewer.
+         */
+        patch: operations["ViewerNotifications_setSettings"];
+        trace?: never;
+    };
+    "/v1/viewer/notifications/unread": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Only the number of notifications not seen yet, for a mark on a bell
+         * @description For a signed-in viewer.
+         */
+        get: operations["ViewerNotifications_unread"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/viewer/password": {
         parameters: {
             query?: never;
@@ -4639,6 +4984,66 @@ export interface paths {
          * @description For a signed-in viewer.
          */
         post: operations["ViewerPurchases_start"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/viewer/push/devices": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Registers this device for notifications: a browser with its subscription, an app with its Firebase token
+         * @description Sent again whenever the token changes and at every start of the app. The device takes notifications for as long as this sign-in holds. For a signed-in viewer.
+         */
+        put: operations["ViewerNotifications_register"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/viewer/push/devices/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Stops notifications for a device, by the id registering gave
+         * @description Safe to repeat. For a signed-in viewer.
+         */
+        delete: operations["ViewerNotifications_unregister"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/viewer/push/devices/forget": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * The same by token, for a device that does not know its id
+         * @description For a signed-in viewer.
+         */
+        post: operations["ViewerNotifications_forget"];
         delete?: never;
         options?: never;
         head?: never;
@@ -5805,6 +6210,12 @@ export interface components {
             /** Format: date-time */
             createdAt: string;
         };
+        AutomaticSettings: {
+            /** @description A series somebody follows has a new episode. */
+            newEpisodes: boolean;
+            /** @description The catalog has new titles. */
+            newTitles: boolean;
+        };
         BackupOverview: {
             settings: {
                 /**
@@ -5957,6 +6368,43 @@ export interface components {
             failures: components["schemas"]["BulkFailure"][];
             /** @description Set by "translate": the job that does the work, in the background. */
             job: components["schemas"]["TranslationJobView"] | null;
+        };
+        /** @enum {string} */
+        CampaignAudience: "EVERYONE" | "SUBSCRIBERS" | "NOT_SUBSCRIBED" | "PLAN";
+        CampaignView: {
+            id: string;
+            title: string;
+            body: string;
+            linked: {
+                id: string;
+                slug: string;
+                name: string;
+                type: string;
+                status: string;
+            } | null;
+            link: string | null;
+            audience: components["schemas"]["CampaignAudience"];
+            plan: {
+                id: string;
+                name: string;
+            } | null;
+            status: string;
+            /** Format: date-time */
+            scheduledAt: string | null;
+            /** Format: date-time */
+            sentAt: string | null;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+            /** @description Viewers it was made for. */
+            recipients: number;
+            /** @description Of those: on how many accounts a device took it, how many saw it in their list, and how many opened it. */
+            pushed: number;
+            read: number;
+            opened: number;
+            /** @description Notifications that still wait to be sent to devices. */
+            waiting: number;
         };
         CategoryView: {
             id: string;
@@ -7067,6 +7515,32 @@ export interface components {
             /** @description How many genres, keywords or people are shared, or profiles that watched both. */
             count: number;
         };
+        NotificationList: {
+            items: components["schemas"]["NotificationView"][];
+            /** @description How many the viewer has not seen. */
+            unread: number;
+            /** @description Pass as `before` for older ones. Null: there are none. */
+            next: string | null;
+        };
+        /** @enum {string} */
+        NotificationTopic: "NEW_EPISODES" | "NEW_TITLES" | "ANNOUNCEMENTS";
+        NotificationView: {
+            id: string;
+            topic: components["schemas"]["NotificationTopic"];
+            title: string;
+            body: string;
+            /** @description An address of a picture, or null. */
+            image: string | null;
+            /** @description Where it leads on the website, as a path such as "/title/the-long-road". */
+            link: string | null;
+            /** @description What it is about, for apps: {"type":"title","slug":"…"}. */
+            data: {
+                [key: string]: string;
+            };
+            /** Format: date-time */
+            createdAt: string;
+            read: boolean;
+        };
         OverviewPoint: [
             number,
             number,
@@ -7231,6 +7705,12 @@ export interface components {
         };
         PageOfAssetView: {
             items: components["schemas"]["AssetView"][];
+            total: number;
+            page: number;
+            pageSize: number;
+        };
+        PageOfCampaignView: {
+            items: components["schemas"]["CampaignView"][];
             total: number;
             page: number;
             pageSize: number;
@@ -8154,6 +8634,62 @@ export interface components {
         PurchaseKind: "RENT" | "BUY";
         /** @enum {string} */
         PurchaseStatus: "ACTIVE" | "REVOKED";
+        PushClientConfig: {
+            /** @description For browsers: the key to subscribe with. */
+            web: {
+                publicKey: string;
+            };
+            /** @description For apps: the Firebase project messages come from. Null: apps cannot be reached. */
+            fcm: {
+                projectId: string;
+            } | null;
+            topics: string[];
+        };
+        PushOverview: {
+            /** @description Devices that take notifications, by what they are. */
+            devices: {
+                platform: string;
+                /** @enum {string} */
+                provider: "WEB" | "FCM";
+                count: number;
+            }[];
+            /** @description Accounts with at least one such device, and all accounts that are not disabled. */
+            reachable: number;
+            viewers: number;
+            /** @description What was told by itself lately. */
+            recent: {
+                topic: string;
+                title: string;
+                body: string;
+                /** Format: date-time */
+                at: string;
+                viewers: number;
+            }[];
+            web: {
+                publicKey: string;
+                createdAt: string;
+                contact: string;
+            };
+            fcm: {
+                projectId: string;
+                clientEmail: string;
+                savedAt: string;
+            } | null;
+            automatic: components["schemas"]["AutomaticSettings"];
+        };
+        PushSetup: {
+            web: {
+                publicKey: string;
+                createdAt: string;
+                contact: string;
+            };
+            fcm: {
+                projectId: string;
+                clientEmail: string;
+                savedAt: string;
+            } | null;
+            automatic: components["schemas"]["AutomaticSettings"];
+        };
         QualityDay: {
             /** @description As "2026-12-24". */
             day: string;
@@ -8516,9 +9052,9 @@ export interface components {
             updatedAt: string | null;
         };
         S3PublicConfig: {
+            endpoint?: string;
             bucket: string;
             region: string;
-            endpoint?: string;
             forcePathStyle: boolean;
             keyPrefix?: string;
             accessKeyId: string;
@@ -19059,6 +19595,726 @@ export interface operations {
             };
         };
     };
+    PushAdmin_setAutomatic: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    newEpisodes?: boolean;
+                    newTitles?: boolean;
+                };
+            };
+        };
+        responses: {
+            /** @description The answer. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AutomaticSettings"];
+                };
+            };
+            /** @description The input was refused. "issues" names every field. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Not signed in, or the sign-in ran out. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Signed in, but not allowed to do this. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    PushAdmin_list: {
+        parameters: {
+            query?: {
+                page?: number;
+                pageSize?: number;
+                status?: "DRAFT" | "SCHEDULED" | "SENDING" | "SENT" | "CANCELLED";
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The answer. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PageOfCampaignView"];
+                };
+            };
+            /** @description The input was refused. "issues" names every field. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Not signed in, or the sign-in ran out. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Signed in, but not allowed to do this. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    PushAdmin_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    title: string;
+                    body: string;
+                    titleId?: string | null;
+                    link?: string | null;
+                    /**
+                     * @default EVERYONE
+                     * @enum {string}
+                     */
+                    audience?: "EVERYONE" | "SUBSCRIBERS" | "NOT_SUBSCRIBED" | "PLAN";
+                    planId?: string | null;
+                    scheduledAt?: string | null;
+                };
+            };
+        };
+        responses: {
+            /** @description The answer. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CampaignView"];
+                };
+            };
+            /** @description The input was refused. "issues" names every field. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Not signed in, or the sign-in ran out. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Signed in, but not allowed to do this. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    PushAdmin_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The answer. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CampaignView"];
+                };
+            };
+            /** @description Not signed in, or the sign-in ran out. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Signed in, but not allowed to do this. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description What the address names does not exist. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    PushAdmin_remove: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Done. Nothing comes back. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Not signed in, or the sign-in ran out. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Signed in, but not allowed to do this. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description What the address names does not exist. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    PushAdmin_update: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    title?: string;
+                    body?: string;
+                    titleId?: string | null;
+                    link?: string | null;
+                    /** @enum {string} */
+                    audience?: "EVERYONE" | "SUBSCRIBERS" | "NOT_SUBSCRIBED" | "PLAN";
+                    planId?: string | null;
+                    scheduledAt?: string | null;
+                };
+            };
+        };
+        responses: {
+            /** @description The answer. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CampaignView"];
+                };
+            };
+            /** @description The input was refused. "issues" names every field. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Not signed in, or the sign-in ran out. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Signed in, but not allowed to do this. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description What the address names does not exist. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    PushAdmin_cancel: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The answer. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CampaignView"];
+                };
+            };
+            /** @description Not signed in, or the sign-in ran out. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Signed in, but not allowed to do this. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description What the address names does not exist. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    PushAdmin_send: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The answer. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CampaignView"];
+                };
+            };
+            /** @description Not signed in, or the sign-in ran out. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Signed in, but not allowed to do this. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description What the address names does not exist. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    PushAdmin_test: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** Format: email */
+                    email: string;
+                };
+            };
+        };
+        responses: {
+            /** @description The answer. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        devices: number;
+                    };
+                };
+            };
+            /** @description The input was refused. "issues" names every field. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Not signed in, or the sign-in ran out. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Signed in, but not allowed to do this. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description What the address names does not exist. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    PushAdmin_reach: {
+        parameters: {
+            query: {
+                audience: "EVERYONE" | "SUBSCRIBERS" | "NOT_SUBSCRIBED" | "PLAN";
+                planId?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The answer. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        viewers: number;
+                        withDevice: number;
+                    };
+                };
+            };
+            /** @description The input was refused. "issues" names every field. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Not signed in, or the sign-in ran out. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Signed in, but not allowed to do this. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    PushAdmin_setFirebase: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    serviceAccount: string;
+                };
+            };
+        };
+        responses: {
+            /** @description The answer. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PushSetup"];
+                };
+            };
+            /** @description The input was refused. "issues" names every field. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Not signed in, or the sign-in ran out. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Signed in, but not allowed to do this. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    PushAdmin_removeFirebase: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The answer. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PushSetup"];
+                };
+            };
+            /** @description Not signed in, or the sign-in ran out. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Signed in, but not allowed to do this. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    PushAdmin_overview: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The answer. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PushOverview"];
+                };
+            };
+            /** @description Not signed in, or the sign-in ran out. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Signed in, but not allowed to do this. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    PushAdmin_renewWebKey: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The answer. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PushSetup"];
+                };
+            };
+            /** @description Not signed in, or the sign-in ran out. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Signed in, but not allowed to do this. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
     OpenApi_get: {
         parameters: {
             query?: never;
@@ -20483,6 +21739,35 @@ export interface operations {
             };
             /** @description What the address names does not exist. */
             404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    PushConfig_config: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The answer. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PushClientConfig"];
+                };
+            };
+            /** @description Too many requests. "Retry-After" says when to try again. */
+            429: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -24811,6 +26096,328 @@ export interface operations {
             };
         };
     };
+    ViewerNotifications_list: {
+        parameters: {
+            query?: {
+                before?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The answer. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NotificationList"];
+                };
+            };
+            /** @description The input was refused. "issues" names every field. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Not signed in, or the sign-in ran out. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    ViewerNotifications_remove: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Done. Nothing comes back. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Not signed in, or the sign-in ran out. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description What the address names does not exist. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Too many requests. "Retry-After" says when to try again. */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    ViewerNotifications_opened: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Done. Nothing comes back. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Not signed in, or the sign-in ran out. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description What the address names does not exist. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Too many requests. "Retry-After" says when to try again. */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    ViewerNotifications_read: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    ids?: string[];
+                };
+            };
+        };
+        responses: {
+            /** @description The answer. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        read: number;
+                    };
+                };
+            };
+            /** @description The input was refused. "issues" names every field. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Not signed in, or the sign-in ran out. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Too many requests. "Retry-After" says when to try again. */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    ViewerNotifications_settings: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The answer. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        topics: {
+                            NEW_EPISODES: boolean;
+                            NEW_TITLES: boolean;
+                            ANNOUNCEMENTS: boolean;
+                        };
+                        devices: number;
+                        thisDevice: boolean;
+                    };
+                };
+            };
+            /** @description Not signed in, or the sign-in ran out. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    ViewerNotifications_setSettings: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    topics: {
+                        NEW_EPISODES?: boolean;
+                        NEW_TITLES?: boolean;
+                        ANNOUNCEMENTS?: boolean;
+                    };
+                };
+            };
+        };
+        responses: {
+            /** @description The answer. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        topics: {
+                            NEW_EPISODES: boolean;
+                            NEW_TITLES: boolean;
+                            ANNOUNCEMENTS: boolean;
+                        };
+                        devices: number;
+                        thisDevice: boolean;
+                    };
+                };
+            };
+            /** @description The input was refused. "issues" names every field. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Not signed in, or the sign-in ran out. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Too many requests. "Retry-After" says when to try again. */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    ViewerNotifications_unread: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The answer. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        unread: number;
+                    };
+                };
+            };
+            /** @description Not signed in, or the sign-in ran out. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
     ViewerAuth_changePassword: {
         parameters: {
             query?: never;
@@ -25438,6 +27045,180 @@ export interface operations {
                         url: string;
                     };
                 };
+            };
+            /** @description The input was refused. "issues" names every field. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Not signed in, or the sign-in ran out. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Too many requests. "Retry-After" says when to try again. */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    ViewerNotifications_register: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** @constant */
+                    provider: "WEB";
+                    subscription: {
+                        /** Format: uri */
+                        endpoint: string;
+                        keys: {
+                            p256dh: string;
+                            auth: string;
+                        };
+                    };
+                    platform: string;
+                    appVersion?: string;
+                    language?: string;
+                } | {
+                    /** @constant */
+                    provider: "FCM";
+                    token: string;
+                    platform: string;
+                    appVersion?: string;
+                    language?: string;
+                };
+            };
+        };
+        responses: {
+            /** @description The answer. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        id: string;
+                    };
+                };
+            };
+            /** @description The input was refused. "issues" names every field. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Not signed in, or the sign-in ran out. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Too many requests. "Retry-After" says when to try again. */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    ViewerNotifications_unregister: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Done. Nothing comes back. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Not signed in, or the sign-in ran out. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description What the address names does not exist. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Too many requests. "Retry-After" says when to try again. */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    ViewerNotifications_forget: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** @enum {string} */
+                    provider: "WEB" | "FCM";
+                    token: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Done. Nothing comes back. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description The input was refused. "issues" names every field. */
             400: {

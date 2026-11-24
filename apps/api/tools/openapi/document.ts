@@ -45,6 +45,11 @@ const AREAS: Record<string, { name: string; description: string }> = {
     name: 'Playback quality',
     description: 'What players report about how playback went, and the figures made of it.',
   },
+  push: {
+    name: 'Notifications',
+    description:
+      'Devices that take notifications, the list of a viewer, and the messages an admin sends.',
+  },
   similar: {
     name: 'Similar titles',
     description: 'Which titles are like a title, why, and rows of them for a profile.',

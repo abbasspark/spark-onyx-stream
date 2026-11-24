@@ -2,6 +2,8 @@
 'use client';
 
 import {
+  Bell,
+  BellOff,
   Check,
   History,
   Loader2,
@@ -15,6 +17,19 @@ import {
   Tv,
   UsersRound,
 } from 'lucide-react';
+import { languageFromCookies } from '@/lib/language';
+import {
+  currentSubscription,
+  disablePush,
+  enablePush,
+  type NotificationSettings,
+  notificationsApi,
+  type PushSupport,
+  pushSupport,
+  type Topic,
+  TOPIC_LOOKS,
+  TOPICS,
+} from '@/lib/notifications';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { type FormEvent, type ReactNode, useCallback, useEffect, useState } from 'react';
@@ -66,9 +81,21 @@ function asError(caught: unknown): ViewerApiError {
     : new ViewerApiError(0, 'Something went wrong. Try again in a moment.');
 }
 
-function Section({ heading, children }: { heading: string; children: ReactNode }) {
+function Section({
+  heading,
+  id,
+  children,
+}: {
+  heading: string;
+  /** For a link that leads straight to the section. */
+  id?: string;
+  children: ReactNode;
+}) {
   return (
-    <section className="grid gap-x-12 gap-y-5 border-t border-line py-10 md:grid-cols-[14rem_minmax(0,28rem)]">
+    <section
+      id={id}
+      className="grid scroll-mt-24 gap-x-12 gap-y-5 border-t border-line py-10 md:grid-cols-[14rem_minmax(0,28rem)]"
+    >
       <h2 className="heading text-xl">{heading}</h2>
       <div>{children}</div>
     </section>
@@ -99,6 +126,137 @@ function Saved({ when, label = 'Saved' }: { when: number; label?: string }) {
         </>
       ) : null}
     </span>
+  );
+}
+
+/**
+ * Which kinds of notification the account wants, and whether this browser
+ * takes them. The kinds hold for the whole account, the switch for this
+ * browser only.
+ */
+function NotificationsSection() {
+  const [settings, setSettings] = useState<NotificationSettings | null>(null);
+  const [support, setSupport] = useState<PushSupport>('unsupported');
+  const [here, setHere] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [savedAt, setSavedAt] = useState(0);
+
+  useEffect(() => {
+    setSupport(pushSupport());
+    notificationsApi
+      .settings()
+      .then(setSettings)
+      .catch((caught) => setError(asError(caught).message));
+    // What the server knows of this sign-in and what the browser holds can differ.
+    void currentSubscription()
+      .then((subscription) => setHere(subscription !== null && pushSupport() === 'allowed'))
+      .catch(() => undefined);
+  }, []);
+
+  const toggle = async (topic: Topic, on: boolean) => {
+    if (!settings) {
+      return;
+    }
+    const before = settings;
+    setSettings({ ...settings, topics: { ...settings.topics, [topic]: on } });
+    try {
+      setSettings(await notificationsApi.setTopics({ [topic]: on }));
+      setError(null);
+      setSavedAt(Date.now());
+    } catch (caught) {
+      setSettings(before);
+      setError(asError(caught).message);
+    }
+  };
+
+  const switchHere = async () => {
+    setBusy(true);
+    setError(null);
+    try {
+      if (here) {
+        await disablePush();
+        setHere(false);
+      } else {
+        const allowed = await enablePush(languageFromCookies(document.cookie));
+        setHere(allowed);
+        setSupport(pushSupport());
+      }
+      setSettings(await notificationsApi.settings());
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : asError(caught).message);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <Section heading="Notifications" id="notifications">
+      <p className="mb-5 text-smoke">
+        What we tell you about. You find everything in the bell at the top, and on the devices you
+        allow.
+      </p>
+      {settings ? (
+        <ul className="mb-6 divide-y divide-line border-y border-line">
+          {TOPICS.map((topic) => (
+            <li key={topic}>
+              <label className="flex cursor-pointer items-start gap-3 py-3">
+                <input
+                  type="checkbox"
+                  className="mt-1 size-4 accent-sard"
+                  checked={settings.topics[topic]}
+                  onChange={(event) => void toggle(topic, event.target.checked)}
+                />
+                <span>
+                  <span className="block font-medium">{TOPIC_LOOKS[topic].label}</span>
+                  <span className="block text-sm text-smoke">{TOPIC_LOOKS[topic].about}</span>
+                </span>
+              </label>
+            </li>
+          ))}
+        </ul>
+      ) : error ? null : (
+        <p className="mb-6 text-smoke">One moment…</p>
+      )}
+
+      <div className="flex flex-wrap items-center gap-4">
+        {support === 'unsupported' ? (
+          <p className="text-sm text-smoke">
+            This browser cannot show notifications. On an iPhone or iPad, add this website to the
+            home screen first.
+          </p>
+        ) : support === 'blocked' ? (
+          <p className="text-sm text-smoke">
+            Notifications are blocked for this website in your browser. Allow them in the
+            browser&apos;s settings for this site, then come back.
+          </p>
+        ) : (
+          <button
+            type="button"
+            className={here ? 'button button-quiet' : 'button button-play'}
+            disabled={busy}
+            onClick={() => void switchHere()}
+          >
+            {busy ? <Spinner /> : here ? <BellOff /> : <Bell />}
+            {here ? 'Stop notifications in this browser' : 'Notify me in this browser'}
+          </button>
+        )}
+        <Saved when={savedAt} />
+      </div>
+      {settings && settings.devices > 0 ? (
+        <p className="mt-4 text-sm text-smoke">
+          {settings.devices === 1
+            ? 'One device of your account takes notifications.'
+            : `${settings.devices} devices of your account take notifications.`}{' '}
+          A device stops when you sign out on it.
+        </p>
+      ) : null}
+      {error ? (
+        <p role="alert" className="mt-4 text-sm text-alarm">
+          {error}
+        </p>
+      ) : null}
+    </Section>
   );
 }
 
@@ -176,6 +334,7 @@ export function AccountScreen() {
       <PurchasesSection />
       <PaymentsSection />
       <ProfilesSection />
+      <NotificationsSection />
       <DevicesSection />
       <PlayingSection />
       <HistorySection />

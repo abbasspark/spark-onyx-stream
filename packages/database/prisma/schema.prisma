@@ -133,22 +133,24 @@ enum ViewerStatus {
 /// A person who watches: an account on the viewer website and in the apps.
 /// Kept apart from admins on purpose. A viewer can never reach the panel.
 model Viewer {
-  id               String       @id @default(uuid(7)) @db.Uuid
+  id               String              @id @default(uuid(7)) @db.Uuid
   /// Lower case. The sign-in name.
-  email            String       @unique
+  email            String              @unique
   passwordHash     String
   displayName      String
-  status           ViewerStatus @default(ACTIVE)
+  status           ViewerStatus        @default(ACTIVE)
   /// When the viewer showed that the email address is theirs, or an admin vouched for it.
   emailVerifiedAt  DateTime?
   lastLoginAt      DateTime?
   /// The viewer as a customer at Stripe, once they started a checkout.
-  stripeCustomerId String?      @unique
+  stripeCustomerId String?             @unique
   /// On how many devices this account plays at the same time, when an admin
   /// set it for this viewer. Empty: the limit of the plan or the installation.
   maxStreams       Int?
-  createdAt        DateTime     @default(now())
-  updatedAt        DateTime     @updatedAt
+  createdAt        DateTime            @default(now())
+  /// The kinds of notification the viewer does not want. Empty: all of them.
+  mutedTopics      NotificationTopic[] @default([])
+  updatedAt        DateTime            @updatedAt
 
   sessions      ViewerSession[]
   devices       ViewerDevice[]
@@ -163,6 +165,8 @@ model Viewer {
   saved         WatchlistItem[]
   plays         Play[]
   tokens        ViewerToken[]
+  pushDevices   PushDevice[]
+  notifications Notification[]
 
   @@index([createdAt])
   @@map("viewers")
@@ -192,7 +196,8 @@ model ViewerSession {
   deviceId      String?        @db.Uuid
   device        ViewerDevice?  @relation(fields: [deviceId], references: [id], onDelete: SetNull)
 
-  streams ViewerStream[]
+  streams     ViewerStream[]
+  pushDevices PushDevice[]
 
   @@index([viewerId])
   @@index([expiresAt])
@@ -1016,6 +1021,8 @@ model Title {
 
   status      PublishStatus @default(DRAFT)
   publishedAt DateTime?
+  /// When viewers were told that the title is there. Empty: not yet.
+  announcedAt DateTime?
 
   /// A published title is shown to viewers from this moment on. Empty: at once.
   availableFrom  DateTime?
@@ -1069,6 +1076,7 @@ model Title {
   playbackSessions PlaybackSession[]
   watchedWith      TitleCoWatch[]    @relation("CoWatchOf")
   watchedWithBy    TitleCoWatch[]    @relation("CoWatchOther")
+  campaigns        PushCampaign[]
 
   @@index([type, status])
   @@index([type, releaseDate])
@@ -1516,6 +1524,8 @@ model Episode {
 
   status      PublishStatus @default(DRAFT)
   publishedAt DateTime?
+  /// When viewers were told that the episode is there. Empty: not yet.
+  announcedAt DateTime?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -1726,6 +1736,7 @@ model Plan {
   payments      Payment[]
   packages      PlanPackage[]
   coupons       CouponPlan[]
+  campaigns     PushCampaign[]
 
   @@index([position])
   @@map("plans")
@@ -2691,4 +2702,164 @@ model PlaybackSession {
   @@index([channelId, startedAt])
   @@index([errorCode, startedAt])
   @@map("playback_sessions")
+}
+
+/// How a notification reaches a device.
+enum PushProvider {
+  /// A browser, through the push service of its maker.
+  WEB
+  /// An app, through Firebase Cloud Messaging. Reaches Android and iOS.
+  FCM
+}
+
+/// What a notification is about. A viewer can turn each kind off.
+enum NotificationTopic {
+  /// A series the viewer follows has a new episode.
+  NEW_EPISODES
+  /// The catalog has new titles.
+  NEW_TITLES
+  /// Something the operator wrote.
+  ANNOUNCEMENTS
+}
+
+/// Where a notification stands on its way to the devices of a viewer.
+enum PushState {
+  /// Not pushed: it is in the list of the viewer only.
+  NONE
+  PENDING
+  /// At least one device took it.
+  SENT
+  /// No device took it, after every try.
+  FAILED
+}
+
+/// A device that takes notifications for an account: a browser that allowed
+/// them, or an app that registered its token. It belongs to one sign-in, and
+/// goes when that sign-in ends.
+model PushDevice {
+  id        String        @id @default(uuid(7)) @db.Uuid
+  viewerId  String        @db.Uuid
+  viewer    Viewer        @relation(fields: [viewerId], references: [id], onDelete: Cascade)
+  sessionId String        @db.Uuid
+  session   ViewerSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  provider  PushProvider
+  /// WEB: the address at the push service. FCM: the registration token.
+  token     String
+  /// WEB only: the keys of the browser the message is encrypted for.
+  p256dh    String?
+  auth      String?
+  /// SHA-256 of the provider and the token, to find a device again.
+  tokenHash String       @unique
+
+  /// What the device says it is: "web", "android", "android-tv", "ios".
+  platform   String
+  appVersion String?
+  /// The language the device shows its texts in, such as "de".
+  language   String?
+
+  /// Sends in a row that the push service refused for a passing reason.
+  failures   Int       @default(0)
+  lastSentAt DateTime?
+  lastSeenAt DateTime  @default(now())
+  createdAt  DateTime  @default(now())
+
+  @@index([viewerId])
+  @@index([sessionId])
+  @@map("push_devices")
+}
+
+/// One notification for one account: what the list of the viewer shows, and
+/// what is pushed to their devices.
+model Notification {
+  id       String            @id @default(uuid(7)) @db.Uuid
+  viewerId String            @db.Uuid
+  viewer   Viewer            @relation(fields: [viewerId], references: [id], onDelete: Cascade)
+  topic    NotificationTopic
+
+  title    String
+  body     String
+  /// A picture, as an address relative to the media server. Empty: none.
+  imageUrl String?
+  /// Where it leads on the website, such as "/title/the-long-road". Empty: nowhere.
+  link     String?
+  /// What it is about, for apps that open their own screens: {"type":"title","slug":"…"}.
+  data     Json    @default("{}")
+
+  campaignId String?       @db.Uuid
+  campaign   PushCampaign? @relation(fields: [campaignId], references: [id], onDelete: SetNull)
+  /// Says what an automatic notification is about, so that it is made once.
+  dedupeKey  String?
+
+  pushState     PushState @default(NONE)
+  pushAttempts  Int       @default(0)
+  nextAttemptAt DateTime  @default(now())
+  /// Devices that took it.
+  devices       Int       @default(0)
+
+  createdAt DateTime  @default(now())
+  /// When the viewer saw it in their list.
+  readAt    DateTime?
+  /// When the viewer opened it, from the list or from a device.
+  openedAt  DateTime?
+
+  @@unique([viewerId, dedupeKey])
+  @@index([viewerId, createdAt])
+  @@index([pushState, nextAttemptAt])
+  @@index([campaignId])
+  @@index([createdAt])
+  @@map("notifications")
+}
+
+enum CampaignStatus {
+  DRAFT
+  /// Waits for its time.
+  SCHEDULED
+  /// Notifications are being made for its audience.
+  SENDING
+  SENT
+  CANCELLED
+}
+
+/// Whom a message of the operator goes to.
+enum CampaignAudience {
+  EVERYONE
+  /// Viewers with a running subscription.
+  SUBSCRIBERS
+  /// Viewers without one.
+  NOT_SUBSCRIBED
+  /// Viewers with a running subscription to one plan.
+  PLAN
+}
+
+/// A message the operator writes and sends to many viewers at once.
+model PushCampaign {
+  id    String @id @default(uuid(7)) @db.Uuid
+  title String
+  body  String
+
+  /// What it leads to: a title of the catalog, or an address of the website.
+  titleId String? @db.Uuid
+  linked  Title?  @relation(fields: [titleId], references: [id], onDelete: SetNull)
+  link    String?
+
+  audience CampaignAudience @default(EVERYONE)
+  planId   String?          @db.Uuid
+  plan     Plan?            @relation(fields: [planId], references: [id], onDelete: SetNull)
+
+  status      CampaignStatus @default(DRAFT)
+  scheduledAt DateTime?
+  sentAt      DateTime?
+  /// Viewers it was made for.
+  recipients  Int            @default(0)
+
+  createdById String?  @db.Uuid
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  notifications Notification[]
+
+  @@index([status, scheduledAt])
+  @@index([createdAt])
+  @@map("push_campaigns")
 }
