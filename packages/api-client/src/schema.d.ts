@@ -80,6 +80,43 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/analytics/quality": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description For an admin or an API key. Needs analytics:read. */
+        get: operations["Quality_summary"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/analytics/quality/failures": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The playbacks a problem ended, the newest first
+         * @description For an admin or an API key. Needs analytics:read.
+         */
+        get: operations["Quality_failures"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/analytics/saved": {
         parameters: {
             query?: never;
@@ -3077,6 +3114,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/playback/sessions/{id}/report": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * A report of a player on one playback, to the `qualityId` that came with the playback addresses
+         * @description It holds everything counted since the playback began, so it can be sent as often as wanted: about every half minute while playing, when a problem ends playback, and last with `ended` when the video ends or is left. Always answers the same, whether the playback is known or not. Open to everyone.
+         */
+        post: operations["PlaybackReports_report"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/programmes/{id}": {
         parameters: {
             query?: never;
@@ -5771,8 +5828,8 @@ export interface components {
             nextRunAt: string | null;
             /** @description The process that makes the backups. Null when none has been heard of lately. */
             runner: {
-                pgDump: string | null;
                 server: string | null;
+                pgDump: string | null;
                 /** @description What stands in the way of a backup, or null. */
                 problem: string | null;
             } | null;
@@ -6793,7 +6850,7 @@ export interface components {
             titles: number;
         };
         /** @enum {string} */
-        LayoutPage: "SERIES" | "CATEGORY" | "GENRE" | "HOME" | "MOVIES" | "LIVE";
+        LayoutPage: "SERIES" | "CATEGORY" | "GENRE" | "LIVE" | "HOME" | "MOVIES";
         /** @enum {string} */
         LimitSource: "VIEWER" | "PLAN" | "SITE";
         ListItem: {
@@ -6810,6 +6867,12 @@ export interface components {
             p2p: components["schemas"]["P2pInfo"] | null;
             /** @description For `POST /viewer/streams/{id}/beat`. Null for a visitor. */
             stream: components["schemas"]["StreamTicket"] | null;
+            /**
+             * @description Where the player says how playback went, for
+             *     `POST /playback/sessions/{qualityId}/report`. Null when the installation
+             *     takes no such reports.
+             */
+            qualityId: string | null;
         };
         LivePlaybackInfo: {
             /** @constant */
@@ -7218,6 +7281,12 @@ export interface components {
             page: number;
             pageSize: number;
         };
+        PageOfQualityFailure: {
+            items: components["schemas"]["QualityFailure"][];
+            total: number;
+            page: number;
+            pageSize: number;
+        };
         PageOfRecordingView: {
             items: components["schemas"]["RecordingView"][];
             total: number;
@@ -7503,6 +7572,12 @@ export interface components {
             }[];
             /** @description For `POST /catalog/plays/{playId}/beat`. Null when the installation records nothing. */
             playId: string | null;
+            /**
+             * @description Where the player says how playback went, for
+             *     `POST /playback/sessions/{qualityId}/report`. Null when the installation
+             *     takes no such reports.
+             */
+            qualityId: string | null;
             /**
              * @description The place this device holds among the streams of the account, for
              *     `POST /viewer/streams/{id}/beat`. Null for a visitor, a trailer or an extra.
@@ -8079,6 +8154,170 @@ export interface components {
         PurchaseKind: "RENT" | "BUY";
         /** @enum {string} */
         PurchaseStatus: "ACTIVE" | "REVOKED";
+        QualityDay: {
+            /** @description As "2026-12-24". */
+            day: string;
+            /** @description Playbacks a player reported on. */
+            attempts: number;
+            /** @description Of those, the ones that showed a picture. */
+            started: number;
+            /** @description A problem ended it before the first picture. */
+            startFailures: number;
+            /** @description The viewer left before the first picture, without a problem being reported. */
+            leftBeforeStart: number;
+            /** @description A problem ended it after it had started. */
+            playbackFailures: number;
+            /** @description Time to the first picture: half of the starts were faster than this, and 95 of 100. Milliseconds. */
+            startupP50Ms: number | null;
+            startupP95Ms: number | null;
+            /** @description Started playbacks that stopped to load at least once. */
+            stalledSessions: number;
+            stallCount: number;
+            stallMs: number;
+            playedSeconds: number;
+            /** @description The share of the time spent waiting instead of watching, from 0 to 1. */
+            rebufferRatio: number;
+            /** @description The average bitrate, weighted by how long each playback played. Kilobits per second. */
+            bitrateKbps: number | null;
+        };
+        QualityError: {
+            code: string;
+            sessions: number;
+            /** @description Of those, how many never showed a picture. */
+            beforeStart: number;
+            /** @description What players said most often, cleaned of addresses. */
+            message: string | null;
+            /** Format: date-time */
+            lastAt: string;
+        };
+        QualityFailure: {
+            id: string;
+            /** Format: date-time */
+            startedAt: string;
+            /** @enum {string} */
+            kind: "VIDEO" | "LIVE";
+            /** @description What was played, in words: a title, "Title · S1 E3", or a channel. Null when it was deleted since. */
+            subject: string | null;
+            titleId: string | null;
+            titleType: string | null;
+            channelId: string | null;
+            device: components["schemas"]["PlayDevice"];
+            server: string;
+            player: string | null;
+            playerVersion: string | null;
+            code: string;
+            message: string | null;
+            /** @description Null: it never started. */
+            startupMs: number | null;
+            /** @description Where in the video it was, in seconds. */
+            atSeconds: number | null;
+            playedSeconds: number;
+        };
+        QualityFigures: {
+            /** @description Playbacks a player reported on. */
+            attempts: number;
+            /** @description Of those, the ones that showed a picture. */
+            started: number;
+            /** @description A problem ended it before the first picture. */
+            startFailures: number;
+            /** @description The viewer left before the first picture, without a problem being reported. */
+            leftBeforeStart: number;
+            /** @description A problem ended it after it had started. */
+            playbackFailures: number;
+            /** @description Time to the first picture: half of the starts were faster than this, and 95 of 100. Milliseconds. */
+            startupP50Ms: number | null;
+            startupP95Ms: number | null;
+            /** @description Started playbacks that stopped to load at least once. */
+            stalledSessions: number;
+            stallCount: number;
+            stallMs: number;
+            playedSeconds: number;
+            /** @description The share of the time spent waiting instead of watching, from 0 to 1. */
+            rebufferRatio: number;
+            /** @description The average bitrate, weighted by how long each playback played. Kilobits per second. */
+            bitrateKbps: number | null;
+        };
+        QualityGroup: {
+            key: string;
+            /** @description Playbacks a player reported on. */
+            attempts: number;
+            /** @description Of those, the ones that showed a picture. */
+            started: number;
+            /** @description A problem ended it before the first picture. */
+            startFailures: number;
+            /** @description The viewer left before the first picture, without a problem being reported. */
+            leftBeforeStart: number;
+            /** @description A problem ended it after it had started. */
+            playbackFailures: number;
+            /** @description Time to the first picture: half of the starts were faster than this, and 95 of 100. Milliseconds. */
+            startupP50Ms: number | null;
+            startupP95Ms: number | null;
+            /** @description Started playbacks that stopped to load at least once. */
+            stalledSessions: number;
+            stallCount: number;
+            stallMs: number;
+            playedSeconds: number;
+            /** @description The share of the time spent waiting instead of watching, from 0 to 1. */
+            rebufferRatio: number;
+            /** @description The average bitrate, weighted by how long each playback played. Kilobits per second. */
+            bitrateKbps: number | null;
+        };
+        QualitySubject: {
+            /** @enum {string} */
+            kind: "title" | "channel";
+            id: string;
+            name: string;
+            /** @description For a title: MOVIE or SERIES. */
+            type: string | null;
+            /** @description Playbacks a player reported on. */
+            attempts: number;
+            /** @description Of those, the ones that showed a picture. */
+            started: number;
+            /** @description A problem ended it before the first picture. */
+            startFailures: number;
+            /** @description The viewer left before the first picture, without a problem being reported. */
+            leftBeforeStart: number;
+            /** @description A problem ended it after it had started. */
+            playbackFailures: number;
+            /** @description Time to the first picture: half of the starts were faster than this, and 95 of 100. Milliseconds. */
+            startupP50Ms: number | null;
+            startupP95Ms: number | null;
+            /** @description Started playbacks that stopped to load at least once. */
+            stalledSessions: number;
+            stallCount: number;
+            stallMs: number;
+            playedSeconds: number;
+            /** @description The share of the time spent waiting instead of watching, from 0 to 1. */
+            rebufferRatio: number;
+            /** @description The average bitrate, weighted by how long each playback played. Kilobits per second. */
+            bitrateKbps: number | null;
+        };
+        QualitySummary: {
+            /** @description False when the installation records nothing: PLAYBACK_REPORTS is off. */
+            recording: boolean;
+            /** @description Days a report is kept. 0: for good. */
+            keptDays: number;
+            totals: components["schemas"]["QualityFigures"];
+            /** @description The same figures for the stretch of the same length right before. */
+            previous: components["schemas"]["QualityFigures"];
+            days: components["schemas"]["QualityDay"][];
+            devices: components["schemas"]["QualityGroup"][];
+            /** @description "origin" is the main server, anything else the host of an edge. */
+            servers: components["schemas"]["QualityGroup"][];
+            /** @description Players by name and version, as "web 1.4.0". */
+            players: components["schemas"]["QualityGroup"][];
+            /** @description How long was played in which height of picture. */
+            heights: {
+                height: number;
+                sessions: number;
+                playedSeconds: number;
+            }[];
+            errors: components["schemas"]["QualityError"][];
+            /** @description The titles and channels with the most trouble, among those played often enough to say. */
+            troubled: components["schemas"]["QualitySubject"][];
+            /** @description Every server playbacks went to in the range, for a filter. */
+            knownServers: string[];
+        };
         RecommendationRow: {
             /** @description The title the row is about. */
             because: components["schemas"]["PublicTitleCard"];
@@ -8477,7 +8716,7 @@ export interface components {
             updatedAt: string;
         };
         /** @enum {string} */
-        StreamKind: "LIVE" | "VIDEO";
+        StreamKind: "VIDEO" | "LIVE";
         StreamsView: {
             streams: components["schemas"]["StreamView"][];
             /** @description Devices that may play at the same time. Null: as many as they like. */
@@ -9832,6 +10071,117 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["WatchingNow"];
+                };
+            };
+            /** @description Not signed in, or the sign-in ran out. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Signed in, but not allowed to do this. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    Quality_summary: {
+        parameters: {
+            query: {
+                from: string;
+                to: string;
+                timezone?: string;
+                kind?: "VIDEO" | "LIVE";
+                device?: "DESKTOP" | "MOBILE" | "TABLET" | "TV" | "OTHER";
+                server?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The answer. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QualitySummary"];
+                };
+            };
+            /** @description The input was refused. "issues" names every field. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Not signed in, or the sign-in ran out. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Signed in, but not allowed to do this. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    Quality_failures: {
+        parameters: {
+            query: {
+                from: string;
+                to: string;
+                timezone?: string;
+                kind?: "VIDEO" | "LIVE";
+                device?: "DESKTOP" | "MOBILE" | "TABLET" | "TV" | "OTHER";
+                server?: string;
+                page?: number;
+                pageSize?: number;
+                code?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The answer. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PageOfQualityFailure"];
+                };
+            };
+            /** @description The input was refused. "issues" names every field. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
                 };
             };
             /** @description Not signed in, or the sign-in ran out. */
@@ -19846,6 +20196,77 @@ export interface operations {
             };
             /** @description Signed in, but not allowed to do this. */
             403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    PlaybackReports_report: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    startupMs?: number;
+                    played: number;
+                    stalls: number;
+                    stallMs: number;
+                    qualityChanges: number;
+                    bitrateKbps?: number;
+                    height?: number;
+                    droppedFrames?: number;
+                    recoveredErrors?: number;
+                    error?: {
+                        code: string;
+                        message?: string;
+                        position?: number;
+                    };
+                    ended?: boolean;
+                    player?: {
+                        name: string;
+                        version?: string;
+                    };
+                };
+            };
+        };
+        responses: {
+            /** @description Done. Nothing comes back. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description The input was refused. "issues" names every field. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description What the address names does not exist. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Too many requests. "Retry-After" says when to try again. */
+            429: {
                 headers: {
                     [name: string]: unknown;
                 };

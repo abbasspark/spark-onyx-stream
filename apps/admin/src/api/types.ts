@@ -2518,3 +2518,89 @@ export interface SimilarView {
   weights: Record<SimilarSignalKind, number>;
   watching: (SimilarWatching & { minimumAccounts: number }) | null;
 }
+
+// --- Playback quality -------------------------------------------------------------------
+
+/** How playback went for a set of playbacks. */
+export interface QualityFigures {
+  /** Playbacks a player reported on. */
+  attempts: number;
+  started: number;
+  /** A problem ended it before the first picture. */
+  startFailures: number;
+  /** The viewer left before the first picture. */
+  leftBeforeStart: number;
+  /** A problem ended it after it had started. */
+  playbackFailures: number;
+  /** Time to the first picture, in milliseconds: the middle start, and the slow end. */
+  startupP50Ms: number | null;
+  startupP95Ms: number | null;
+  stalledSessions: number;
+  stallCount: number;
+  stallMs: number;
+  playedSeconds: number;
+  /** The share of the time spent waiting instead of watching, from 0 to 1. */
+  rebufferRatio: number;
+  bitrateKbps: number | null;
+}
+
+export type QualityGroup = QualityFigures & { key: string };
+export type QualityDay = QualityFigures & { day: string };
+
+export interface QualityError {
+  code: string;
+  sessions: number;
+  beforeStart: number;
+  message: string | null;
+  lastAt: string;
+}
+
+export type QualitySubject = QualityFigures & {
+  kind: 'title' | 'channel';
+  id: string;
+  name: string;
+  type: TitleType | null;
+};
+
+export interface QualitySummary {
+  recording: boolean;
+  keptDays: number;
+  totals: QualityFigures;
+  previous: QualityFigures;
+  days: QualityDay[];
+  devices: QualityGroup[];
+  servers: QualityGroup[];
+  players: QualityGroup[];
+  heights: { height: number; sessions: number; playedSeconds: number }[];
+  errors: QualityError[];
+  troubled: QualitySubject[];
+  knownServers: string[];
+}
+
+export interface QualityFailure {
+  id: string;
+  startedAt: string;
+  kind: 'VIDEO' | 'LIVE';
+  subject: string | null;
+  titleId: string | null;
+  titleType: TitleType | null;
+  channelId: string | null;
+  device: PlayDevice;
+  server: string;
+  player: string | null;
+  playerVersion: string | null;
+  code: string;
+  message: string | null;
+  startupMs: number | null;
+  atSeconds: number | null;
+  playedSeconds: number;
+}
+
+export interface QualityRange {
+  from: string;
+  to: string;
+  timezone: string;
+  kind?: 'VIDEO' | 'LIVE';
+  device?: PlayDevice;
+  server?: string;
+}

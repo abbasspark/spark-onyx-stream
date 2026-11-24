@@ -16,12 +16,19 @@ import { SubscriptionsService } from '../billing/subscriptions.service.js';
 import type { Watcher } from '../catalog/public-catalog.service.js';
 import { AppConfig } from '../config/app-config.js';
 import { StreamsService, type StreamTicket } from '../streams/streams.service.js';
+import { QualityRecorder } from '../quality/quality-recorder.service.js';
 import { type LivePlaybackInfo, LivePlaybackService } from './live-playback.service.js';
 
 /** The address for watching a channel, and the place the device holds while it does. */
 export type LiveAnswer = LivePlaybackInfo & {
   /** For `POST /viewer/streams/{id}/beat`. Null for a visitor. */
   stream: StreamTicket | null;
+  /**
+   * Where the player says how playback went, for
+   * `POST /playback/sessions/{qualityId}/report`. Null when the installation
+   * takes no such reports.
+   */
+  qualityId: string | null;
 };
 
 /** A channel as viewers see it. Nothing about where its video comes from. */
@@ -119,6 +126,7 @@ export class PublicChannelsService {
     @Inject(SubscriptionsService) private readonly subscriptions: SubscriptionsService,
     @Inject(LivePlaybackService) private readonly playback: LivePlaybackService,
     @Inject(StreamsService) private readonly streams: StreamsService,
+    @Inject(QualityRecorder) private readonly quality: QualityRecorder,
   ) {}
 
   async list(): Promise<PublicChannel[]> {
@@ -222,7 +230,14 @@ export class PublicChannelsService {
     const stream = watcher
       ? await this.streams.open(watcher, { kind: 'LIVE', subject: channel.name, userAgent })
       : null;
-    return { ...(await this.playback.createPlayback(channel.id, 'viewer')), stream };
+    const info = await this.playback.createPlayback(channel.id, 'viewer');
+    const qualityId = await this.quality.start({
+      kind: 'LIVE',
+      channelId: channel.id,
+      userAgent,
+      playbackUrl: info.url,
+    });
+    return { ...info, stream, qualityId };
   }
 
   private async find(slug: string): Promise<PublicRecord> {

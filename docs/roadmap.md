@@ -94,7 +94,7 @@ A comparison with other platforms named ten things that change what the API says
 4. Several sound tracks per video, kept apart from the picture, a language added later without processing the picture again, and the languages a profile likes to hear and to read. **Done.** See [phase-1-media-engine.md](phase-1-media-engine.md#sound).
 5. Skip recap, intro and credits: markers on a video, set in the panel against the player or found for a season by comparing the sound of its episodes. **Done.** See [phase-1-media-engine.md](phase-1-media-engine.md#markers).
 6. Similar titles: found by comparing genres, keywords, people and collections and by what the same viewers watch, corrected by an editor who pins and hides, shown on the page of a title, at the end of a video and as rows made from what a profile watched. **Done.** See [phase-2-catalog.md](phase-2-catalog.md#similar-titles).
-7. Reports from players about how playback went. **Planned.**
+7. Reports from players about how playback went: the time to start, waiting, quality and what broke, for videos and live channels, with a page in the panel that grades them and compares devices, servers and players. **Done.** See [playback-quality.md](playback-quality.md).
 8. Push notifications. **Planned.**
 9. Prepaid codes that start or extend a subscription. **Planned.**
 10. Selling inside the apps, or sending viewers to the website. **To decide.**

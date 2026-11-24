@@ -170,7 +170,13 @@ import type {
   AppVersions,
 } from './types';
 import type { Marker, MarkerDetection } from '@/lib/markers';
-import type { SimilarView, SimilarWatching } from './types';
+import type {
+  QualityFailure,
+  QualityRange,
+  QualitySummary,
+  SimilarView,
+  SimilarWatching,
+} from './types';
 import type { OpenApiDocument } from '@/lib/openapi';
 
 export const authApi = {
@@ -648,6 +654,21 @@ export const analyticsApi = {
   ) => request<Page<TitleViewFigures>>('/v1/analytics/titles', { query: { ...range }, signal }),
   title: (id: string, range: Omit<AnalyticsRange, 'type'>, signal?: AbortSignal) =>
     request<TitleAnalytics>(`/v1/analytics/titles/${id}`, { query: { ...range }, signal }),
+};
+
+/** How playback goes, from what players report. No viewer is named. */
+export const qualityApi = {
+  summary: (range: QualityRange, signal?: AbortSignal) =>
+    request<QualitySummary>('/v1/analytics/quality', { query: { ...range }, signal }),
+  /** The playbacks a problem ended, the newest first. */
+  failures: (
+    range: QualityRange & { code?: string; page: number; pageSize: number },
+    signal?: AbortSignal,
+  ) =>
+    request<Page<QualityFailure>>('/v1/analytics/quality/failures', {
+      query: { ...range },
+      signal,
+    }),
 };
 
 export const metadataApi = {

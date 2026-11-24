@@ -38,6 +38,7 @@ import {
   useState,
 } from 'react';
 import { formatClock } from '@/lib/format';
+import { errorCodeOf, errorWordsOf, useQualityReports } from './use-quality';
 import { endOf, runningMarker, skipLabel } from '@/lib/markers';
 import { type PlaybackPreferences, profilesApi } from '@/lib/profiles';
 import { pickTrack } from '@/lib/tracks';
@@ -227,6 +228,10 @@ export function Player({
 
   // --- Loading the stream ---------------------------------------------------
 
+  // How the playback goes, for the figures in the panel. Set up before the
+  // video is loaded, so the wait for the first picture is counted whole.
+  const reports = useQualityReports(playback.qualityId, video);
+
   useEffect(() => {
     const element = video.current;
     if (!element) {
@@ -258,7 +263,7 @@ export function Player({
     const begin = () => {
       // Browsers refuse to start with sound unless the viewer just clicked.
       // The big play button stays then, and one click starts it.
-      void element.play().catch(() => undefined);
+      void element.play().catch(() => reports.current?.hold());
     };
 
     if (Hls.isSupported()) {
@@ -291,7 +296,9 @@ export function Player({
         begin();
       });
       hls.on(Hls.Events.LEVEL_SWITCHED, (_event, data) => {
-        setPlayingHeight(hls.levels[data.level]?.height ?? null);
+        const level = hls.levels[data.level];
+        setPlayingHeight(level?.height ?? null);
+        reports.current?.level(level?.height ?? null, level?.bitrate ?? null);
       });
       let audioChosen = false;
       hls.on(Hls.Events.AUDIO_TRACKS_UPDATED, (_event, data) => {
@@ -354,6 +361,11 @@ export function Player({
           if (data.type === Hls.ErrorTypes.NETWORK_ERROR) {
             failedLoads += 1;
             if (failedLoads === FAILED_LOADS_BEFORE_MOVING) {
+              reports.current?.fail(
+                errorCodeOf(data),
+                `${errorWordsOf(data)}, ${failedLoads} times in a row`,
+                element.currentTime,
+              );
               callbacks.current.onFatal(
                 'The video could not be loaded. Check your connection.',
                 true,
@@ -365,9 +377,11 @@ export function Player({
         // A decoding hiccup can often be repaired once without the viewer noticing.
         if (data.type === Hls.ErrorTypes.MEDIA_ERROR && !recovered) {
           recovered = true;
+          reports.current?.recoveredError();
           hls.recoverMediaError();
           return;
         }
+        reports.current?.fail(errorCodeOf(data), errorWordsOf(data), element.currentTime);
         callbacks.current.onFatal(
           data.type === Hls.ErrorTypes.NETWORK_ERROR
             ? 'The video could not be loaded. Check your connection.'
@@ -401,8 +415,16 @@ export function Player({
         );
         begin();
       };
-      const onError = () =>
+      const onError = () => {
+        // 3 is a picture the device could not decode, 4 a video it cannot play at all.
+        const code = element.error?.code;
+        reports.current?.fail(
+          code === 3 ? 'media' : code === 4 ? 'unsupported' : 'network',
+          element.error?.message || undefined,
+          element.currentTime,
+        );
         callbacks.current.onFatal('The video could not be loaded. Check your connection.', true);
+      };
       element.addEventListener('loadedmetadata', onLoaded, { once: true });
       element.addEventListener('error', onError);
       element.src = source;
@@ -414,6 +436,7 @@ export function Player({
       };
     }
 
+    reports.current?.fail('unsupported', 'no way to play HLS in this browser');
     callbacks.current.onFatal('This browser cannot play this video.');
     return undefined;
     // The start position only matters when a stream is first loaded.

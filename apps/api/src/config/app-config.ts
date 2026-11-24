@@ -29,6 +29,10 @@ export class AppConfig {
   readonly viewingStatistics: boolean;
   /** Days a record of a play is kept. 0: for good. */
   readonly viewingStatisticsDays: number;
+  /** Whether players report how playback went. */
+  readonly playbackReports: boolean;
+  /** Days a report of a playback is kept. 0: for good. */
+  readonly playbackReportsDays: number;
   /** Devices one viewer account plays on at the same time. 0: no limit. */
   readonly streamLimit: number;
   readonly corsOrigins: readonly string[];
@@ -135,6 +139,8 @@ export class AppConfig {
     this.watchSettleSeconds = env.WATCH_SETTLE_SECONDS;
     this.viewingStatistics = env.VIEWING_STATISTICS === 'on';
     this.viewingStatisticsDays = env.VIEWING_STATISTICS_DAYS;
+    this.playbackReports = env.PLAYBACK_REPORTS === 'on';
+    this.playbackReportsDays = env.PLAYBACK_REPORTS_DAYS;
     this.streamLimit = env.STREAM_LIMIT;
     this.corsOrigins = env.CORS_ORIGINS;
     this.trustProxyHops = env.TRUST_PROXY_HOPS;

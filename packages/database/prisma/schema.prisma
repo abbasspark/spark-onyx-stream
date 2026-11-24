@@ -1064,10 +1064,11 @@ model Title {
   revisions    TitleRevision[]
   watchedFiles WatchedFile[]
 
-  similarChoices  SimilarChoice[] @relation("SimilarChoiceOf")
-  chosenAsSimilar SimilarChoice[] @relation("SimilarChoiceOther")
-  watchedWith     TitleCoWatch[]  @relation("CoWatchOf")
-  watchedWithBy   TitleCoWatch[]  @relation("CoWatchOther")
+  similarChoices   SimilarChoice[]   @relation("SimilarChoiceOf")
+  chosenAsSimilar  SimilarChoice[]   @relation("SimilarChoiceOther")
+  playbackSessions PlaybackSession[]
+  watchedWith      TitleCoWatch[]    @relation("CoWatchOf")
+  watchedWithBy    TitleCoWatch[]    @relation("CoWatchOther")
 
   @@index([type, status])
   @@index([type, releaseDate])
@@ -1524,7 +1525,8 @@ model Episode {
   translations EpisodeTranslation[]
   watchedFiles WatchedFile[]
 
-  plays Play[]
+  plays            Play[]
+  playbackSessions PlaybackSession[]
 
   @@unique([seasonId, number])
   @@index([assetId])
@@ -2175,7 +2177,8 @@ model Channel {
   updatedAt DateTime @updatedAt
 
   /// The age from which the channel suits. Empty: profiles with an age limit do not see it.
-  minAge Int? @db.SmallInt
+  minAge           Int?              @db.SmallInt
+  playbackSessions PlaybackSession[]
 
   @@index([enabled])
   @@map("channels")
@@ -2621,4 +2624,71 @@ model Play {
   @@index([titleId, startedAt])
   @@index([lastBeatAt])
   @@map("plays")
+}
+
+/// What a playback session was of.
+enum PlaybackSessionKind {
+  /// A movie, an episode, a trailer or an extra.
+  VIDEO
+  /// A live channel.
+  LIVE
+}
+
+/// How one playback went, as the player reported it: how long it took to
+/// start, how often it stopped to load, in what quality it played and what
+/// went wrong. One row per request for playback addresses. It says nothing
+/// about who watched: no account, no address, only the kind of device.
+model PlaybackSession {
+  id   String              @id @default(uuid(7)) @db.Uuid
+  kind PlaybackSessionKind
+
+  /// What was played. Emptied when it is deleted. The figures stay.
+  titleId   String?  @db.Uuid
+  title     Title?   @relation(fields: [titleId], references: [id], onDelete: SetNull)
+  episodeId String?  @db.Uuid
+  episode   Episode? @relation(fields: [episodeId], references: [id], onDelete: SetNull)
+  channelId String?  @db.Uuid
+  channel   Channel? @relation(fields: [channelId], references: [id], onDelete: SetNull)
+
+  device        PlayDevice @default(OTHER)
+  /// Where the player was sent for the files: the address of an edge, or
+  /// "origin" for the main server.
+  server        String     @default("origin")
+  /// What the player says it is, such as "web" or "android-tv", and its version.
+  player        String?
+  playerVersion String?
+
+  /// From the wish to play to the first picture, in milliseconds. Empty: it never started.
+  startupMs       Int?
+  /// How long it actually played.
+  playedSeconds   Int     @default(0)
+  /// How often it stopped to load after it had started, and for how long. Seeking is not counted.
+  stallCount      Int     @default(0)
+  stallMs         Int     @default(0)
+  /// How often the quality changed.
+  qualityChanges  Int     @default(0)
+  /// The average bitrate of the picture while it played, in kilobits per second.
+  bitrateKbps     Int?
+  /// The height of the picture it mostly played in, such as 1080.
+  height          Int?    @db.SmallInt
+  droppedFrames   Int     @default(0)
+  /// Problems the player got over by itself.
+  recoveredErrors Int     @default(0)
+  /// The problem that ended playback, as a short code such as "network" or
+  /// "media", with what the player said and where in the video it was.
+  errorCode       String?
+  errorMessage    String?
+  errorAtSeconds  Int?
+  /// Set once the player said it is done: the video ended or was left.
+  ended           Boolean @default(false)
+
+  startedAt  DateTime  @default(now())
+  /// When the player last reported. Empty: it never did.
+  reportedAt DateTime?
+
+  @@index([startedAt])
+  @@index([titleId, startedAt])
+  @@index([channelId, startedAt])
+  @@index([errorCode, startedAt])
+  @@map("playback_sessions")
 }

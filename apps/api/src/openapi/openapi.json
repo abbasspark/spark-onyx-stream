@@ -85,6 +85,10 @@
       "description": "Movies, series, people, genres and collections."
     },
     {
+      "name": "Playback quality",
+      "description": "What players report about how playback went, and the figures made of it."
+    },
+    {
       "name": "Similar titles",
       "description": "Which titles are like a title, why, and rows of them for a profile."
     },
@@ -752,6 +756,308 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/WatchingNow"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or the sign-in ran out.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Signed in, but not allowed to do this.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/analytics/quality": {
+      "get": {
+        "operationId": "Quality_summary",
+        "tags": [
+          "Playback quality"
+        ],
+        "description": "For an admin or an API key. Needs analytics:read.",
+        "security": [
+          {
+            "adminSession": []
+          },
+          {
+            "apiKey": []
+          }
+        ],
+        "x-onyx-access": {
+          "kind": "admin",
+          "permissions": [
+            "analytics:read"
+          ],
+          "sessionOnly": false
+        },
+        "parameters": [
+          {
+            "name": "from",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "date",
+              "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+            }
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "date",
+              "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+            }
+          },
+          {
+            "name": "timezone",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "default": "UTC",
+              "type": "string",
+              "maxLength": 64
+            }
+          },
+          {
+            "name": "kind",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "VIDEO",
+                "LIVE"
+              ]
+            }
+          },
+          {
+            "name": "device",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "DESKTOP",
+                "MOBILE",
+                "TABLET",
+                "TV",
+                "OTHER"
+              ]
+            }
+          },
+          {
+            "name": "server",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The answer.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/QualitySummary"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The input was refused. \"issues\" names every field.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or the sign-in ran out.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Signed in, but not allowed to do this.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/analytics/quality/failures": {
+      "get": {
+        "operationId": "Quality_failures",
+        "tags": [
+          "Playback quality"
+        ],
+        "summary": "The playbacks a problem ended, the newest first",
+        "description": "For an admin or an API key. Needs analytics:read.",
+        "security": [
+          {
+            "adminSession": []
+          },
+          {
+            "apiKey": []
+          }
+        ],
+        "x-onyx-access": {
+          "kind": "admin",
+          "permissions": [
+            "analytics:read"
+          ],
+          "sessionOnly": false
+        },
+        "parameters": [
+          {
+            "name": "from",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "date",
+              "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+            }
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "date",
+              "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+            }
+          },
+          {
+            "name": "timezone",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "default": "UTC",
+              "type": "string",
+              "maxLength": 64
+            }
+          },
+          {
+            "name": "kind",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "VIDEO",
+                "LIVE"
+              ]
+            }
+          },
+          {
+            "name": "device",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "DESKTOP",
+                "MOBILE",
+                "TABLET",
+                "TV",
+                "OTHER"
+              ]
+            }
+          },
+          {
+            "name": "server",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "default": 1,
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 9007199254740991
+            }
+          },
+          {
+            "name": "pageSize",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "default": 25,
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100
+            }
+          },
+          {
+            "name": "code",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "pattern": "^[a-z][a-z0-9_-]{0,31}$"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The answer.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PageOfQualityFailure"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The input was refused. \"issues\" names every field.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
                 }
               }
             }
@@ -18626,6 +18932,173 @@
         }
       }
     },
+    "/v1/playback/sessions/{id}/report": {
+      "post": {
+        "operationId": "PlaybackReports_report",
+        "tags": [
+          "Playback quality"
+        ],
+        "summary": "A report of a player on one playback, to the `qualityId` that came with the playback addresses",
+        "description": "It holds everything counted since the playback began, so it can be sent as often as wanted: about every half minute while playing, when a problem ends playback, and last with `ended` when the video ends or is left. Always answers the same, whether the playback is known or not. Open to everyone.",
+        "security": [],
+        "x-onyx-access": {
+          "kind": "public",
+          "permissions": [],
+          "sessionOnly": false
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "startupMs": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 3600000
+                  },
+                  "played": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 1000000000
+                  },
+                  "stalls": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 1000000000
+                  },
+                  "stallMs": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 1000000000
+                  },
+                  "qualityChanges": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 1000000000
+                  },
+                  "bitrateKbps": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 1000000
+                  },
+                  "height": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 16000
+                  },
+                  "droppedFrames": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 1000000000
+                  },
+                  "recoveredErrors": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 1000000000
+                  },
+                  "error": {
+                    "type": "object",
+                    "properties": {
+                      "code": {
+                        "type": "string",
+                        "pattern": "^[a-z][a-z0-9_-]{0,31}$"
+                      },
+                      "message": {
+                        "type": "string",
+                        "maxLength": 1200
+                      },
+                      "position": {
+                        "type": "number",
+                        "minimum": 0,
+                        "maximum": 1000000
+                      }
+                    },
+                    "required": [
+                      "code"
+                    ]
+                  },
+                  "ended": {
+                    "type": "boolean"
+                  },
+                  "player": {
+                    "type": "object",
+                    "properties": {
+                      "name": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 40
+                      },
+                      "version": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 40
+                      }
+                    },
+                    "required": [
+                      "name"
+                    ]
+                  }
+                },
+                "required": [
+                  "played",
+                  "stalls",
+                  "stallMs",
+                  "qualityChanges"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": "Done. Nothing comes back."
+          },
+          "400": {
+            "description": "The input was refused. \"issues\" names every field.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "What the address names does not exist.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests. \"Retry-After\" says when to try again.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/v1/programmes/{id}": {
       "delete": {
         "operationId": "Guide_removeProgramme",
@@ -35022,13 +35495,13 @@
               "null"
             ],
             "properties": {
-              "pgDump": {
+              "server": {
                 "type": [
                   "string",
                   "null"
                 ]
               },
-              "server": {
+              "pgDump": {
                 "type": [
                   "string",
                   "null"
@@ -35043,8 +35516,8 @@
               }
             },
             "required": [
-              "pgDump",
               "server",
+              "pgDump",
               "problem"
             ],
             "description": "The process that makes the backups. Null when none has been heard of lately."
@@ -39122,9 +39595,9 @@
           "SERIES",
           "CATEGORY",
           "GENRE",
+          "LIVE",
           "HOME",
-          "MOVIES",
-          "LIVE"
+          "MOVIES"
         ]
       },
       "LimitSource": {
@@ -39185,6 +39658,13 @@
               }
             ],
             "description": "For `POST /viewer/streams/{id}/beat`. Null for a visitor."
+          },
+          "qualityId": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Where the player says how playback went, for\n`POST /playback/sessions/{qualityId}/report`. Null when the installation\ntakes no such reports."
           }
         },
         "required": [
@@ -39192,7 +39672,8 @@
           "url",
           "expiresAt",
           "p2p",
-          "stream"
+          "stream",
+          "qualityId"
         ]
       },
       "LivePlaybackInfo": {
@@ -40769,6 +41250,32 @@
           "pageSize"
         ]
       },
+      "PageOfQualityFailure": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/QualityFailure"
+            }
+          },
+          "total": {
+            "type": "number"
+          },
+          "page": {
+            "type": "number"
+          },
+          "pageSize": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "items",
+          "total",
+          "page",
+          "pageSize"
+        ]
+      },
       "PageOfRecordingView": {
         "type": "object",
         "properties": {
@@ -41895,6 +42402,13 @@
             ],
             "description": "For `POST /catalog/plays/{playId}/beat`. Null when the installation records nothing."
           },
+          "qualityId": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Where the player says how playback went, for\n`POST /playback/sessions/{qualityId}/report`. Null when the installation\ntakes no such reports."
+          },
           "stream": {
             "anyOf": [
               {
@@ -41918,6 +42432,7 @@
           "subtitles",
           "markers",
           "playId",
+          "qualityId",
           "stream"
         ]
       },
@@ -44168,6 +44683,593 @@
           "REVOKED"
         ]
       },
+      "QualityDay": {
+        "type": "object",
+        "properties": {
+          "day": {
+            "type": "string",
+            "description": "As \"2026-12-24\"."
+          },
+          "attempts": {
+            "type": "number",
+            "description": "Playbacks a player reported on."
+          },
+          "started": {
+            "type": "number",
+            "description": "Of those, the ones that showed a picture."
+          },
+          "startFailures": {
+            "type": "number",
+            "description": "A problem ended it before the first picture."
+          },
+          "leftBeforeStart": {
+            "type": "number",
+            "description": "The viewer left before the first picture, without a problem being reported."
+          },
+          "playbackFailures": {
+            "type": "number",
+            "description": "A problem ended it after it had started."
+          },
+          "startupP50Ms": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "description": "Time to the first picture: half of the starts were faster than this, and 95 of 100. Milliseconds."
+          },
+          "startupP95Ms": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "stalledSessions": {
+            "type": "number",
+            "description": "Started playbacks that stopped to load at least once."
+          },
+          "stallCount": {
+            "type": "number"
+          },
+          "stallMs": {
+            "type": "number"
+          },
+          "playedSeconds": {
+            "type": "number"
+          },
+          "rebufferRatio": {
+            "type": "number",
+            "description": "The share of the time spent waiting instead of watching, from 0 to 1."
+          },
+          "bitrateKbps": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "description": "The average bitrate, weighted by how long each playback played. Kilobits per second."
+          }
+        },
+        "required": [
+          "day",
+          "attempts",
+          "started",
+          "startFailures",
+          "leftBeforeStart",
+          "playbackFailures",
+          "startupP50Ms",
+          "startupP95Ms",
+          "stalledSessions",
+          "stallCount",
+          "stallMs",
+          "playedSeconds",
+          "rebufferRatio",
+          "bitrateKbps"
+        ]
+      },
+      "QualityError": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "sessions": {
+            "type": "number"
+          },
+          "beforeStart": {
+            "type": "number",
+            "description": "Of those, how many never showed a picture."
+          },
+          "message": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "What players said most often, cleaned of addresses."
+          },
+          "lastAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "code",
+          "sessions",
+          "beforeStart",
+          "message",
+          "lastAt"
+        ]
+      },
+      "QualityFailure": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "startedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "VIDEO",
+              "LIVE"
+            ]
+          },
+          "subject": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "What was played, in words: a title, \"Title · S1 E3\", or a channel. Null when it was deleted since."
+          },
+          "titleId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "titleType": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "channelId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "device": {
+            "$ref": "#/components/schemas/PlayDevice"
+          },
+          "server": {
+            "type": "string"
+          },
+          "player": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "playerVersion": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "code": {
+            "type": "string"
+          },
+          "message": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "startupMs": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "description": "Null: it never started."
+          },
+          "atSeconds": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "description": "Where in the video it was, in seconds."
+          },
+          "playedSeconds": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "id",
+          "startedAt",
+          "kind",
+          "subject",
+          "titleId",
+          "titleType",
+          "channelId",
+          "device",
+          "server",
+          "player",
+          "playerVersion",
+          "code",
+          "message",
+          "startupMs",
+          "atSeconds",
+          "playedSeconds"
+        ]
+      },
+      "QualityFigures": {
+        "type": "object",
+        "properties": {
+          "attempts": {
+            "type": "number",
+            "description": "Playbacks a player reported on."
+          },
+          "started": {
+            "type": "number",
+            "description": "Of those, the ones that showed a picture."
+          },
+          "startFailures": {
+            "type": "number",
+            "description": "A problem ended it before the first picture."
+          },
+          "leftBeforeStart": {
+            "type": "number",
+            "description": "The viewer left before the first picture, without a problem being reported."
+          },
+          "playbackFailures": {
+            "type": "number",
+            "description": "A problem ended it after it had started."
+          },
+          "startupP50Ms": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "description": "Time to the first picture: half of the starts were faster than this, and 95 of 100. Milliseconds."
+          },
+          "startupP95Ms": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "stalledSessions": {
+            "type": "number",
+            "description": "Started playbacks that stopped to load at least once."
+          },
+          "stallCount": {
+            "type": "number"
+          },
+          "stallMs": {
+            "type": "number"
+          },
+          "playedSeconds": {
+            "type": "number"
+          },
+          "rebufferRatio": {
+            "type": "number",
+            "description": "The share of the time spent waiting instead of watching, from 0 to 1."
+          },
+          "bitrateKbps": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "description": "The average bitrate, weighted by how long each playback played. Kilobits per second."
+          }
+        },
+        "required": [
+          "attempts",
+          "started",
+          "startFailures",
+          "leftBeforeStart",
+          "playbackFailures",
+          "startupP50Ms",
+          "startupP95Ms",
+          "stalledSessions",
+          "stallCount",
+          "stallMs",
+          "playedSeconds",
+          "rebufferRatio",
+          "bitrateKbps"
+        ]
+      },
+      "QualityGroup": {
+        "type": "object",
+        "properties": {
+          "key": {
+            "type": "string"
+          },
+          "attempts": {
+            "type": "number",
+            "description": "Playbacks a player reported on."
+          },
+          "started": {
+            "type": "number",
+            "description": "Of those, the ones that showed a picture."
+          },
+          "startFailures": {
+            "type": "number",
+            "description": "A problem ended it before the first picture."
+          },
+          "leftBeforeStart": {
+            "type": "number",
+            "description": "The viewer left before the first picture, without a problem being reported."
+          },
+          "playbackFailures": {
+            "type": "number",
+            "description": "A problem ended it after it had started."
+          },
+          "startupP50Ms": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "description": "Time to the first picture: half of the starts were faster than this, and 95 of 100. Milliseconds."
+          },
+          "startupP95Ms": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "stalledSessions": {
+            "type": "number",
+            "description": "Started playbacks that stopped to load at least once."
+          },
+          "stallCount": {
+            "type": "number"
+          },
+          "stallMs": {
+            "type": "number"
+          },
+          "playedSeconds": {
+            "type": "number"
+          },
+          "rebufferRatio": {
+            "type": "number",
+            "description": "The share of the time spent waiting instead of watching, from 0 to 1."
+          },
+          "bitrateKbps": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "description": "The average bitrate, weighted by how long each playback played. Kilobits per second."
+          }
+        },
+        "required": [
+          "key",
+          "attempts",
+          "started",
+          "startFailures",
+          "leftBeforeStart",
+          "playbackFailures",
+          "startupP50Ms",
+          "startupP95Ms",
+          "stalledSessions",
+          "stallCount",
+          "stallMs",
+          "playedSeconds",
+          "rebufferRatio",
+          "bitrateKbps"
+        ]
+      },
+      "QualitySubject": {
+        "type": "object",
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "title",
+              "channel"
+            ]
+          },
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "type": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "For a title: MOVIE or SERIES."
+          },
+          "attempts": {
+            "type": "number",
+            "description": "Playbacks a player reported on."
+          },
+          "started": {
+            "type": "number",
+            "description": "Of those, the ones that showed a picture."
+          },
+          "startFailures": {
+            "type": "number",
+            "description": "A problem ended it before the first picture."
+          },
+          "leftBeforeStart": {
+            "type": "number",
+            "description": "The viewer left before the first picture, without a problem being reported."
+          },
+          "playbackFailures": {
+            "type": "number",
+            "description": "A problem ended it after it had started."
+          },
+          "startupP50Ms": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "description": "Time to the first picture: half of the starts were faster than this, and 95 of 100. Milliseconds."
+          },
+          "startupP95Ms": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "stalledSessions": {
+            "type": "number",
+            "description": "Started playbacks that stopped to load at least once."
+          },
+          "stallCount": {
+            "type": "number"
+          },
+          "stallMs": {
+            "type": "number"
+          },
+          "playedSeconds": {
+            "type": "number"
+          },
+          "rebufferRatio": {
+            "type": "number",
+            "description": "The share of the time spent waiting instead of watching, from 0 to 1."
+          },
+          "bitrateKbps": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "description": "The average bitrate, weighted by how long each playback played. Kilobits per second."
+          }
+        },
+        "required": [
+          "kind",
+          "id",
+          "name",
+          "type",
+          "attempts",
+          "started",
+          "startFailures",
+          "leftBeforeStart",
+          "playbackFailures",
+          "startupP50Ms",
+          "startupP95Ms",
+          "stalledSessions",
+          "stallCount",
+          "stallMs",
+          "playedSeconds",
+          "rebufferRatio",
+          "bitrateKbps"
+        ]
+      },
+      "QualitySummary": {
+        "type": "object",
+        "properties": {
+          "recording": {
+            "type": "boolean",
+            "description": "False when the installation records nothing: PLAYBACK_REPORTS is off."
+          },
+          "keptDays": {
+            "type": "number",
+            "description": "Days a report is kept. 0: for good."
+          },
+          "totals": {
+            "$ref": "#/components/schemas/QualityFigures"
+          },
+          "previous": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/QualityFigures"
+              }
+            ],
+            "description": "The same figures for the stretch of the same length right before."
+          },
+          "days": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/QualityDay"
+            }
+          },
+          "devices": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/QualityGroup"
+            }
+          },
+          "servers": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/QualityGroup"
+            },
+            "description": "\"origin\" is the main server, anything else the host of an edge."
+          },
+          "players": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/QualityGroup"
+            },
+            "description": "Players by name and version, as \"web 1.4.0\"."
+          },
+          "heights": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "height": {
+                  "type": "number"
+                },
+                "sessions": {
+                  "type": "number"
+                },
+                "playedSeconds": {
+                  "type": "number"
+                }
+              },
+              "required": [
+                "height",
+                "sessions",
+                "playedSeconds"
+              ]
+            },
+            "description": "How long was played in which height of picture."
+          },
+          "errors": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/QualityError"
+            }
+          },
+          "troubled": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/QualitySubject"
+            },
+            "description": "The titles and channels with the most trouble, among those played often enough to say."
+          },
+          "knownServers": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Every server playbacks went to in the range, for a filter."
+          }
+        },
+        "required": [
+          "recording",
+          "keptDays",
+          "totals",
+          "previous",
+          "days",
+          "devices",
+          "servers",
+          "players",
+          "heights",
+          "errors",
+          "troubled",
+          "knownServers"
+        ]
+      },
       "RecommendationRow": {
         "type": "object",
         "properties": {
@@ -45728,8 +46830,8 @@
       "StreamKind": {
         "type": "string",
         "enum": [
-          "LIVE",
-          "VIDEO"
+          "VIDEO",
+          "LIVE"
         ]
       },
       "StreamsView": {
