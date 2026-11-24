@@ -13,6 +13,7 @@ import { REDIS_CLIENT } from '../redis/redis.module.js';
 import { StripeSyncService } from '../stripe/stripe-sync.service.js';
 import { PlaysService } from '../analytics/plays.service.js';
 import { StreamsService } from '../streams/streams.service.js';
+import { CoWatchService } from '../similar/co-watch.service.js';
 
 /** How often the repairs run. */
 export const SWEEP_INTERVAL_MS = 60_000;
@@ -56,6 +57,7 @@ export class MaintenanceService implements OnApplicationBootstrap, OnApplication
     @Inject(StripeSyncService) private readonly stripeSync: StripeSyncService,
     @Inject(PlaysService) private readonly plays: PlaysService,
     @Inject(StreamsService) private readonly streams: StreamsService,
+    @Inject(CoWatchService) private readonly coWatch: CoWatchService,
   ) {}
 
   onApplicationBootstrap(): void {
@@ -86,6 +88,7 @@ export class MaintenanceService implements OnApplicationBootstrap, OnApplication
       await this.stripeSync.reconcile();
       await this.stripeSync.purgeEvents();
       const result = await this.sweep();
+      await this.countWatchedTogether();
       if (result.started > 0 || result.cleanups > 0) {
         this.logger.log(
           `Repaired: started processing of ${result.started} uploads, queued ${result.cleanups} cleanups`,
@@ -93,6 +96,25 @@ export class MaintenanceService implements OnApplicationBootstrap, OnApplication
       }
     } catch (error) {
       this.logger.error(`Sweep failed: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
+
+  /**
+   * Counts again which titles the same people watch, every few hours. A
+   * failure here is logged and does not stop the other repairs.
+   */
+  private async countWatchedTogether(): Promise<void> {
+    try {
+      const state = await this.coWatch.rebuildIfDue();
+      if (state) {
+        this.logger.log(
+          `Counted titles watched together: ${state.pairs} pairs from ${state.profiles} profiles in ${state.tookMs} ms`,
+        );
+      }
+    } catch (error) {
+      this.logger.warn(
+        `Counting titles watched together failed: ${error instanceof Error ? error.message : String(error)}`,
+      );
     }
   }
 

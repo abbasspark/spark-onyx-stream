@@ -2,8 +2,15 @@
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import { WatchScreen } from '@/components/watch-screen';
-import { getTitle } from '@/lib/api';
-import { episodeCode, episodeKey, findEpisode, watchHref } from '@/lib/watch';
+import { getSimilar, getTitle } from '@/lib/api';
+import {
+  END_SUGGESTIONS,
+  episodeCode,
+  episodeKey,
+  findEpisode,
+  toSuggestions,
+  watchHref,
+} from '@/lib/watch';
 
 interface EpisodePageProps {
   params: Promise<{ slug: string; episodeId: string }>;
@@ -34,6 +41,8 @@ export default async function EpisodePage({ params }: EpisodePageProps) {
   const { season, episode, next } = place;
   const label = (seasonNumber: number, number: number, name: string) =>
     `${episodeCode(seasonNumber, number)} ${name}`;
+  // After the last episode nothing follows: titles like the series are offered instead.
+  const similar = next ? [] : await getSimilar(title.slug, END_SUGGESTIONS);
 
   return (
     <WatchScreen
@@ -55,6 +64,7 @@ export default async function EpisodePage({ params }: EpisodePageProps) {
             }
           : null
       }
+      suggestions={toSuggestions(similar)}
     />
   );
 }

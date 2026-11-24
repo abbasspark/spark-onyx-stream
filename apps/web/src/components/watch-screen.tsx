@@ -38,6 +38,15 @@ export interface WatchScreenProps {
   progress: { id: string; key: string; href: string; image: string | null } | null;
   /** What plays after this, for an episode that has a following one. */
   next: { href: string; label: string } | null;
+  /** Titles like this one, offered when it ends and nothing follows. */
+  suggestions?: Suggestion[];
+}
+
+/** What the end of a video shows of a title to watch next. */
+export interface Suggestion {
+  slug: string;
+  name: string;
+  image: string | null;
 }
 
 type Loaded =
@@ -85,6 +94,7 @@ export function WatchScreen({
   backHref,
   progress,
   next,
+  suggestions = [],
 }: WatchScreenProps) {
   const router = useRouter();
   const { state: sessionState, viewer, profile, access } = useViewerSession();
@@ -582,6 +592,25 @@ export function WatchScreen({
               Watch again
             </button>
           </div>
+          {suggestions.length > 0 ? (
+            <div className="w-full max-w-3xl">
+              <p className="text-sm text-smoke">More like this</p>
+              <ul className="mt-3 flex justify-center gap-3 sm:gap-4">
+                {suggestions.map((title) => (
+                  <li key={title.slug} className="w-[min(28vw,15rem)]">
+                    <Link href={`/title/${title.slug}`} className="group block text-left">
+                      <div className="aspect-video overflow-hidden rounded-[3px] bg-ash outline-2 outline-offset-2 outline-transparent transition-[outline-color] duration-150 group-hover:outline-vein group-focus-visible:outline-sard">
+                        {title.image ? (
+                          <img src={title.image} alt="" className="size-full object-cover" />
+                        ) : null}
+                      </div>
+                      <p className="mt-2 truncate text-sm font-medium">{title.name}</p>
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
         </>
       )}
     </div>

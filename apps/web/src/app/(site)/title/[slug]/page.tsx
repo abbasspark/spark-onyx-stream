@@ -9,7 +9,7 @@ import { PersonCard } from '@/components/person-card';
 import { PosterCard } from '@/components/poster-card';
 import { TitleActions } from '@/components/title-actions';
 import { StripRow } from '@/components/title-row';
-import { getCollection, getPlans, getSite, getTitle, getTitles } from '@/lib/api';
+import { getCollection, getPlans, getSimilar, getSite, getTitle, getTitles } from '@/lib/api';
 import { DEFAULT_RENTAL, NO_PLANS, subscribable } from '@/lib/plans';
 import { absoluteUrl, siteConfig } from '@/lib/config';
 import {
@@ -131,7 +131,8 @@ export default async function TitlePage({ params }: TitlePageProps) {
     notFound();
   }
   // A free title needs no offer, and the page must not fail because the plans could not be read.
-  const [related, collection, plans] = await Promise.all([
+  const [similar, related, collection, plans] = await Promise.all([
+    getSimilar(title.slug),
     loadRelated(title),
     loadCollection(title),
     title.access === 'PAID' ? getPlans().catch(() => NO_PLANS) : NO_PLANS,
@@ -399,7 +400,20 @@ export default async function TitlePage({ params }: TitlePageProps) {
         </div>
       ) : null}
 
-      {related.length > 0 && firstCategory ? (
+      {similar.length > 0 ? (
+        <div className="mt-20">
+          <StripRow heading="More like this">
+            {similar.map((item) => (
+              <li key={item.id} className="w-[clamp(8.5rem,38vw,12.5rem)]">
+                <PosterCard title={item} />
+              </li>
+            ))}
+          </StripRow>
+        </div>
+      ) : null}
+
+      {/* Without anything alike, the page still leads on: to the rest of the category. */}
+      {similar.length === 0 && related.length > 0 && firstCategory ? (
         <div className="mt-20">
           <StripRow
             heading={`More in ${firstCategory.name}`}

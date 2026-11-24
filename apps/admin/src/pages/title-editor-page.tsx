@@ -28,6 +28,7 @@ import { Link, useLocation, useNavigate, useParams } from 'react-router';
 import { toast } from 'sonner';
 import { DuplicateTitleDialog } from '@/components/duplicate-title-dialog';
 import { TitleHistory } from '@/components/title-history';
+import { TitleSimilar } from '@/components/title-similar';
 import { ApiError, apiUrl } from '@/api/client';
 import {
   categoriesApi,
@@ -459,6 +460,7 @@ export function TitleEditorPage() {
               Translations
               {title.translations.length > 0 ? <Badge>{title.translations.length}</Badge> : null}
             </TabsTrigger>
+            <TabsTrigger value="similar">Similar</TabsTrigger>
             <TabsTrigger value="history">History</TabsTrigger>
           </TabsList>
           {title.type === 'SERIES' ? (
@@ -489,6 +491,9 @@ export function TitleEditorPage() {
                 void queryClient.invalidateQueries({ queryKey: ['titles', 'detail', id] })
               }
             />
+          </TabsContent>
+          <TabsContent value="similar">
+            <TitleSimilar key={title.id} title={title} disabled={!mayWrite} />
           </TabsContent>
           <TabsContent value="history">
             <TitleHistory

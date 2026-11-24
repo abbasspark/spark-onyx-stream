@@ -197,14 +197,16 @@ export interface PublicCollectionDetail extends PublicCollection {
 
 /** One row of the home page. */
 export interface PublicRow {
-  /** Stable, for keys: "featured", "latest", "category:{slug}", "continue" or "section:{id}". */
+  /** Stable, for keys: "featured", "latest", "category:{slug}", "continue", "list", "recommended" or "section:{id}". */
   key: string;
   name: string;
   /**
    * "continue": the place of the viewer's own row of started videos. "list":
-   * the place of the titles the viewer saved. Neither has titles here.
+   * the place of the titles the viewer saved. "recommended": the place of the
+   * rows of `GET /viewer/recommendations`, each headed by this row's name
+   * followed by the name of the title it is about. None of them has titles here.
    */
-  kind: 'titles' | 'continue' | 'list';
+  kind: 'titles' | 'continue' | 'list' | 'recommended';
   /** How the cards look: posters, wide cards with the backdrop, or a numbered top list. */
   layout: 'poster' | 'landscape' | 'numbered';
   /** Set for a category row. */

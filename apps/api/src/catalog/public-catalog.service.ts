@@ -134,7 +134,7 @@ export class PublicCatalogService {
    * Cards in a language: the names and taglines of the titles, and the names
    * of the categories they carry. What is not translated stays as it is.
    */
-  private async cards<T extends PublicTitleCard>(
+  async cards<T extends PublicTitleCard>(
     cards: readonly T[],
     language: string | undefined,
   ): Promise<T[]> {

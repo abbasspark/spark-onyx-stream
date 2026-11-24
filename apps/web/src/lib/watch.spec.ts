@@ -1,6 +1,13 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 import type { Episode, Season, TitleDetail } from './types';
-import { episodeCode, findEpisode, firstEpisode, nextUnwatched, watchHref } from './watch';
+import {
+  toSuggestions,
+  episodeCode,
+  findEpisode,
+  firstEpisode,
+  nextUnwatched,
+  watchHref,
+} from './watch';
 
 function episode(id: string, number: number): Episode {
   return { id, number, name: `Episode ${id}`, synopsis: null, still: null, durationMs: 60_000 };
@@ -68,5 +75,26 @@ describe('nextUnwatched', () => {
 
   it('has nothing for a series without episodes', () => {
     expect(nextUnwatched({ seasons: [] } as unknown as TitleDetail, new Set())).toBeNull();
+  });
+});
+
+describe('toSuggestions', () => {
+  const image = (url: string) => ({ url, width: 16, height: 9 });
+
+  it('offers the first three, with the wide picture where there is one', () => {
+    const titles = ['a', 'b', 'c', 'd'].map((slug) => ({
+      slug,
+      name: slug.toUpperCase(),
+      backdrop: slug === 'b' ? null : image(`/${slug}-wide`),
+      poster: slug === 'c' ? null : image(`/${slug}-poster`),
+    }));
+    expect(toSuggestions(titles)).toEqual([
+      { slug: 'a', name: 'A', image: '/a-wide' },
+      { slug: 'b', name: 'B', image: '/b-poster' },
+      { slug: 'c', name: 'C', image: '/c-wide' },
+    ]);
+    expect(toSuggestions([{ slug: 'x', name: 'X', backdrop: null, poster: null }])).toEqual([
+      { slug: 'x', name: 'X', image: null },
+    ]);
   });
 });

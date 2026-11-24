@@ -85,6 +85,10 @@
       "description": "Movies, series, people, genres and collections."
     },
     {
+      "name": "Similar titles",
+      "description": "Which titles are like a title, why, and rows of them for a profile."
+    },
+    {
       "name": "Title history",
       "description": "What changed on a title, with a way back."
     },
@@ -7304,6 +7308,105 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/PlayAnswer"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "What the address names does not exist.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests. \"Retry-After\" says when to try again.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/catalog/titles/{slug}/similar": {
+      "get": {
+        "operationId": "PublicSimilar_forTitle",
+        "tags": [
+          "Similar titles"
+        ],
+        "summary": "Titles like this one, most alike first: what an editor pinned, then what shares genres, keywords, people or a collection with it, or is watched by the same viewers",
+        "description": "Empty when nothing is alike. A profile with an age limit only gets what suits it. Open to everyone.",
+        "security": [],
+        "x-onyx-access": {
+          "kind": "public",
+          "permissions": [],
+          "sessionOnly": false
+        },
+        "parameters": [
+          {
+            "name": "slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "default": 12,
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 30
+            }
+          },
+          {
+            "name": "language",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "maxLength": 20
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The answer.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/PublicTitleCard"
+                      }
+                    }
+                  },
+                  "required": [
+                    "items"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The input was refused. \"issues\" names every field.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
                 }
               }
             }
@@ -14898,6 +15001,7 @@
                       "HERO",
                       "CONTINUE_WATCHING",
                       "MY_LIST",
+                      "BECAUSE_YOU_WATCHED",
                       "TITLES"
                     ]
                   },
@@ -20276,6 +20380,130 @@
         }
       }
     },
+    "/v1/similar/watching": {
+      "get": {
+        "operationId": "Similar_watching",
+        "tags": [
+          "Similar titles"
+        ],
+        "summary": "When titles watched by the same people were last counted, and what was found",
+        "description": "For an admin or an API key. Needs catalog:read.",
+        "security": [
+          {
+            "adminSession": []
+          },
+          {
+            "apiKey": []
+          }
+        ],
+        "x-onyx-access": {
+          "kind": "admin",
+          "permissions": [
+            "catalog:read"
+          ],
+          "sessionOnly": false
+        },
+        "responses": {
+          "200": {
+            "description": "The answer.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WatchingView"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or the sign-in ran out.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Signed in, but not allowed to do this.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/similar/watching/rebuild": {
+      "post": {
+        "operationId": "Similar_rebuild",
+        "tags": [
+          "Similar titles"
+        ],
+        "summary": "Counts now, instead of waiting for the scheduler",
+        "description": "Takes a moment on a large audience. For an admin or an API key. Needs catalog:write.",
+        "security": [
+          {
+            "adminSession": []
+          },
+          {
+            "apiKey": []
+          }
+        ],
+        "x-onyx-access": {
+          "kind": "admin",
+          "permissions": [
+            "catalog:write"
+          ],
+          "sessionOnly": false
+        },
+        "responses": {
+          "200": {
+            "description": "The answer.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WatchingView"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or the sign-in ran out.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Signed in, but not allowed to do this.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests. \"Retry-After\" says when to try again.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/v1/stats/overview": {
       "get": {
         "operationId": "Stats_overview",
@@ -23190,6 +23418,203 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/TitleDetail"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The input was refused. \"issues\" names every field.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or the sign-in ran out.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Signed in, but not allowed to do this.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "What the address names does not exist.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/titles/{id}/similar": {
+      "get": {
+        "operationId": "Similar_get",
+        "tags": [
+          "Similar titles"
+        ],
+        "description": "For an admin or an API key. Needs catalog:read.",
+        "security": [
+          {
+            "adminSession": []
+          },
+          {
+            "apiKey": []
+          }
+        ],
+        "x-onyx-access": {
+          "kind": "admin",
+          "permissions": [
+            "catalog:read"
+          ],
+          "sessionOnly": false
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The answer.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SimilarAdminView"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or the sign-in ran out.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Signed in, but not allowed to do this.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "What the address names does not exist.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "operationId": "Similar_set",
+        "tags": [
+          "Similar titles"
+        ],
+        "summary": "Replaces what was decided for a title: the titles always shown, in their order, and the titles never shown",
+        "description": "It holds for this title only. For an admin or an API key. Needs catalog:write.",
+        "security": [
+          {
+            "adminSession": []
+          },
+          {
+            "apiKey": []
+          }
+        ],
+        "x-onyx-access": {
+          "kind": "admin",
+          "permissions": [
+            "catalog:write"
+          ],
+          "sessionOnly": false
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "pinned": {
+                    "maxItems": 30,
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "format": "uuid",
+                      "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                    }
+                  },
+                  "hidden": {
+                    "maxItems": 200,
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "format": "uuid",
+                      "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                    }
+                  }
+                },
+                "required": [
+                  "pinned",
+                  "hidden"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The answer.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SimilarAdminView"
                 }
               }
             }
@@ -27895,6 +28320,83 @@
           },
           "429": {
             "description": "Too many requests. \"Retry-After\" says when to try again.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/viewer/recommendations": {
+      "get": {
+        "operationId": "Recommendations_rows",
+        "tags": [
+          "Similar titles"
+        ],
+        "summary": "Up to three rows of titles like the ones the profile watched last, each named after the title it comes from",
+        "description": "Nothing the profile already started is in them, and no title is in two rows. Empty for a profile that watched nothing yet. For a signed-in viewer.",
+        "security": [
+          {
+            "viewerSession": []
+          },
+          {
+            "viewerCookie": []
+          }
+        ],
+        "x-onyx-access": {
+          "kind": "viewer",
+          "permissions": [],
+          "sessionOnly": false
+        },
+        "parameters": [
+          {
+            "name": "language",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "maxLength": 20
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The answer.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "rows": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/RecommendationRow"
+                      }
+                    }
+                  },
+                  "required": [
+                    "rows"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The input was refused. \"issues\" names every field.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or the sign-in ran out.",
             "content": {
               "application/json": {
                 "schema": {
@@ -36383,6 +36885,36 @@
           "updatedAt"
         ]
       },
+      "CoWatchState": {
+        "type": "object",
+        "properties": {
+          "rebuiltAt": {
+            "type": "string"
+          },
+          "pairs": {
+            "type": "number",
+            "description": "Pairs kept, each counted once."
+          },
+          "titles": {
+            "type": "number",
+            "description": "Titles that have at least one partner."
+          },
+          "profiles": {
+            "type": "number",
+            "description": "Profiles whose watching was counted."
+          },
+          "tookMs": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "rebuiltAt",
+          "pairs",
+          "titles",
+          "profiles",
+          "tookMs"
+        ]
+      },
       "CreatedApiKey": {
         "type": "object",
         "properties": {
@@ -38199,7 +38731,8 @@
           "TITLES",
           "HERO",
           "CONTINUE_WATCHING",
-          "MY_LIST"
+          "MY_LIST",
+          "BECAUSE_YOU_WATCHED"
         ]
       },
       "HomeSort": {
@@ -39410,6 +39943,48 @@
           "source",
           "language",
           "region"
+        ]
+      },
+      "NamedSignal": {
+        "type": "object",
+        "properties": {
+          "names": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "The genres, people, keywords, studios or collections both have. Empty for the others."
+          },
+          "signal": {
+            "type": "string",
+            "enum": [
+              "language",
+              "kind",
+              "categories",
+              "keywords",
+              "genres",
+              "collection",
+              "watched",
+              "cast",
+              "crew",
+              "era",
+              "studio"
+            ]
+          },
+          "points": {
+            "type": "number",
+            "description": "What it gave, rounded to one decimal."
+          },
+          "count": {
+            "type": "number",
+            "description": "How many genres, keywords or people are shared, or profiles that watched both."
+          }
+        },
+        "required": [
+          "names",
+          "signal",
+          "points",
+          "count"
         ]
       },
       "OverviewPoint": {
@@ -42734,7 +43309,7 @@
         "properties": {
           "key": {
             "type": "string",
-            "description": "Stable, for keys: \"featured\", \"latest\", \"category:{slug}\", \"continue\" or \"section:{id}\"."
+            "description": "Stable, for keys: \"featured\", \"latest\", \"category:{slug}\", \"continue\", \"list\", \"recommended\" or \"section:{id}\"."
           },
           "name": {
             "type": "string"
@@ -42744,9 +43319,10 @@
             "enum": [
               "titles",
               "continue",
-              "list"
+              "list",
+              "recommended"
             ],
-            "description": "\"continue\": the place of the viewer's own row of started videos. \"list\":\nthe place of the titles the viewer saved. Neither has titles here."
+            "description": "\"continue\": the place of the viewer's own row of started videos. \"list\":\nthe place of the titles the viewer saved. \"recommended\": the place of the\nrows of `GET /viewer/recommendations`, each headed by this row's name\nfollowed by the name of the title it is about. None of them has titles here."
           },
           "layout": {
             "type": "string",
@@ -43590,6 +44166,29 @@
         "enum": [
           "ACTIVE",
           "REVOKED"
+        ]
+      },
+      "RecommendationRow": {
+        "type": "object",
+        "properties": {
+          "because": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/PublicTitleCard"
+              }
+            ],
+            "description": "The title the row is about."
+          },
+          "titles": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PublicTitleCard"
+            }
+          }
+        },
+        "required": [
+          "because",
+          "titles"
         ]
       },
       "RecordingStatus": {
@@ -44620,6 +45219,254 @@
           "hours",
           "video",
           "live"
+        ]
+      },
+      "SimilarAdminItem": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "slug": {
+                "type": "string"
+              },
+              "name": {
+                "type": "string"
+              },
+              "type": {
+                "type": "string"
+              },
+              "releaseYear": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              },
+              "ageRating": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "status": {
+                "$ref": "#/components/schemas/PublishStatus"
+              },
+              "poster": {
+                "anyOf": [
+                  {
+                    "$ref": "#/components/schemas/ImageView"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            },
+            "required": [
+              "id",
+              "slug",
+              "name",
+              "type",
+              "releaseYear",
+              "ageRating",
+              "status",
+              "poster"
+            ]
+          },
+          "pinned": {
+            "type": "boolean"
+          },
+          "score": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "description": "From 0 to 100. Null: the two share nothing, and an editor put it here."
+          },
+          "signals": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NamedSignal"
+            }
+          },
+          "rank": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "description": "Where the title stands in what viewers get, from 1. Null while they do\nnot see it, for the reason in `unseen`."
+          },
+          "unseen": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "draft",
+                  "dates",
+                  "unplayable"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "\"draft\": not published. \"dates\": outside its dates. \"unplayable\": nothing to watch yet."
+          }
+        },
+        "required": [
+          "title",
+          "pinned",
+          "score",
+          "signals",
+          "rank",
+          "unseen"
+        ]
+      },
+      "SimilarAdminView": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "name": {
+                "type": "string"
+              },
+              "type": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "name",
+              "type"
+            ]
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SimilarAdminItem"
+            },
+            "description": "Pinned titles in their order, then the titles found, most alike first."
+          },
+          "hidden": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SimilarAdminItem"
+            },
+            "description": "Titles an editor took out."
+          },
+          "shownByDefault": {
+            "type": "number",
+            "description": "How many titles the website and the apps show unless they ask for more, and the most they get."
+          },
+          "most": {
+            "type": "number"
+          },
+          "weights": {
+            "type": "object",
+            "properties": {
+              "language": {
+                "type": "number"
+              },
+              "kind": {
+                "type": "number"
+              },
+              "categories": {
+                "type": "number"
+              },
+              "keywords": {
+                "type": "number"
+              },
+              "genres": {
+                "type": "number"
+              },
+              "collection": {
+                "type": "number"
+              },
+              "watched": {
+                "type": "number"
+              },
+              "cast": {
+                "type": "number"
+              },
+              "crew": {
+                "type": "number"
+              },
+              "era": {
+                "type": "number"
+              },
+              "studio": {
+                "type": "number"
+              }
+            },
+            "required": [
+              "language",
+              "kind",
+              "categories",
+              "keywords",
+              "genres",
+              "collection",
+              "watched",
+              "cast",
+              "crew",
+              "era",
+              "studio"
+            ],
+            "description": "The most points each reason can give."
+          },
+          "watching": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "properties": {
+              "rebuiltAt": {
+                "type": "string"
+              },
+              "pairs": {
+                "type": "number",
+                "description": "Pairs kept, each counted once."
+              },
+              "titles": {
+                "type": "number",
+                "description": "Titles that have at least one partner."
+              },
+              "profiles": {
+                "type": "number",
+                "description": "Profiles whose watching was counted."
+              },
+              "tookMs": {
+                "type": "number"
+              },
+              "minimumAccounts": {
+                "type": "number"
+              }
+            },
+            "required": [
+              "rebuiltAt",
+              "pairs",
+              "titles",
+              "profiles",
+              "tookMs",
+              "minimumAccounts"
+            ],
+            "description": "What is known about titles watched by the same people. Null: never counted."
+          }
+        },
+        "required": [
+          "title",
+          "items",
+          "hidden",
+          "shownByDefault",
+          "most",
+          "weights",
+          "watching"
         ]
       },
       "SourceStreams": {
@@ -48109,6 +48956,30 @@
         "required": [
           "watching",
           "titles"
+        ]
+      },
+      "WatchingView": {
+        "type": "object",
+        "properties": {
+          "state": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CoWatchState"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Null: never counted."
+          },
+          "minimumAccounts": {
+            "type": "number",
+            "description": "A pair of titles only counts when this many accounts watched both."
+          }
+        },
+        "required": [
+          "state",
+          "minimumAccounts"
         ]
       },
       "WatchSummary": {

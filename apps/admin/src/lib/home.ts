@@ -75,10 +75,11 @@ const KIND_WORD = { MOVIE: 'movies', SERIES: 'series' } as const;
  */
 /**
  * True for a place that each viewer's own browser fills: what they started,
- * or what they saved. Such a section has no titles to choose.
+ * what they saved, or titles like the ones they watched. Such a section has
+ * no titles to choose.
  */
 export const isOwnRow = (kind: HomeSectionKind): boolean =>
-  kind === 'CONTINUE_WATCHING' || kind === 'MY_LIST';
+  kind === 'CONTINUE_WATCHING' || kind === 'MY_LIST' || kind === 'BECAUSE_YOU_WATCHED';
 
 export function describeSection(
   section: Pick<
@@ -101,6 +102,9 @@ export function describeSection(
   }
   if (section.kind === 'MY_LIST') {
     return 'What each viewer saved to watch later. Shown only to those who have something.';
+  }
+  if (section.kind === 'BECAUSE_YOU_WATCHED') {
+    return 'Up to three rows of titles like the ones each viewer watched last, each named after the title it comes from.';
   }
   const what = section.titleType ? KIND_WORD[section.titleType] : 'titles';
   const from: Record<HomeSource, string> = {

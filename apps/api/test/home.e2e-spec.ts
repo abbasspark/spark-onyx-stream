@@ -129,6 +129,8 @@ describe.skipIf(!TEST_DATABASE_URL)('Home page (e2e)', () => {
         ['list', 'list', '/my-list', []],
         ['featured', 'titles', '/browse?featured=true', ['Gamma', 'Beta']],
         ['latest', 'titles', '/browse', ['Gamma', 'Beta', 'Alpha']],
+        // The place for rows made from what a viewer watched.
+        ['recommended', 'recommended', null, []],
       ]);
     });
 
@@ -154,6 +156,7 @@ describe.skipIf(!TEST_DATABASE_URL)('Home page (e2e)', () => {
         ['MY_LIST', 'My list', 0],
         ['TITLES', 'Featured', 2],
         ['TITLES', 'New', 3],
+        ['BECAUSE_YOU_WATCHED', 'Because you watched', 0],
         ['TITLES', 'Drama', 1],
       ]);
       await post('/v1/layout/home/start').expect(409);
@@ -398,6 +401,7 @@ describe.skipIf(!TEST_DATABASE_URL)('Home page (e2e)', () => {
         'continue',
         'list',
         'latest',
+        'recommended',
       ]);
       await http().get('/v1/catalog/pages/channels').expect(404);
       await http().get('/v1/catalog/pages/MOVIES').expect(404);
