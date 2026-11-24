@@ -137,6 +137,51 @@ viewer writes in to say the picture keeps stopping: "4 of 4, 440 Mbps, 27
 seconds loaded" and "1 of 4, 2 Mbps, 0.4 seconds loaded" are different
 complaints with different answers.
 
+## Live channels
+
+The live player shares the menu, the settings, the figures panel, the
+gestures and the hardware hooks with the one above, and adds what a channel
+needs.
+
+**Tuning.** Typing a number tunes to that channel, the way a remote control
+does: `1` waits in case `12` is coming and tunes by itself when nothing
+longer could follow. `P` flips back to the channel watched before. The arrows
+step up and down the lineup. After every change a banner names the channel,
+what is on, how far through it is and what follows, and then goes away.
+
+**The guide.** `G` lays the guide over the picture, which keeps playing
+behind it: a row per channel, time running to the right, a line at the
+present moment, and the programme that is running shown with its progress.
+Choosing a programme on another channel tunes to it. Choosing one that has
+already been sent, on a channel that keeps what it sent, goes back to where
+it began — those are marked, so a viewer can see at a glance what is still
+reachable.
+
+**Going back.** On a channel with a DVR window the bar shows the whole of
+what is kept, with a mark where each programme began, so that going back
+lands on a beginning rather than in the middle. "Start over" returns to the
+beginning of what is on, and a step back goes to the beginning of the one
+before it. While the viewer is behind, the controls name what is actually on
+the screen rather than what is on now.
+
+**Favourites** are marked on a star, in the player, in the lineup and in the
+guide. They sort to the top of every list. Like the rest of the player's
+settings they belong to the device: the remote in the living room and the
+phone in the kitchen do not watch the same things.
+
+**Sound only** holds the channel at its smallest rung and turns the picture
+off, for watching on a connection that is paid for by the megabyte.
+
+| Keys                                |                                     |
+| ----------------------------------- | ----------------------------------- |
+| `0`–`9`                             | Tune to that channel number         |
+| `↑` `↓`                             | The channel before and after        |
+| `P`                                 | Back to the channel before this one |
+| `G`                                 | The guide                           |
+| `L`                                 | The list of channels                |
+| `←` `→`                             | Back and forward in what is kept    |
+| `Space` `K` `M` `V` `F` `I` `D` `?` | As above                            |
+
 ## Reporting
 
 Separately from the panel, every playback reports how it went to the API,
