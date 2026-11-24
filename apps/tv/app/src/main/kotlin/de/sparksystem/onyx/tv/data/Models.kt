@@ -308,6 +308,21 @@ data class ApiError(
     val code: String? = null,
 )
 
+// --- The list a viewer saves -------------------------------------------------
+
+@Serializable
+data class ListItem(val title: TitleCard, val addedAt: String? = null)
+
+@Serializable
+data class ViewerList(
+    val items: List<ListItem> = emptyList(),
+    /** How many more titles the list takes. */
+    val room: Int = 0,
+)
+
+@Serializable
+data class SavedIds(val ids: List<String> = emptyList())
+
 // --- Live channels -----------------------------------------------------------
 
 @Serializable

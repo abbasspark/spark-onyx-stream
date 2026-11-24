@@ -23,6 +23,8 @@ import androidx.compose.foundation.layout.Column
 import de.sparksystem.onyx.tv.ui.CatalogModel
 import de.sparksystem.onyx.tv.ui.LiveModel
 import de.sparksystem.onyx.tv.ui.PlayingModel
+import de.sparksystem.onyx.tv.ui.SavedModel
+import de.sparksystem.onyx.tv.ui.SearchModel
 import de.sparksystem.onyx.tv.ui.StartUpModel
 import de.sparksystem.onyx.tv.ui.Step
 import de.sparksystem.onyx.tv.ui.components.Page
@@ -34,7 +36,10 @@ import de.sparksystem.onyx.tv.ui.screens.LineupScreen
 import de.sparksystem.onyx.tv.ui.screens.LivePlayerScreen
 import de.sparksystem.onyx.tv.ui.screens.PlayerScreen
 import de.sparksystem.onyx.tv.ui.screens.ProfilesScreen
+import de.sparksystem.onyx.tv.ui.screens.SavedScreen
+import de.sparksystem.onyx.tv.ui.screens.SearchScreen
 import de.sparksystem.onyx.tv.ui.screens.ServerScreen
+import de.sparksystem.onyx.tv.ui.screens.SettingsScreen
 import de.sparksystem.onyx.tv.ui.screens.SignInScreen
 import de.sparksystem.onyx.tv.ui.screens.TitleScreen
 import de.sparksystem.onyx.tv.ui.theme.OnyxTheme
@@ -55,6 +60,8 @@ private class Models(private val container: Container) : ViewModelProvider.Facto
         modelClass.isAssignableFrom(CatalogModel::class.java) -> CatalogModel(container) as T
         modelClass.isAssignableFrom(PlayingModel::class.java) -> PlayingModel(container) as T
         modelClass.isAssignableFrom(LiveModel::class.java) -> LiveModel(container) as T
+        modelClass.isAssignableFrom(SearchModel::class.java) -> SearchModel(container) as T
+        modelClass.isAssignableFrom(SavedModel::class.java) -> SavedModel(container) as T
         else -> throw IllegalArgumentException("No model for ${modelClass.name}")
     }
 }
@@ -71,10 +78,20 @@ private sealed interface Where {
     data object Lineup : Where
     data object Live : Where
     data object Guide : Where
+    data object Search : Where
+    data object Saved : Where
+    data object Settings : Where
 }
 
-/** The two parts of the app the navigation across the top moves between. */
-private val PLACES = listOf("Home", "Live")
+/**
+ * The places the navigation across the top moves between, in the order a
+ * viewer reaches for them: what to watch, then live, then the two they go
+ * looking for, then the one they visit twice a year.
+ */
+private val PLACES = listOf("Home", "Live", "Search", "My list", "Settings")
+
+/** Which place each item of the navigation stands for. */
+private val NAV = listOf(Where.Home, Where.Lineup, Where.Search, Where.Saved, Where.Settings)
 
 @OptIn(ExperimentalTvMaterial3Api::class)
 @Composable
@@ -119,26 +136,30 @@ private fun App(container: Container) {
                     onCancelPin = startUp::cancelPin,
                 )
 
-                is Step.Ready -> Catalog(
-                    models = models,
-                    siteName = state.siteName,
-                    onSignedOut = startUp::signedOut,
-                )
+                is Step.Ready -> Catalog(models = models, state = state, startUp = startUp)
             }
         }
     }
 }
 
 @Composable
-private fun Catalog(models: ViewModelProvider.Factory, siteName: String, onSignedOut: () -> Unit) {
+private fun Catalog(
+    models: ViewModelProvider.Factory,
+    state: de.sparksystem.onyx.tv.ui.StartUpState,
+    startUp: StartUpModel,
+) {
     val catalog: CatalogModel = viewModel(factory = models)
     val playing: PlayingModel = viewModel(factory = models)
     val live: LiveModel = viewModel(factory = models)
+    val search: SearchModel = viewModel(factory = models)
+    val saved: SavedModel = viewModel(factory = models)
     val home by catalog.homeFlow.collectAsStateWithLifecycle()
     val title by catalog.titleFlow.collectAsStateWithLifecycle()
     val player by playing.flow.collectAsStateWithLifecycle()
     val liveState by live.flow.collectAsStateWithLifecycle()
     val goBackTo by live.goBackFlow.collectAsStateWithLifecycle()
+    val searchState by search.flow.collectAsStateWithLifecycle()
+    val savedState by saved.flow.collectAsStateWithLifecycle()
     val signedOut by catalog.signedOutFlow.collectAsStateWithLifecycle()
 
     var where by remember { mutableStateOf<Where>(Where.Home) }
@@ -147,7 +168,7 @@ private fun Catalog(models: ViewModelProvider.Factory, siteName: String, onSigne
     // code screen rather than leaving a wall of refusals.
     LaunchedEffect(signedOut) {
         if (signedOut) {
-            onSignedOut()
+            startUp.signedOut()
         }
     }
 
@@ -167,9 +188,20 @@ private fun Catalog(models: ViewModelProvider.Factory, siteName: String, onSigne
                 live.stopWatching()
                 Where.Lineup
             }
-            is Where.Lineup -> Where.Home
             else -> Where.Home
         }
+    }
+
+    /** The navigation across the top, which every screen under it shares. */
+    fun goTo(index: Int) {
+        val wanted = NAV.getOrNull(index) ?: Where.Home
+        if (wanted == Where.Lineup) {
+            live.loadChannels()
+        }
+        if (wanted == Where.Saved) {
+            saved.load()
+        }
+        where = wanted
     }
 
     /** Takes a channel, and goes to the picture. */
@@ -179,17 +211,10 @@ private fun Catalog(models: ViewModelProvider.Factory, siteName: String, onSigne
     }
 
     when (val place = where) {
-        is Where.Home -> WithNav(at = 0, onGo = { index ->
-            where = if (index == 1) {
-                live.loadChannels()
-                Where.Lineup
-            } else {
-                Where.Home
-            }
-        }) {
+        is Where.Home -> WithNav(at = 0, onGo = ::goTo) {
             HomeScreen(
                 state = home,
-                siteName = siteName,
+                siteName = state.siteName,
                 onOpen = { slug ->
                     catalog.openTitle(slug)
                     where = Where.Title(slug)
@@ -208,9 +233,7 @@ private fun Catalog(models: ViewModelProvider.Factory, siteName: String, onSigne
             )
         }
 
-        is Where.Lineup -> WithNav(at = 1, onGo = { index ->
-            where = if (index == 0) Where.Home else Where.Lineup
-        }) {
+        is Where.Lineup -> WithNav(at = 1, onGo = ::goTo) {
             LineupScreen(
                 state = liveState,
                 onWatch = ::watch,
@@ -261,9 +284,63 @@ private fun Catalog(models: ViewModelProvider.Factory, siteName: String, onSigne
             },
         )
 
+        is Where.Search -> WithNav(at = 2, onGo = ::goTo) {
+            SearchScreen(
+                state = searchState,
+                onType = search::type,
+                onOpen = { slug ->
+                    catalog.openTitle(slug)
+                    where = Where.Title(slug)
+                },
+            )
+        }
+
+        is Where.Saved -> WithNav(at = 3, onGo = ::goTo) {
+            SavedScreen(
+                state = savedState,
+                onOpen = { slug ->
+                    catalog.openTitle(slug)
+                    where = Where.Title(slug)
+                },
+            )
+        }
+
+        is Where.Settings -> WithNav(at = 4, onGo = ::goTo) {
+            SettingsScreen(
+                siteName = state.siteName,
+                serverUrl = state.serverUrl,
+                viewerName = state.viewerName,
+                profileName = state.profileName,
+                onChangeProfile = startUp::changeProfile,
+                onSignOut = startUp::signedOut,
+                onForgetService = startUp::forgetService,
+            )
+        }
+
         is Where.Title -> TitleScreen(
             state = title,
             whatToPlay = catalog.whatToPlay(title),
+            saved = title.detail?.let { savedState.slugs.contains(it.slug) } == true,
+            onToggleSaved = {
+                title.detail?.let { detail ->
+                    saved.toggle(
+                        de.sparksystem.onyx.tv.data.TitleCard(
+                            id = detail.id,
+                            type = detail.type,
+                            slug = detail.slug,
+                            name = detail.name,
+                            tagline = detail.tagline,
+                            releaseYear = detail.releaseYear,
+                            ageRating = detail.ageRating,
+                            access = detail.access,
+                            poster = detail.poster,
+                            backdrop = detail.backdrop,
+                            categories = detail.categories,
+                            durationMs = detail.durationMs,
+                        ),
+                    )
+                }
+            },
             onPlay = { episodeId, positionSeconds ->
                 val detail = title.detail ?: return@TitleScreen
                 playing.play(
