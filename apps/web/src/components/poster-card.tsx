@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 import { Lock } from 'lucide-react';
 import Link from 'next/link';
+import { Fragment } from 'react';
 import { describeLength } from '@/lib/format';
 import type { TitleCard } from '@/lib/types';
 import { MyListButton } from './my-list';
@@ -65,9 +66,12 @@ export function PosterCard({ title, eager, className }: PosterCardProps) {
           {title.name}
         </p>
         {facts.length > 0 ? (
-          <p className="flex gap-2.5 truncate text-xs text-smoke">
-            {facts.map((fact) => (
-              <span key={fact}>{fact}</span>
+          <p className="flex items-center gap-2.5 truncate text-xs text-smoke">
+            {facts.map((fact, index) => (
+              <Fragment key={fact}>
+                {index > 0 ? <span aria-hidden="true" className="h-2.5 w-px bg-line" /> : null}
+                <span>{fact}</span>
+              </Fragment>
             ))}
           </p>
         ) : null}

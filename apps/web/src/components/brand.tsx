@@ -15,6 +15,23 @@ export function BandMark({ className }: { className?: string }) {
 }
 
 /**
+ * The same bands, small, to stand before a heading. Three weights with the
+ * amber on top: the mark of the site repeated wherever a section begins.
+ */
+export function HeadingBands({ className }: { className?: string }) {
+  return (
+    <span
+      aria-hidden="true"
+      className={`inline-flex w-4 shrink-0 flex-col gap-[3px] ${className ?? ''}`}
+    >
+      <span className="h-[2px] bg-sard" />
+      <span className="h-[2px] bg-vein/40" />
+      <span className="h-[2px] bg-vein/15" />
+    </span>
+  );
+}
+
+/**
  * The site as it signs its pages: the logo set in the panel, or else the mark
  * with the name beside it. A logo can stand for the name or sit next to it.
  */
