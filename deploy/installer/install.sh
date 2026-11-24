@@ -478,8 +478,11 @@ write_settings() {
     # Only the HTTPS proxy is reachable from outside, and it is a second proxy
     # in front of the API.
     set_env HTTP_BIND "127.0.0.1" "$ENV_FILE"
-    set_env TRUST_PROXY_HOPS "2" "$ENV_FILE"
   fi
+  # How many proxies stand in front of the API. The address of the viewer is
+  # read from this, and the audit log, the sign-in limit and every rate limit
+  # go by it. The gateway is one; with HTTPS the proxy in front is the second.
+  set_env TRUST_PROXY_HOPS "$([[ -n "$domain" ]] && echo 2 || echo 1)" "$ENV_FILE"
   chmod 600 "$ENV_FILE"
   ok "$ENV_FILE written, with fresh secrets"
   ok "Address of the site: $site_url"

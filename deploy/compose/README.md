@@ -85,10 +85,12 @@ The gateway speaks plain HTTP. Do not put the installation on the public interne
    SITE_URL=https://watch.example.com
    P2P_TRACKER_URL=wss://watch.example.com/tracker
    HTTP_BIND=127.0.0.1
-   TRUST_PROXY_HOPS=2
    ```
 
 3. Run `docker compose up -d`.
+
+   The proxy counts itself, so `TRUST_PROXY_HOPS` is 2 while it is in use and
+   needs no line of its own. Set it only for a proxy of your own in front.
 
 `COMPOSE_FILE` makes every `docker compose` command in this folder include the proxy. `HTTP_BIND=127.0.0.1` closes port 8080 to the outside, so the proxy is the only way in.
 
@@ -98,7 +100,7 @@ Traefik, the load balancer of your hosting provider, or any other TLS proxy work
 
 - send its traffic to port 8080 of this server
 - make it set `X-Forwarded-Proto` and `X-Forwarded-For`
-- set `TRUST_PROXY_HOPS=2` in `.env`, so the audit log shows the real client address
+- set `TRUST_PROXY_HOPS` in `.env` to how many proxies stand in front of the API, counting the gateway: 2 for one proxy of your own, 3 if that one sits behind another. The address of the viewer is read from this, and the audit log, the sign-in limit and every rate limit go by it
 - set `SITE_URL` and `P2P_TRACKER_URL` to the public address, with `https://` and `wss://`
 
 ## Everyday tasks
