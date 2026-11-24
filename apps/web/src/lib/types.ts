@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-only
+import type { Marker } from './markers';
 //
 // The shapes of the public catalog API (/v1/catalog). Dates arrive as text.
 
@@ -248,6 +249,8 @@ export interface Playback {
   audio?: { language: string; label: string | null; isDefault: boolean }[];
   /** The subtitle tracks of the video. Missing from an older API. */
   subtitles?: { language: string; label: string | null; isForced: boolean }[];
+  /** The stretches a player offers to skip. Missing from an API older than them. */
+  markers?: Marker[];
 }
 
 /** A live channel as viewers see it. */

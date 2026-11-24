@@ -9,6 +9,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { formatClock } from '@/lib/format';
+import { type Marker, watchedFrom } from '@/lib/markers';
 import { findEntry, isResumable } from '@/lib/progress';
 import { recordFinished, recordPosition, syncSettled } from '@/lib/watch-sync';
 import type { Playback } from '@/lib/types';
@@ -118,7 +119,9 @@ export function WatchScreen({
       }
       await syncSettled();
       const stored = findEntry(progress.key);
-      return stored && isResumable(stored.position, stored.duration) ? stored.position : 0;
+      return stored && isResumable(stored.position, stored.duration, stored.creditsAt)
+        ? stored.position
+        : 0;
     };
 
     Promise.all([
@@ -200,6 +203,10 @@ export function WatchScreen({
 
   // --- Remembering the position --------------------------------------------
 
+  // The markers of the video that plays, for knowing where its credits begin.
+  const markersRef = useRef<readonly Marker[] | undefined>(undefined);
+  markersRef.current = loaded.state === 'ready' ? loaded.playback.markers : undefined;
+
   const save = useCallback(
     (leaving = false) => {
       const { time, duration } = position.current;
@@ -218,6 +225,7 @@ export function WatchScreen({
           position: time,
           duration,
           updatedAt: Date.now(),
+          creditsAt: watchedFrom(markersRef.current, duration),
         },
         leaving,
       );
@@ -607,6 +615,7 @@ export function WatchScreen({
       onEnded={onEnded}
       onFatal={onFatal}
       overlay={endScreen}
+      afterCredits={next ? { label: 'Next episode', onPress: () => router.push(next.href) } : null}
     />
   );
 }

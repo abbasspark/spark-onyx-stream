@@ -41,6 +41,14 @@ export interface PlaybackInfo {
   audio: { language: string; label: string | null; isDefault: boolean }[];
   /** The subtitle tracks of the video. */
   subtitles: { language: string; label: string | null; isForced: boolean }[];
+  /**
+   * The stretches a player offers to skip, in the order they come: "RECAP"
+   * and "INTRO" with a button while they run, "CREDITS" as the moment to
+   * offer what comes next. Times are milliseconds from the start. Credits
+   * with "endMs": null run to the end of the video, and from where they
+   * begin the video counts as watched.
+   */
+  markers: { kind: 'RECAP' | 'INTRO' | 'CREDITS'; startMs: number; endMs: number | null }[];
 }
 
 /** Where a requested media file lives. */
@@ -123,6 +131,7 @@ export class PlaybackService {
         thumbnails: true,
         audioTracks: { where: { status: 'READY' }, orderBy: [{ createdAt: 'asc' }, { id: 'asc' }] },
         subtitleTracks: { orderBy: [{ createdAt: 'asc' }, { id: 'asc' }] },
+        markers: { orderBy: [{ startMs: 'asc' }, { id: 'asc' }] },
       },
     });
 
@@ -184,6 +193,11 @@ export class PlaybackService {
         language: track.language,
         label: track.label,
         isForced: track.isForced,
+      })),
+      markers: asset.markers.map((marker) => ({
+        kind: marker.kind,
+        startMs: marker.startMs,
+        endMs: marker.endMs,
       })),
     };
   }

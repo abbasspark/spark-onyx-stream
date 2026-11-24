@@ -229,6 +229,7 @@ export class PipelineService {
       this.prisma.thumbnail.deleteMany({ where: { assetId } }),
       this.prisma.subtitleTrack.deleteMany({ where: { assetId } }),
       this.prisma.audioTrack.deleteMany({ where: { assetId } }),
+      this.prisma.assetMarker.deleteMany({ where: { assetId } }),
       this.prisma.encryptionKey.deleteMany({ where: { assetId } }),
       // An empty source path marks the asset as cleaned up.
       this.prisma.asset.update({

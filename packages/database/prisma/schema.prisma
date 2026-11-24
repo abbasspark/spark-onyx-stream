@@ -608,6 +608,7 @@ model Asset {
 
   renditions     Rendition[]
   audioTracks    AudioTrack[]
+  markers        AssetMarker[]
   subtitleTracks SubtitleTrack[]
   thumbnails     Thumbnail[]
   encryptionKeys EncryptionKey[]
@@ -694,6 +695,39 @@ model AudioTrack {
 
   @@index([assetId])
   @@map("audio_tracks")
+}
+
+enum MarkerKind {
+  /// "Previously on": what happened before, at the start of an episode.
+  RECAP
+  /// The opening titles.
+  INTRO
+  /// The closing credits. From here on the video counts as watched.
+  CREDITS
+}
+
+enum MarkerSource {
+  /// Set by an admin.
+  MANUAL
+  /// Found by comparing the sound of the episodes of a season.
+  DETECTED
+}
+
+/// A stretch of a video a player offers to skip.
+model AssetMarker {
+  id        String       @id @default(uuid(7)) @db.Uuid
+  assetId   String       @db.Uuid
+  asset     Asset        @relation(fields: [assetId], references: [id], onDelete: Cascade)
+  kind      MarkerKind
+  /// Milliseconds from the start of the video.
+  startMs   Int
+  /// Null for credits that run to the end of the video.
+  endMs     Int?
+  source    MarkerSource @default(MANUAL)
+  createdAt DateTime     @default(now())
+
+  @@index([assetId])
+  @@map("asset_markers")
 }
 
 enum SubtitleSource {
@@ -815,6 +849,8 @@ enum JobType {
   SUBTITLES
   /// Makes an added sound file into a track of a video.
   AUDIO
+  /// Finds intros and credits by comparing the episodes of a season.
+  MARKERS
   CLEANUP
 }
 

@@ -23,6 +23,7 @@ import {
   planAudio,
   withAudioTracks,
 } from './media/audio.js';
+import { DetectionImpossibleError, MarkerDetector } from '../markers/marker-detector.js';
 import { decideProcessingMode } from './media/decision.js';
 import {
   buildCopyArgs,
@@ -132,6 +133,7 @@ export class ProcessingSteps {
     @Inject(ContentKeysService) private readonly contentKeys: ContentKeysService,
     @Inject(SubtitlesService) private readonly subtitleFiles: SubtitlesService,
     @Inject(AudioTracksService) private readonly audioTracks: AudioTracksService,
+    @Inject(MarkerDetector) private readonly markerDetector: MarkerDetector,
   ) {}
 
   /** Runs the step for a job type and returns what is stored as the job's output. */
@@ -148,6 +150,17 @@ export class ProcessingSteps {
         return this.withWorkDirectory(context, (directory) => this.thumbnails(context, directory));
       case 'AUDIO':
         return this.withWorkDirectory(context, (directory) => this.addAudio(context, directory));
+      case 'MARKERS':
+        return this.withWorkDirectory(context, async (directory) => {
+          try {
+            return await this.markerDetector.run(context, directory);
+          } catch (error) {
+            if (error instanceof DetectionImpossibleError) {
+              throw new NonRetryableProcessingError(error.message);
+            }
+            throw error;
+          }
+        });
       case 'CLEANUP':
         return this.cleanup(context);
       default:

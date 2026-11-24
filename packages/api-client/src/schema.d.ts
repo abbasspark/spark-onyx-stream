@@ -319,6 +319,30 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/assets/{assetId}/markers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The markers of a video, in the order they come
+         * @description For an admin or an API key. Needs assets:read.
+         */
+        get: operations["Markers_list"];
+        /**
+         * Sets all the markers of a video at once: at most one recap, one intro and one credits, inside the video and not overlapping
+         * @description What is left out is removed. Credits with "endMs": null run to the end. For an admin or an API key. Needs assets:write.
+         */
+        put: operations["Markers_replace"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/assets/{assetId}/subtitles": {
         parameters: {
             query?: never;
@@ -3227,6 +3251,46 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/seasons/{id}/markers/detect": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Starts a search for the intros and credits of a season
+         * @description Its episodes are compared by their sound, in the background; what they share at the start is marked as intro, what they share at the end as credits, both as "DETECTED" for an admin to check. Needs two episodes with a video. For an admin or an API key. Needs catalog:write.
+         */
+        post: operations["Markers_detect"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/seasons/{id}/markers/detection": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * How the newest search of a season goes, or went
+         * @description "detection" is null when it was never searched. For an admin or an API key. Needs catalog:read.
+         */
+        get: operations["Markers_detection"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/stats/overview": {
         parameters: {
             query?: never;
@@ -5327,6 +5391,16 @@ export interface components {
             /** @description Something to check, when the file looks as if it belonged to another video. */
             warning: string | null;
         };
+        AdminMarkerView: {
+            /** @description MANUAL: set by an admin. DETECTED: found by comparing episodes, and not checked by anyone yet. */
+            source: components["schemas"]["MarkerSource"];
+            /** @description RECAP: what happened before. INTRO: the opening titles. CREDITS: the closing credits. */
+            kind: components["schemas"]["MarkerKind"];
+            /** @description Milliseconds from the start of the video. */
+            startMs: number;
+            /** @description Null for credits that run to the end of the video. */
+            endMs: number | null;
+        };
         AdminPrincipal: {
             /** @constant */
             type: "admin";
@@ -6471,8 +6545,8 @@ export interface components {
             id: string;
             /** @description The heading an admin gave. Null: {@link defaultName} is used. */
             name: string | null;
-            sort: components["schemas"]["HomeSort"];
             kind: components["schemas"]["HomeSectionKind"];
+            sort: components["schemas"]["HomeSort"];
             source: components["schemas"]["HomeSource"];
             visible: boolean;
             layout: components["schemas"]["HomeLayout"];
@@ -6580,7 +6654,7 @@ export interface components {
         /** @enum {string} */
         JobStatus: "FAILED" | "RUNNING" | "CANCELLED" | "QUEUED" | "COMPLETED";
         /** @enum {string} */
-        JobType: "TRANSCODE" | "PROBE" | "REMUX" | "PACKAGE" | "THUMBNAILS" | "SUBTITLES" | "CLEANUP" | "AUDIO";
+        JobType: "TRANSCODE" | "PROBE" | "REMUX" | "PACKAGE" | "THUMBNAILS" | "SUBTITLES" | "CLEANUP" | "AUDIO" | "MARKERS";
         JobView: {
             id: string;
             type: components["schemas"]["JobType"];
@@ -6710,6 +6784,38 @@ export interface components {
             /** @description The last attempt of the process that answered. Null when it sent nothing yet. */
             lastDelivery: components["schemas"]["MailDelivery"] | null;
         };
+        MarkerDetectionView: {
+            jobId: string;
+            status: string;
+            /** @description 0 to 100. */
+            progress: number;
+            /** Format: date-time */
+            queuedAt: string;
+            /** Format: date-time */
+            finishedAt: string | null;
+            error: string | null;
+            /** @description Set once it is done. */
+            result: {
+                /** @description Episodes that were listened to. */
+                episodes: number;
+                /** @description How many of them got an intro, and how many got credits. */
+                intros: number;
+                credits: number;
+                /** @description Markers an admin set that were left as they are. */
+                keptManual: number;
+                perEpisode: {
+                    episode: number;
+                    intro: boolean;
+                    credits: boolean;
+                }[];
+                /** @description What could not be done, in words. */
+                notes?: string[];
+            } | null;
+        };
+        /** @enum {string} */
+        MarkerKind: "RECAP" | "INTRO" | "CREDITS";
+        /** @enum {string} */
+        MarkerSource: "MANUAL" | "DETECTED";
         MetadataPreview: {
             id: string;
             /** @description How many people the import would bring. */
@@ -7261,6 +7367,19 @@ export interface components {
                 label: string | null;
                 isForced: boolean;
             }[];
+            /**
+             * @description The stretches a player offers to skip, in the order they come: "RECAP"
+             *     and "INTRO" with a button while they run, "CREDITS" as the moment to
+             *     offer what comes next. Times are milliseconds from the start. Credits
+             *     with "endMs": null run to the end of the video, and from where they
+             *     begin the video counts as watched.
+             */
+            markers: {
+                /** @enum {string} */
+                kind: "RECAP" | "INTRO" | "CREDITS";
+                startMs: number;
+                endMs: number | null;
+            }[];
             /** @description For `POST /catalog/plays/{playId}/beat`. Null when the installation records nothing. */
             playId: string | null;
             /**
@@ -7304,6 +7423,19 @@ export interface components {
                 language: string;
                 label: string | null;
                 isForced: boolean;
+            }[];
+            /**
+             * @description The stretches a player offers to skip, in the order they come: "RECAP"
+             *     and "INTRO" with a button while they run, "CREDITS" as the moment to
+             *     offer what comes next. Times are milliseconds from the start. Credits
+             *     with "endMs": null run to the end of the video, and from where they
+             *     begin the video counts as watched.
+             */
+            markers: {
+                /** @enum {string} */
+                kind: "RECAP" | "INTRO" | "CREDITS";
+                startMs: number;
+                endMs: number | null;
             }[];
         };
         PlaybackPreferences: {
@@ -8715,9 +8847,9 @@ export interface components {
             devices: {
                 id: string;
                 name: string;
+                kind: components["schemas"]["PlayDevice"];
                 /** Format: date-time */
                 createdAt: string;
-                kind: components["schemas"]["PlayDevice"];
                 /** @description The app: "android-tv". */
                 platform: string;
                 model: string | null;
@@ -10369,6 +10501,124 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["AudioTrackView"];
+                };
+            };
+            /** @description Not signed in, or the sign-in ran out. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Signed in, but not allowed to do this. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description What the address names does not exist. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    Markers_list: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                assetId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The answer. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminMarkerView"][];
+                };
+            };
+            /** @description Not signed in, or the sign-in ran out. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Signed in, but not allowed to do this. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description What the address names does not exist. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    Markers_replace: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                assetId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    markers: {
+                        /** @enum {string} */
+                        kind: "RECAP" | "INTRO" | "CREDITS";
+                        startMs: number;
+                        endMs: number | null;
+                    }[];
+                };
+            };
+        };
+        responses: {
+            /** @description The answer. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminMarkerView"][];
+                };
+            };
+            /** @description The input was refused. "issues" names every field. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
                 };
             };
             /** @description Not signed in, or the sign-in ran out. */
@@ -20205,6 +20455,122 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Not signed in, or the sign-in ran out. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Signed in, but not allowed to do this. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description What the address names does not exist. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    Markers_detect: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** @default false */
+                    overwrite?: boolean;
+                };
+            };
+        };
+        responses: {
+            /** @description The answer. */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MarkerDetectionView"];
+                };
+            };
+            /** @description The input was refused. "issues" names every field. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Not signed in, or the sign-in ran out. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Signed in, but not allowed to do this. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description What the address names does not exist. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    Markers_detection: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The answer. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        detection: components["schemas"]["MarkerDetectionView"] | null;
+                    };
                 };
             };
             /** @description Not signed in, or the sign-in ran out. */

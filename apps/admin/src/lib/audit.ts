@@ -46,6 +46,8 @@ const ACTION_LABELS: Record<string, string> = {
   'asset.audio.add': 'Added a sound track to a video',
   'asset.audio.update': 'Changed a sound track of a video',
   'asset.audio.remove': 'Removed a sound track from a video',
+  'asset.markers.update': 'Changed the markers of a video',
+  'season.markers.detect': 'Searched a season for intros and credits',
   'viewer.stream_stop': 'Stopped what a viewer was playing',
   'viewer.device_remove': 'Removed a device of a viewer',
   'viewer.profile_pin_clear': 'Took the PIN off a profile of a viewer',

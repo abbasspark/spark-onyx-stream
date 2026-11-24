@@ -3,6 +3,15 @@ import { describe, expect, it } from 'vitest';
 import { clampWatchedAt, judgePosition } from './watch-rules.js';
 
 describe('judgePosition', () => {
+  it('counts a video as watched from where its credits begin, when that is known', () => {
+    // The credits of an hour begin at 52 minutes, long before 95 percent.
+    expect(judgePosition(3100, 3600, 3120)).toMatchObject({ kind: 'in-progress' });
+    expect(judgePosition(3120, 3600, 3120)).toEqual({ kind: 'finished', durationSeconds: 3600 });
+    // Without credits, and before them, the usual rule holds.
+    expect(judgePosition(3120, 3600)).toMatchObject({ kind: 'in-progress' });
+    expect(judgePosition(3500, 3600, 3590)).toEqual({ kind: 'finished', durationSeconds: 3600 });
+  });
+
   it('does not count the first seconds', () => {
     expect(judgePosition(0, 3600)).toEqual({ kind: 'not-started' });
     expect(judgePosition(14.9, 3600)).toEqual({ kind: 'not-started' });

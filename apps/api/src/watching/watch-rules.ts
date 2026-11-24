@@ -2,7 +2,10 @@
 
 /** The first seconds do not count as having started. */
 export const MIN_POSITION_SECONDS = 15;
-/** From here on the credits are running and the video counts as watched. */
+/**
+ * From here on a video counts as watched, when nobody marked where its
+ * credits begin: most credits are within the last twentieth.
+ */
 export const FINISHED_FRACTION = 0.95;
 
 export type WatchOutcome =
@@ -14,16 +17,24 @@ export type WatchOutcome =
   | { kind: 'finished'; durationSeconds: number };
 
 /**
- * What a reported position means. The viewer website applies the same two
- * numbers, so a video is resumable on the device exactly when it is here.
+ * What a reported position means. The viewer website applies the same
+ * rules, so a video is resumable on the device exactly when it is here.
+ *
+ * @param creditsAt Where the credits of the video begin, in seconds, when
+ *   that is marked. Whoever reached them watched the video, however long
+ *   they run.
  */
-export function judgePosition(position: number, duration: number): WatchOutcome {
+export function judgePosition(
+  position: number,
+  duration: number,
+  creditsAt: number | null = null,
+): WatchOutcome {
   const durationSeconds = Math.round(duration);
   if (!(durationSeconds > 0)) {
     return { kind: 'not-started' };
   }
   // First, so that a clip shorter than the minimum can be finished too.
-  if (position / duration >= FINISHED_FRACTION) {
+  if (position / duration >= FINISHED_FRACTION || (creditsAt !== null && position >= creditsAt)) {
     return { kind: 'finished', durationSeconds };
   }
   if (position < MIN_POSITION_SECONDS) {

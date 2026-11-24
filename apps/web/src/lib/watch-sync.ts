@@ -120,7 +120,7 @@ export function recordPosition(entry: WatchEntry, leaving = false): void {
   const known = findEntry(entry.key) !== undefined;
   saveEntry({ ...entry, synced: false });
   // The first seconds of a video nobody has begun are nothing to tell.
-  if (!signedIn || (!known && !isResumable(entry.position, entry.duration))) {
+  if (!signedIn || (!known && !isResumable(entry.position, entry.duration, entry.creditsAt))) {
     return;
   }
   const now = Date.now();

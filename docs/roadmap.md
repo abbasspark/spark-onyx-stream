@@ -92,7 +92,7 @@ A comparison with other platforms named ten things that change what the API says
 2. Devices, and sign-in on a television with a code: a device has an identity that outlasts its sign-ins, and a television shows a code that the viewer confirms on their phone. **Done.** See [phase-2-viewers.md](phase-2-viewers.md#devices-and-signing-in-with-a-code).
 3. Parental controls: an age on titles and channels, profiles with a limit, profiles for children, and a PIN per profile. **Done.** See [phase-2-viewers.md](phase-2-viewers.md#parental-controls).
 4. Several sound tracks per video, kept apart from the picture, a language added later without processing the picture again, and the languages a profile likes to hear and to read. **Done.** See [phase-1-media-engine.md](phase-1-media-engine.md#sound).
-5. Skip intro and credits. **Planned.**
+5. Skip recap, intro and credits: markers on a video, set in the panel against the player or found for a season by comparing the sound of its episodes. **Done.** See [phase-1-media-engine.md](phase-1-media-engine.md#markers).
 6. Similar titles. **Planned.**
 7. Reports from players about how playback went. **Planned.**
 8. Push notifications. **Planned.**
