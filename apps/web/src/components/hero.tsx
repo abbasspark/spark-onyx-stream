@@ -3,6 +3,7 @@ import { Info, ListVideo, Play } from 'lucide-react';
 import Link from 'next/link';
 import { MyListButton } from './my-list';
 import type { TitleCard } from '@/lib/types';
+import { HeadingBands } from './brand';
 import { Facts } from './facts';
 
 /**
@@ -11,6 +12,8 @@ import { Facts } from './facts';
  */
 export function Hero({ title }: { title: TitleCard }) {
   const isSeries = title.type === 'SERIES';
+  // Something true about this title, in its own words: the first group it was put in.
+  const eyebrow = title.categories[0]?.name ?? null;
 
   return (
     <section
@@ -30,11 +33,17 @@ export function Hero({ title }: { title: TitleCard }) {
         <div className="absolute inset-0 bg-ash" />
       )}
       {/* Darkens the side the text sits on and melts the picture into the page below. */}
-      <div className="absolute inset-0 bg-linear-to-r from-onyx/85 via-onyx/30 to-transparent" />
-      <div className="absolute inset-x-0 bottom-0 h-2/5 bg-linear-to-t from-onyx to-transparent" />
+      <div className="absolute inset-0 bg-linear-to-r from-onyx/90 via-onyx/35 to-transparent" />
+      <div className="absolute inset-x-0 bottom-0 h-3/5 bg-linear-to-t from-onyx via-onyx/55 to-transparent" />
 
       <div className="gutter relative w-full pt-32 pb-14 sm:pb-20">
         <div className="max-w-2xl">
+          {eyebrow ? (
+            <p className="eyebrow mb-5">
+              <HeadingBands className="w-3.5" />
+              {eyebrow}
+            </p>
+          ) : null}
           {title.logo ? (
             <h1>
               <img
@@ -51,7 +60,7 @@ export function Hero({ title }: { title: TitleCard }) {
           {title.tagline ? (
             <p className="mt-5 max-w-xl text-lg text-vein/90">{title.tagline}</p>
           ) : null}
-          <Facts title={title} className="mt-4 text-vein/80" />
+          <Facts title={title} className="mt-5 text-vein/80" />
           <div className="mt-7 flex flex-wrap gap-3">
             {isSeries ? (
               <Link href={`/title/${title.slug}#episodes`} className="button button-play">
@@ -64,11 +73,14 @@ export function Hero({ title }: { title: TitleCard }) {
                 Play
               </Link>
             )}
-            <Link href={`/title/${title.slug}`} className="button button-quiet">
+            <Link href={`/title/${title.slug}`} className="button button-outline">
               <Info />
               Details
             </Link>
             <MyListButton title={{ id: title.id, slug: title.slug, name: title.name }} />
+            {title.access === 'PAID' ? (
+              <p className="ml-1 text-sm text-dust">Included with a plan</p>
+            ) : null}
           </div>
         </div>
       </div>
