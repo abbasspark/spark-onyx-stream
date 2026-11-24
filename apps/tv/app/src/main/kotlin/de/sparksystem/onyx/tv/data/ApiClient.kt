@@ -200,6 +200,23 @@ class ApiClient(
     suspend fun playEpisode(id: String): Answer<Playback> =
         call("POST", "catalog/episodes/$id/playback")
 
+    // --- Live channels ----------------------------------------------------------
+
+    suspend fun channels(): Answer<List<Channel>> = call("GET", "catalog/channels")
+
+    suspend fun channel(slug: String): Answer<Channel> = call("GET", "catalog/channels/$slug")
+
+    /**
+     * The programme guide. The stretch asked for starts an hour ago, which is
+     * what the server does by itself, so that a viewer who opens the guide can
+     * see what is finishing as well as what is next.
+     */
+    suspend fun guide(hours: Int = 12): Answer<Guide> =
+        call("GET", "catalog/guide", mapOf("hours" to hours.toString()))
+
+    suspend fun playChannel(slug: String): Answer<LivePlayback> =
+        call("POST", "catalog/channels/$slug/playback")
+
     // --- Signing in ------------------------------------------------------------
 
     suspend fun startDeviceCode(name: String, model: String?): Answer<DeviceCodeStart> = call(

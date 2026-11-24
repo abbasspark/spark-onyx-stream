@@ -49,6 +49,11 @@ android {
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
+        // Dates and times come from the API as strings and are read with
+        // java.time, which Android only has from version 8. Desugaring puts
+        // it on the older televisions this app still supports, which is
+        // cheaper than carrying a date library or raising the floor.
+        isCoreLibraryDesugaringEnabled = true
     }
 
     kotlinOptions {
@@ -100,6 +105,8 @@ dependencies {
     implementation(libs.okhttp)
     implementation(libs.kotlinx.serialization.json)
     implementation(libs.zxing.core)
+
+    coreLibraryDesugaring(libs.desugar.jdk.libs)
 
     testImplementation(libs.junit)
 }

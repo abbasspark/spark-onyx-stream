@@ -186,3 +186,59 @@ fun Trouble(text: String, modifier: Modifier = Modifier) {
 fun Hairline(modifier: Modifier = Modifier, color: Color = Onyx.line) {
     Spacer(modifier.fillMaxWidth().height(1.dp).background(color))
 }
+
+/**
+ * The way between the parts of the app: the catalog and the live channels.
+ *
+ * It sits across the top rather than down the side, because a viewer reaches
+ * it by pressing up from the first row and that is where up should land.
+ */
+@OptIn(ExperimentalTvMaterial3Api::class)
+@Composable
+fun TopNav(
+    places: List<String>,
+    at: Int,
+    onGo: (Int) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(horizontal = Safe.horizontal, vertical = 14.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        BandMark(width = 28)
+        Spacer(Modifier.width(14.dp))
+        places.forEachIndexed { index, place ->
+            NavItem(text = place, here = index == at, onClick = { onGo(index) })
+        }
+    }
+}
+
+@OptIn(ExperimentalTvMaterial3Api::class)
+@Composable
+private fun NavItem(text: String, here: Boolean, onClick: () -> Unit) {
+    Button(
+        onClick = onClick,
+        colors = ButtonDefaults.colors(
+            containerColor = Color.Transparent,
+            contentColor = if (here) Onyx.vein else Onyx.smoke,
+            focusedContainerColor = LocalAccent.current,
+            focusedContentColor = Onyx.onyx,
+        ),
+    ) {
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Text(text = text, style = MaterialTheme.typography.labelLarge)
+            if (here) {
+                Spacer(Modifier.height(4.dp))
+                Spacer(
+                    Modifier
+                        .width(22.dp)
+                        .height(2.dp)
+                        .background(LocalAccent.current),
+                )
+            }
+        }
+    }
+}
