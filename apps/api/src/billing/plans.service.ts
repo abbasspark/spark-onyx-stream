@@ -160,6 +160,12 @@ export class PlansService {
         'Viewers have or had this plan, so it is part of their history. Stop offering it instead.',
       );
     }
+    const batches = await this.prisma.prepaidBatch.count({ where: { planId: id } });
+    if (batches > 0) {
+      throw new ConflictException(
+        'Prepaid codes were made for this plan. Delete or withdraw their batches first, or stop offering the plan instead.',
+      );
+    }
     await this.prisma.plan.delete({ where: { id } });
     return plan;
   }

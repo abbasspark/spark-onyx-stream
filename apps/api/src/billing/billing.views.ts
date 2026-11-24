@@ -113,6 +113,8 @@ export interface ViewerSubscriptionView {
   renewsAt: Date | null;
   /** Whether it is paid online, so the viewer manages it at the payment provider. */
   online: boolean;
+  /** Whether it came from a prepaid code, so another code of the same plan adds days to it. */
+  prepaid: boolean;
 }
 
 type WithPlan = Subscription & { plan: Pick<Plan, 'id' | 'name'> };
@@ -127,6 +129,7 @@ export function toViewerSubscriptionView(subscription: WithPlan): ViewerSubscrip
     cancelAtPeriodEnd: subscription.cancelAtPeriodEnd,
     renewsAt: subscription.renewsAt,
     online: subscription.source === 'STRIPE',
+    prepaid: subscription.source === 'PREPAID',
   };
 }
 
@@ -188,6 +191,8 @@ export interface BillingOverview {
   grantedByHand: number;
   /** Of those, the ones who pay online. */
   paidOnline: number;
+  /** Of those, the ones who used a prepaid code. */
+  prepaid: number;
   /** Paying subscribers whose last payment failed and is being tried again. */
   pastDue: number;
   /** How online payment is set up. Null when it is off. */

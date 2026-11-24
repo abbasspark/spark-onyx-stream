@@ -1067,8 +1067,8 @@ export interface Subscription {
   id: string;
   plan: { id: string; name: string };
   status: SubscriptionStatus;
-  /** MANUAL: granted by an admin. STRIPE: paid online. */
-  source: 'MANUAL' | 'STRIPE';
+  /** MANUAL: granted by an admin. STRIPE: paid online. PREPAID: started with a prepaid code. */
+  source: 'MANUAL' | 'STRIPE' | 'PREPAID';
   interval: 'MONTH' | 'YEAR' | null;
   /** Whether it lets the viewer watch right now. */
   running: boolean;
@@ -1115,6 +1115,8 @@ export interface BillingOverview {
   grantedByHand: number;
   /** Subscribers who pay online. */
   paidOnline: number;
+  /** Subscribers who used a prepaid code. */
+  prepaid: number;
   /** Paying subscribers whose last payment failed and is being tried again. */
   pastDue: number;
   /** How online payment is set up. Null when it is off. */
@@ -2653,4 +2655,64 @@ export interface PushOverview {
   reachable: number;
   viewers: number;
   recent: { topic: string; title: string; body: string; at: string; viewers: number }[];
+}
+
+/** A batch of prepaid codes: what one code gives, and what became of the codes. */
+export interface PrepaidBatch {
+  id: string;
+  name: string;
+  plan: { id: string; name: string };
+  /** How many days of the plan one code gives. */
+  days: number;
+  /** Until when the codes can be used. Null: without an end. */
+  expiresAt: string | null;
+  voidedAt: string | null;
+  note: string | null;
+  createdAt: string;
+  /** "open": codes can be used. "expired": their time ran out. "withdrawn": taken back. */
+  state: 'open' | 'expired' | 'withdrawn';
+  total: number;
+  redeemed: number;
+  withdrawn: number;
+  /** Codes that can still be used right now. */
+  left: number;
+  lastRedeemedAt: string | null;
+}
+
+export interface PrepaidBatchInput {
+  name: string;
+  planId: string;
+  days: number;
+  count: number;
+  expiresAt: string | null;
+  note: string | null;
+}
+
+export type PrepaidCodeState = 'unused' | 'redeemed' | 'withdrawn' | 'expired';
+
+/** One code of a batch, hidden but for its last four characters. */
+export interface PrepaidCode {
+  id: string;
+  masked: string;
+  state: PrepaidCodeState;
+  redeemedAt: string | null;
+  redeemedBy: { id: string; email: string; displayName: string } | null;
+}
+
+/** A code found by typing it in. */
+export interface PrepaidCodeLookup extends PrepaidCode {
+  code: string;
+  batch: { id: string; name: string; plan: string; days: number; expiresAt: string | null };
+}
+
+/** All batches together. */
+export interface PrepaidSummary {
+  batches: number;
+  codes: number;
+  redeemed: number;
+  left: number;
+  /** Viewers who watch through a prepaid code right now. */
+  subscribers: number;
+  /** Codes used on each of the last thirty days, the oldest first. */
+  days: { day: string; redeemed: number }[];
 }

@@ -50,6 +50,10 @@ const AREAS: Record<string, { name: string; description: string }> = {
     description:
       'Devices that take notifications, the list of a viewer, and the messages an admin sends.',
   },
+  prepaid: {
+    name: 'Prepaid codes',
+    description: 'Codes that start a plan or add days to it, made in batches and used once.',
+  },
   similar: {
     name: 'Similar titles',
     description: 'Which titles are like a title, why, and rows of them for a profile.',

@@ -38,6 +38,7 @@ import type { AppRole } from './roles/app-role.js';
 import { AnalyticsModule, PlaysModule } from './analytics/analytics.module.js';
 import { QualityModule, QualityRecorderModule } from './quality/quality.module.js';
 import { PushCoreModule, PushModule } from './push/push.module.js';
+import { PrepaidModule } from './prepaid/prepaid.module.js';
 import { TitleHistoryCoreModule } from './history/title-history.module.js';
 import { WebhooksCoreModule, WebhooksModule } from './webhooks/webhooks.module.js';
 import { StreamsCoreModule, StreamsModule } from './streams/streams.module.js';
@@ -61,6 +62,7 @@ const ROLE_MODULES: Record<AppRole, Type[]> = {
     AnalyticsModule,
     QualityModule,
     PushModule,
+    PrepaidModule,
     StreamsModule,
     CatalogModule,
     MailModule,

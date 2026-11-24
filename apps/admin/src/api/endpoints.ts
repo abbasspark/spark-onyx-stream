@@ -130,6 +130,11 @@ import type {
   PlanInput,
   Playback,
   PublishStatus,
+  PrepaidBatch,
+  PrepaidBatchInput,
+  PrepaidCode,
+  PrepaidCodeLookup,
+  PrepaidSummary,
   Purchase,
   RecordPaymentInput,
   ReprocessInput,
@@ -349,6 +354,40 @@ export const couponsApi = {
       query: { page, pageSize: 10 },
       signal,
     }),
+};
+
+export const prepaidApi = {
+  summary: (signal?: AbortSignal) => request<PrepaidSummary>('/v1/prepaid/summary', { signal }),
+  batches: (page: number, signal?: AbortSignal) =>
+    request<Page<PrepaidBatch>>('/v1/prepaid/batches', { query: { page, pageSize: 20 }, signal }),
+  batch: (id: string, signal?: AbortSignal) =>
+    request<PrepaidBatch>(`/v1/prepaid/batches/${id}`, { signal }),
+  create: (body: PrepaidBatchInput) =>
+    request<PrepaidBatch>('/v1/prepaid/batches', { method: 'POST', body }),
+  update: (id: string, body: Partial<Pick<PrepaidBatchInput, 'name' | 'expiresAt' | 'note'>>) =>
+    request<PrepaidBatch>(`/v1/prepaid/batches/${id}`, { method: 'PATCH', body }),
+  withdraw: (id: string) =>
+    request<PrepaidBatch>(`/v1/prepaid/batches/${id}/withdraw`, { method: 'POST' }),
+  remove: (id: string) => request<void>(`/v1/prepaid/batches/${id}`, { method: 'DELETE' }),
+  codes: (
+    id: string,
+    query: { page: number; state?: 'unused' | 'redeemed' | 'withdrawn' },
+    signal?: AbortSignal,
+  ) =>
+    request<Page<PrepaidCode>>(`/v1/prepaid/batches/${id}/codes`, {
+      query: { ...query, pageSize: 10 },
+      signal,
+    }),
+  /** The codes as a CSV file: the usable ones, or all with their state. */
+  exportCsv: (id: string, all: boolean) =>
+    download(`/v1/prepaid/batches/${id}/export`, all ? { all: 'true' } : undefined),
+  /** One code in full. Written to the audit log. */
+  reveal: (codeId: string) =>
+    request<{ code: string }>(`/v1/prepaid/codes/${codeId}/reveal`, { method: 'POST' }),
+  withdrawCode: (codeId: string) =>
+    request<void>(`/v1/prepaid/codes/${codeId}/withdraw`, { method: 'POST' }),
+  lookup: (code: string) =>
+    request<PrepaidCodeLookup>('/v1/prepaid/codes/lookup', { method: 'POST', body: { code } }),
 };
 
 export const packagesApi = {

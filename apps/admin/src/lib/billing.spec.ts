@@ -15,6 +15,7 @@ import {
   toPriceText,
   webhookUrl,
   yearlySaving,
+  describeSubscribers,
 } from './billing';
 
 describe('currencies', () => {
@@ -177,5 +178,28 @@ describe('the books', () => {
       tone: 'warning',
     });
     expect(describePayment({ status: 'REFUNDED' }).tone).toBe('neutral');
+  });
+});
+
+describe('describeSubscribers', () => {
+  const none = { subscribers: 0, grantedByHand: 0, paidOnline: 0, prepaid: 0 };
+
+  it('says where subscribers come from', () => {
+    expect(describeSubscribers(none)).toBe('Nobody yet');
+    expect(describeSubscribers({ ...none, subscribers: 3, grantedByHand: 3 })).toBe(
+      'All granted by hand',
+    );
+    expect(describeSubscribers({ ...none, subscribers: 2, prepaid: 2 })).toBe(
+      'All through a prepaid code',
+    );
+    expect(
+      describeSubscribers({ subscribers: 9, paidOnline: 5, prepaid: 3, grantedByHand: 1 }),
+    ).toBe('5 paying online, 3 through a prepaid code, 1 granted by hand');
+  });
+
+  it('reads an answer of an older API without prepaid codes', () => {
+    expect(describeSubscribers({ subscribers: 2, paidOnline: 2, grantedByHand: 0 })).toBe(
+      '2 paying online',
+    );
   });
 });

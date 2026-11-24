@@ -144,6 +144,16 @@ export function PlansScreen({ offer }: { offer: Plans }) {
         </p>
       ) : null}
 
+      {own?.online ? null : (
+        <p className="mt-6 text-smoke">
+          Have a prepaid code?{' '}
+          <Link href="/redeem" className="text-vein underline underline-offset-4">
+            Enter it here
+          </Link>
+          {own ? ' to add its days to your plan.' : ' to start a plan without paying online.'}
+        </p>
+      )}
+
       {intervals.length > 1 ? (
         <div
           role="radiogroup"

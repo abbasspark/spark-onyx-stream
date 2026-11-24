@@ -200,6 +200,8 @@ export interface OwnSubscription {
   renewsAt?: string | null;
   /** Whether it is paid online, so the viewer manages it at the payment provider. */
   online?: boolean;
+  /** Whether it came from a prepaid code, so another code adds days to it. */
+  prepaid?: boolean;
 }
 
 /** A payment of the viewer's own. Amounts are in the smallest unit of the currency. */

@@ -327,6 +327,7 @@ describe.skipIf(!TEST_DATABASE_URL)('Billing with Stripe (e2e)', () => {
           endsAt: new Date(periodEnd + RENEWAL_GRACE_MS).toISOString(),
           cancelAtPeriodEnd: false,
           online: true,
+          prepaid: false,
         },
       });
       await play(movie.slug, anna.cookie).expect(200);
@@ -694,6 +695,7 @@ describe.skipIf(!TEST_DATABASE_URL)('Billing with Stripe (e2e)', () => {
         source: 'STRIPE',
         running: true,
         online: true,
+        prepaid: false,
         externalId: anna.remote.id,
         externalUrl: `https://dashboard.stripe.com/test/subscriptions/${anna.remote.id}`,
         grantedBy: null,

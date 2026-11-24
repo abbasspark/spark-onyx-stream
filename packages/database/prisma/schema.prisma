@@ -167,6 +167,7 @@ model Viewer {
   tokens        ViewerToken[]
   pushDevices   PushDevice[]
   notifications Notification[]
+  prepaidCodes  PrepaidCode[]
 
   @@index([createdAt])
   @@map("viewers")
@@ -1737,6 +1738,7 @@ model Plan {
   packages      PlanPackage[]
   coupons       CouponPlan[]
   campaigns     PushCampaign[]
+  codeBatches   PrepaidBatch[]
 
   @@index([position])
   @@map("plans")
@@ -1759,6 +1761,8 @@ enum SubscriptionSource {
   MANUAL
   /// Paid online.
   STRIPE
+  /// Started or extended with a prepaid code.
+  PREPAID
 }
 
 /// A viewer's hold on a plan over a stretch of time. A viewer has at most one
@@ -1797,8 +1801,9 @@ model Subscription {
   externalId  String?    @unique
   payments    Payment[]
 
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+  prepaidCodes PrepaidCode[]
 
   @@index([viewerId, status])
   @@index([planId])
@@ -2862,4 +2867,57 @@ model PushCampaign {
   @@index([status, scheduledAt])
   @@index([createdAt])
   @@map("push_campaigns")
+}
+
+/// A set of prepaid codes made together: so many codes that each give so
+/// many days of a plan. Codes are sold or given away outside the platform,
+/// on cards, by resellers, as gifts.
+model PrepaidBatch {
+  id        String    @id @default(uuid(7)) @db.Uuid
+  /// What the batch is called in the panel, such as "Kiosk cards, winter".
+  name      String
+  planId    String    @db.Uuid
+  plan      Plan      @relation(fields: [planId], references: [id], onDelete: Restrict)
+  /// How many days of the plan one code gives.
+  days      Int
+  /// A code of the batch can be used until this moment. Empty: without an end.
+  expiresAt DateTime?
+  /// Set when the batch was withdrawn: its unused codes no longer work.
+  voidedAt  DateTime?
+  /// A remark for the panel: who got the codes, what they were sold for.
+  note      String?
+
+  createdById String?  @db.Uuid
+  createdAt   DateTime @default(now())
+
+  codes PrepaidCode[]
+
+  @@index([createdAt])
+  @@map("prepaid_batches")
+}
+
+/// One prepaid code. It works once, for one account.
+model PrepaidCode {
+  id       String       @id @default(uuid(7)) @db.Uuid
+  batchId  String       @db.Uuid
+  batch    PrepaidBatch @relation(fields: [batchId], references: [id], onDelete: Cascade)
+  /// SHA-256 of the code, to find it. The code itself cannot be read from it.
+  codeHash String       @unique
+  /// The code, encrypted with the master key, so that a batch can be handed out again.
+  codeBox  String
+  /// Its last four characters, to tell codes apart in a list without showing them.
+  ending   String
+
+  /// Set when it was used: by whom, and the subscription it started or extended.
+  redeemedAt     DateTime?
+  redeemedById   String?       @db.Uuid
+  redeemedBy     Viewer?       @relation(fields: [redeemedById], references: [id], onDelete: SetNull)
+  subscriptionId String?       @db.Uuid
+  subscription   Subscription? @relation(fields: [subscriptionId], references: [id], onDelete: SetNull)
+  /// Set when this one code was withdrawn.
+  voidedAt       DateTime?
+
+  @@index([batchId, redeemedAt])
+  @@index([redeemedById])
+  @@map("prepaid_codes")
 }

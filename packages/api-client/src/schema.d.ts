@@ -3335,6 +3335,192 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/prepaid/batches": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description For an admin or an API key. Needs billing:read. */
+        get: operations["Prepaid_list"];
+        put?: never;
+        /**
+         * Makes a batch of codes
+         * @description The codes are had from the export, or one by one. For an admin or an API key. Needs billing:write.
+         */
+        post: operations["Prepaid_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/prepaid/batches/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description For an admin or an API key. Needs billing:read. */
+        get: operations["Prepaid_get"];
+        put?: never;
+        post?: never;
+        /**
+         * Deletes a batch of which no code was used
+         * @description For an admin or an API key. Needs billing:write.
+         */
+        delete: operations["Prepaid_remove"];
+        options?: never;
+        head?: never;
+        /**
+         * Changes the name, the note, or until when the codes can be used
+         * @description For an admin or an API key. Needs billing:write.
+         */
+        patch: operations["Prepaid_update"];
+        trace?: never;
+    };
+    "/v1/prepaid/batches/{id}/codes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The codes of a batch, hidden but for their last four characters
+         * @description For an admin or an API key. Needs billing:read.
+         */
+        get: operations["Prepaid_codes"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/prepaid/batches/{id}/export": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The codes of a batch as a CSV file: the ones that can still be used, or with `all=true` every one with its state
+         * @description Codes are money, so every export is written to the audit log. For an admin or an API key. Needs billing:write.
+         */
+        get: operations["Prepaid_export"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/prepaid/batches/{id}/withdraw": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Withdraws a batch: its unused codes stop working
+         * @description For an admin or an API key. Needs billing:write.
+         */
+        post: operations["Prepaid_withdraw"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/prepaid/codes/{id}/reveal": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Shows one code in full, to hand it to somebody
+         * @description Written to the audit log. For an admin or an API key. Needs billing:write.
+         */
+        post: operations["Prepaid_reveal"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/prepaid/codes/{id}/withdraw": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Withdraws one unused code
+         * @description For an admin or an API key. Needs billing:write.
+         */
+        post: operations["Prepaid_withdrawCode"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/prepaid/codes/lookup": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Finds a code a viewer reads out, and says where it stands and who used it
+         * @description For an admin or an API key. Needs billing:read.
+         */
+        post: operations["Prepaid_lookup"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/prepaid/summary": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * All batches together: codes made, used and left, and uses per day of the last thirty
+         * @description For an admin or an API key. Needs billing:read.
+         */
+        get: operations["Prepaid_summary"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/programmes/{id}": {
         parameters: {
             query?: never;
@@ -4252,6 +4438,46 @@ export interface paths {
          * @description Records the subscription at once, without waiting for Stripe's own message about it. For a signed-in viewer.
          */
         post: operations["PublicBilling_confirm"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/viewer/codes/check": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Says what a code would do for this account, without using it: which plan, how many days, and until when the account could watch
+         * @description A code that cannot be used answers with `code`: "not_found", "used", "expired", "withdrawn", "subscription_renews", "subscription_open" or "other_plan". For a signed-in viewer.
+         */
+        post: operations["ViewerCodes_check"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/viewer/codes/redeem": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Uses a code: the plan starts now, or the days are added to the same plan when it is running
+         * @description A code works once. Refusals are as for checking, and a refused code stays good. For a signed-in viewer.
+         */
+        post: operations["ViewerCodes_redeem"];
         delete?: never;
         options?: never;
         head?: never;
@@ -6292,6 +6518,35 @@ export interface components {
             startedAt: string | null;
             finishedAt: string | null;
         };
+        BatchView: {
+            id: string;
+            name: string;
+            plan: {
+                id: string;
+                name: string;
+            };
+            days: number;
+            /** Format: date-time */
+            expiresAt: string | null;
+            /** Format: date-time */
+            voidedAt: string | null;
+            note: string | null;
+            /** Format: date-time */
+            createdAt: string;
+            /**
+             * @description "open": codes can be used. "expired": their time ran out. "withdrawn": an admin took them back.
+             * @enum {string}
+             */
+            state: "withdrawn" | "open" | "expired";
+            /** @description How many codes it holds, and what became of them. */
+            total: number;
+            redeemed: number;
+            withdrawn: number;
+            /** @description Codes that can still be used right now. */
+            left: number;
+            /** Format: date-time */
+            lastRedeemedAt: string | null;
+        };
         BillingOverview: {
             /** @description Devices one account plays on at once where a plan says nothing. 0: no limit. */
             streamLimit: number;
@@ -6305,6 +6560,8 @@ export interface components {
             grantedByHand: number;
             /** @description Of those, the ones who pay online. */
             paidOnline: number;
+            /** @description Of those, the ones who used a prepaid code. */
+            prepaid: number;
             /** @description Paying subscribers whose last payment failed and is being tried again. */
             pastDue: number;
             /** @description How online payment is set up. Null when it is off. */
@@ -6593,6 +6850,60 @@ export interface components {
             minimumVersion: string;
             message: string;
             updateUrl: string | null;
+        };
+        CodeLookup: {
+            code: string;
+            batch: {
+                id: string;
+                name: string;
+                plan: string;
+                days: number;
+                /** Format: date-time */
+                expiresAt: string | null;
+            };
+            id: string;
+            /** @description Hidden but for its last four characters. */
+            masked: string;
+            state: components["schemas"]["CodeState"];
+            /** Format: date-time */
+            redeemedAt: string | null;
+            redeemedBy: {
+                id: string;
+                email: string;
+                displayName: string;
+            } | null;
+        };
+        CodePreview: {
+            plan: {
+                id: string;
+                name: string;
+            };
+            days: number;
+            /**
+             * @description "start": the plan begins now. "extend": the days are added to what is running.
+             * @enum {string}
+             */
+            action: "start" | "extend";
+            /**
+             * Format: date-time
+             * @description Until when the account can watch afterwards.
+             */
+            endsAt: string;
+        };
+        /** @enum {string} */
+        CodeState: "unused" | "redeemed" | "withdrawn" | "expired";
+        CodeView: {
+            id: string;
+            /** @description Hidden but for its last four characters. */
+            masked: string;
+            state: components["schemas"]["CodeState"];
+            /** Format: date-time */
+            redeemedAt: string | null;
+            redeemedBy: {
+                id: string;
+                email: string;
+                displayName: string;
+            } | null;
         };
         CollectionDetail: {
             titles: components["schemas"]["CollectionTitleView"][];
@@ -7709,8 +8020,20 @@ export interface components {
             page: number;
             pageSize: number;
         };
+        PageOfBatchView: {
+            items: components["schemas"]["BatchView"][];
+            total: number;
+            page: number;
+            pageSize: number;
+        };
         PageOfCampaignView: {
             items: components["schemas"]["CampaignView"][];
+            total: number;
+            page: number;
+            pageSize: number;
+        };
+        PageOfCodeView: {
+            items: components["schemas"]["CodeView"][];
             total: number;
             page: number;
             pageSize: number;
@@ -8120,6 +8443,20 @@ export interface components {
         };
         /** @enum {string} */
         PlayDevice: "TV" | "MOBILE" | "TABLET" | "DESKTOP" | "OTHER";
+        PrepaidSummary: {
+            batches: number;
+            codes: number;
+            redeemed: number;
+            /** @description Codes that can still be used right now. */
+            left: number;
+            /** @description Viewers who watch through a prepaid code right now. */
+            subscribers: number;
+            /** @description Codes used on each of the last thirty days, the oldest first. Days are in UTC. */
+            days: {
+                day: string;
+                redeemed: number;
+            }[];
+        };
         Principal: components["schemas"]["AdminPrincipal"] | components["schemas"]["ApiKeyPrincipal"];
         ProbeResult: {
             /** @constant */
@@ -8882,6 +9219,24 @@ export interface components {
             } | null;
             createdAt: string;
         };
+        Redeemed: {
+            subscriptionId: string;
+            plan: {
+                id: string;
+                name: string;
+            };
+            days: number;
+            /**
+             * @description "start": the plan begins now. "extend": the days are added to what is running.
+             * @enum {string}
+             */
+            action: "start" | "extend";
+            /**
+             * Format: date-time
+             * @description Until when the account can watch afterwards.
+             */
+            endsAt: string;
+        };
         RedemptionView: {
             id: string;
             viewer: {
@@ -9357,9 +9712,11 @@ export interface components {
             renewsAt: string | null;
             /** @description Whether it is paid online, so the viewer manages it at the payment provider. */
             online: boolean;
+            /** @description Whether it came from a prepaid code, so another code of the same plan adds days to it. */
+            prepaid: boolean;
         };
         /** @enum {string} */
-        SubscriptionSource: "MANUAL" | "STRIPE";
+        SubscriptionSource: "MANUAL" | "STRIPE" | "PREPAID";
         /** @enum {string} */
         SubscriptionStatus: "ACTIVE" | "TRIALING" | "PAST_DUE" | "CANCELED" | "EXPIRED";
         SubtitleTrackView: {
@@ -10016,6 +10373,8 @@ export interface components {
             renewsAt: string | null;
             /** @description Whether it is paid online, so the viewer manages it at the payment provider. */
             online: boolean;
+            /** @description Whether it came from a prepaid code, so another code of the same plan adds days to it. */
+            prepaid: boolean;
         };
         ViewerView: {
             id: string;
@@ -21532,6 +21891,626 @@ export interface operations {
             };
         };
     };
+    Prepaid_list: {
+        parameters: {
+            query?: {
+                page?: number;
+                pageSize?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The answer. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PageOfBatchView"];
+                };
+            };
+            /** @description The input was refused. "issues" names every field. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Not signed in, or the sign-in ran out. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Signed in, but not allowed to do this. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    Prepaid_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    name: string;
+                    /** Format: uuid */
+                    planId: string;
+                    days: number;
+                    count: number;
+                    expiresAt?: string | null;
+                    note?: string | null;
+                };
+            };
+        };
+        responses: {
+            /** @description The answer. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BatchView"];
+                };
+            };
+            /** @description The input was refused. "issues" names every field. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Not signed in, or the sign-in ran out. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Signed in, but not allowed to do this. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    Prepaid_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The answer. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BatchView"];
+                };
+            };
+            /** @description Not signed in, or the sign-in ran out. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Signed in, but not allowed to do this. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description What the address names does not exist. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    Prepaid_remove: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Done. Nothing comes back. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Not signed in, or the sign-in ran out. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Signed in, but not allowed to do this. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description What the address names does not exist. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    Prepaid_update: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    name?: string;
+                    expiresAt?: string | null;
+                    note?: string | null;
+                };
+            };
+        };
+        responses: {
+            /** @description The answer. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BatchView"];
+                };
+            };
+            /** @description The input was refused. "issues" names every field. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Not signed in, or the sign-in ran out. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Signed in, but not allowed to do this. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description What the address names does not exist. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    Prepaid_codes: {
+        parameters: {
+            query?: {
+                page?: number;
+                pageSize?: number;
+                state?: "unused" | "redeemed" | "withdrawn";
+            };
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The answer. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PageOfCodeView"];
+                };
+            };
+            /** @description The input was refused. "issues" names every field. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Not signed in, or the sign-in ran out. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Signed in, but not allowed to do this. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description What the address names does not exist. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    Prepaid_export: {
+        parameters: {
+            query?: {
+                all?: string;
+            };
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The answer is written by the server as it goes: a file, a stream or a redirect. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Not signed in, or the sign-in ran out. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Signed in, but not allowed to do this. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description What the address names does not exist. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    Prepaid_withdraw: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The answer. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BatchView"];
+                };
+            };
+            /** @description Not signed in, or the sign-in ran out. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Signed in, but not allowed to do this. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description What the address names does not exist. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    Prepaid_reveal: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The answer. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        code: string;
+                    };
+                };
+            };
+            /** @description Not signed in, or the sign-in ran out. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Signed in, but not allowed to do this. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description What the address names does not exist. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    Prepaid_withdrawCode: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Done. Nothing comes back. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Not signed in, or the sign-in ran out. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Signed in, but not allowed to do this. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description What the address names does not exist. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    Prepaid_lookup: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    code: string;
+                };
+            };
+        };
+        responses: {
+            /** @description The answer. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodeLookup"];
+                };
+            };
+            /** @description The input was refused. "issues" names every field. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Not signed in, or the sign-in ran out. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Signed in, but not allowed to do this. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    Prepaid_summary: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The answer. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PrepaidSummary"];
+                };
+            };
+            /** @description Not signed in, or the sign-in ran out. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Signed in, but not allowed to do this. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
     Guide_removeProgramme: {
         parameters: {
             query?: never;
@@ -25100,6 +26079,112 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["OwnSubscription"];
+                };
+            };
+            /** @description The input was refused. "issues" names every field. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Not signed in, or the sign-in ran out. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Too many requests. "Retry-After" says when to try again. */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    ViewerCodes_check: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    code: string;
+                };
+            };
+        };
+        responses: {
+            /** @description The answer. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodePreview"];
+                };
+            };
+            /** @description The input was refused. "issues" names every field. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Not signed in, or the sign-in ran out. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Too many requests. "Retry-After" says when to try again. */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    ViewerCodes_redeem: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    code: string;
+                };
+            };
+        };
+        responses: {
+            /** @description The answer. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Redeemed"];
                 };
             };
             /** @description The input was refused. "issues" names every field. */
