@@ -74,41 +74,42 @@ What changes is scale, not taste. Every size is larger than its counterpart
 on the web, and nothing is set below 14sp, because a television is read from
 three metres away.
 
-## Live channels
+## Searching with a remote control
 
-Nobody learns a new way of changing channels. People who watch live have done
-it with a number pad and two arrows for forty years, so the app does it that
-way: the digits tune, the channel keys and the up and down arrows step through
-the lineup, and after every change a banner says where they have landed, what
-is on and how far through it is.
+Every letter is four or five presses away, so the app does two things
+differently from a website. It waits for the typing to stop before it asks
+the server, rather than asking on each letter, and it starts at two letters,
+because one matches half a catalog and tells a viewer nothing.
 
-The wait on a digit is what makes a number pad work at all. A single `1` holds
-for a moment in case `12` is coming, and tunes by itself as soon as no longer
-number could follow. Without that a lineup cannot have both channel 1 and
-channel 12.
+The keyboard is drawn by the app rather than asked of the system. The
+system's own covers the screen, which hides the very results the viewer is
+typing towards; this one sits down the left with what was found beside it,
+filling in as they go. The letters are alphabetical and six to a row, which
+is what every television keyboard does — somebody looking for G should find
+it where they expect it.
 
-The guide lays over the picture, which keeps playing behind it, and opens on
-the channel being watched. A programme on another channel tunes to it. A
-programme that has already been sent, on a channel that keeps what it sent,
-goes back to where it began — and because the player cannot know how much of
-the channel it holds until it has it, that request waits until it can be met
-rather than being dropped.
+## The list, and the settings
 
-The bar of a channel that keeps what it sent carries a mark where each
-programme began, so that going back lands on a beginning rather than in the
-middle of something. While the viewer is behind, the banner names what is
-actually on the screen rather than what is on now.
+A title goes on the list from its own page, and the screen changes the moment
+the viewer presses rather than when the server answers; if the server refuses,
+it goes back and says so. A list is the viewer's own, and it should feel like
+it.
+
+The settings screen holds the four things that are occasionally needed —
+change who is watching, sign out, forget this service, and the facts worth
+quoting when a viewer writes in. Signing out keeps the address, because the
+television still belongs where it did; forgetting the service is for handing
+it on to somebody else, and both are asked about once in plain words first.
 
 ## What is built, and what is not
 
 Built: the address, signing in by code, profiles with their PINs, the home
 page with its opening and rows, "Continue watching", a title with its seasons
-and episodes, the player — HLS through Media3, resume, progress reported back
-every half minute, and the opening and credits skippable — and live channels
-as described above.
+and episodes, and the player — HLS through Media3, resume, progress reported
+back every half minute, and the opening and credits skippable.
 
-Not built: search, the list a viewer saves, and a settings screen. The phone
-app has not been started.
+Not built: live channels, search, the list a viewer saves, and a settings
+screen. The phone app has not been started.
 
 ## What has been checked
 

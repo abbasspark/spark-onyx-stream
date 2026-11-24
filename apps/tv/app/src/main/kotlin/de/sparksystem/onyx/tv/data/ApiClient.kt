@@ -64,22 +64,7 @@ class ApiClient(
 
     // --- Addresses -----------------------------------------------------------
 
-    /**
-     * Whether an address could be a server at all, before anything is sent to
-     * it. An operator typing it with a remote control gets this wrong often.
-     */
-    fun addressOf(raw: String): HttpUrl? {
-        val trimmed = raw.trim().trimEnd('/')
-        if (trimmed.isEmpty()) {
-            return null
-        }
-        val withScheme = if (trimmed.startsWith("http://") || trimmed.startsWith("https://")) {
-            trimmed
-        } else {
-            "https://$trimmed"
-        }
-        return withScheme.toHttpUrlOrNull()
-    }
+    fun addressOf(raw: String): HttpUrl? = serverAddressOf(raw)
 
     private fun url(path: String, query: Map<String, String?> = emptyMap()): HttpUrl? {
         val base = session.serverUrl()?.let { addressOf(it) } ?: return null
@@ -178,7 +163,9 @@ class ApiClient(
         pageSize: Int = 40,
         sort: String? = null,
         category: String? = null,
-        search: String? = null,
+        genre: String? = null,
+        /** Matches the name and the original name, ignoring case. */
+        q: String? = null,
     ): Answer<Paged<TitleCard>> = call(
         "GET",
         "catalog/titles",
@@ -188,9 +175,12 @@ class ApiClient(
             "pageSize" to pageSize.toString(),
             "sort" to sort,
             "category" to category,
-            "search" to search,
+            "genre" to genre,
+            "q" to q,
         ),
     )
+
+    suspend fun genres(): Answer<List<GenreRef>> = call("GET", "catalog/genres")
 
     suspend fun title(slug: String): Answer<TitleDetail> = call("GET", "catalog/titles/$slug")
 
@@ -245,6 +235,18 @@ class ApiClient(
         body = json.encodeToString(SelectProfileBody.serializer(), SelectProfileBody(pin)),
     )
 
+    // --- The list a viewer saves -------------------------------------------------
+
+    suspend fun savedList(): Answer<ViewerList> = call("GET", "viewer/list")
+
+    /** Only the ids, which is enough to mark the titles of a page. */
+    suspend fun savedIds(): Answer<SavedIds> = call("GET", "viewer/list/ids")
+
+    /** Puts a title on the list. Safe to repeat. */
+    suspend fun save(slug: String): Answer<Unit> = call("PUT", "viewer/list/$slug")
+
+    suspend fun unsave(slug: String): Answer<Unit> = call("DELETE", "viewer/list/$slug")
+
     // --- Watching ---------------------------------------------------------------
 
     /** The "Continue watching" row, as the website shows it. */
@@ -284,6 +286,35 @@ class ApiClient(
             .retryOnConnectionFailure(true)
             .build()
     }
+}
+
+/**
+ * Whether an address could be a server at all, before anything is sent to it.
+ *
+ * Somebody typing this with a remote control leaves out the scheme, adds a
+ * trailing slash, or stops halfway. A plain host is taken as https, because
+ * that is what a service on the open internet is; anyone running one on their
+ * own network without a certificate can still type http:// in full.
+ */
+fun serverAddressOf(raw: String): HttpUrl? {
+    val trimmed = raw.trim().trimEnd('/')
+    if (trimmed.isEmpty()) {
+        return null
+    }
+    val withScheme = if (trimmed.startsWith("http://") || trimmed.startsWith("https://")) {
+        trimmed
+    } else {
+        "https://$trimmed"
+    }
+    val url = withScheme.toHttpUrlOrNull() ?: return null
+    // A host with no dot and no port is a word, not an address: somebody got
+    // halfway through typing. "localhost" is the one exception worth making.
+    val host = url.host
+    val explicitPort = withScheme.substringAfter("://").contains(':')
+    if (!host.contains('.') && host != "localhost" && !explicitPort) {
+        return null
+    }
+    return url
 }
 
 @kotlinx.serialization.Serializable

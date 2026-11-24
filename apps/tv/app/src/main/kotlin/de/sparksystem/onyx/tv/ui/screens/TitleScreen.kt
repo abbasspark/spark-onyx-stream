@@ -55,7 +55,10 @@ import de.sparksystem.onyx.tv.ui.theme.oneLine
 fun TitleScreen(
     state: TitleState,
     whatToPlay: WhatToPlay?,
+    /** Whether this title is already on the viewer's list. */
+    saved: Boolean,
     onPlay: (episodeId: String?, positionSeconds: Double) -> Unit,
+    onToggleSaved: () -> Unit,
     onBack: () -> Unit,
 ) {
     if (state.loading) {
@@ -163,6 +166,10 @@ fun TitleScreen(
                                 },
                             )
                         }
+                        AccentButton(
+                            text = if (saved) "On my list" else "Add to my list",
+                            onClick = onToggleSaved,
+                        )
                         AccentButton(text = "Back", onClick = onBack)
                         if (whatToPlay?.detail != null) {
                             Text(

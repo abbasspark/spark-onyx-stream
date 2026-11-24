@@ -49,6 +49,10 @@ data class StartUpState(
     val step: Step = Step.Starting,
     val siteName: String = "Onyx",
     val accent: Color = Onyx.sard,
+    /** What the settings screen says about this television. */
+    val serverUrl: String? = null,
+    val viewerName: String? = null,
+    val profileName: String? = null,
 )
 
 /**
@@ -73,8 +77,14 @@ class StartUpModel(private val container: Container) : ViewModel() {
 
     private suspend fun begin() {
         val session = container.session.load()
-        if (session.siteName != null) {
-            state.update { it.copy(siteName = session.siteName, accent = parseAccent(session.accent)) }
+        state.update {
+            it.copy(
+                siteName = session.siteName ?: it.siteName,
+                accent = parseAccent(session.accent),
+                serverUrl = session.serverUrl,
+                viewerName = session.viewerName,
+                profileName = session.profileName,
+            )
         }
         if (!session.hasServer) {
             state.update { it.copy(step = Step.NeedsServer()) }
@@ -207,7 +217,13 @@ class StartUpModel(private val container: Container) : ViewModel() {
                             val profile = answer.profile
                             if (!answer.chooseProfile && profile != null) {
                                 container.session.setProfile(profile.id, profile.name)
-                                state.update { it.copy(step = Step.Ready) }
+                                state.update {
+                                    it.copy(
+                                        step = Step.Ready,
+                                        viewerName = answer.viewer?.name ?: it.viewerName,
+                                        profileName = profile.name,
+                                    )
+                                }
                             } else {
                                 loadProfiles()
                             }
@@ -248,6 +264,23 @@ class StartUpModel(private val container: Container) : ViewModel() {
     }
 
     // --- Profiles ------------------------------------------------------------------
+
+    /** Back to the profile picker, from the settings screen. */
+    fun changeProfile() {
+        viewModelScope.launch {
+            container.session.forgetProfile()
+            state.update { it.copy(step = Step.ChoosingProfile()) }
+            loadProfiles()
+        }
+    }
+
+    /** The television is handed on: it forgets the service as well as the viewer. */
+    fun forgetService() {
+        viewModelScope.launch {
+            container.session.forgetEverything()
+            state.update { StartUpState(step = Step.NeedsServer()) }
+        }
+    }
 
     private suspend fun loadProfiles() {
         when (val answer = container.api.profiles()) {
@@ -297,7 +330,7 @@ class StartUpModel(private val container: Container) : ViewModel() {
             when (val answer = container.api.selectProfile(profile.id, pin)) {
                 is Answer.Ok -> {
                     container.session.setProfile(profile.id, profile.name)
-                    state.update { it.copy(step = Step.Ready) }
+                    state.update { it.copy(step = Step.Ready, profileName = profile.name) }
                 }
                 is Answer.Refused -> state.update { current ->
                     val step = current.step as? Step.ChoosingProfile ?: Step.ChoosingProfile()

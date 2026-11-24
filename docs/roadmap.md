@@ -43,8 +43,8 @@ See [phase-4-live.md](phase-4-live.md) for the design.
 
 1. The television app: the project, signing in without a keyboard, profiles, the home page, a title with its episodes, and the player with resume. **Done.**
 2. Live channels on the television: the lineup, the guide, going back in what a channel keeps. **Done.**
-3. Search, the list a viewer saves, and the settings of the app. **Next.**
-4. The Android app for phones and tablets. **Planned.**
+3. Search, the list a viewer saves, and the settings of the app. **Done.**
+4. The Android app for phones and tablets. **Next.**
 
 See [phase-7-apps.md](phase-7-apps.md) for the design.
 

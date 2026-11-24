@@ -105,6 +105,14 @@ class SessionStore(private val context: Context) {
         runBlocking { signOut() }
     }
 
+    /** Forgets which profile is watching, so the app asks again. */
+    suspend fun forgetProfile() {
+        context.store.edit {
+            it.remove(Keys.profileId)
+            it.remove(Keys.profileName)
+        }
+    }
+
     suspend fun signOut() {
         context.store.edit {
             it.remove(Keys.token)
