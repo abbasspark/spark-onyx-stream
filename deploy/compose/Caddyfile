@@ -5,6 +5,10 @@
 # on to HTTPS.
 
 {$ONYX_DOMAIN} {
+	# Tells browsers to come back over https for the next two years, this
+	# domain and its subdomains. Only set here, where https is certain.
+	header Strict-Transport-Security "max-age=63072000; includeSubDomains"
+
 	# Playback tokens are part of the path, so requests are not logged.
 	reverse_proxy gateway:8080 {
 		# Live updates of the panel and video segments are passed on as they come.

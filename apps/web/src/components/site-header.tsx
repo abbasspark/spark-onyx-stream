@@ -102,8 +102,16 @@ export function SiteHeader({
   /** On the page itself, or in the list it leads to. */
   const isCurrent = (link: (typeof LINKS)[number]) =>
     pathname === link.href || (currentType === link.type && !currentCategory);
+  /*
+   * The page you are on is marked with a band under it, in the amber of the
+   * site, so the header says where you are without a second colour of text.
+   */
   const linkClass = (active: boolean) =>
-    `heading text-base transition-colors hover:text-vein ${active ? 'text-vein' : 'text-smoke'}`;
+    `heading relative text-base transition-colors hover:text-vein ${
+      active
+        ? 'text-vein after:absolute after:-bottom-1.5 after:inset-x-0 after:h-[2px] after:bg-sard after:content-[""]'
+        : 'text-smoke'
+    }`;
 
   return (
     <header

@@ -284,6 +284,7 @@ The part between the asset id and the file path is the token: the expiry as Unix
 - Only assets with status `READY` can be played.
 - Media responses allow any web origin, because players are embedded on other sites and the signed URL is the authorization. All other endpoints stay limited to `CORS_ORIGINS`.
 - Byte ranges are supported, with `206` and `416` answers.
+- **A token says what may be played, not who plays it.** It is tied to the asset and to the time, not to a viewer, a session or an address, so a copied address plays until it runs out. That is the price of relative paths in playlists, which is what lets an unchanged playlist be served by the API, by the gateway and by an edge alike. Shorten `PLAYBACK_URL_TTL_SECONDS` where that matters; the device limit still counts the plays of an account.
 
 ### Media origin
 

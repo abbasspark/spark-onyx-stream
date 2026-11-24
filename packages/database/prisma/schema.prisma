@@ -203,6 +203,7 @@ model ViewerSession {
   @@index([viewerId])
   @@index([expiresAt])
   @@index([deviceId])
+  @@index([profileId])
   @@map("viewer_sessions")
 }
 
@@ -273,6 +274,7 @@ model DeviceCode {
   createdAt    DateTime  @default(now())
 
   @@index([expiresAt])
+  @@index([viewerId])
   @@map("device_codes")
 }
 
@@ -345,6 +347,7 @@ model Webhook {
 
   deliveries WebhookDelivery[]
 
+  @@index([createdById])
   @@map("webhooks")
 }
 
@@ -471,6 +474,8 @@ model WatchLocation {
 
   files WatchedFile[]
 
+  @@index([encodingProfileId])
+  @@index([storagePoolId])
   @@map("watch_locations")
 }
 
@@ -529,6 +534,9 @@ model WatchedFile {
   @@unique([locationId, path])
   @@index([state])
   @@index([locationId, state])
+  @@index([assetId])
+  @@index([episodeId])
+  @@index([titleId])
   @@map("watched_files")
 }
 
@@ -630,6 +638,8 @@ model Asset {
   @@index([status])
   @@index([storagePoolId])
   @@index([createdAt])
+  @@index([createdById])
+  @@index([encodingProfileId])
   @@map("assets")
 }
 
@@ -969,6 +979,7 @@ model Image {
   collectionPosterOf   Collection[] @relation("CollectionPoster")
   collectionBackdropOf Collection[] @relation("CollectionBackdrop")
 
+  @@index([storagePoolId])
   @@map("images")
 }
 
@@ -1087,6 +1098,11 @@ model Title {
   @@index([status, publishedAt])
   @@index([createdAt])
   @@index([keywords], type: Gin)
+  @@index([assetId])
+  @@index([backdropId])
+  @@index([logoId])
+  @@index([posterId])
+  @@index([trailerAssetId])
   @@map("titles")
 }
 
@@ -1207,6 +1223,7 @@ model TranslationJob {
   finishedAt  DateTime?
 
   @@index([status, createdAt])
+  @@index([createdById])
   @@map("translation_jobs")
 }
 
@@ -1231,6 +1248,7 @@ model TitleRevision {
   createdAt   DateTime   @default(now())
 
   @@index([titleId, createdAt])
+  @@index([adminId])
   @@map("title_revisions")
 }
 
@@ -1358,6 +1376,7 @@ model TitleExtra {
 
   @@unique([titleId, assetId])
   @@index([titleId, position])
+  @@index([assetId])
   @@map("title_extras")
 }
 
@@ -1391,6 +1410,8 @@ model Collection {
 
   @@unique([metadataSource, metadataId])
   @@index([position])
+  @@index([backdropId])
+  @@index([posterId])
   @@map("collections")
 }
 
@@ -1456,6 +1477,7 @@ model Person {
 
   @@unique([metadataSource, metadataId])
   @@index([name])
+  @@index([portraitId])
   @@map("people")
 }
 
@@ -1504,6 +1526,7 @@ model Season {
   translations SeasonTranslation[]
 
   @@unique([titleId, number])
+  @@index([posterId])
   @@map("seasons")
 }
 
@@ -1541,6 +1564,7 @@ model Episode {
 
   @@unique([seasonId, number])
   @@index([assetId])
+  @@index([stillId])
   @@map("episodes")
 }
 
@@ -1612,6 +1636,7 @@ model ViewerStream {
   @@index([viewerId, lastSeenAt])
   @@index([sessionId])
   @@index([lastSeenAt])
+  @@index([profileId])
   @@map("viewer_streams")
 }
 
@@ -1808,6 +1833,7 @@ model Subscription {
   @@index([viewerId, status])
   @@index([planId])
   @@index([status, endsAt])
+  @@index([grantedById])
   @@map("subscriptions")
 }
 
@@ -1889,6 +1915,10 @@ model Payment {
   @@index([paidAt])
   @@index([viewerId, paidAt])
   @@index([externalPaymentId])
+  @@index([planId])
+  @@index([recordedById])
+  @@index([subscriptionId])
+  @@index([titleId])
   @@map("payments")
 }
 
@@ -1994,6 +2024,7 @@ model Purchase {
 
   @@index([viewerId, titleId])
   @@index([titleId])
+  @@index([grantedById])
   @@map("purchases")
 }
 
@@ -2060,6 +2091,7 @@ model Coupon {
 
   redemptions CouponRedemption[]
 
+  @@index([createdById])
   @@map("coupons")
 }
 
@@ -2315,6 +2347,7 @@ model Recording {
 
   @@index([status, startsAt])
   @@index([channelId])
+  @@index([createdById])
   @@map("recordings")
 }
 
@@ -2463,6 +2496,8 @@ model Backup {
 
   @@index([createdAt])
   @@index([status])
+  @@index([createdById])
+  @@index([storagePoolId])
   @@map("backups")
 }
 
@@ -2568,6 +2603,9 @@ model HomeSection {
   updatedAt DateTime           @updatedAt
 
   @@index([page, position])
+  @@index([categoryId])
+  @@index([collectionId])
+  @@index([genreId])
   @@map("home_sections")
 }
 
@@ -2639,6 +2677,8 @@ model Play {
   @@index([startedAt])
   @@index([titleId, startedAt])
   @@index([lastBeatAt])
+  @@index([episodeId])
+  @@index([viewerId])
   @@map("plays")
 }
 
@@ -2706,6 +2746,7 @@ model PlaybackSession {
   @@index([titleId, startedAt])
   @@index([channelId, startedAt])
   @@index([errorCode, startedAt])
+  @@index([episodeId])
   @@map("playback_sessions")
 }
 
@@ -2866,6 +2907,8 @@ model PushCampaign {
 
   @@index([status, scheduledAt])
   @@index([createdAt])
+  @@index([planId])
+  @@index([titleId])
   @@map("push_campaigns")
 }
 
@@ -2893,6 +2936,7 @@ model PrepaidBatch {
   codes PrepaidCode[]
 
   @@index([createdAt])
+  @@index([planId])
   @@map("prepaid_batches")
 }
 
@@ -2919,5 +2963,6 @@ model PrepaidCode {
 
   @@index([batchId, redeemedAt])
   @@index([redeemedById])
+  @@index([subscriptionId])
   @@map("prepaid_codes")
 }

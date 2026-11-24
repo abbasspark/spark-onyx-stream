@@ -4,6 +4,7 @@
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import Link from 'next/link';
 import { type ReactNode, useCallback, useEffect, useId, useRef, useState } from 'react';
+import { HeadingBands } from './brand';
 
 interface StripRowProps {
   heading: string;
@@ -58,12 +59,20 @@ export function StripRow({ heading, href, children }: StripRowProps) {
   return (
     <section aria-labelledby={headingId} className="group/row">
       <div className="gutter mb-3 flex items-baseline justify-between gap-4">
-        <h2 id={headingId} className="heading text-lg sm:text-xl">
+        <h2 id={headingId} className="heading flex items-center gap-3 text-lg sm:text-xl">
+          <HeadingBands />
           {heading}
         </h2>
         {href ? (
-          <Link href={href} className="shrink-0 text-sm text-smoke hover:text-vein">
+          <Link
+            href={href}
+            className="group/all flex shrink-0 items-center gap-1.5 text-sm text-smoke hover:text-vein"
+          >
             See all
+            <ChevronRight
+              className="size-4 transition-transform duration-150 group-hover/all:translate-x-0.5"
+              aria-hidden="true"
+            />
           </Link>
         ) : null}
       </div>
