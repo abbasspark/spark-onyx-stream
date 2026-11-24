@@ -89,6 +89,10 @@
       "description": "What players report about how playback went, and the figures made of it."
     },
     {
+      "name": "Notifications",
+      "description": "Devices that take notifications, the list of a viewer, and the messages an admin sends."
+    },
+    {
       "name": "Similar titles",
       "description": "Which titles are like a title, why, and rows of them for a profile."
     },
@@ -16752,6 +16756,1287 @@
         }
       }
     },
+    "/v1/notifications/automatic": {
+      "patch": {
+        "operationId": "PushAdmin_setAutomatic",
+        "tags": [
+          "Notifications"
+        ],
+        "summary": "Turns on or off what viewers are told by themselves",
+        "description": "For an admin or an API key. Needs viewers:write.",
+        "security": [
+          {
+            "adminSession": []
+          },
+          {
+            "apiKey": []
+          }
+        ],
+        "x-onyx-access": {
+          "kind": "admin",
+          "permissions": [
+            "viewers:write"
+          ],
+          "sessionOnly": false
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "newEpisodes": {
+                    "type": "boolean"
+                  },
+                  "newTitles": {
+                    "type": "boolean"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The answer.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AutomaticSettings"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The input was refused. \"issues\" names every field.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or the sign-in ran out.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Signed in, but not allowed to do this.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/notifications/campaigns": {
+      "get": {
+        "operationId": "PushAdmin_list",
+        "tags": [
+          "Notifications"
+        ],
+        "description": "For an admin or an API key. Needs viewers:read.",
+        "security": [
+          {
+            "adminSession": []
+          },
+          {
+            "apiKey": []
+          }
+        ],
+        "x-onyx-access": {
+          "kind": "admin",
+          "permissions": [
+            "viewers:read"
+          ],
+          "sessionOnly": false
+        },
+        "parameters": [
+          {
+            "name": "page",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "default": 1,
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 9007199254740991
+            }
+          },
+          {
+            "name": "pageSize",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "default": 25,
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "DRAFT",
+                "SCHEDULED",
+                "SENDING",
+                "SENT",
+                "CANCELLED"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The answer.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PageOfCampaignView"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The input was refused. \"issues\" names every field.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or the sign-in ran out.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Signed in, but not allowed to do this.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "operationId": "PushAdmin_create",
+        "tags": [
+          "Notifications"
+        ],
+        "summary": "Writes a message as a draft",
+        "description": "Nothing is sent. For an admin or an API key. Needs viewers:write.",
+        "security": [
+          {
+            "adminSession": []
+          },
+          {
+            "apiKey": []
+          }
+        ],
+        "x-onyx-access": {
+          "kind": "admin",
+          "permissions": [
+            "viewers:write"
+          ],
+          "sessionOnly": false
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "title": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 80
+                  },
+                  "body": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 240
+                  },
+                  "titleId": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "format": "uuid",
+                        "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "link": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "maxLength": 300,
+                        "pattern": "^\\/(?!\\/)[^\\s]*$"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "audience": {
+                    "default": "EVERYONE",
+                    "type": "string",
+                    "enum": [
+                      "EVERYONE",
+                      "SUBSCRIBERS",
+                      "NOT_SUBSCRIBED",
+                      "PLAN"
+                    ]
+                  },
+                  "planId": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "format": "uuid",
+                        "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "scheduledAt": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "format": "date-time",
+                        "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  }
+                },
+                "required": [
+                  "title",
+                  "body"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "The answer.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CampaignView"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The input was refused. \"issues\" names every field.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or the sign-in ran out.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Signed in, but not allowed to do this.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/notifications/campaigns/{id}": {
+      "delete": {
+        "operationId": "PushAdmin_remove",
+        "tags": [
+          "Notifications"
+        ],
+        "description": "For an admin or an API key. Needs viewers:write.",
+        "security": [
+          {
+            "adminSession": []
+          },
+          {
+            "apiKey": []
+          }
+        ],
+        "x-onyx-access": {
+          "kind": "admin",
+          "permissions": [
+            "viewers:write"
+          ],
+          "sessionOnly": false
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Done. Nothing comes back."
+          },
+          "401": {
+            "description": "Not signed in, or the sign-in ran out.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Signed in, but not allowed to do this.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "What the address names does not exist.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "operationId": "PushAdmin_get",
+        "tags": [
+          "Notifications"
+        ],
+        "description": "For an admin or an API key. Needs viewers:read.",
+        "security": [
+          {
+            "adminSession": []
+          },
+          {
+            "apiKey": []
+          }
+        ],
+        "x-onyx-access": {
+          "kind": "admin",
+          "permissions": [
+            "viewers:read"
+          ],
+          "sessionOnly": false
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The answer.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CampaignView"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or the sign-in ran out.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Signed in, but not allowed to do this.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "What the address names does not exist.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "operationId": "PushAdmin_update",
+        "tags": [
+          "Notifications"
+        ],
+        "description": "For an admin or an API key. Needs viewers:write.",
+        "security": [
+          {
+            "adminSession": []
+          },
+          {
+            "apiKey": []
+          }
+        ],
+        "x-onyx-access": {
+          "kind": "admin",
+          "permissions": [
+            "viewers:write"
+          ],
+          "sessionOnly": false
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "title": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 80
+                  },
+                  "body": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 240
+                  },
+                  "titleId": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "format": "uuid",
+                        "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "link": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "maxLength": 300,
+                        "pattern": "^\\/(?!\\/)[^\\s]*$"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "audience": {
+                    "type": "string",
+                    "enum": [
+                      "EVERYONE",
+                      "SUBSCRIBERS",
+                      "NOT_SUBSCRIBED",
+                      "PLAN"
+                    ]
+                  },
+                  "planId": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "format": "uuid",
+                        "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "scheduledAt": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "format": "date-time",
+                        "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The answer.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CampaignView"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The input was refused. \"issues\" names every field.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or the sign-in ran out.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Signed in, but not allowed to do this.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "What the address names does not exist.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/notifications/campaigns/{id}/cancel": {
+      "post": {
+        "operationId": "PushAdmin_cancel",
+        "tags": [
+          "Notifications"
+        ],
+        "summary": "Holds back a message that waits for its time",
+        "description": "For an admin or an API key. Needs viewers:write.",
+        "security": [
+          {
+            "adminSession": []
+          },
+          {
+            "apiKey": []
+          }
+        ],
+        "x-onyx-access": {
+          "kind": "admin",
+          "permissions": [
+            "viewers:write"
+          ],
+          "sessionOnly": false
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The answer.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CampaignView"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or the sign-in ran out.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Signed in, but not allowed to do this.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "What the address names does not exist.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/notifications/campaigns/{id}/send": {
+      "post": {
+        "operationId": "PushAdmin_send",
+        "tags": [
+          "Notifications"
+        ],
+        "summary": "Sends a message: at once, or at its time when that is still to come",
+        "description": "For an admin or an API key. Needs viewers:write.",
+        "security": [
+          {
+            "adminSession": []
+          },
+          {
+            "apiKey": []
+          }
+        ],
+        "x-onyx-access": {
+          "kind": "admin",
+          "permissions": [
+            "viewers:write"
+          ],
+          "sessionOnly": false
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The answer.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CampaignView"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or the sign-in ran out.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Signed in, but not allowed to do this.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "What the address names does not exist.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/notifications/campaigns/{id}/test": {
+      "post": {
+        "operationId": "PushAdmin_test",
+        "tags": [
+          "Notifications"
+        ],
+        "summary": "Sends a message to one viewer only, to see how it arrives",
+        "description": "For an admin or an API key. Needs viewers:write.",
+        "security": [
+          {
+            "adminSession": []
+          },
+          {
+            "apiKey": []
+          }
+        ],
+        "x-onyx-access": {
+          "kind": "admin",
+          "permissions": [
+            "viewers:write"
+          ],
+          "sessionOnly": false
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "email": {
+                    "type": "string",
+                    "maxLength": 320,
+                    "format": "email",
+                    "pattern": "^(?:[A-Za-z0-9_'+\\-]+\\.)*[A-Za-z0-9_'+\\-]*[A-Za-z0-9_+-]@(?:[A-Za-z0-9][A-Za-z0-9\\-]*\\.)+[A-Za-z]{2,}$"
+                  }
+                },
+                "required": [
+                  "email"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The answer.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "devices": {
+                      "type": "number"
+                    }
+                  },
+                  "required": [
+                    "devices"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The input was refused. \"issues\" names every field.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or the sign-in ran out.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Signed in, but not allowed to do this.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "What the address names does not exist.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/notifications/campaigns/reach": {
+      "get": {
+        "operationId": "PushAdmin_reach",
+        "tags": [
+          "Notifications"
+        ],
+        "summary": "How many viewers an audience is right now, and how many of them have a device that takes notifications",
+        "description": "For an admin or an API key. Needs viewers:read.",
+        "security": [
+          {
+            "adminSession": []
+          },
+          {
+            "apiKey": []
+          }
+        ],
+        "x-onyx-access": {
+          "kind": "admin",
+          "permissions": [
+            "viewers:read"
+          ],
+          "sessionOnly": false
+        },
+        "parameters": [
+          {
+            "name": "audience",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "EVERYONE",
+                "SUBSCRIBERS",
+                "NOT_SUBSCRIBED",
+                "PLAN"
+              ]
+            }
+          },
+          {
+            "name": "planId",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The answer.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "viewers": {
+                      "type": "number"
+                    },
+                    "withDevice": {
+                      "type": "number"
+                    }
+                  },
+                  "required": [
+                    "viewers",
+                    "withDevice"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The input was refused. \"issues\" names every field.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or the sign-in ran out.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Signed in, but not allowed to do this.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/notifications/firebase": {
+      "delete": {
+        "operationId": "PushAdmin_removeFirebase",
+        "tags": [
+          "Notifications"
+        ],
+        "summary": "Forgets the Firebase key, and with it every app that registered",
+        "description": "For an admin or an API key. Needs settings:write.",
+        "security": [
+          {
+            "adminSession": []
+          },
+          {
+            "apiKey": []
+          }
+        ],
+        "x-onyx-access": {
+          "kind": "admin",
+          "permissions": [
+            "settings:write"
+          ],
+          "sessionOnly": false
+        },
+        "responses": {
+          "200": {
+            "description": "The answer.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PushSetup"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or the sign-in ran out.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Signed in, but not allowed to do this.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "operationId": "PushAdmin_setFirebase",
+        "tags": [
+          "Notifications"
+        ],
+        "summary": "Stores the key of a Firebase service account, after trying it",
+        "description": "With it, apps on Android and iOS can be reached. The key itself is never answered back. For an admin or an API key. Needs settings:write.",
+        "security": [
+          {
+            "adminSession": []
+          },
+          {
+            "apiKey": []
+          }
+        ],
+        "x-onyx-access": {
+          "kind": "admin",
+          "permissions": [
+            "settings:write"
+          ],
+          "sessionOnly": false
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "serviceAccount": {
+                    "type": "string",
+                    "minLength": 2,
+                    "maxLength": 20000
+                  }
+                },
+                "required": [
+                  "serviceAccount"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The answer.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PushSetup"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The input was refused. \"issues\" names every field.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or the sign-in ran out.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Signed in, but not allowed to do this.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/notifications/setup": {
+      "get": {
+        "operationId": "PushAdmin_overview",
+        "tags": [
+          "Notifications"
+        ],
+        "description": "For an admin or an API key. Needs viewers:read.",
+        "security": [
+          {
+            "adminSession": []
+          },
+          {
+            "apiKey": []
+          }
+        ],
+        "x-onyx-access": {
+          "kind": "admin",
+          "permissions": [
+            "viewers:read"
+          ],
+          "sessionOnly": false
+        },
+        "responses": {
+          "200": {
+            "description": "The answer.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PushOverview"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or the sign-in ran out.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Signed in, but not allowed to do this.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/notifications/web-key/renew": {
+      "post": {
+        "operationId": "PushAdmin_renewWebKey",
+        "tags": [
+          "Notifications"
+        ],
+        "summary": "Makes a new key pair for browsers",
+        "description": "Every browser that allowed notifications is forgotten and subscribes again at its next visit. For an admin or an API key. Needs settings:write.",
+        "security": [
+          {
+            "adminSession": []
+          },
+          {
+            "apiKey": []
+          }
+        ],
+        "x-onyx-access": {
+          "kind": "admin",
+          "permissions": [
+            "settings:write"
+          ],
+          "sessionOnly": false
+        },
+        "responses": {
+          "200": {
+            "description": "The answer.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PushSetup"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or the sign-in ran out.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Signed in, but not allowed to do this.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/v1/openapi.json": {
       "get": {
         "operationId": "OpenApi_get",
@@ -19459,6 +20744,44 @@
           },
           "404": {
             "description": "What the address names does not exist.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/push/config": {
+      "get": {
+        "operationId": "PushConfig_config",
+        "tags": [
+          "Notifications"
+        ],
+        "summary": "How this installation sends notifications: the key a browser subscribes with, the Firebase project an app registers with, and the kinds of notification a viewer can turn on and off",
+        "description": "Open to everyone.",
+        "security": [],
+        "x-onyx-access": {
+          "kind": "public",
+          "permissions": [],
+          "sessionOnly": false
+        },
+        "responses": {
+          "200": {
+            "description": "The answer.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PushClientConfig"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests. \"Retry-After\" says when to try again.",
             "content": {
               "application/json": {
                 "schema": {
@@ -27642,6 +28965,560 @@
         }
       }
     },
+    "/v1/viewer/notifications": {
+      "get": {
+        "operationId": "ViewerNotifications_list",
+        "tags": [
+          "Notifications"
+        ],
+        "summary": "What was sent to the account, the newest first, thirty at a time",
+        "description": "For a signed-in viewer.",
+        "security": [
+          {
+            "viewerSession": []
+          },
+          {
+            "viewerCookie": []
+          }
+        ],
+        "x-onyx-access": {
+          "kind": "viewer",
+          "permissions": [],
+          "sessionOnly": false
+        },
+        "parameters": [
+          {
+            "name": "before",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The answer.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotificationList"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The input was refused. \"issues\" names every field.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or the sign-in ran out.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/viewer/notifications/{id}": {
+      "delete": {
+        "operationId": "ViewerNotifications_remove",
+        "tags": [
+          "Notifications"
+        ],
+        "summary": "Takes a notification out of the list",
+        "description": "Safe to repeat. For a signed-in viewer.",
+        "security": [
+          {
+            "viewerSession": []
+          },
+          {
+            "viewerCookie": []
+          }
+        ],
+        "x-onyx-access": {
+          "kind": "viewer",
+          "permissions": [],
+          "sessionOnly": false
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Done. Nothing comes back."
+          },
+          "401": {
+            "description": "Not signed in, or the sign-in ran out.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "What the address names does not exist.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests. \"Retry-After\" says when to try again.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/viewer/notifications/{id}/opened": {
+      "post": {
+        "operationId": "ViewerNotifications_opened",
+        "tags": [
+          "Notifications"
+        ],
+        "summary": "Says that the viewer opened a notification, from the list or by tapping it on a device",
+        "description": "For a signed-in viewer.",
+        "security": [
+          {
+            "viewerSession": []
+          },
+          {
+            "viewerCookie": []
+          }
+        ],
+        "x-onyx-access": {
+          "kind": "viewer",
+          "permissions": [],
+          "sessionOnly": false
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Done. Nothing comes back."
+          },
+          "401": {
+            "description": "Not signed in, or the sign-in ran out.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "What the address names does not exist.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests. \"Retry-After\" says when to try again.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/viewer/notifications/read": {
+      "post": {
+        "operationId": "ViewerNotifications_read",
+        "tags": [
+          "Notifications"
+        ],
+        "summary": "Marks notifications as seen: the ones named, or all of them",
+        "description": "For a signed-in viewer.",
+        "security": [
+          {
+            "viewerSession": []
+          },
+          {
+            "viewerCookie": []
+          }
+        ],
+        "x-onyx-access": {
+          "kind": "viewer",
+          "permissions": [],
+          "sessionOnly": false
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "ids": {
+                    "minItems": 1,
+                    "maxItems": 200,
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "format": "uuid",
+                      "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The answer.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "read": {
+                      "type": "number"
+                    }
+                  },
+                  "required": [
+                    "read"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The input was refused. \"issues\" names every field.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or the sign-in ran out.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests. \"Retry-After\" says when to try again.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/viewer/notifications/settings": {
+      "get": {
+        "operationId": "ViewerNotifications_settings",
+        "tags": [
+          "Notifications"
+        ],
+        "summary": "Which kinds of notification the account wants, and whether this device is registered",
+        "description": "For a signed-in viewer.",
+        "security": [
+          {
+            "viewerSession": []
+          },
+          {
+            "viewerCookie": []
+          }
+        ],
+        "x-onyx-access": {
+          "kind": "viewer",
+          "permissions": [],
+          "sessionOnly": false
+        },
+        "responses": {
+          "200": {
+            "description": "The answer.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "topics": {
+                      "type": "object",
+                      "properties": {
+                        "NEW_EPISODES": {
+                          "type": "boolean"
+                        },
+                        "NEW_TITLES": {
+                          "type": "boolean"
+                        },
+                        "ANNOUNCEMENTS": {
+                          "type": "boolean"
+                        }
+                      },
+                      "required": [
+                        "NEW_EPISODES",
+                        "NEW_TITLES",
+                        "ANNOUNCEMENTS"
+                      ]
+                    },
+                    "devices": {
+                      "type": "number"
+                    },
+                    "thisDevice": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "topics",
+                    "devices",
+                    "thisDevice"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or the sign-in ran out.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "operationId": "ViewerNotifications_setSettings",
+        "tags": [
+          "Notifications"
+        ],
+        "summary": "Turns kinds of notification on or off, for the whole account",
+        "description": "For a signed-in viewer.",
+        "security": [
+          {
+            "viewerSession": []
+          },
+          {
+            "viewerCookie": []
+          }
+        ],
+        "x-onyx-access": {
+          "kind": "viewer",
+          "permissions": [],
+          "sessionOnly": false
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "topics": {
+                    "type": "object",
+                    "properties": {
+                      "NEW_EPISODES": {
+                        "type": "boolean"
+                      },
+                      "NEW_TITLES": {
+                        "type": "boolean"
+                      },
+                      "ANNOUNCEMENTS": {
+                        "type": "boolean"
+                      }
+                    }
+                  }
+                },
+                "required": [
+                  "topics"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The answer.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "topics": {
+                      "type": "object",
+                      "properties": {
+                        "NEW_EPISODES": {
+                          "type": "boolean"
+                        },
+                        "NEW_TITLES": {
+                          "type": "boolean"
+                        },
+                        "ANNOUNCEMENTS": {
+                          "type": "boolean"
+                        }
+                      },
+                      "required": [
+                        "NEW_EPISODES",
+                        "NEW_TITLES",
+                        "ANNOUNCEMENTS"
+                      ]
+                    },
+                    "devices": {
+                      "type": "number"
+                    },
+                    "thisDevice": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "topics",
+                    "devices",
+                    "thisDevice"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The input was refused. \"issues\" names every field.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or the sign-in ran out.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests. \"Retry-After\" says when to try again.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/viewer/notifications/unread": {
+      "get": {
+        "operationId": "ViewerNotifications_unread",
+        "tags": [
+          "Notifications"
+        ],
+        "summary": "Only the number of notifications not seen yet, for a mark on a bell",
+        "description": "For a signed-in viewer.",
+        "security": [
+          {
+            "viewerSession": []
+          },
+          {
+            "viewerCookie": []
+          }
+        ],
+        "x-onyx-access": {
+          "kind": "viewer",
+          "permissions": [],
+          "sessionOnly": false
+        },
+        "responses": {
+          "200": {
+            "description": "The answer.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "unread": {
+                      "type": "number"
+                    }
+                  },
+                  "required": [
+                    "unread"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or the sign-in ran out.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/v1/viewer/password": {
       "post": {
         "operationId": "ViewerAuth_changePassword",
@@ -28770,6 +30647,340 @@
                 }
               }
             }
+          },
+          "400": {
+            "description": "The input was refused. \"issues\" names every field.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or the sign-in ran out.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests. \"Retry-After\" says when to try again.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/viewer/push/devices": {
+      "put": {
+        "operationId": "ViewerNotifications_register",
+        "tags": [
+          "Notifications"
+        ],
+        "summary": "Registers this device for notifications: a browser with its subscription, an app with its Firebase token",
+        "description": "Sent again whenever the token changes and at every start of the app. The device takes notifications for as long as this sign-in holds. For a signed-in viewer.",
+        "security": [
+          {
+            "viewerSession": []
+          },
+          {
+            "viewerCookie": []
+          }
+        ],
+        "x-onyx-access": {
+          "kind": "viewer",
+          "permissions": [],
+          "sessionOnly": false
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "oneOf": [
+                  {
+                    "type": "object",
+                    "properties": {
+                      "provider": {
+                        "type": "string",
+                        "const": "WEB"
+                      },
+                      "subscription": {
+                        "type": "object",
+                        "properties": {
+                          "endpoint": {
+                            "type": "string",
+                            "maxLength": 2000,
+                            "format": "uri"
+                          },
+                          "keys": {
+                            "type": "object",
+                            "properties": {
+                              "p256dh": {
+                                "type": "string",
+                                "minLength": 80,
+                                "maxLength": 100
+                              },
+                              "auth": {
+                                "type": "string",
+                                "minLength": 16,
+                                "maxLength": 40
+                              }
+                            },
+                            "required": [
+                              "p256dh",
+                              "auth"
+                            ]
+                          }
+                        },
+                        "required": [
+                          "endpoint",
+                          "keys"
+                        ]
+                      },
+                      "platform": {
+                        "type": "string",
+                        "pattern": "^[a-z][a-z0-9-]{0,30}$"
+                      },
+                      "appVersion": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 40
+                      },
+                      "language": {
+                        "type": "string",
+                        "minLength": 2,
+                        "maxLength": 20
+                      }
+                    },
+                    "required": [
+                      "provider",
+                      "subscription",
+                      "platform"
+                    ]
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "provider": {
+                        "type": "string",
+                        "const": "FCM"
+                      },
+                      "token": {
+                        "type": "string",
+                        "minLength": 20,
+                        "maxLength": 4096
+                      },
+                      "platform": {
+                        "type": "string",
+                        "pattern": "^[a-z][a-z0-9-]{0,30}$"
+                      },
+                      "appVersion": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 40
+                      },
+                      "language": {
+                        "type": "string",
+                        "minLength": 2,
+                        "maxLength": 20
+                      }
+                    },
+                    "required": [
+                      "provider",
+                      "token",
+                      "platform"
+                    ]
+                  }
+                ],
+                "properties": {}
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The answer.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "id"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The input was refused. \"issues\" names every field.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or the sign-in ran out.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests. \"Retry-After\" says when to try again.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/viewer/push/devices/{id}": {
+      "delete": {
+        "operationId": "ViewerNotifications_unregister",
+        "tags": [
+          "Notifications"
+        ],
+        "summary": "Stops notifications for a device, by the id registering gave",
+        "description": "Safe to repeat. For a signed-in viewer.",
+        "security": [
+          {
+            "viewerSession": []
+          },
+          {
+            "viewerCookie": []
+          }
+        ],
+        "x-onyx-access": {
+          "kind": "viewer",
+          "permissions": [],
+          "sessionOnly": false
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Done. Nothing comes back."
+          },
+          "401": {
+            "description": "Not signed in, or the sign-in ran out.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "What the address names does not exist.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests. \"Retry-After\" says when to try again.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/viewer/push/devices/forget": {
+      "post": {
+        "operationId": "ViewerNotifications_forget",
+        "tags": [
+          "Notifications"
+        ],
+        "summary": "The same by token, for a device that does not know its id",
+        "description": "For a signed-in viewer.",
+        "security": [
+          {
+            "viewerSession": []
+          },
+          {
+            "viewerCookie": []
+          }
+        ],
+        "x-onyx-access": {
+          "kind": "viewer",
+          "permissions": [],
+          "sessionOnly": false
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "provider": {
+                    "type": "string",
+                    "enum": [
+                      "WEB",
+                      "FCM"
+                    ]
+                  },
+                  "token": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 4096
+                  }
+                },
+                "required": [
+                  "provider",
+                  "token"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": "Done. Nothing comes back."
           },
           "400": {
             "description": "The input was refused. \"issues\" names every field.",
@@ -35429,6 +37640,23 @@
           "createdAt"
         ]
       },
+      "AutomaticSettings": {
+        "type": "object",
+        "properties": {
+          "newEpisodes": {
+            "type": "boolean",
+            "description": "A series somebody follows has a new episode."
+          },
+          "newTitles": {
+            "type": "boolean",
+            "description": "The catalog has new titles."
+          }
+        },
+        "required": [
+          "newEpisodes",
+          "newTitles"
+        ]
+      },
       "BackupOverview": {
         "type": "object",
         "properties": {
@@ -36035,6 +38263,148 @@
           "failed",
           "failures",
           "job"
+        ]
+      },
+      "CampaignAudience": {
+        "type": "string",
+        "enum": [
+          "EVERYONE",
+          "SUBSCRIBERS",
+          "NOT_SUBSCRIBED",
+          "PLAN"
+        ]
+      },
+      "CampaignView": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "body": {
+            "type": "string"
+          },
+          "linked": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "slug": {
+                "type": "string"
+              },
+              "name": {
+                "type": "string"
+              },
+              "type": {
+                "type": "string"
+              },
+              "status": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "slug",
+              "name",
+              "type",
+              "status"
+            ]
+          },
+          "link": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "audience": {
+            "$ref": "#/components/schemas/CampaignAudience"
+          },
+          "plan": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "name": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "name"
+            ]
+          },
+          "status": {
+            "type": "string"
+          },
+          "scheduledAt": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "sentAt": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "recipients": {
+            "type": "number",
+            "description": "Viewers it was made for."
+          },
+          "pushed": {
+            "type": "number",
+            "description": "Of those: on how many accounts a device took it, how many saw it in their list, and how many opened it."
+          },
+          "read": {
+            "type": "number"
+          },
+          "opened": {
+            "type": "number"
+          },
+          "waiting": {
+            "type": "number",
+            "description": "Notifications that still wait to be sent to devices."
+          }
+        },
+        "required": [
+          "id",
+          "title",
+          "body",
+          "linked",
+          "link",
+          "audience",
+          "plan",
+          "status",
+          "scheduledAt",
+          "sentAt",
+          "createdAt",
+          "updatedAt",
+          "recipients",
+          "pushed",
+          "read",
+          "opened",
+          "waiting"
         ]
       },
       "CategoryView": {
@@ -40468,6 +42838,97 @@
           "count"
         ]
       },
+      "NotificationList": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NotificationView"
+            }
+          },
+          "unread": {
+            "type": "number",
+            "description": "How many the viewer has not seen."
+          },
+          "next": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Pass as `before` for older ones. Null: there are none."
+          }
+        },
+        "required": [
+          "items",
+          "unread",
+          "next"
+        ]
+      },
+      "NotificationTopic": {
+        "type": "string",
+        "enum": [
+          "NEW_EPISODES",
+          "NEW_TITLES",
+          "ANNOUNCEMENTS"
+        ]
+      },
+      "NotificationView": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "topic": {
+            "$ref": "#/components/schemas/NotificationTopic"
+          },
+          "title": {
+            "type": "string"
+          },
+          "body": {
+            "type": "string"
+          },
+          "image": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "An address of a picture, or null."
+          },
+          "link": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Where it leads on the website, as a path such as \"/title/the-long-road\"."
+          },
+          "data": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            },
+            "description": "What it is about, for apps: {\"type\":\"title\",\"slug\":\"…\"}."
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "read": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "id",
+          "topic",
+          "title",
+          "body",
+          "image",
+          "link",
+          "data",
+          "createdAt",
+          "read"
+        ]
+      },
       "OverviewPoint": {
         "type": "array",
         "prefixItems": [
@@ -41028,6 +43489,32 @@
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/AssetView"
+            }
+          },
+          "total": {
+            "type": "number"
+          },
+          "page": {
+            "type": "number"
+          },
+          "pageSize": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "items",
+          "total",
+          "page",
+          "pageSize"
+        ]
+      },
+      "PageOfCampaignView": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CampaignView"
             }
           },
           "total": {
@@ -44683,6 +47170,227 @@
           "REVOKED"
         ]
       },
+      "PushClientConfig": {
+        "type": "object",
+        "properties": {
+          "web": {
+            "type": "object",
+            "properties": {
+              "publicKey": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "publicKey"
+            ],
+            "description": "For browsers: the key to subscribe with."
+          },
+          "fcm": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "properties": {
+              "projectId": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "projectId"
+            ],
+            "description": "For apps: the Firebase project messages come from. Null: apps cannot be reached."
+          },
+          "topics": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "web",
+          "fcm",
+          "topics"
+        ]
+      },
+      "PushOverview": {
+        "type": "object",
+        "properties": {
+          "devices": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "platform": {
+                  "type": "string"
+                },
+                "provider": {
+                  "type": "string",
+                  "enum": [
+                    "WEB",
+                    "FCM"
+                  ]
+                },
+                "count": {
+                  "type": "number"
+                }
+              },
+              "required": [
+                "platform",
+                "provider",
+                "count"
+              ]
+            },
+            "description": "Devices that take notifications, by what they are."
+          },
+          "reachable": {
+            "type": "number",
+            "description": "Accounts with at least one such device, and all accounts that are not disabled."
+          },
+          "viewers": {
+            "type": "number"
+          },
+          "recent": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "topic": {
+                  "type": "string"
+                },
+                "title": {
+                  "type": "string"
+                },
+                "body": {
+                  "type": "string"
+                },
+                "at": {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                "viewers": {
+                  "type": "number"
+                }
+              },
+              "required": [
+                "topic",
+                "title",
+                "body",
+                "at",
+                "viewers"
+              ]
+            },
+            "description": "What was told by itself lately."
+          },
+          "web": {
+            "type": "object",
+            "properties": {
+              "publicKey": {
+                "type": "string"
+              },
+              "createdAt": {
+                "type": "string"
+              },
+              "contact": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "publicKey",
+              "createdAt",
+              "contact"
+            ]
+          },
+          "fcm": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "properties": {
+              "projectId": {
+                "type": "string"
+              },
+              "clientEmail": {
+                "type": "string"
+              },
+              "savedAt": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "projectId",
+              "clientEmail",
+              "savedAt"
+            ]
+          },
+          "automatic": {
+            "$ref": "#/components/schemas/AutomaticSettings"
+          }
+        },
+        "required": [
+          "devices",
+          "reachable",
+          "viewers",
+          "recent",
+          "web",
+          "fcm",
+          "automatic"
+        ]
+      },
+      "PushSetup": {
+        "type": "object",
+        "properties": {
+          "web": {
+            "type": "object",
+            "properties": {
+              "publicKey": {
+                "type": "string"
+              },
+              "createdAt": {
+                "type": "string"
+              },
+              "contact": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "publicKey",
+              "createdAt",
+              "contact"
+            ]
+          },
+          "fcm": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "properties": {
+              "projectId": {
+                "type": "string"
+              },
+              "clientEmail": {
+                "type": "string"
+              },
+              "savedAt": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "projectId",
+              "clientEmail",
+              "savedAt"
+            ]
+          },
+          "automatic": {
+            "$ref": "#/components/schemas/AutomaticSettings"
+          }
+        },
+        "required": [
+          "web",
+          "fcm",
+          "automatic"
+        ]
+      },
       "QualityDay": {
         "type": "object",
         "properties": {
@@ -46066,13 +48774,13 @@
       "S3PublicConfig": {
         "type": "object",
         "properties": {
+          "endpoint": {
+            "type": "string"
+          },
           "bucket": {
             "type": "string"
           },
           "region": {
-            "type": "string"
-          },
-          "endpoint": {
             "type": "string"
           },
           "forcePathStyle": {

@@ -2604,3 +2604,53 @@ export interface QualityRange {
   device?: PlayDevice;
   server?: string;
 }
+
+// --- Notifications ----------------------------------------------------------------------
+
+export type CampaignStatus = 'DRAFT' | 'SCHEDULED' | 'SENDING' | 'SENT' | 'CANCELLED';
+export type CampaignAudience = 'EVERYONE' | 'SUBSCRIBERS' | 'NOT_SUBSCRIBED' | 'PLAN';
+
+/** A message an admin writes for many viewers. */
+export interface Campaign {
+  id: string;
+  title: string;
+  body: string;
+  /** The title of the catalog it leads to. */
+  linked: { id: string; slug: string; name: string; type: TitleType; status: PublishStatus } | null;
+  /** Or a path on the website. */
+  link: string | null;
+  audience: CampaignAudience;
+  plan: { id: string; name: string } | null;
+  status: CampaignStatus;
+  scheduledAt: string | null;
+  sentAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+  /** Viewers it was made for, and what became of it. */
+  recipients: number;
+  pushed: number;
+  read: number;
+  opened: number;
+  waiting: number;
+}
+
+export interface CampaignInput {
+  title: string;
+  body: string;
+  titleId: string | null;
+  link: string | null;
+  audience: CampaignAudience;
+  planId: string | null;
+  scheduledAt: string | null;
+}
+
+/** How notifications are set up, and who can be reached. */
+export interface PushOverview {
+  web: { publicKey: string; createdAt: string; contact: string };
+  fcm: { projectId: string; clientEmail: string; savedAt: string } | null;
+  automatic: { newEpisodes: boolean; newTitles: boolean };
+  devices: { platform: string; provider: 'WEB' | 'FCM'; count: number }[];
+  reachable: number;
+  viewers: number;
+  recent: { topic: string; title: string; body: string; at: string; viewers: number }[];
+}

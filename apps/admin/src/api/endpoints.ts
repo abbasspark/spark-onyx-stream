@@ -171,6 +171,9 @@ import type {
 } from './types';
 import type { Marker, MarkerDetection } from '@/lib/markers';
 import type {
+  Campaign,
+  CampaignInput,
+  PushOverview,
   QualityFailure,
   QualityRange,
   QualitySummary,
@@ -669,6 +672,41 @@ export const qualityApi = {
       query: { ...range },
       signal,
     }),
+};
+
+/** Notifications: the setup, what is told by itself, and the messages an admin writes. */
+export const notificationsApi = {
+  overview: (signal?: AbortSignal) => request<PushOverview>('/v1/notifications/setup', { signal }),
+  setAutomatic: (automatic: Partial<PushOverview['automatic']>) =>
+    request<PushOverview['automatic']>('/v1/notifications/automatic', {
+      method: 'PATCH',
+      body: automatic,
+    }),
+  setFirebase: (serviceAccount: string) =>
+    request<unknown>('/v1/notifications/firebase', { method: 'PUT', body: { serviceAccount } }),
+  removeFirebase: () => request<unknown>('/v1/notifications/firebase', { method: 'DELETE' }),
+  renewWebKey: () => request<unknown>('/v1/notifications/web-key/renew', { method: 'POST' }),
+  campaigns: (query: { page: number; pageSize: number; status?: string }, signal?: AbortSignal) =>
+    request<Page<Campaign>>('/v1/notifications/campaigns', { query: { ...query }, signal }),
+  reach: (audience: string, planId: string | null, signal?: AbortSignal) =>
+    request<{ viewers: number; withDevice: number }>('/v1/notifications/campaigns/reach', {
+      query: { audience, planId: planId ?? undefined },
+      signal,
+    }),
+  create: (input: CampaignInput) =>
+    request<Campaign>('/v1/notifications/campaigns', { method: 'POST', body: input }),
+  update: (id: string, input: Partial<CampaignInput>) =>
+    request<Campaign>(`/v1/notifications/campaigns/${id}`, { method: 'PATCH', body: input }),
+  send: (id: string) =>
+    request<Campaign>(`/v1/notifications/campaigns/${id}/send`, { method: 'POST' }),
+  cancel: (id: string) =>
+    request<Campaign>(`/v1/notifications/campaigns/${id}/cancel`, { method: 'POST' }),
+  test: (id: string, email: string) =>
+    request<{ devices: number }>(`/v1/notifications/campaigns/${id}/test`, {
+      method: 'POST',
+      body: { email },
+    }),
+  remove: (id: string) => request<void>(`/v1/notifications/campaigns/${id}`, { method: 'DELETE' }),
 };
 
 export const metadataApi = {

@@ -81,6 +81,27 @@ export const envSchema = z
     PLAYBACK_REPORTS_DAYS: z.coerce.number().int().min(0).max(3650).default(90),
 
     /**
+     * How a push service can reach whoever runs the installation, sent with
+     * every notification to a browser: "mailto:…" or an https address. Empty:
+     * SITE_URL when it is https. Some push services refuse a sender without one.
+     */
+    PUSH_CONTACT: z
+      .string()
+      .trim()
+      .max(200)
+      .refine((value) => value === '' || /^(mailto:.+@.+|https:\/\/.+)$/.test(value), {
+        message: 'PUSH_CONTACT must be "mailto:name@host" or an https address',
+      })
+      .default(''),
+    /**
+     * More hosts notifications may be sent to, beyond the push services of
+     * the browsers and Firebase, separated by commas. A host with a port
+     * also allows plain http there. For tests and for push services not
+     * known here.
+     */
+    PUSH_SERVICE_HOSTS: z.string().trim().max(1000).default(''),
+
+    /**
      * On how many devices one viewer account plays at the same time. 0: no
      * limit. A plan, and an admin for a single viewer, can say otherwise.
      */

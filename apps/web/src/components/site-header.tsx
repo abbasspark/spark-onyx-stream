@@ -7,6 +7,7 @@ import { usePathname, useSearchParams } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
 import type { Category } from '@/lib/types';
 import { AccountMenu } from './account-menu';
+import { NotificationBell } from './notification-bell';
 import { SiteBrand } from './brand';
 
 interface SiteHeaderProps {
@@ -201,7 +202,8 @@ export function SiteHeader({
             />
           </label>
         </form>
-        <div className="hidden md:block">
+        <div className="hidden items-center gap-2 md:flex">
+          <NotificationBell />
           <AccountMenu />
         </div>
 
@@ -213,6 +215,7 @@ export function SiteHeader({
           >
             <Search className="size-5" />
           </Link>
+          <NotificationBell />
           <div className="mx-1">
             <AccountMenu />
           </div>

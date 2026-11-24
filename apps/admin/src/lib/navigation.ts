@@ -2,6 +2,7 @@
 import {
   Activity,
   BarChart3,
+  BellRing,
   Clapperboard,
   MonitorPlay,
   PanelsTopLeft,
@@ -220,6 +221,13 @@ export const NAVIGATION: NavGroup[] = [
         icon: UsersRound,
         permission: 'viewers:read',
         keywords: 'accounts users customers members subscribers sign-up devices',
+      },
+      {
+        to: '/notifications',
+        label: 'Notifications',
+        icon: BellRing,
+        permission: 'viewers:read',
+        keywords: 'push messages campaigns announcements firebase fcm web push bell inbox',
       },
     ],
   },
