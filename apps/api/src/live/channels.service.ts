@@ -73,6 +73,8 @@ export interface ChannelView {
   guideId: string | null;
   /** Whether viewers find the channel on the website and in the apps. */
   published: boolean;
+  /** The age from which the channel suits. Null: hidden from profiles with an age limit. */
+  minAge: number | null;
   /** FREE is as open as the installation. PAID needs a plan that opens the channel. */
   access: TitleAccess;
   /** The packages the channel is in, in their order. */
@@ -174,6 +176,7 @@ export class ChannelsService {
           description: input.description,
           guideId: input.guideId,
           published: input.published,
+          minAge: input.minAge,
           access: input.access,
           packages: { create: input.packageIds.map((packageId) => ({ packageId })) },
           ingest: input.ingest,
@@ -224,6 +227,7 @@ export class ChannelsService {
           description: input.description,
           guideId: input.guideId,
           published: input.published,
+          minAge: input.minAge,
           access: input.access,
           ...(input.packageIds
             ? {
@@ -485,6 +489,7 @@ function toView(channel: ChannelRecord, health: ChannelHealth | null): ChannelVi
     dvrMinutes: channel.dvrMinutes,
     guideId: channel.guideId,
     published: channel.published,
+    minAge: channel.minAge,
     access: channel.access,
     packages: channel.packages
       .map((link) => link.package)

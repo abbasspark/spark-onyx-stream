@@ -97,6 +97,9 @@ describe.skipIf(!TEST_DATABASE_URL)('Viewer profiles (e2e)', () => {
       name: 'Anna Berg',
       color: 'amber',
       isMain: true,
+      isKids: false,
+      maxAge: null,
+      locked: false,
     });
 
     const profiles = await list(cookie);
@@ -143,6 +146,9 @@ describe.skipIf(!TEST_DATABASE_URL)('Viewer profiles (e2e)', () => {
       name: 'Kids room',
       color: 'coral',
       isMain: false,
+      isKids: false,
+      maxAge: null,
+      locked: false,
     });
     const picked = await add(cookie, { name: 'Sam', color: 'teal' }).expect(201);
     expect(picked.body.color).toBe('teal');
@@ -183,6 +189,9 @@ describe.skipIf(!TEST_DATABASE_URL)('Viewer profiles (e2e)', () => {
       name: 'Anna',
       color: 'violet',
       isMain: true,
+      isKids: false,
+      maxAge: null,
+      locked: false,
     });
     await patch('00000000-0000-7000-8000-000000000000', { name: 'Nobody' }).expect(404);
   });

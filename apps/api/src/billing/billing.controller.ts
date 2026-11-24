@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-only
+import { assertUnrestricted } from '../audience/audience.js';
 import {
   Body,
   Controller,
@@ -111,6 +112,8 @@ export class PublicBillingController {
     @CurrentViewer() identity: ViewerIdentity,
     @Body(new ZodValidationPipe(startCheckoutSchema)) body: StartCheckoutInput,
   ): Promise<{ url: string }> {
+    // A child's profile does not spend the account's money.
+    assertUnrestricted();
     return this.checkout.start(
       identity.viewer,
       body,
@@ -142,6 +145,7 @@ export class PublicBillingController {
   @HttpCode(HttpStatus.OK)
   @Header('Cache-Control', 'no-store')
   portal(@CurrentViewer() identity: ViewerIdentity): Promise<{ url: string }> {
+    assertUnrestricted();
     return this.checkout.portal(identity.viewer);
   }
 

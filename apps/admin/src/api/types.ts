@@ -601,6 +601,8 @@ export interface TitleDetail extends TitleSummary {
   tagline: string | null;
   synopsis: string | null;
   ageRating: string | null;
+  /** The age the title suits from. Null: nobody said, and profiles with an age limit do not see it. */
+  minAge: number | null;
   originalLanguage: string | null;
   backdrop: CatalogImage | null;
   logo: CatalogImage | null;
@@ -725,6 +727,8 @@ export interface UpdateTitleInput {
   synopsis?: string | null;
   releaseYear?: number | null;
   ageRating?: string | null;
+  /** Left out with a rating, the API reads the age from the rating. */
+  minAge?: number | null;
   originalLanguage?: string | null;
   releaseDate?: string | null;
   runtimeMinutes?: number | null;
@@ -878,6 +882,12 @@ export interface ViewerProfile {
   /** Name of a colour, such as "amber". */
   color: string;
   isMain: boolean;
+  /** A profile for a child. */
+  isKids: boolean;
+  /** The oldest age rating the profile sees. Null is everything. */
+  maxAge: number | null;
+  /** Whether choosing the profile asks for its PIN. */
+  locked: boolean;
 }
 
 export interface ViewerDetail extends Viewer {
@@ -1284,6 +1294,8 @@ export interface Channel {
   outputs: ChannelOutput[] | null;
   /** Minutes viewers can go back in time. 0 means only the present. */
   dvrMinutes: number;
+  /** The age the channel suits from. Null: nobody said, and profiles with an age limit do not see it. */
+  minAge: number | null;
   /** The id of the channel in guide sources. Null when it is not linked. */
   guideId: string | null;
   /** Whether viewers find the channel on the website and in the apps. */
@@ -1325,6 +1337,7 @@ export interface ChannelInput {
   qualities?: number[];
   guideId?: string | null;
   dvrMinutes?: number;
+  minAge?: number | null;
   published?: boolean;
   access?: 'FREE' | 'PAID';
   packageIds?: string[];
@@ -1883,6 +1896,8 @@ export interface WatchSummary {
 export type BulkAction =
   | { type: 'publish' | 'unpublish' | 'archive' | 'delete' }
   | { type: 'feature'; value: boolean }
+  /** Null takes the age off. */
+  | { type: 'age'; minAge: number | null }
   | { type: 'categories' | 'genres' | 'collections'; add?: string[]; remove?: string[] }
   /** A date left out stays as it is, null clears it. */
   | { type: 'availability'; availableFrom?: string | null; availableUntil?: string | null }

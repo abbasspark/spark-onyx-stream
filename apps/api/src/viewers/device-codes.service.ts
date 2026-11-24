@@ -57,6 +57,8 @@ export type DeviceCodePoll =
       viewer: ViewerView;
       profile: ProfileView;
       device: { id: string; name: string };
+      /** Whether a profile has to be chosen first: the main one has a PIN. */
+      chooseProfile: boolean;
     };
 
 /** The device that asks, as the viewer sees it before they answer. */
@@ -196,6 +198,7 @@ export class DeviceCodesService {
       viewer: toViewerView(viewer),
       profile: toProfileView(await this.profiles.main(viewer)),
       device: { id: device.id, name: device.name },
+      chooseProfile: session.profileLocked,
     };
   }
 

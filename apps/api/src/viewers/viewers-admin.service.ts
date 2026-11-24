@@ -126,6 +126,17 @@ export class ViewersAdminService {
   }
 
   /**
+   * Takes the PIN off a profile of a viewer who forgot it and their password.
+   *
+   * @returns The name of the profile, for the audit log.
+   * @throws NotFoundException
+   */
+  async clearProfilePin(id: string, profileId: string): Promise<string> {
+    await this.find(id);
+    return (await this.profiles.clearPin(id, profileId)).name;
+  }
+
+  /**
    * Signs a device of a viewer out and forgets it.
    *
    * @returns The name of the device, for the audit log.

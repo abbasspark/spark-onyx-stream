@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-only
+import { MAX_TITLE_AGE } from '../catalog/age-rating.js';
 import { z } from 'zod';
 import { titleFiltersSchema } from '../catalog/catalog.schemas.js';
 import { normalizeLanguage } from '../catalog/language.js';
@@ -39,6 +40,14 @@ export const bulkActionSchema = z.discriminatedUnion('type', [
     type: z.literal('availability'),
     availableFrom: moment.optional(),
     availableUntil: moment.optional(),
+  }),
+  /**
+   * Says from which age the titles suit. Null takes the age off: profiles with
+   * an age limit then no longer see them. The rating as written stays.
+   */
+  z.object({
+    type: z.literal('age'),
+    minAge: z.number().int().min(0).max(MAX_TITLE_AGE).nullable(),
   }),
   /** Starts a job that fills in the texts of the titles in a language, from the source. */
   z.object({ type: z.literal('translate'), language, overwrite: z.boolean().default(false) }),

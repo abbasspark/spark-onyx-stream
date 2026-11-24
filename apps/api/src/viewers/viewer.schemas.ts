@@ -2,6 +2,7 @@
 import { z } from 'zod';
 import { displayNameSchema, emailSchema, MAX_PASSWORD_LENGTH } from '../auth/auth.schemas.js';
 import { paginationSchema } from '../common/pagination.js';
+import { MAX_PROFILE_AGE } from '../catalog/age-rating.js';
 import { deviceInfoSchema } from './device.schemas.js';
 
 /** Shorter than for admins: a viewer protects their own account, not the installation. */
@@ -57,18 +58,49 @@ const profileNameSchema = z
   .transform((value) => value.replace(/\s+/g, ' ').trim())
   .pipe(z.string().min(1, 'Enter a name').max(40, 'Use at most 40 characters'));
 
+/** The highest age a title may be for and still show. Null: no limit. */
+const maxAgeSchema = z.number().int().min(0).max(MAX_PROFILE_AGE).nullable();
+/** Four to six digits. */
+const pinSchema = z.string().regex(/^\d{4,6}$/, 'A PIN is four to six digits');
+
 export const createProfileSchema = z.object({
   name: profileNameSchema,
   /** Left out, the profile gets a colour no other profile of the account has. */
   color: profileColorSchema.optional(),
+  /** A profile for a child. Without a limit of its own it gets the one for children. */
+  isKids: z.boolean().optional(),
+  maxAge: maxAgeSchema.optional(),
 });
 export type CreateProfileInput = z.infer<typeof createProfileSchema>;
 
 export const updateProfileSchema = z
-  .object({ name: profileNameSchema, color: profileColorSchema })
+  .object({
+    name: profileNameSchema,
+    color: profileColorSchema,
+    isKids: z.boolean(),
+    maxAge: maxAgeSchema,
+  })
   .partial()
   .refine((value) => Object.keys(value).length > 0, { message: 'Nothing to change' });
 export type UpdateProfileInput = z.infer<typeof updateProfileSchema>;
+
+export const selectProfileSchema = z.preprocess(
+  // Apps from before PINs send nothing at all.
+  (body) => body ?? {},
+  z.object({
+    /** Needed for a profile that has one. */
+    pin: z.string().max(12).optional(),
+  }),
+);
+export type SelectProfileInput = z.infer<typeof selectProfileSchema>;
+
+export const setProfilePinSchema = z.object({
+  /** The new PIN. Null takes the PIN off. */
+  pin: pinSchema.nullable(),
+  /** The password of the account: a PIN is set and lifted by whoever owns the account. */
+  password: z.string().min(1).max(MAX_PASSWORD_LENGTH),
+});
+export type SetProfilePinInput = z.infer<typeof setProfilePinSchema>;
 
 export const forgotViewerPasswordSchema = z.object({ email: emailSchema });
 export type ForgotViewerPasswordInput = z.infer<typeof forgotViewerPasswordSchema>;

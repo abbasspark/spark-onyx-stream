@@ -22,6 +22,7 @@ import { toast } from 'sonner';
 import { channelsApi, packagesApi } from '@/api/endpoints';
 import type { Channel, ChannelIngest, ChannelInput, ChannelMode, SourceProbe } from '@/api/types';
 import { useSession } from '@/auth/session';
+import { AgeField } from '@/components/age-field';
 import { useConfirm } from '@/components/confirm';
 import { CopyField } from '@/components/copy-field';
 import { LivePlayer } from '@/components/live-player';
@@ -76,6 +77,7 @@ import {
   toggleQuality,
   totalsOf,
 } from '@/lib/channels';
+import { describeAge } from '@/lib/age-rating';
 import { cn } from '@/lib/cn';
 import { formatBitrate, formatBytes, formatDateTime, formatResolution } from '@/lib/format';
 import { FALLBACK_POLL_MS, useLiveState } from '@/live/live';
@@ -795,6 +797,12 @@ function ChannelSheet({ id, fallback, actions, onClose }: ChannelSheetProps) {
                     : 'Off',
                 ],
                 ['Viewers', describeAudience(channel)],
+                [
+                  'Suitable from',
+                  channel.minAge === null
+                    ? 'Not rated. Profiles with an age limit do not see it.'
+                    : describeAge(channel.minAge),
+                ],
                 ['Live process', channel.health?.node ?? '–'],
                 [
                   'Address name',
@@ -866,6 +874,7 @@ function ChannelDialog({ item, open, onOpenChange, onSaved }: ChannelDialogProps
   const [ingest, setIngest] = useState<ChannelIngest>('PULL');
   const [mode, setMode] = useState<ChannelMode>('COPY');
   const [dvr, setDvr] = useState('0');
+  const [minAge, setMinAge] = useState<number | null>(null);
   const [qualities, setQualities] = useState<number[]>([...DEFAULT_QUALITIES]);
 
   // The stored address may carry a password, so it is asked for only when the form opens.
@@ -892,6 +901,7 @@ function ChannelDialog({ item, open, onOpenChange, onSaved }: ChannelDialogProps
       setIngest(item?.ingest ?? 'PULL');
       setMode(item?.mode ?? 'COPY');
       setDvr(String(item?.dvrMinutes ?? 0));
+      setMinAge(item?.minAge ?? null);
       setQualities(item && item.qualities.length > 0 ? item.qualities : [...DEFAULT_QUALITIES]);
     }
   }, [open, item]);
@@ -931,6 +941,7 @@ function ChannelDialog({ item, open, onOpenChange, onSaved }: ChannelDialogProps
         mode,
         ...(mode === 'TRANSCODE' ? { qualities } : {}),
         dvrMinutes: Number(dvr),
+        minAge,
         published,
         access: paid ? 'PAID' : 'FREE',
         packageIds: paid ? packageIds : [],
@@ -1209,6 +1220,7 @@ function ChannelDialog({ item, open, onOpenChange, onSaved }: ChannelDialogProps
                 />
               )}
             </Field>
+            <AgeField what="channel" value={minAge} onChange={setMinAge} />
             <fieldset className="grid gap-2">
               <legend className="mb-2 text-sm font-medium">Viewers</legend>
               <ToggleRow

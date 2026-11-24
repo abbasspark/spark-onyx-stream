@@ -6,7 +6,7 @@ The catalog turns videos into things a viewer can find: movies and series with n
 
 | Thing      | What it is                                                                                                                     |
 | ---------- | ------------------------------------------------------------------------------------------------------------------------------ |
-| Title      | A movie or a series. Holds the name, texts, facts, age rating, language and publishing state                                   |
+| Title      | A movie or a series. Holds the name, texts, facts, age rating, the age it suits from, language and publishing state            |
 | Season     | A numbered part of a series, with an optional name, the day it was first shown and a poster                                    |
 | Episode    | A numbered part of a season, with its own video, picture, air date, length and publishing state                                |
 | Genre      | What kind of story a title is: drama, thriller. Shared by all titles, one name once                                            |
@@ -142,7 +142,7 @@ Every title keeps a history: after each change, what the title looks like and wh
 On the lists of movies and series, titles can be selected and changed together.
 
 - **Which titles:** the ones ticked, on this page and on others (up to 500), or **everything the filters match**, which also means what is on pages nobody opened. One action changes 5,000 titles at most.
-- **What can be done:** publish, unpublish, archive, delete, feature or stop featuring; add to or take out of categories, genres and collections; set, change or remove the start and the end of the availability; and translate into a language.
+- **What can be done:** publish, unpublish, archive, delete, feature or stop featuring; say from which age the titles suit; add to or take out of categories, genres and collections; set, change or remove the start and the end of the availability; and translate into a language.
 - **The rules of one title hold for many.** Each title goes through the same checks as a change made in its editor: a title with open points on its checklist is not published, a published title is not deleted. A title that cannot be changed is named with its reason, the others go on, and in the panel the ones that failed stay selected.
 - **Adding and taking out touches only what was ticked.** A title that is put into a genre keeps its other genres. In a collection it goes to the end and keeps its place in the others.
 - **Each date can be left alone.** The start of many titles can be set without touching their ends. A title whose own other date does not fit is left as it is and named.
@@ -171,7 +171,7 @@ On the lists of movies and series, titles can be selected and changed together.
 }
 ```
 
-The filter takes what `GET /titles` takes, without the page and the order. Actions are `publish`, `unpublish`, `archive`, `delete`, `feature` (`value`), `categories`, `genres` and `collections` (`add`, `remove`), `availability` (`availableFrom`, `availableUntil`; left out: unchanged, `null`: removed) and `translate` (`language`, `overwrite`).
+The filter takes what `GET /titles` takes, without the page and the order. `rated=no` is the titles without an age, which profiles with an age limit do not see (see [parental controls](phase-2-viewers.md#parental-controls)). Actions are `publish`, `unpublish`, `archive`, `delete`, `feature` (`value`), `age` (`minAge`, `null` takes it off), `categories`, `genres` and `collections` (`add`, `remove`), `availability` (`availableFrom`, `availableUntil`; left out: unchanged, `null`: removed) and `translate` (`language`, `overwrite`).
 
 ## The home page, and the pages for movies and series
 

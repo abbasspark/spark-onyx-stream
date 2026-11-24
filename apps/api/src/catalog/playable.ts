@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 import type { Prisma } from '@onyx/database';
+import { suitsAudience } from '../audience/audience.js';
 
 /**
  * Whether a video can be streamed: it is processed and has a stream.
@@ -49,6 +50,10 @@ export function isAvailable(
  * Titles viewers can see: published, inside their dates, and with something to
  * watch. A published title whose video was deleted in the library, or is being
  * processed again, is left out until it plays again.
+ *
+ * For a profile with an age limit, titles for older viewers and titles
+ * nobody rated are left out as well. That is read from the request, so every
+ * list, row, search and page that asks here respects it without saying so.
  */
 export function visibleTitle(now: Date = new Date()) {
   return {
@@ -57,6 +62,7 @@ export function visibleTitle(now: Date = new Date()) {
       { type: 'MOVIE', asset: PLAYABLE_ASSET },
       { type: 'SERIES', seasons: { some: { episodes: { some: VISIBLE_EPISODE } } } },
     ],
-    AND: availableAt(now),
+    // Also what suits whoever is being answered: see the audience of a request.
+    AND: [...availableAt(now), suitsAudience()],
   } satisfies Prisma.TitleWhereInput;
 }

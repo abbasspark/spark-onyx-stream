@@ -27,6 +27,7 @@ const FIELDS: Record<keyof SnapshotFields, FieldInfo> = {
   releaseDate: { group: 'facts', label: 'Release date', kind: 'value', format: 'date' },
   runtimeMinutes: { group: 'facts', label: 'Runtime in minutes', kind: 'value' },
   ageRating: { group: 'facts', label: 'Age rating', kind: 'value' },
+  minAge: { group: 'facts', label: 'Suitable from age', kind: 'value' },
   originalLanguage: { group: 'facts', label: 'Original language', kind: 'value' },
   imdbId: { group: 'facts', label: 'IMDb id', kind: 'value' },
   seriesStatus: { group: 'facts', label: 'Running or ended', kind: 'value', format: 'status' },
@@ -297,6 +298,10 @@ export function diffSnapshots(before: TitleSnapshot, after: TitleSnapshot): Chan
   };
 
   for (const key of Object.keys(FIELDS) as (keyof SnapshotFields)[]) {
+    // A field the older version was made without did not change: it was not there to change.
+    if (before.fields[key] === undefined) {
+      continue;
+    }
     push(valueChange(FIELDS[key], key, before.fields[key], after.fields[key]));
   }
   push(listChange('facts', 'countries', 'Countries', before.countries, after.countries));

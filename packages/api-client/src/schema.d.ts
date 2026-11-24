@@ -4271,6 +4271,26 @@ export interface paths {
         patch: operations["ViewerProfiles_update"];
         trace?: never;
     };
+    "/v1/viewer/profiles/{id}/pin": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Puts a PIN on a profile, changes it, or takes it off with "pin": null
+         * @description Asks for the password of the account, which is also the way out when a PIN is forgotten. For a signed-in viewer.
+         */
+        put: operations["ViewerProfiles_setPin"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/viewer/profiles/{id}/select": {
         parameters: {
             query?: never;
@@ -4282,7 +4302,7 @@ export interface paths {
         put?: never;
         /**
          * Chooses who is watching on this device
-         * @description Other devices keep their own choice. For a signed-in viewer.
+         * @description Other devices keep their own choice. A profile with a PIN needs it: without, the answer is 403 with code "pin_required", with a wrong one "pin_wrong", and after five wrong ones 429 with "pin_locked" for five minutes. For a signed-in viewer.
          */
         post: operations["ViewerProfiles_select"];
         delete?: never;
@@ -4689,6 +4709,26 @@ export interface paths {
          */
         post: operations["PaymentsAdmin_record"];
         delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/viewers/{id}/profiles/{profileId}/pin": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Takes the PIN off a profile, for a viewer who forgot it
+         * @description For an admin or an API key. Needs viewers:write.
+         */
+        delete: operations["ViewersAdmin_clearProfilePin"];
         options?: never;
         head?: never;
         patch?: never;
@@ -5549,7 +5589,7 @@ export interface components {
         };
         BulkResult: {
             /** @enum {string} */
-            action: "delete" | "categories" | "availability" | "collections" | "genres" | "publish" | "unpublish" | "archive" | "feature" | "translate";
+            action: "delete" | "categories" | "availability" | "collections" | "genres" | "publish" | "unpublish" | "archive" | "feature" | "age" | "translate";
             /** @description How many titles the selection meant. */
             matched: number;
             changed: number;
@@ -5628,6 +5668,8 @@ export interface components {
             guideId: string | null;
             /** @description Whether viewers find the channel on the website and in the apps. */
             published: boolean;
+            /** @description The age from which the channel suits. Null: hidden from profiles with an age limit. */
+            minAge: number | null;
             /** @description FREE is as open as the installation. PAID needs a plan that opens the channel. */
             access: components["schemas"]["TitleAccess"];
             /** @description The packages the channel is in, in their order. */
@@ -5685,6 +5727,8 @@ export interface components {
             guideId: string | null;
             /** @description Whether viewers find the channel on the website and in the apps. */
             published: boolean;
+            /** @description The age from which the channel suits. Null: hidden from profiles with an age limit. */
+            minAge: number | null;
             /** @description FREE is as open as the installation. PAID needs a plan that opens the channel. */
             access: components["schemas"]["TitleAccess"];
             /** @description The packages the channel is in, in their order. */
@@ -6003,6 +6047,8 @@ export interface components {
                 id: string;
                 name: string;
             };
+            /** @description Whether a profile has to be chosen first: the main one has a PIN. */
+            chooseProfile: boolean;
         };
         DeviceCodeRequest: {
             userCode: string;
@@ -6172,6 +6218,7 @@ export interface components {
             renditions: {
                 id: string;
                 name: string;
+                profileId: string;
                 /**
                  * @description Target height in pixels. Width follows the source aspect ratio.
                  *     Renditions taller than the source are skipped, so nothing is upscaled.
@@ -6183,7 +6230,6 @@ export interface components {
                 preset: string;
                 videoCodec: string;
                 audioCodec: string;
-                profileId: string;
                 sortOrder: number;
             }[];
         };
@@ -7161,8 +7207,14 @@ export interface components {
             id: string;
             name: string;
             color: string;
-            /** @description The profile the account started with. It cannot be deleted. */
+            /** @description The profile the account started with. It cannot be deleted, and has no age limit. */
             isMain: boolean;
+            /** @description The highest age a title may be for and still show. Null: everything shows. */
+            maxAge: number | null;
+            /** @description A profile for a child: clients give it a simpler look. */
+            isKids: boolean;
+            /** @description Whether choosing it asks for a PIN. */
+            locked: boolean;
         };
         ProgrammeView: {
             id: string;
@@ -7198,6 +7250,8 @@ export interface components {
             number: number | null;
             description: string | null;
             access: components["schemas"]["TitleAccess"];
+            /** @description The age from which the channel suits. Null: not said. */
+            minAge: number | null;
             /** @description The packages the channel is in, for the site to say whether a plan opens it. */
             packageIds: string[];
             /** @description Whether the channel is sending right now. */
@@ -7307,6 +7361,8 @@ export interface components {
                 tagline: string | null;
                 releaseYear: number | null;
                 ageRating: string | null;
+                /** @description The age from which the title suits. Null: not said. */
+                minAge: number | null;
                 isFeatured: boolean;
                 /** @description FREE, or PAID when watching needs a subscription. */
                 access: components["schemas"]["TitleAccess"];
@@ -7456,6 +7512,8 @@ export interface components {
             tagline: string | null;
             releaseYear: number | null;
             ageRating: string | null;
+            /** @description The age from which the title suits. Null: not said. */
+            minAge: number | null;
             isFeatured: boolean;
             /** @description FREE, or PAID when watching needs a subscription. */
             access: components["schemas"]["TitleAccess"];
@@ -7524,6 +7582,8 @@ export interface components {
             tagline: string | null;
             releaseYear: number | null;
             ageRating: string | null;
+            /** @description The age from which the title suits. Null: not said. */
+            minAge: number | null;
             isFeatured: boolean;
             /** @description FREE, or PAID when watching needs a subscription. */
             access: components["schemas"]["TitleAccess"];
@@ -8123,6 +8183,8 @@ export interface components {
             tagline: string | null;
             synopsis: string | null;
             ageRating: string | null;
+            /** @description The age from which the title suits. Null: not said, hidden from profiles with a limit. */
+            minAge: number | null;
             originalLanguage: string | null;
             backdrop: components["schemas"]["ImageView"] | null;
             logo: components["schemas"]["ImageView"] | null;
@@ -8468,12 +8530,7 @@ export interface components {
         };
         ViewerAdminDetail: {
             /** @description The people who share the account, the main profile first. */
-            profiles: {
-                id: string;
-                name: string;
-                color: string;
-                isMain: boolean;
-            }[];
+            profiles: components["schemas"]["ProfileView"][];
             sessions: components["schemas"]["ViewerSessionAdminView"][];
             /** @description The apps the viewer is, or was, signed in on. */
             devices: {
@@ -8651,6 +8708,11 @@ export interface components {
             token: string;
             /** Format: date-time */
             expiresAt: string;
+            /**
+             * @description Whether a profile has to be chosen before anything else: the main one
+             *     has a PIN. Until then the sign-in sees only what suits every age.
+             */
+            chooseProfile: boolean;
         };
         /** @enum {string} */
         ViewerStatus: "ACTIVE" | "DISABLED";
@@ -13040,6 +13102,8 @@ export interface operations {
                     qualities?: number[];
                     /** @default false */
                     published?: boolean;
+                    /** @default null */
+                    minAge?: number | null;
                     /**
                      * @default FREE
                      * @enum {string}
@@ -13344,6 +13408,7 @@ export interface operations {
                     mode?: "COPY" | "TRANSCODE";
                     qualities?: number[];
                     published?: boolean;
+                    minAge?: number | null;
                     /** @enum {string} */
                     access?: "FREE" | "PAID";
                     packageIds?: string[];
@@ -20222,6 +20287,7 @@ export interface operations {
                 access?: "FREE" | "PAID";
                 packageId?: string;
                 packaged?: "none";
+                rated?: "yes" | "no";
                 q?: string;
                 sort?: "createdAt" | "updatedAt" | "name" | "releaseYear" | "publishedAt" | "releaseDate" | "rating" | "runtimeMinutes";
                 order?: "asc" | "desc";
@@ -20441,6 +20507,7 @@ export interface operations {
                     synopsis?: string | null;
                     releaseYear?: number | null;
                     ageRating?: string | null;
+                    minAge?: number | null;
                     originalLanguage?: string | null;
                     releaseDate?: string | null;
                     availableFrom?: string | null;
@@ -21475,6 +21542,8 @@ export interface operations {
                         packageId?: string;
                         /** @enum {string} */
                         packaged?: "none";
+                        /** @enum {string} */
+                        rated?: "yes" | "no";
                         q?: string;
                     };
                     action: {
@@ -21519,6 +21588,10 @@ export interface operations {
                         type: "availability";
                         availableFrom?: string | null;
                         availableUntil?: string | null;
+                    } | {
+                        /** @constant */
+                        type: "age";
+                        minAge: number | null;
                     } | {
                         /** @constant */
                         type: "translate";
@@ -23246,6 +23319,8 @@ export interface operations {
                     name: string;
                     /** @enum {string} */
                     color?: "amber" | "coral" | "rose" | "violet" | "blue" | "teal" | "green" | "slate";
+                    isKids?: boolean;
+                    maxAge?: number | null;
                 };
             };
         };
@@ -23350,6 +23425,73 @@ export interface operations {
                     name?: string;
                     /** @enum {string} */
                     color?: "amber" | "coral" | "rose" | "violet" | "blue" | "teal" | "green" | "slate";
+                    isKids?: boolean;
+                    maxAge?: number | null;
+                };
+            };
+        };
+        responses: {
+            /** @description The answer. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProfileView"];
+                };
+            };
+            /** @description The input was refused. "issues" names every field. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Not signed in, or the sign-in ran out. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description What the address names does not exist. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Too many requests. "Retry-After" says when to try again. */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    ViewerProfiles_setPin: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    pin: string | null;
+                    password: string;
                 };
             };
         };
@@ -23410,7 +23552,13 @@ export interface operations {
             };
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody: {
+            content: {
+                "application/json": {
+                    pin?: string;
+                };
+            };
+        };
         responses: {
             /** @description The answer. */
             200: {
@@ -23419,6 +23567,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ProfileView"];
+                };
+            };
+            /** @description The input was refused. "issues" names every field. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
                 };
             };
             /** @description Not signed in, or the sign-in ran out. */
@@ -23610,6 +23767,8 @@ export interface operations {
                         entitled: boolean;
                         access: components["schemas"]["ViewerAccess"];
                         purchases: components["schemas"]["OwnedTitle"][];
+                        /** @description Whether a profile has to be chosen before anything else: the main one has a PIN. */
+                        chooseProfile: boolean;
                     };
                 };
             };
@@ -24626,6 +24785,54 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["Problem"];
                 };
+            };
+            /** @description Not signed in, or the sign-in ran out. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Signed in, but not allowed to do this. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description What the address names does not exist. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    ViewersAdmin_clearProfilePin: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                profileId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Done. Nothing comes back. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Not signed in, or the sign-in ran out. */
             401: {

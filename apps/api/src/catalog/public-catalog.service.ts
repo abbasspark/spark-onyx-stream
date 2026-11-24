@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-only
+import { suitsAudience } from '../audience/audience.js';
 import {
   ConflictException,
   ForbiddenException,
@@ -632,7 +633,7 @@ export class PublicCatalogService {
       where: {
         id: episodeId,
         ...VISIBLE_EPISODE,
-        season: { title: { status: 'PUBLISHED', AND: availableAt() } },
+        season: { title: { status: 'PUBLISHED', AND: [...availableAt(), suitsAudience()] } },
       },
       select: {
         assetId: true,

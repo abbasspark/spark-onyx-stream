@@ -510,6 +510,7 @@ describe.skipIf(!TEST_DATABASE_URL)('Packages (e2e)', () => {
         entitled: false,
         access: null,
         purchases: [],
+        chooseProfile: false,
       });
 
       await grant(anna.id, world.kidsPlan.id);

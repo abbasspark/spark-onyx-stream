@@ -41,6 +41,8 @@ export interface PublicTitleCard {
   tagline: string | null;
   releaseYear: number | null;
   ageRating: string | null;
+  /** The age from which the title suits. Null: not said. */
+  minAge: number | null;
   isFeatured: boolean;
   /** FREE, or PAID when watching needs a subscription. */
   access: TitleAccess;
@@ -220,6 +222,8 @@ export interface CardRecord {
   tagline: string | null;
   releaseYear: number | null;
   ageRating: string | null;
+  /** The age from which the title suits. Null: not said. */
+  minAge: number | null;
   isFeatured: boolean;
   access: TitleAccess;
   packages: { packageId: string }[];
@@ -260,6 +264,7 @@ export function toPublicCard(title: CardRecord, mediaBaseUrl: string): PublicTit
     tagline: title.tagline,
     releaseYear: title.releaseYear,
     ageRating: title.ageRating,
+    minAge: title.minAge,
     isFeatured: title.isFeatured,
     access: title.access,
     packageIds: title.access === 'PAID' ? title.packages.map((link) => link.packageId).sort() : [],

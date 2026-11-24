@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-only
+import { ageFromRating } from './age-rating.js';
 import {
   BadRequestException,
   ConflictException,
@@ -149,6 +150,7 @@ export class TitlesService {
         : {}),
       ...(input.packageId ? { packages: { some: { packageId: input.packageId } } } : {}),
       ...(input.packaged === 'none' ? { access: 'PAID', packages: { none: {} } } : {}),
+      ...(input.rated ? { minAge: input.rated === 'no' ? null : { not: null } } : {}),
       ...(input.q
         ? {
             OR: [
@@ -272,6 +274,10 @@ export class TitlesService {
         ? { releaseDate: releaseDate ? new Date(`${releaseDate}T00:00:00Z`) : null }
         : {}),
     };
+    // A new rating says from which age, unless the admin says it in the same breath.
+    if (fields.ageRating !== undefined && fields.minAge === undefined) {
+      data.minAge = ageFromRating(fields.ageRating);
+    }
     // The two dates are checked together, also when only one of them is sent.
     const from = fields.availableFrom === undefined ? current.availableFrom : fields.availableFrom;
     const until =

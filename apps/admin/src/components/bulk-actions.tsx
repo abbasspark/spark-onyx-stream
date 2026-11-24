@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   Archive,
   CalendarRange,
+  ShieldCheck,
   CheckCircle2,
   ChevronDown,
   EyeOff,
@@ -31,6 +32,7 @@ import {
   translationsApi,
 } from '@/api/endpoints';
 import type { BulkAction, BulkResult, TitleType } from '@/api/types';
+import { AgeField } from '@/components/age-field';
 import { useConfirm } from '@/components/confirm';
 import { Button } from '@/components/ui/button';
 import { ErrorNote, Spinner } from '@/components/ui/display';
@@ -47,6 +49,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/overlay';
+import { describeAge } from '@/lib/age-rating';
 import { counted, describeOutcome, MAX_TITLES, type Nouns } from '@/lib/bulk';
 import { availabilityProblem, fromLocalInput, titlePath } from '@/lib/catalog';
 import { cn } from '@/lib/cn';
@@ -102,6 +105,7 @@ export function BulkBar({
   const [shelf, setShelf] = useState<Shelf | null>(null);
   const [datesOpen, setDatesOpen] = useState(false);
   const [translateOpen, setTranslateOpen] = useState(false);
+  const [ageOpen, setAgeOpen] = useState(false);
   const [report, setReport] = useState<BulkResult | null>(null);
 
   const run = useMutation({
@@ -120,6 +124,7 @@ export function BulkBar({
       setShelf(null);
       setDatesOpen(false);
       setTranslateOpen(false);
+      setAgeOpen(false);
       onDone(result);
     },
     onError: (error: Error) => toast.error(error.message),
@@ -283,6 +288,10 @@ export function BulkBar({
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
                 </div>
+                <DropdownMenuItem onSelect={() => setAgeOpen(true)}>
+                  <ShieldCheck />
+                  Suitable from age…
+                </DropdownMenuItem>
                 <DropdownMenuItem onSelect={() => run.mutate({ type: 'feature', value: true })}>
                   <Star />
                   Feature
@@ -339,6 +348,13 @@ export function BulkBar({
         these={these}
         busy={busy}
         onClose={() => setTranslateOpen(false)}
+        onRun={(action) => run.mutate(action)}
+      />
+      <AgeDialog
+        open={ageOpen}
+        these={these}
+        busy={busy}
+        onClose={() => setAgeOpen(false)}
         onRun={(action) => run.mutate(action)}
       />
       <ReportDialog report={report} nouns={nouns} kind={kind} onClose={() => setReport(null)} />
@@ -483,6 +499,47 @@ function ShelfDialog({
               {picked.size > 0
                 ? counted(picked.size, { one: look.one, many: look.title.toLowerCase() })
                 : look.title.toLowerCase()}
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+/** Says from which age the selection suits, or takes the age off. */
+function AgeDialog({ open, these, busy, onClose, onRun }: ActionDialogProps & { open: boolean }) {
+  const [minAge, setMinAge] = useState<number | null>(12);
+  useEffect(() => {
+    if (open) {
+      setMinAge(12);
+    }
+  }, [open]);
+
+  return (
+    <Dialog open={open} onOpenChange={(next) => (next ? undefined : onClose())}>
+      <DialogContent
+        size="sm"
+        title={`Age of ${these}`}
+        description="Profiles of viewers can have an age limit. They see what suits up to that age, and nothing that has no age."
+      >
+        <form
+          onSubmit={(event: FormEvent) => {
+            event.preventDefault();
+            onRun({ type: 'age', minAge });
+          }}
+          className="contents"
+        >
+          <DialogBody>
+            <AgeField what="title" value={minAge} onChange={setMinAge} disabled={busy} />
+            <p className="text-xs text-muted-foreground">
+              The rating as it is written on each title, such as "PG-13", stays as it is.
+            </p>
+          </DialogBody>
+          <DialogFooter>
+            <Button onClick={onClose}>Cancel</Button>
+            <Button type="submit" variant="primary" loading={busy}>
+              {minAge === null ? 'Take the age off' : `Set to ${describeAge(minAge)}`}
             </Button>
           </DialogFooter>
         </form>

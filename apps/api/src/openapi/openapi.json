@@ -7270,6 +7270,19 @@
                     "default": false,
                     "type": "boolean"
                   },
+                  "minAge": {
+                    "default": null,
+                    "anyOf": [
+                      {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 21
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
                   "access": {
                     "default": "FREE",
                     "type": "string",
@@ -7861,6 +7874,18 @@
                   },
                   "published": {
                     "type": "boolean"
+                  },
+                  "minAge": {
+                    "anyOf": [
+                      {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 21
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
                   },
                   "access": {
                     "type": "string",
@@ -20405,6 +20430,18 @@
             }
           },
           {
+            "name": "rated",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "yes",
+                "no"
+              ]
+            }
+          },
+          {
             "name": "q",
             "in": "query",
             "required": false,
@@ -20833,6 +20870,18 @@
                       {
                         "type": "string",
                         "maxLength": 16
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "minAge": {
+                    "anyOf": [
+                      {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 21
                       },
                       {
                         "type": "null"
@@ -22981,6 +23030,13 @@
                           "none"
                         ]
                       },
+                      "rated": {
+                        "type": "string",
+                        "enum": [
+                          "yes",
+                          "no"
+                        ]
+                      },
                       "q": {
                         "type": "string",
                         "minLength": 1,
@@ -23184,6 +23240,31 @@
                         },
                         "required": [
                           "type"
+                        ]
+                      },
+                      {
+                        "type": "object",
+                        "properties": {
+                          "type": {
+                            "type": "string",
+                            "const": "age"
+                          },
+                          "minAge": {
+                            "anyOf": [
+                              {
+                                "type": "integer",
+                                "minimum": 0,
+                                "maximum": 21
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          }
+                        },
+                        "required": [
+                          "type",
+                          "minAge"
                         ]
                       },
                       {
@@ -26094,6 +26175,21 @@
                       "green",
                       "slate"
                     ]
+                  },
+                  "isKids": {
+                    "type": "boolean"
+                  },
+                  "maxAge": {
+                    "anyOf": [
+                      {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 18
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
                   }
                 },
                 "required": [
@@ -26268,8 +26364,141 @@
                       "green",
                       "slate"
                     ]
+                  },
+                  "isKids": {
+                    "type": "boolean"
+                  },
+                  "maxAge": {
+                    "anyOf": [
+                      {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 18
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
                   }
                 }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The answer.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProfileView"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The input was refused. \"issues\" names every field.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or the sign-in ran out.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "What the address names does not exist.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests. \"Retry-After\" says when to try again.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/viewer/profiles/{id}/pin": {
+      "put": {
+        "operationId": "ViewerProfiles_setPin",
+        "tags": [
+          "Viewers"
+        ],
+        "summary": "Puts a PIN on a profile, changes it, or takes it off with \"pin\": null",
+        "description": "Asks for the password of the account, which is also the way out when a PIN is forgotten. For a signed-in viewer.",
+        "security": [
+          {
+            "viewerSession": []
+          },
+          {
+            "viewerCookie": []
+          }
+        ],
+        "x-onyx-access": {
+          "kind": "viewer",
+          "permissions": [],
+          "sessionOnly": false
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "pin": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "pattern": "^\\d{4,6}$"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "password": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 128
+                  }
+                },
+                "required": [
+                  "pin",
+                  "password"
+                ]
               }
             }
           }
@@ -26335,7 +26564,7 @@
           "Viewers"
         ],
         "summary": "Chooses who is watching on this device",
-        "description": "Other devices keep their own choice. For a signed-in viewer.",
+        "description": "Other devices keep their own choice. A profile with a PIN needs it: without, the answer is 403 with code \"pin_required\", with a wrong one \"pin_wrong\", and after five wrong ones 429 with \"pin_locked\" for five minutes. For a signed-in viewer.",
         "security": [
           {
             "viewerSession": []
@@ -26360,6 +26589,22 @@
             }
           }
         ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "pin": {
+                    "type": "string",
+                    "maxLength": 12
+                  }
+                }
+              }
+            }
+          }
+        },
         "responses": {
           "200": {
             "description": "The answer.",
@@ -26367,6 +26612,16 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ProfileView"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The input was refused. \"issues\" names every field.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
                 }
               }
             }
@@ -26725,6 +26980,10 @@
                       "items": {
                         "$ref": "#/components/schemas/OwnedTitle"
                       }
+                    },
+                    "chooseProfile": {
+                      "type": "boolean",
+                      "description": "Whether a profile has to be chosen before anything else: the main one has a PIN."
                     }
                   },
                   "required": [
@@ -26732,7 +26991,8 @@
                     "profile",
                     "entitled",
                     "access",
-                    "purchases"
+                    "purchases",
+                    "chooseProfile"
                   ]
                 }
               }
@@ -28527,6 +28787,86 @@
                 }
               }
             }
+          },
+          "401": {
+            "description": "Not signed in, or the sign-in ran out.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Signed in, but not allowed to do this.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "What the address names does not exist.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/viewers/{id}/profiles/{profileId}/pin": {
+      "delete": {
+        "operationId": "ViewersAdmin_clearProfilePin",
+        "tags": [
+          "Viewers"
+        ],
+        "summary": "Takes the PIN off a profile, for a viewer who forgot it",
+        "description": "For an admin or an API key. Needs viewers:write.",
+        "security": [
+          {
+            "adminSession": []
+          },
+          {
+            "apiKey": []
+          }
+        ],
+        "x-onyx-access": {
+          "kind": "admin",
+          "permissions": [
+            "viewers:write"
+          ],
+          "sessionOnly": false
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "profileId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Done. Nothing comes back."
           },
           "401": {
             "description": "Not signed in, or the sign-in ran out.",
@@ -33426,6 +33766,7 @@
               "unpublish",
               "archive",
               "feature",
+              "age",
               "translate"
             ]
           },
@@ -33693,6 +34034,13 @@
             "type": "boolean",
             "description": "Whether viewers find the channel on the website and in the apps."
           },
+          "minAge": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "description": "The age from which the channel suits. Null: hidden from profiles with an age limit."
+          },
           "access": {
             "allOf": [
               {
@@ -33809,6 +34157,7 @@
           "dvrMinutes",
           "guideId",
           "published",
+          "minAge",
           "access",
           "packages",
           "enabled",
@@ -33935,6 +34284,13 @@
             "type": "boolean",
             "description": "Whether viewers find the channel on the website and in the apps."
           },
+          "minAge": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "description": "The age from which the channel suits. Null: hidden from profiles with an age limit."
+          },
           "access": {
             "allOf": [
               {
@@ -34050,6 +34406,7 @@
           "dvrMinutes",
           "guideId",
           "published",
+          "minAge",
           "access",
           "packages",
           "enabled",
@@ -35255,6 +35612,10 @@
                   "id",
                   "name"
                 ]
+              },
+              "chooseProfile": {
+                "type": "boolean",
+                "description": "Whether a profile has to be chosen first: the main one has a PIN."
               }
             },
             "required": [
@@ -35263,7 +35624,8 @@
               "expiresAt",
               "viewer",
               "profile",
-              "device"
+              "device",
+              "chooseProfile"
             ]
           }
         ]
@@ -35915,6 +36277,9 @@
                 "name": {
                   "type": "string"
                 },
+                "profileId": {
+                  "type": "string"
+                },
                 "height": {
                   "type": "number",
                   "description": "Target height in pixels. Width follows the source aspect ratio.\nRenditions taller than the source are skipped, so nothing is upscaled."
@@ -35935,9 +36300,6 @@
                 "audioCodec": {
                   "type": "string"
                 },
-                "profileId": {
-                  "type": "string"
-                },
                 "sortOrder": {
                   "type": "number"
                 }
@@ -35945,13 +36307,13 @@
               "required": [
                 "id",
                 "name",
+                "profileId",
                 "height",
                 "videoBitrate",
                 "audioBitrate",
                 "preset",
                 "videoCodec",
                 "audioCodec",
-                "profileId",
                 "sortOrder"
               ]
             }
@@ -39794,14 +40156,32 @@
           },
           "isMain": {
             "type": "boolean",
-            "description": "The profile the account started with. It cannot be deleted."
+            "description": "The profile the account started with. It cannot be deleted, and has no age limit."
+          },
+          "maxAge": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "description": "The highest age a title may be for and still show. Null: everything shows."
+          },
+          "isKids": {
+            "type": "boolean",
+            "description": "A profile for a child: clients give it a simpler look."
+          },
+          "locked": {
+            "type": "boolean",
+            "description": "Whether choosing it asks for a PIN."
           }
         },
         "required": [
           "id",
           "name",
           "color",
-          "isMain"
+          "isMain",
+          "maxAge",
+          "isKids",
+          "locked"
         ]
       },
       "ProgrammeView": {
@@ -39947,6 +40327,13 @@
           "access": {
             "$ref": "#/components/schemas/TitleAccess"
           },
+          "minAge": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "description": "The age from which the channel suits. Null: not said."
+          },
           "packageIds": {
             "type": "array",
             "items": {
@@ -39990,6 +40377,7 @@
           "number",
           "description",
           "access",
+          "minAge",
           "packageIds",
           "onAir",
           "dvrMinutes",
@@ -40430,6 +40818,13 @@
                     "null"
                   ]
                 },
+                "minAge": {
+                  "type": [
+                    "number",
+                    "null"
+                  ],
+                  "description": "The age from which the title suits. Null: not said."
+                },
                 "isFeatured": {
                   "type": "boolean"
                 },
@@ -40537,6 +40932,7 @@
                 "tagline",
                 "releaseYear",
                 "ageRating",
+                "minAge",
                 "isFeatured",
                 "access",
                 "packageIds",
@@ -41045,6 +41441,13 @@
               "null"
             ]
           },
+          "minAge": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "description": "The age from which the title suits. Null: not said."
+          },
           "isFeatured": {
             "type": "boolean"
           },
@@ -41146,6 +41549,7 @@
           "tagline",
           "releaseYear",
           "ageRating",
+          "minAge",
           "isFeatured",
           "access",
           "packageIds",
@@ -41321,6 +41725,13 @@
               "null"
             ]
           },
+          "minAge": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "description": "The age from which the title suits. Null: not said."
+          },
           "isFeatured": {
             "type": "boolean"
           },
@@ -41440,6 +41851,7 @@
           "tagline",
           "releaseYear",
           "ageRating",
+          "minAge",
           "isFeatured",
           "access",
           "packageIds",
@@ -43640,6 +44052,13 @@
               "null"
             ]
           },
+          "minAge": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "description": "The age from which the title suits. Null: not said, hidden from profiles with a limit."
+          },
           "originalLanguage": {
             "type": [
               "string",
@@ -43991,6 +44410,7 @@
           "tagline",
           "synopsis",
           "ageRating",
+          "minAge",
           "originalLanguage",
           "backdrop",
           "logo",
@@ -44935,27 +45355,7 @@
           "profiles": {
             "type": "array",
             "items": {
-              "type": "object",
-              "properties": {
-                "id": {
-                  "type": "string"
-                },
-                "name": {
-                  "type": "string"
-                },
-                "color": {
-                  "type": "string"
-                },
-                "isMain": {
-                  "type": "boolean"
-                }
-              },
-              "required": [
-                "id",
-                "name",
-                "color",
-                "isMain"
-              ]
+              "$ref": "#/components/schemas/ProfileView"
             },
             "description": "The people who share the account, the main profile first."
           },
@@ -45587,13 +45987,18 @@
           "expiresAt": {
             "type": "string",
             "format": "date-time"
+          },
+          "chooseProfile": {
+            "type": "boolean",
+            "description": "Whether a profile has to be chosen before anything else: the main one\nhas a PIN. Until then the sign-in sees only what suits every age."
           }
         },
         "required": [
           "viewer",
           "profile",
           "token",
-          "expiresAt"
+          "expiresAt",
+          "chooseProfile"
         ]
       },
       "ViewerStatus": {

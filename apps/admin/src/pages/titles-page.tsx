@@ -259,6 +259,8 @@ function TitlesList({ kind }: { kind: TitleType }) {
   const access = (
     ['FREE', 'PAID'].includes(params.get('access') ?? '') ? params.get('access') : ''
   ) as TitleAccess | '';
+  const rated = (['yes', 'no'].includes(params.get('rated') ?? '') ? params.get('rated') : '') as
+    'yes' | 'no' | '';
   // A package by its id, or "none" for paid titles that are in no package.
   const packageFilter = params.get('package') ?? (params.get('packaged') === 'none' ? 'none' : '');
   const q = params.get('q') ?? '';
@@ -307,6 +309,7 @@ function TitlesList({ kind }: { kind: TitleType }) {
       access: access || undefined,
       packageId: packageFilter && packageFilter !== 'none' ? packageFilter : undefined,
       packaged: packageFilter === 'none' ? 'none' : undefined,
+      rated: rated || undefined,
       q: q || undefined,
     }),
     [
@@ -321,6 +324,7 @@ function TitlesList({ kind }: { kind: TitleType }) {
       seriesStatus,
       access,
       packageFilter,
+      rated,
       q,
     ],
   );
@@ -367,7 +371,8 @@ function TitlesList({ kind }: { kind: TitleType }) {
     video ||
     seriesStatus ||
     access ||
-    packageFilter,
+    packageFilter ||
+    rated,
   );
 
   // --- Selection ------------------------------------------------------------------
@@ -731,6 +736,21 @@ function TitlesList({ kind }: { kind: TitleType }) {
           />
         ) : null}
         <Select
+          aria-label="Filter by age"
+          className="w-36"
+          value={rated || 'ALL'}
+          onValueChange={(value) => change({ rated: value === 'ALL' ? null : value, page: null })}
+          options={[
+            { value: 'ALL', label: 'Any age' },
+            {
+              value: 'no',
+              label: 'Not rated',
+              description: 'Hidden from profiles with an age limit',
+            },
+            { value: 'yes', label: 'Rated', description: 'Has an age it suits from' },
+          ]}
+        />
+        <Select
           aria-label="Sort by"
           className="w-40"
           value={sort}
@@ -764,6 +784,7 @@ function TitlesList({ kind }: { kind: TitleType }) {
                 access: null,
                 package: null,
                 packaged: null,
+                rated: null,
                 page: null,
               });
             }}

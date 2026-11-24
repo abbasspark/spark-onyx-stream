@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-only
+import { ageFromRating } from '../catalog/age-rating.js';
 import {
   BadGatewayException,
   BadRequestException,
@@ -332,6 +333,10 @@ export class MetadataService {
         if (value !== null && value !== current && (overwrite || isEmpty)) {
           Object.assign(data, { [field]: value });
           report.fields.push(field);
+          // The age the rating stands for comes with it.
+          if (field === 'ageRating') {
+            Object.assign(data, { minAge: ageFromRating(imported.ageRating) });
+          }
         }
       }
     }

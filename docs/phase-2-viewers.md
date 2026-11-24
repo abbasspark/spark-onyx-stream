@@ -142,19 +142,62 @@ One account is often used by a household. Profiles give each person their own wa
 - **Which profile is in use is kept per device.** The phone can be on one profile while the television is on another. A device that never chose uses the main profile.
 - **Watch history belongs to the profile:** "Continue watching", resume positions and watched marks. Clearing the history clears that of the profile in use.
 - **Deleting a profile deletes what it watched.** Devices that used it go back to the main profile and stay signed in.
-- **Profiles are not a lock.** Anyone signed in to the account can choose any profile.
+- **A profile is a lock only with a PIN.** Without one, anyone signed in to the account can choose any profile. See [Parental controls](#parental-controls).
 
 | Method and path              | Purpose                                                             |
 | ---------------------------- | ------------------------------------------------------------------- |
 | `GET /profiles`              | The profiles, the one in use on this device, the limit, the colours |
-| `POST /profiles`             | Add a profile: `{ name, color? }`                                   |
-| `PATCH /profiles/{id}`       | Change name or colour                                               |
+| `POST /profiles`             | Add a profile: `{ name, color?, isKids?, maxAge? }`                 |
+| `PATCH /profiles/{id}`       | Change name, colour, or what the profile can watch                  |
 | `DELETE /profiles/{id}`      | Delete a profile and its watch history                              |
-| `POST /profiles/{id}/select` | Use this profile on this device                                     |
+| `POST /profiles/{id}/select` | Use this profile on this device: `{ pin? }`                         |
+| `PUT /profiles/{id}/pin`     | Set, change or lift the PIN: `{ pin, password }`, `pin: null` lifts |
 
 All under `/v1/viewer`. `GET /session`, `POST /register` and `POST /login` also return the profile in use as `profile`. The watch history endpoints work on the profile in use.
 
 On the website, signing in to an account with more than one profile asks "Who is watching?". The header shows the profile in use and switches between them, and other open tabs follow. In the panel, a viewer's sheet lists the profiles and says who watched what.
+
+## Parental controls
+
+A household shares an account, and not everything in a catalog is for a child. Three things work together: an age on what can be watched, a limit on a profile, and a PIN.
+
+### The age of a title and of a channel
+
+- **Every title and every live channel can say from which age it suits:** a whole number from 0 to 21, `minAge`. This is what limits compare with, because ratings are written differently in every country.
+- **The age is read from the rating** when a rating is saved without an age: "FSK 12" is 12, "PG-13" is 13, "TV-MA" is 17, "G" is 0. An import from TMDB does the same. An admin can say the age differently, and it then stays.
+- **A rating nobody can read leaves the title without an age.** The panel says so on the title, the list of titles filters by "Not rated", and "Suitable from age" in the actions on many titles sets the age of everything the filters match.
+- Titles that existed before got their age from their rating when the installation was updated.
+
+### A limit on a profile
+
+- **A profile can have a limit,** `maxAge`, from 0 to 18. It sees titles and channels that suit up to that age. **What has no age is hidden from it,** because nobody said it suits.
+- **A profile for a child,** `isKids`, always has a limit, 12 unless another is chosen. Apps can show it with a simpler look.
+- **The main profile has no limit.** It is the way back into the account.
+- **The limit is enforced by the API, from the sign-in.** Lists, pages, search, rows, "My list", "Continue watching", the guide and playback are all narrowed, wherever they are asked from. A title above the limit answers as if it did not exist.
+- **A profile with a limit watches. It does not manage.** Adding, changing or deleting profiles, changing the name or password of the account, deleting the account, signing other devices out or in, and paying for a plan or a title all answer `403` with `code: "profile_restricted"`.
+- Answers narrowed by a sign-in carry `Cache-Control: private, no-store`.
+
+Anyone may also ask the open catalog for less: `?maxAge=12` on any address under `/v1/catalog`. The stricter of this and the profile counts, so it can never widen what a sign-in sees. The website uses it, see below.
+
+### A PIN on a profile
+
+- **Four to six digits,** stored the way passwords are. Choosing a profile that has one needs it.
+- **Setting, changing and lifting a PIN asks for the password of the account.** That is also the way out when a PIN is forgotten, and it is why this one action is open to a profile with a limit. An admin can lift a PIN in the panel, which is written to the audit log.
+- **Five wrong PINs close the profile for five minutes.** A wrong one answers `403` with `code: "pin_wrong"` and `attemptsLeft`, a missing one `pin_required`, and a closed profile `429` with `pin_locked` and `retryAfterSeconds`.
+- **A PIN on the main profile makes a new sign-in choose first.** A device that never chose uses the main profile, so without this a child would only have to sign in again. Such a sign-in answers `chooseProfile: true`, sees only what suits every age and manages nothing, until a profile is chosen.
+
+### On the website
+
+- "Who is watching?" shows a lock on profiles with a PIN and the limit under the name, and asks for the PIN with a way to lift it by password. "Manage profiles" sets what a profile can watch and its PIN.
+- A profile with a limit has a shorter menu and no account page.
+- **Pages still leave the server the same for everyone with the same limit.** The browser keeps the limit of the profile in use in a cookie, `onyx_audience`, and the server of the website asks the catalog with `?maxAge=`. The cookie only decides which cards are drawn. Removing it shows what a visitor without an account sees, and playing still goes by the sign-in.
+
+### Limits of this
+
+- **Signing out is always possible.** On a site where anyone can watch without an account, a child who signs out sees what every visitor sees. Parental controls protect an account, so they mean most where watching needs one.
+- An age is one number for every country. A title rated 12 in one country and 16 in another has the age its admin gave it.
+- Episodes have no age of their own. They follow their series.
+- There is no time limit per day, and no list of what a child watched other than the watch history of the profile.
 
 ## Watch history
 
@@ -247,6 +290,8 @@ Devices exist for what comes next: a notification is sent to a device, and a dow
 | `DELETE /viewer/devices/{id}`              | Sign a device out and forget it                                      |
 | `DELETE /viewers/{id}/devices/{deviceId}`  | For admins with `viewers:write`: the same, written to the audit log  |
 
+For a viewer who forgot a PIN, `DELETE /viewers/{id}/profiles/{profileId}/pin` lifts it, for admins with `viewers:write`. See [Parental controls](#parental-controls).
+
 The address a device shows is the site address of the installation (`SITE_URL`) with `/activate`.
 
 ### Limits
@@ -268,13 +313,12 @@ The address a device shows is the site address of the installation (`SITE_URL`) 
 - **A title's page** shows its genres, rating, release date, countries and studios, who directed and wrote it, its cast with portraits, its extras ("Trailers and more", played like the trailer), and the other titles of its collection.
 - **A page per person** (`/person/{slug}`) with their portrait, biography and everything of theirs there is to watch, and **a page per collection** (`/collection/{slug}`) with its titles in order. Both are found by search engines. Somebody with nothing to watch has no page.
 - **Browsing by genre**, beside kind, order and category.
-- **"Titles in"** in the footer chooses the language names and descriptions are shown in, when at least one visible title is translated. The choice is kept in a cookie for a year and reaches the home page, lists, title pages, collections, people and the search. The site around the titles stays in English. This is the one thing that makes a page differ between two visitors when it leaves the server.
+- **"Titles in"** in the footer chooses the language names and descriptions are shown in, when at least one visible title is translated. The choice is kept in a cookie for a year and reaches the home page, lists, title pages, collections, people and the search. The site around the titles stays in English. This and the age limit of a profile are the two things that make a page differ between two visitors when it leaves the server.
 
 ## Not built yet
 
 - Changing the email address by the viewer. An admin can change it
 - Emails in other languages, and editing their text in the panel
-- Profiles for children that show only what suits them, and a PIN on a profile
 - A picture of one's own for a profile
 - A "watch next" row that offers the following episode of a series
 - Subscriptions and payments

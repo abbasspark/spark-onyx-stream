@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-only
+import { ageFromRating } from '../catalog/age-rating.js';
 import { Inject, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { type Prisma, PrismaClient } from '@onyx/database';
 import { type Page, type PaginationInput, toPage, toSkipTake } from '../common/pagination.js';
@@ -116,6 +117,7 @@ export class TitleHistoryService {
         releaseDate: day(title.releaseDate),
         runtimeMinutes: title.runtimeMinutes,
         ageRating: title.ageRating,
+        minAge: title.minAge,
         originalLanguage: title.originalLanguage,
         imdbId: title.imdbId,
         seriesStatus: title.seriesStatus,
@@ -473,6 +475,8 @@ export class TitleHistoryService {
           releaseDate: fields.releaseDate ? new Date(fields.releaseDate) : null,
           runtimeMinutes: fields.runtimeMinutes,
           ageRating: fields.ageRating,
+          // A version from before the field existed says its age through its rating.
+          minAge: fields.minAge === undefined ? ageFromRating(fields.ageRating) : fields.minAge,
           originalLanguage: fields.originalLanguage,
           imdbId: fields.imdbId,
           seriesStatus: fields.seriesStatus as never,

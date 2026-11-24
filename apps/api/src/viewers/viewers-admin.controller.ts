@@ -137,6 +137,20 @@ export class ViewersAdminController {
     await this.record('viewer.verification_email', id, principal, request);
   }
 
+  /** Takes the PIN off a profile, for a viewer who forgot it. */
+  @Delete(':id/profiles/:profileId/pin')
+  @RequirePermissions('viewers:write')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  async clearProfilePin(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Param('profileId', ParseUUIDPipe) profileId: string,
+    @CurrentPrincipal() principal: Principal,
+    @Req() request: Request,
+  ): Promise<void> {
+    const profile = await this.viewers.clearProfilePin(id, profileId);
+    await this.record('viewer.profile_pin_clear', id, principal, request, { profile });
+  }
+
   /** Signs one device of a viewer out and forgets it. */
   @Delete(':id/devices/:deviceId')
   @RequirePermissions('viewers:write')

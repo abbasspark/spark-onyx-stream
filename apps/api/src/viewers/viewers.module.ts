@@ -1,5 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 import { Module } from '@nestjs/common';
+import { APP_INTERCEPTOR } from '@nestjs/core';
+import { AudienceInterceptor } from './audience.interceptor.js';
 import { DeviceCodesService } from './device-codes.service.js';
 import { ViewerAuthController } from './viewer-auth.controller.js';
 import { ViewerAuthGuard } from './viewer-auth.guard.js';
@@ -34,6 +36,8 @@ import { ViewersAdminService } from './viewers-admin.service.js';
     ViewerAuthService,
     ViewerAuthGuard,
     ViewersAdminService,
+    // Every request is answered for somebody: see the interceptor.
+    { provide: APP_INTERCEPTOR, useClass: AudienceInterceptor },
   ],
   exports: [ViewerSessionService, ViewerAuthGuard, ViewerProfilesService],
 })

@@ -250,6 +250,8 @@ export interface TitleDetail extends TitleSummary {
   tagline: string | null;
   synopsis: string | null;
   ageRating: string | null;
+  /** The age from which the title suits. Null: not said, hidden from profiles with a limit. */
+  minAge: number | null;
   originalLanguage: string | null;
   backdrop: ImageView | null;
   logo: ImageView | null;
@@ -556,6 +558,7 @@ export function toTitleDetail(title: TitleDetailRecord, mediaBaseUrl: string): T
     synopsis: title.synopsis,
     releaseYear: title.releaseYear,
     ageRating: title.ageRating,
+    minAge: title.minAge,
     originalLanguage: title.originalLanguage,
     status: title.status,
     publishedAt: title.publishedAt,

@@ -15,6 +15,7 @@ const WORDS: Record<Exclude<Kind, 'translate'>, { done: string; already: string;
   archive: { done: 'Archived', already: 'archived already', not: 'archived' },
   delete: { done: 'Deleted', already: 'gone already', not: 'deleted' },
   feature: { done: 'Changed', already: 'as asked already', not: 'changed' },
+  age: { done: 'Set the age of', already: 'as asked already', not: 'changed' },
   categories: { done: 'Changed the categories of', already: 'as asked already', not: 'changed' },
   genres: { done: 'Changed the genres of', already: 'as asked already', not: 'changed' },
   collections: { done: 'Changed the collections of', already: 'as asked already', not: 'changed' },
