@@ -1,9 +1,10 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 import { Inject, Injectable, NotFoundException } from '@nestjs/common';
-import { type Prisma, PrismaClient } from '@onyx/database';
+import { type MarkerKind, type Prisma, PrismaClient } from '@onyx/database';
 import { VISIBLE_EPISODE, visibleTitle } from '../catalog/playable.js';
 import { toPublicImage } from '../catalog/public-catalog.views.js';
 import { AppConfig } from '../config/app-config.js';
+import { watchedFromSeconds } from '../markers/marker.rules.js';
 import { clampWatchedAt, judgePosition } from './watch-rules.js';
 import type { WatchPositionInput } from './watching.schemas.js';
 import type { TitleWatchState, ViewerWatchingAdminView, WatchingItem } from './watching.views.js';
@@ -31,7 +32,17 @@ interface Target {
   titleId: string;
   episodeId: string | null;
   itemId: string;
+  /** The markers of the video, to know where its credits begin. */
+  markers: { kind: MarkerKind; startMs: number }[];
 }
+
+/** What of a target is stored with a position. */
+const keysOf = ({ titleId, episodeId, itemId }: Target) => ({ titleId, episodeId, itemId });
+
+/** The credits of a video: from where they begin it counts as watched. */
+const CREDITS = {
+  markers: { where: { kind: 'CREDITS' as const }, select: { kind: true, startMs: true } },
+};
 
 /**
  * Where each profile of each viewer is in each video. Positions come from the player; the
@@ -144,7 +155,11 @@ export class WatchingService {
       if (stored && stored.watchedAt.getTime() > at.getTime()) {
         continue;
       }
-      const outcome = judgePosition(item.position, item.duration);
+      const outcome = judgePosition(
+        item.position,
+        item.duration,
+        watchedFromSeconds(target.markers, item.duration),
+      );
       const where = { profileId_itemId: { profileId, itemId: target.itemId } };
 
       if (outcome.kind === 'not-started') {
@@ -157,7 +172,9 @@ export class WatchingService {
             }),
           );
         } else if (stored) {
-          writes.push(this.prisma.watchProgress.deleteMany({ where: { profileId, ...target } }));
+          writes.push(
+            this.prisma.watchProgress.deleteMany({ where: { profileId, ...keysOf(target) } }),
+          );
         }
         continue;
       }
@@ -172,7 +189,7 @@ export class WatchingService {
       writes.push(
         this.prisma.watchProgress.upsert({
           where,
-          create: { viewerId, profileId, ...target, ...data, watchedAt: at },
+          create: { viewerId, profileId, ...keysOf(target), ...data, watchedAt: at },
           update: { ...data, watchedAt: at },
         }),
       );
@@ -255,17 +272,21 @@ export class WatchingService {
     const [titles, episodes] = await Promise.all([
       this.prisma.title.findMany({
         where: { slug: { in: slugs }, ...visibleTitle() },
-        select: { id: true, slug: true, type: true },
+        select: { id: true, slug: true, type: true, asset: { select: CREDITS } },
       }),
       episodeIds.length > 0
         ? this.prisma.episode.findMany({
             where: { id: { in: episodeIds }, ...VISIBLE_EPISODE },
-            select: { id: true, season: { select: { titleId: true } } },
+            select: {
+              id: true,
+              season: { select: { titleId: true } },
+              asset: { select: CREDITS },
+            },
           })
         : [],
     ]);
     const titleBySlug = new Map(titles.map((title) => [title.slug, title]));
-    const titleOfEpisode = new Map(episodes.map((episode) => [episode.id, episode.season.titleId]));
+    const byEpisode = new Map(episodes.map((episode) => [episode.id, episode]));
 
     return items.map((item) => {
       const title = titleBySlug.get(item.title);
@@ -275,12 +296,23 @@ export class WatchingService {
       if (title.type === 'MOVIE') {
         return item.episodeId
           ? undefined
-          : { titleId: title.id, episodeId: null, itemId: title.id };
+          : {
+              titleId: title.id,
+              episodeId: null,
+              itemId: title.id,
+              markers: title.asset?.markers ?? [],
+            };
       }
-      if (!item.episodeId || titleOfEpisode.get(item.episodeId) !== title.id) {
+      const episode = item.episodeId ? byEpisode.get(item.episodeId) : undefined;
+      if (!episode || episode.season.titleId !== title.id) {
         return undefined;
       }
-      return { titleId: title.id, episodeId: item.episodeId, itemId: item.episodeId };
+      return {
+        titleId: title.id,
+        episodeId: episode.id,
+        itemId: episode.id,
+        markers: episode.asset?.markers ?? [],
+      };
     });
   }
 }

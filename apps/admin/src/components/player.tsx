@@ -16,13 +16,27 @@ interface Quality {
  * Plays an asset from its signed playback URLs. Uses hls.js where the browser
  * supports it and the browser's own HLS support otherwise (Safari on iOS).
  */
-export function Player({ playback, title }: { playback: Playback; title: string }) {
+export function Player({
+  playback,
+  title,
+  onVideo,
+}: {
+  playback: Playback;
+  title: string;
+  /** Told the video element once it is there, and null when it goes: for what works against the player. */
+  onVideo?: (video: HTMLVideoElement | null) => void;
+}) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const hlsRef = useRef<Hls | null>(null);
   const [qualities, setQualities] = useState<Quality[]>([]);
   const [selected, setSelected] = useState(-1);
   const [playing, setPlaying] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    onVideo?.(videoRef.current);
+    return () => onVideo?.(null);
+  }, [onVideo]);
 
   useEffect(() => {
     const video = videoRef.current;

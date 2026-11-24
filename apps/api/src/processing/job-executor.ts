@@ -71,11 +71,17 @@ export class JobExecutor {
 
     try {
       await this.jobs.markRunning(jobId, run.workerId, run.attempt);
-      if (!assetId) {
+      // A search for markers is about a season, which its input names.
+      if (!assetId && type !== 'MARKERS') {
         throw new NonRetryableProcessingError('The job names no asset');
       }
 
-      const output = await this.steps.run(type, { jobId, assetId, signal, onProgress });
+      const output = await this.steps.run(type, {
+        jobId,
+        assetId: assetId ?? '',
+        signal,
+        onProgress,
+      });
       await this.jobs.markCompleted(jobId, output);
       return output;
     } catch (error) {

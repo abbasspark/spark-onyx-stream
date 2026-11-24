@@ -24,6 +24,8 @@ export interface WatchEntry {
   id?: string;
   /** Set when the viewer's account holds this entry as it is here. */
   synced?: boolean;
+  /** Where the credits of the video begin, in seconds, when that is marked. */
+  creditsAt?: number;
 }
 
 /** A position as the account takes it. */
@@ -39,13 +41,21 @@ export const STORAGE_KEY = 'onyx.web.watching.v1';
 export const MAX_ENTRIES = 30;
 /** The first seconds do not count as having started. */
 const MIN_POSITION_SECONDS = 15;
-/** From here on, the credits are running and the video counts as watched. */
+/** From here on a video counts as watched, when nobody marked where its credits begin. */
 const FINISHED_FRACTION = 0.95;
 
-/** Whether a position is worth coming back to: started, and not finished. */
-export function isResumable(position: number, duration: number): boolean {
+/**
+ * Whether a position is worth coming back to: started, and not finished.
+ *
+ * @param creditsAt Where the credits begin, in seconds, when that is marked:
+ *   whoever reached them watched the video.
+ */
+export function isResumable(position: number, duration: number, creditsAt?: number): boolean {
   return (
-    duration > 0 && position >= MIN_POSITION_SECONDS && position / duration < FINISHED_FRACTION
+    duration > 0 &&
+    position >= MIN_POSITION_SECONDS &&
+    position / duration < FINISHED_FRACTION &&
+    (creditsAt === undefined || position < creditsAt)
   );
 }
 
@@ -55,7 +65,7 @@ export function isResumable(position: number, duration: number): boolean {
  */
 export function withEntry(entries: readonly WatchEntry[], entry: WatchEntry): WatchEntry[] {
   const others = entries.filter((existing) => existing.key !== entry.key);
-  if (!isResumable(entry.position, entry.duration)) {
+  if (!isResumable(entry.position, entry.duration, entry.creditsAt)) {
     return others;
   }
   return [entry, ...others].slice(0, MAX_ENTRIES);

@@ -115,6 +115,23 @@ The API writes `master.m3u8` itself after FFmpeg has finished. It measures the s
 
 **Videos processed before this have their sound inside the segments of the picture.** They play as before and are listed with one track "in the video". Sound cannot be added to them until they are processed again once.
 
+### Markers
+
+A video can say where its recap, its intro and its credits are, so that players offer to skip them. Markers belong to the video: they are moments on its timeline, and stay true wherever the video is used.
+
+- **Three kinds, one of each per video:** `RECAP` ("previously on"), `INTRO` (the opening titles) and `CREDITS`. Each has a start and an end in milliseconds. Credits may have no end: they then run to the end of the video.
+- **They are set in the panel,** on the Markers tab of a video, against the preview player: play to the moment and take it over. Markers must lie inside the video and must not overlap.
+- **A playback answer carries them** as `markers`, in the order they come. A player shows "Skip recap" or "Skip intro" while one runs, and offers the next episode when the credits begin. Credits with an end, which have a scene after them, get "Skip credits".
+- **From where the credits begin, a video counts as watched.** Without credits that is at 95 percent. Credits marked in the first half of a video are not believed for this.
+
+**Intros and credits of a season can be found automatically.** The opening of a series is the same recording in every episode, so the episodes are compared by their sound.
+
+- **How:** a job of type `MARKERS` reads the first and the last ten minutes of each episode's source file (at most 40 percent of it), turns the sound into a fingerprint that survives being encoded again and does not depend on loudness, and looks for the longest stretch two neighbouring episodes share. Shared at the start is the intro, shared at the end the credits.
+- **What it needs:** two episodes of the season with a video that is ready and has sound. An intro is at least 12 seconds, credits at least 15, and neither more than five and a half minutes: two episodes that share more are the same video.
+- **What it cannot find:** a recap, which differs in every episode; an intro only one episode has; credits over music that changes from episode to episode; anything in a film. Those are set by hand.
+- **What is found is stored as "detected"** and shown so in the panel, until somebody changes it. Markers set by hand are left alone unless the search is told to replace them. Searching again replaces what was detected before.
+- It is started per season in the panel, or with `POST /v1/seasons/{id}/markers/detect`. Nothing starts it by itself when an episode is added.
+
 ### Subtitles
 
 Text subtitles inside the source (SubRip, ASS, WebVTT, MOV text) are converted to WebVTT and listed in the multivariant playlist, so every HLS player offers them. Each track gets a language, a label and a row in `subtitle_tracks`. Picture-based subtitles (DVD, Blu-ray) cannot be converted to text and are skipped, which the job output reports. A forced track is on by default, other tracks are off until the viewer turns them on.
@@ -344,6 +361,9 @@ Status shows what exists today.
 | `POST`                  | `/assets/{id}/subtitles`                    | Add a subtitle file. The body is the file; `language`, `label`, `forced`, `filename`, `encoding` in the address    | Built  |
 | `PATCH`, `DELETE`       | `/assets/{id}/subtitles/{trackId}`          | Rename a track, change its language or make it forced; remove it                                                   | Built  |
 | `GET`                   | `/assets/{id}/subtitles/{trackId}/file`     | The WebVTT file of a track                                                                                         | Built  |
+| `GET`, `PUT`            | `/assets/{id}/markers`                      | The recap, intro and credits of a video; set them all at once                                                      |
+| `POST`                  | `/seasons/{id}/markers/detect`              | Search a season for intros and credits, in the background. `overwrite` also replaces markers set by hand           |
+| `GET`                   | `/seasons/{id}/markers/detection`           | How the newest search of a season goes, or went                                                                    |
 | `GET`, `POST`           | `/assets/{id}/audio-tracks`                 | The sound tracks; add a sound file. The body is the file; `language`, `label`, `filename` in the address           |
 | `PATCH`, `DELETE`       | `/assets/{id}/audio-tracks/{trackId}`       | Rename a track, change its language or make it the default; remove it                                              |
 | `POST`                  | `/assets/{id}/audio-tracks/{trackId}/retry` | Try an added track again that failed                                                                               |

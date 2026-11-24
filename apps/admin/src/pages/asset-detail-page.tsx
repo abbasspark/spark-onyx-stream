@@ -5,6 +5,7 @@ import {
   ArrowLeft,
   AudioLines,
   Captions,
+  SkipForward,
   Check,
   Copy,
   FileQuestion,
@@ -19,12 +20,13 @@ import {
   Trash2,
 } from 'lucide-react';
 import { type FormEvent, type ReactNode, useState } from 'react';
-import { Link, useNavigate, useParams } from 'react-router';
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router';
 import { toast } from 'sonner';
 import { ApiError } from '@/api/client';
 import { assetsApi, jobsApi } from '@/api/endpoints';
 import type { Asset, EncryptionMode } from '@/api/types';
 import { AudioTab } from '@/components/asset-audio';
+import { MarkersTab } from '@/components/asset-markers';
 import { SubtitlesTab } from '@/components/asset-subtitles';
 import { useSession } from '@/auth/session';
 import { ActivityTab, QualitiesTab, ThumbnailsTab, useAssetMedia } from '@/components/asset-tabs';
@@ -101,6 +103,8 @@ export function AssetDetailPage() {
   const queryClient = useQueryClient();
   const pollInterval = usePollInterval();
   const [renameOpen, setRenameOpen] = useState(false);
+  // The preview player, which the markers are set against.
+  const [video, setVideo] = useState<HTMLVideoElement | null>(null);
   const [reprocessOpen, setReprocessOpen] = useState(false);
 
   const asset = useQuery({
@@ -251,7 +255,7 @@ export function AssetDetailPage() {
       <div className="grid gap-4 xl:grid-cols-[minmax(0,5fr)_minmax(0,3fr)]">
         <Card className="overflow-hidden">
           {data.status === 'READY' && playback.data ? (
-            <Player playback={playback.data} title={data.title} />
+            <Player playback={playback.data} title={data.title} onVideo={setVideo} />
           ) : (
             <div className="flex aspect-video flex-col items-center justify-center gap-3 bg-muted/40 p-6 text-center">
               {data.status === 'READY' && data.processingMode === 'PASSTHROUGH' ? (
@@ -317,6 +321,7 @@ export function AssetDetailPage() {
 
       <AssetTabs
         asset={data}
+        video={data.status === 'READY' ? video : null}
         jobs={
           <>
             <ErrorNote error={jobs.error} />
@@ -353,13 +358,31 @@ export function AssetDetailPage() {
 }
 
 /** The tabs under the player: outputs, jobs, history and the source file. */
-function AssetTabs({ asset, jobs, jobCount }: { asset: Asset; jobs: ReactNode; jobCount: number }) {
+function AssetTabs({
+  asset,
+  jobs,
+  jobCount,
+  video,
+}: {
+  asset: Asset;
+  jobs: ReactNode;
+  jobCount: number;
+  /** The preview player of the page, for the markers to be set against. */
+  video: HTMLVideoElement | null;
+}) {
   const { can } = useSession();
   const media = useAssetMedia(asset);
   const outputs = media.data;
-  // A video still in processing opens on its jobs, a finished one on its qualities.
+  // A video still in processing opens on its jobs, a finished one on its
+  // qualities, unless the address asks for something: a link from an episode
+  // leads straight to the markers.
+  const [params] = useSearchParams();
   const [tab, setTab] = useState(
-    asset.status === 'READY' || !can('jobs:read') ? 'qualities' : 'jobs',
+    params.get('tab') === 'markers'
+      ? 'markers'
+      : asset.status === 'READY' || !can('jobs:read')
+        ? 'qualities'
+        : 'jobs',
   );
 
   return (
@@ -385,6 +408,10 @@ function AssetTabs({ asset, jobs, jobCount }: { asset: Asset; jobs: ReactNode; j
           {outputs && outputs.subtitles.length > 0 ? (
             <Badge>{outputs.subtitles.length}</Badge>
           ) : null}
+        </TabsTrigger>
+        <TabsTrigger value="markers">
+          <SkipForward />
+          Markers
         </TabsTrigger>
         <TabsTrigger value="thumbnails">
           <Images />
@@ -416,6 +443,9 @@ function AssetTabs({ asset, jobs, jobCount }: { asset: Asset; jobs: ReactNode; j
       </TabsContent>
       <TabsContent value="subtitles">
         <SubtitlesTab asset={asset} media={media} mayWrite={can('assets:write')} />
+      </TabsContent>
+      <TabsContent value="markers">
+        <MarkersTab asset={asset} video={video} mayWrite={can('assets:write')} />
       </TabsContent>
       <TabsContent value="thumbnails">
         <ThumbnailsTab media={media} />

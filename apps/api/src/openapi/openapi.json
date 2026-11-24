@@ -57,6 +57,10 @@
       "description": "Subtitle files of a video."
     },
     {
+      "name": "Markers",
+      "description": "The stretches of a video a player offers to skip: recap, intro and credits."
+    },
+    {
       "name": "Sound tracks",
       "description": "The languages and versions of the sound of a video."
     },
@@ -2386,6 +2390,230 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/AudioTrackView"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or the sign-in ran out.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Signed in, but not allowed to do this.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "What the address names does not exist.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/assets/{assetId}/markers": {
+      "get": {
+        "operationId": "Markers_list",
+        "tags": [
+          "Markers"
+        ],
+        "summary": "The markers of a video, in the order they come",
+        "description": "For an admin or an API key. Needs assets:read.",
+        "security": [
+          {
+            "adminSession": []
+          },
+          {
+            "apiKey": []
+          }
+        ],
+        "x-onyx-access": {
+          "kind": "admin",
+          "permissions": [
+            "assets:read"
+          ],
+          "sessionOnly": false
+        },
+        "parameters": [
+          {
+            "name": "assetId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The answer.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/AdminMarkerView"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or the sign-in ran out.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Signed in, but not allowed to do this.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "What the address names does not exist.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "operationId": "Markers_replace",
+        "tags": [
+          "Markers"
+        ],
+        "summary": "Sets all the markers of a video at once: at most one recap, one intro and one credits, inside the video and not overlapping",
+        "description": "What is left out is removed. Credits with \"endMs\": null run to the end. For an admin or an API key. Needs assets:write.",
+        "security": [
+          {
+            "adminSession": []
+          },
+          {
+            "apiKey": []
+          }
+        ],
+        "x-onyx-access": {
+          "kind": "admin",
+          "permissions": [
+            "assets:write"
+          ],
+          "sessionOnly": false
+        },
+        "parameters": [
+          {
+            "name": "assetId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "markers": {
+                    "maxItems": 3,
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "kind": {
+                          "type": "string",
+                          "enum": [
+                            "RECAP",
+                            "INTRO",
+                            "CREDITS"
+                          ]
+                        },
+                        "startMs": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 108000000
+                        },
+                        "endMs": {
+                          "anyOf": [
+                            {
+                              "type": "integer",
+                              "minimum": 0,
+                              "maximum": 108000000
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        }
+                      },
+                      "required": [
+                        "kind",
+                        "startMs",
+                        "endMs"
+                      ]
+                    }
+                  }
+                },
+                "required": [
+                  "markers"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The answer.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/AdminMarkerView"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The input was refused. \"issues\" names every field.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
                 }
               }
             }
@@ -19851,6 +20079,203 @@
         }
       }
     },
+    "/v1/seasons/{id}/markers/detect": {
+      "post": {
+        "operationId": "Markers_detect",
+        "tags": [
+          "Markers"
+        ],
+        "summary": "Starts a search for the intros and credits of a season",
+        "description": "Its episodes are compared by their sound, in the background; what they share at the start is marked as intro, what they share at the end as credits, both as \"DETECTED\" for an admin to check. Needs two episodes with a video. For an admin or an API key. Needs catalog:write.",
+        "security": [
+          {
+            "adminSession": []
+          },
+          {
+            "apiKey": []
+          }
+        ],
+        "x-onyx-access": {
+          "kind": "admin",
+          "permissions": [
+            "catalog:write"
+          ],
+          "sessionOnly": false
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "overwrite": {
+                    "default": false,
+                    "type": "boolean"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "The answer.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MarkerDetectionView"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The input was refused. \"issues\" names every field.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or the sign-in ran out.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Signed in, but not allowed to do this.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "What the address names does not exist.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/seasons/{id}/markers/detection": {
+      "get": {
+        "operationId": "Markers_detection",
+        "tags": [
+          "Markers"
+        ],
+        "summary": "How the newest search of a season goes, or went",
+        "description": "\"detection\" is null when it was never searched. For an admin or an API key. Needs catalog:read.",
+        "security": [
+          {
+            "adminSession": []
+          },
+          {
+            "apiKey": []
+          }
+        ],
+        "x-onyx-access": {
+          "kind": "admin",
+          "permissions": [
+            "catalog:read"
+          ],
+          "sessionOnly": false
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The answer.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "detection": {
+                      "anyOf": [
+                        {
+                          "$ref": "#/components/schemas/MarkerDetectionView"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    }
+                  },
+                  "required": [
+                    "detection"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or the sign-in ran out.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Signed in, but not allowed to do this.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "What the address names does not exist.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/v1/stats/overview": {
       "get": {
         "operationId": "Stats_overview",
@@ -32985,6 +33410,44 @@
           "warning"
         ]
       },
+      "AdminMarkerView": {
+        "type": "object",
+        "properties": {
+          "source": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/MarkerSource"
+              }
+            ],
+            "description": "MANUAL: set by an admin. DETECTED: found by comparing episodes, and not checked by anyone yet."
+          },
+          "kind": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/MarkerKind"
+              }
+            ],
+            "description": "RECAP: what happened before. INTRO: the opening titles. CREDITS: the closing credits."
+          },
+          "startMs": {
+            "type": "number",
+            "description": "Milliseconds from the start of the video."
+          },
+          "endMs": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "description": "Null for credits that run to the end of the video."
+          }
+        },
+        "required": [
+          "source",
+          "kind",
+          "startMs",
+          "endMs"
+        ]
+      },
       "AdminPrincipal": {
         "type": "object",
         "properties": {
@@ -37555,11 +38018,11 @@
             ],
             "description": "The heading an admin gave. Null: {@link defaultName} is used."
           },
-          "sort": {
-            "$ref": "#/components/schemas/HomeSort"
-          },
           "kind": {
             "$ref": "#/components/schemas/HomeSectionKind"
+          },
+          "sort": {
+            "$ref": "#/components/schemas/HomeSort"
           },
           "source": {
             "$ref": "#/components/schemas/HomeSource"
@@ -37710,8 +38173,8 @@
         "required": [
           "id",
           "name",
-          "sort",
           "kind",
+          "sort",
           "source",
           "visible",
           "layout",
@@ -38014,7 +38477,8 @@
           "THUMBNAILS",
           "SUBTITLES",
           "CLEANUP",
-          "AUDIO"
+          "AUDIO",
+          "MARKERS"
         ]
       },
       "JobView": {
@@ -38507,6 +38971,122 @@
           "siteName",
           "verification",
           "lastDelivery"
+        ]
+      },
+      "MarkerDetectionView": {
+        "type": "object",
+        "properties": {
+          "jobId": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "progress": {
+            "type": "number",
+            "description": "0 to 100."
+          },
+          "queuedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "finishedAt": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "error": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "result": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "properties": {
+              "episodes": {
+                "type": "number",
+                "description": "Episodes that were listened to."
+              },
+              "intros": {
+                "type": "number",
+                "description": "How many of them got an intro, and how many got credits."
+              },
+              "credits": {
+                "type": "number"
+              },
+              "keptManual": {
+                "type": "number",
+                "description": "Markers an admin set that were left as they are."
+              },
+              "perEpisode": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "episode": {
+                      "type": "number"
+                    },
+                    "intro": {
+                      "type": "boolean"
+                    },
+                    "credits": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "episode",
+                    "intro",
+                    "credits"
+                  ]
+                }
+              },
+              "notes": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "description": "What could not be done, in words."
+              }
+            },
+            "required": [
+              "episodes",
+              "intros",
+              "credits",
+              "keptManual",
+              "perEpisode"
+            ],
+            "description": "Set once it is done."
+          }
+        },
+        "required": [
+          "jobId",
+          "status",
+          "progress",
+          "queuedAt",
+          "finishedAt",
+          "error",
+          "result"
+        ]
+      },
+      "MarkerKind": {
+        "type": "string",
+        "enum": [
+          "RECAP",
+          "INTRO",
+          "CREDITS"
+        ]
+      },
+      "MarkerSource": {
+        "type": "string",
+        "enum": [
+          "MANUAL",
+          "DETECTED"
         ]
       },
       "MetadataPreview": {
@@ -40702,6 +41282,37 @@
             },
             "description": "The subtitle tracks of the video."
           },
+          "markers": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "kind": {
+                  "type": "string",
+                  "enum": [
+                    "RECAP",
+                    "INTRO",
+                    "CREDITS"
+                  ]
+                },
+                "startMs": {
+                  "type": "number"
+                },
+                "endMs": {
+                  "type": [
+                    "number",
+                    "null"
+                  ]
+                }
+              },
+              "required": [
+                "kind",
+                "startMs",
+                "endMs"
+              ]
+            },
+            "description": "The stretches a player offers to skip, in the order they come: \"RECAP\"\nand \"INTRO\" with a button while they run, \"CREDITS\" as the moment to\noffer what comes next. Times are milliseconds from the start. Credits\nwith \"endMs\": null run to the end of the video, and from where they\nbegin the video counts as watched."
+          },
           "playId": {
             "type": [
               "string",
@@ -40730,6 +41341,7 @@
           "p2p",
           "audio",
           "subtitles",
+          "markers",
           "playId",
           "stream"
         ]
@@ -40826,6 +41438,37 @@
               ]
             },
             "description": "The subtitle tracks of the video."
+          },
+          "markers": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "kind": {
+                  "type": "string",
+                  "enum": [
+                    "RECAP",
+                    "INTRO",
+                    "CREDITS"
+                  ]
+                },
+                "startMs": {
+                  "type": "number"
+                },
+                "endMs": {
+                  "type": [
+                    "number",
+                    "null"
+                  ]
+                }
+              },
+              "required": [
+                "kind",
+                "startMs",
+                "endMs"
+              ]
+            },
+            "description": "The stretches a player offers to skip, in the order they come: \"RECAP\"\nand \"INTRO\" with a button while they run, \"CREDITS\" as the moment to\noffer what comes next. Times are milliseconds from the start. Credits\nwith \"endMs\": null run to the end of the video, and from where they\nbegin the video counts as watched."
           }
         },
         "required": [
@@ -40836,7 +41479,8 @@
           "expiresAt",
           "p2p",
           "audio",
-          "subtitles"
+          "subtitles",
+          "markers"
         ]
       },
       "PlaybackPreferences": {
@@ -46324,12 +46968,12 @@
                 "name": {
                   "type": "string"
                 },
+                "kind": {
+                  "$ref": "#/components/schemas/PlayDevice"
+                },
                 "createdAt": {
                   "type": "string",
                   "format": "date-time"
-                },
-                "kind": {
-                  "$ref": "#/components/schemas/PlayDevice"
                 },
                 "platform": {
                   "type": "string",
@@ -46359,8 +47003,8 @@
               "required": [
                 "id",
                 "name",
-                "createdAt",
                 "kind",
+                "createdAt",
                 "platform",
                 "model",
                 "appVersion",

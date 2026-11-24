@@ -22,6 +22,7 @@ import {
   Play,
   RotateCcw,
   RotateCw,
+  SkipForward,
   Volume1,
   Volume2,
   VolumeX,
@@ -37,6 +38,7 @@ import {
   useState,
 } from 'react';
 import { formatClock } from '@/lib/format';
+import { endOf, runningMarker, skipLabel } from '@/lib/markers';
 import { type PlaybackPreferences, profilesApi } from '@/lib/profiles';
 import { pickTrack } from '@/lib/tracks';
 import type { Playback } from '@/lib/types';
@@ -84,6 +86,11 @@ interface PlayerProps {
   onFatal: (message: string, network?: boolean) => void;
   /** Drawn over the video, above the controls: the end screen. */
   overlay?: ReactNode;
+  /**
+   * What is offered while the credits run, in place of sitting through
+   * them: the next episode. Null when nothing comes next.
+   */
+  afterCredits?: { label: string; onPress: () => void } | null;
 }
 
 /** The name of a language for a code such as "en", for subtitle tracks without a name. */
@@ -134,7 +141,8 @@ function isOwnedByControl(event: KeyboardEvent): boolean {
  *
  * Plays HLS through hls.js, or through the browser itself where hls.js does
  * not run (Safari on iPhone). Keys: Space or K play and pause, the arrows skip
- * and change the volume, M mutes, F is full screen, C switches subtitles.
+ * and change the volume, M mutes, F is full screen, C switches subtitles,
+ * S skips the recap, intro or credits that are running.
  */
 export function Player({
   playback,
@@ -147,6 +155,7 @@ export function Player({
   onEnded,
   onFatal,
   overlay,
+  afterCredits = null,
 }: PlayerProps) {
   const container = useRef<HTMLDivElement>(null);
   const video = useRef<HTMLVideoElement>(null);
@@ -637,6 +646,31 @@ export function Player({
     return () => document.removeEventListener('fullscreenchange', onFullscreen);
   }, []);
 
+  // --- Skipping recap, intro and credits ------------------------------------
+
+  // The stretch the video is in, while skipping it still saves something.
+  const running = overlay ? null : runningMarker(playback.markers, time, duration);
+  // Credits are skipped to what comes next. Without that, only credits
+  // followed by a scene are worth a button.
+  const skipAction =
+    running === null
+      ? null
+      : running.kind === 'CREDITS' && afterCredits
+        ? afterCredits
+        : running.kind === 'CREDITS' && running.endMs === null
+          ? null
+          : {
+              label: skipLabel(running.kind),
+              onPress: () => {
+                if (video.current) {
+                  video.current.currentTime = endOf(running, duration);
+                }
+              },
+            };
+  const skipRef = useRef(skipAction);
+  skipRef.current = skipAction;
+  const skipRunning = useCallback(() => skipRef.current?.onPress(), []);
+
   // --- Keys -----------------------------------------------------------------
 
   useEffect(() => {
@@ -656,6 +690,7 @@ export function Player({
         ArrowDown: () => changeVolume((element?.volume ?? 1) - 0.1),
         m: toggleMute,
         f: toggleFullscreen,
+        s: skipRunning,
         c: () => {
           if (textTracks.length > 0) {
             chooseTextTrack(textTrack === NONE ? (textTracks[0]?.id ?? NONE) : NONE);
@@ -833,6 +868,20 @@ export function Player({
       ) : null}
 
       {overlay}
+
+      {skipAction ? (
+        <button
+          type="button"
+          className="button absolute right-[clamp(0.75rem,3vw,2.5rem)] bottom-[clamp(6rem,14vh,8.5rem)] z-10 border border-vein/70 bg-onyx/75 text-vein backdrop-blur-sm hover:bg-vein hover:text-onyx"
+          onClick={() => {
+            skipAction.onPress();
+            wake();
+          }}
+        >
+          <SkipForward className="fill-current" />
+          {skipAction.label}
+        </button>
+      ) : null}
 
       <div
         className={`pointer-events-none absolute inset-x-0 top-0 bg-linear-to-b from-onyx/80 to-transparent pb-16 transition-opacity duration-200 ${visible ? 'opacity-100' : 'opacity-0'}`}

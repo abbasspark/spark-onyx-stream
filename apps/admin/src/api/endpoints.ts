@@ -169,6 +169,7 @@ import type {
   AppVersionRule,
   AppVersions,
 } from './types';
+import type { Marker, MarkerDetection } from '@/lib/markers';
 import type { OpenApiDocument } from '@/lib/openapi';
 
 export const authApi = {
@@ -503,6 +504,28 @@ export interface AddSubtitleOptions {
   /** For files that are not Unicode, when the guess from the language is wrong. */
   encoding?: string;
 }
+
+/** The stretches of a video players offer to skip, and the search for them in a season. */
+export const markersApi = {
+  list: (assetId: string, signal?: AbortSignal) =>
+    request<Marker[]>(`/v1/assets/${assetId}/markers`, { signal }),
+  /** Sets all the markers of a video at once. What is left out is removed. */
+  replace: (assetId: string, markers: Pick<Marker, 'kind' | 'startMs' | 'endMs'>[]) =>
+    request<Marker[]>(`/v1/assets/${assetId}/markers`, { method: 'PUT', body: { markers } }),
+  detect: (seasonId: string, overwrite: boolean) =>
+    request<MarkerDetection>(`/v1/seasons/${seasonId}/markers/detect`, {
+      method: 'POST',
+      body: { overwrite },
+    }),
+  /** How the newest search of a season goes, or went. Null when there was none. */
+  detection: async (seasonId: string, signal?: AbortSignal) =>
+    (
+      await request<{ detection: MarkerDetection | null }>(
+        `/v1/seasons/${seasonId}/markers/detection`,
+        { signal },
+      )
+    ).detection,
+};
 
 /** The sound tracks of a video. They are listed with its media. */
 export const audioTracksApi = {

@@ -12,6 +12,8 @@ import { ProcessingSteps } from './processing-steps.js';
 import { ProcessingConsumer } from './processing.consumer.js';
 import { RunningJobs } from './running-jobs.js';
 import { AudioTracksService } from '../audio-tracks/audio-tracks.service.js';
+import { MarkerDetector } from '../markers/marker-detector.js';
+import { MarkersService } from '../markers/markers.service.js';
 import { SubtitlesService } from '../subtitles/subtitles.service.js';
 
 /**
@@ -26,6 +28,7 @@ import { SubtitlesService } from '../subtitles/subtitles.service.js';
     PipelineService,
     SubtitlesService,
     AudioTracksService,
+    MarkersService,
   ],
   exports: [
     JobsService,
@@ -33,6 +36,7 @@ import { SubtitlesService } from '../subtitles/subtitles.service.js';
     PipelineService,
     SubtitlesService,
     AudioTracksService,
+    MarkersService,
   ],
 })
 export class ProcessingCoreModule {}
@@ -45,8 +49,8 @@ export class ProcessingApiModule {}
 
 /** The media steps and their executor, without the queue. Imported by the worker and by tests. */
 @Module({
-  providers: [FfmpegRunner, ProcessingSteps, RunningJobs, JobExecutor],
-  exports: [FfmpegRunner, ProcessingSteps, RunningJobs, JobExecutor],
+  providers: [FfmpegRunner, ProcessingSteps, RunningJobs, JobExecutor, MarkerDetector],
+  exports: [FfmpegRunner, ProcessingSteps, RunningJobs, JobExecutor, MarkerDetector],
 })
 export class ProcessingStepsModule {}
 

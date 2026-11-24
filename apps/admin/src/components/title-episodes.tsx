@@ -1,6 +1,15 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 import { useMutation } from '@tanstack/react-query';
-import { ListVideo, MoreHorizontal, Pencil, Plus, Trash2 } from 'lucide-react';
+import {
+  ListVideo,
+  MoreHorizontal,
+  Pencil,
+  Plus,
+  ScanSearch,
+  SkipForward,
+  Trash2,
+} from 'lucide-react';
+import { Link } from 'react-router';
 import { type FormEvent, useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import { apiUrl } from '@/api/client';
@@ -10,6 +19,7 @@ import { countStates, EPISODE_STATE_LOOKS, episodeState, formatRuntime } from '@
 import { cn } from '@/lib/cn';
 import { formatDay, formatDuration } from '@/lib/format';
 import { useConfirm } from './confirm';
+import { SeasonMarkersDialog } from './season-markers';
 import { ImageField } from './image-field';
 import { VideoSlot } from './title-media';
 import { Button } from './ui/button';
@@ -58,6 +68,8 @@ interface TitleEpisodesProps {
 export function TitleEpisodes({ title, disabled, refresh }: TitleEpisodesProps) {
   const confirm = useConfirm();
   const [seasonForm, setSeasonForm] = useState<Season | 'new' | null>(null);
+  /** The season whose intros and credits are being searched for. */
+  const [searching, setSearching] = useState<Season | null>(null);
   const [episodeForm, setEpisodeForm] = useState<{ season: Season; episode?: Episode } | null>(
     null,
   );
@@ -199,6 +211,10 @@ export function TitleEpisodes({ title, disabled, refresh }: TitleEpisodesProps) 
                           <Pencil />
                           Edit season
                         </DropdownMenuItem>
+                        <DropdownMenuItem onSelect={() => setSearching(season)}>
+                          <ScanSearch />
+                          Find intros and credits…
+                        </DropdownMenuItem>
                         <DropdownMenuSeparator />
                         <DropdownMenuItem destructive onSelect={() => void askDeleteSeason(season)}>
                           <Trash2 />
@@ -335,6 +351,14 @@ export function TitleEpisodes({ title, disabled, refresh }: TitleEpisodesProps) 
                                     <Pencil />
                                     Edit
                                   </DropdownMenuItem>
+                                  {episode.asset ? (
+                                    <DropdownMenuItem asChild>
+                                      <Link to={`/assets/${episode.asset.id}?tab=markers`}>
+                                        <SkipForward />
+                                        Intro and credits
+                                      </Link>
+                                    </DropdownMenuItem>
+                                  ) : null}
                                   <DropdownMenuSeparator />
                                   <DropdownMenuItem
                                     destructive
@@ -360,6 +384,9 @@ export function TitleEpisodes({ title, disabled, refresh }: TitleEpisodesProps) 
 
       {title.seasons.length > 0 && addSeason ? <div>{addSeason}</div> : null}
 
+      {searching ? (
+        <SeasonMarkersDialog season={searching} onClose={() => setSearching(null)} />
+      ) : null}
       <SeasonDialog
         titleId={title.id}
         refresh={refresh}
