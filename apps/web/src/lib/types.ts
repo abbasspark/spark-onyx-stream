@@ -246,6 +246,8 @@ export interface Playback {
    * operator. Missing or null when the installation records nothing.
    */
   playId?: string | null;
+  /** Where the player says how playback went. Null or missing: nothing is reported. */
+  qualityId?: string | null;
   /** The sound tracks of the video. Missing from an API older than them. */
   audio?: { language: string; label: string | null; isDefault: boolean }[];
   /** The subtitle tracks of the video. Missing from an older API. */
@@ -294,6 +296,8 @@ export interface Guide {
 export interface LivePlayback {
   /** Set for a signed-in viewer. Missing from an older API. */
   stream?: StreamTicket | null;
+  /** Where the player says how playback went. Null or missing: nothing is reported. */
+  qualityId?: string | null;
   protocol: 'hls';
   url: string;
   expiresAt: string;

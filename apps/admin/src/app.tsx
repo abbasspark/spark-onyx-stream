@@ -16,6 +16,7 @@ import { titlePath } from './lib/catalog';
 import { LiveProvider } from './live/live';
 import { AccountPage } from './pages/account-page';
 import { AnalyticsPage } from './pages/analytics-page';
+import { QualityPage } from './pages/quality-page';
 import { LayoutPage } from './pages/layout-page';
 import { EmailPage } from './pages/email-page';
 import { ChannelsPage } from './pages/channels-page';
@@ -119,6 +120,7 @@ function Pages() {
           <Route element={<AppShell />}>
             <Route index element={<DashboardPage />} />
             <Route path="analytics" element={<AnalyticsPage />} />
+            <Route path="quality" element={<QualityPage />} />
             <Route path="assets" element={<AssetsPage />} />
             <Route
               path="assets/:id"

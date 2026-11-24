@@ -17,6 +17,7 @@ import { DatabaseModule } from '../../src/database/database.module.js';
 import type { QueuedJobData } from '../../src/jobs/jobs.service.js';
 import { ProcessingCoreModule } from '../../src/processing/processing.module.js';
 import { PlaysModule } from '../../src/analytics/analytics.module.js';
+import { QualityRecorderModule } from '../../src/quality/quality.module.js';
 import { TitleHistoryCoreModule } from '../../src/history/title-history.module.js';
 import { WebhooksCoreModule } from '../../src/webhooks/webhooks.module.js';
 import { StreamsCoreModule } from '../../src/streams/streams.module.js';
@@ -301,6 +302,7 @@ export async function createTestApp(
       StorageModule,
       ProcessingCoreModule,
       PlaysModule,
+      QualityRecorderModule,
       TitleHistoryCoreModule,
       WebhooksCoreModule,
       StreamsCoreModule,
@@ -357,6 +359,7 @@ export async function createTestApp(
       await prisma.coupon.deleteMany();
       await prisma.watchlistItem.deleteMany();
       await prisma.play.deleteMany();
+      await prisma.playbackSession.deleteMany();
       await prisma.auditLog.deleteMany();
       await prisma.backup.deleteMany();
       await prisma.deviceCode.deleteMany();

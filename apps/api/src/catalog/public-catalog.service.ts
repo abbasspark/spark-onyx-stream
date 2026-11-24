@@ -45,6 +45,7 @@ import { TranslationsService } from './translations.service.js';
 import { CARD_INCLUDE } from './card-include.js';
 import { HomeService, type LayoutPage, type PageScope } from '../home/home.service.js';
 import { PlaysService } from '../analytics/plays.service.js';
+import { QualityRecorder } from '../quality/quality-recorder.service.js';
 import { StreamsService, type StreamTicket } from '../streams/streams.service.js';
 
 /** The page of one category or genre: its rows, and what it is the page of. */
@@ -62,6 +63,12 @@ export interface PlayClient {
 export type PlayAnswer = PlaybackInfo & {
   /** For `POST /catalog/plays/{playId}/beat`. Null when the installation records nothing. */
   playId: string | null;
+  /**
+   * Where the player says how playback went, for
+   * `POST /playback/sessions/{qualityId}/report`. Null when the installation
+   * takes no such reports.
+   */
+  qualityId: string | null;
   /**
    * The place this device holds among the streams of the account, for
    * `POST /viewer/streams/{id}/beat`. Null for a visitor, a trailer or an extra.
@@ -128,6 +135,7 @@ export class PublicCatalogService {
     @Inject(HomeService) private readonly homeLayout: HomeService,
     @Inject(PlaysService) private readonly plays: PlaysService,
     @Inject(StreamsService) private readonly streams: StreamsService,
+    @Inject(QualityRecorder) private readonly quality: QualityRecorder,
   ) {}
 
   /**
@@ -718,7 +726,14 @@ export class PublicCatalogService {
       ipAddress: play.client?.ipAddress ?? null,
       userAgent: play.client?.userAgent ?? null,
     });
-    return { ...info, playId, stream };
+    const qualityId = await this.quality.start({
+      kind: 'VIDEO',
+      titleId: play.titleId,
+      episodeId: play.episodeId,
+      userAgent: play.client?.userAgent ?? null,
+      playbackUrl: info.manifestUrl,
+    });
+    return { ...info, playId, qualityId, stream };
   }
 
   /**

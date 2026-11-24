@@ -14,6 +14,7 @@
 | [phase-6-operations.md](phase-6-operations.md)     | Backups, the installer, updates with rollback, diagnostics           |
 | [watched-locations.md](watched-locations.md)       | Folders and buckets that import videos named by their TMDB id        |
 | [viewing-statistics.md](viewing-statistics.md)     | What is recorded about watching, and the figures made of it          |
+| [playback-quality.md](playback-quality.md)         | What players report about how playback went, and how to read it      |
 | [api.md](api.md)                                   | The API described for programs, generated clients, and app versions  |
 | [extension-points.md](extension-points.md)         | Interfaces that let features be added without changing the core      |
 

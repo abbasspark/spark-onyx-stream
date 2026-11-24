@@ -14,6 +14,8 @@ import {
   sharingPreference,
 } from '@/lib/p2p';
 import Hls from 'hls.js';
+import type { ErrorCode } from '@/lib/quality';
+import { errorCodeOf, errorWordsOf, useQualityReports } from './player/use-quality';
 import {
   ArrowLeft,
   List,
@@ -360,13 +362,18 @@ function LivePlayer({ channel, channels, playback, onBroken, onZap }: LivePlayer
 
   // --- The stream -----------------------------------------------------------
 
+  // How the playback goes, for the figures in the panel. Set up before the
+  // channel is loaded, so the wait for the first picture is counted whole.
+  const quality = useQualityReports(playback.qualityId, videoRef);
+
   useEffect(() => {
     const video = videoRef.current;
     if (!video) {
       return undefined;
     }
     let timer: number | undefined;
-    const broken = () => {
+    const broken = (code: ErrorCode = 'other', words?: string) => {
+      quality.current?.fail(code, words, video.currentTime);
       setWaiting(true);
       timer = window.setTimeout(onBroken, BROKEN_RETRY_MS);
     };
@@ -400,7 +407,7 @@ function LivePlayer({ channel, channels, playback, onBroken, onZap }: LivePlayer
         gaveUp = true;
         hlsRef.current?.destroy();
         hlsRef.current = null;
-        broken();
+        broken('timeout', 'the picture stood still');
       }
     }, 2000);
 
@@ -417,11 +424,15 @@ function LivePlayer({ channel, channels, playback, onBroken, onZap }: LivePlayer
       sharing?.bind(hls);
       hlsRef.current = hls;
       hls.on(Hls.Events.MANIFEST_PARSED, start);
+      hls.on(Hls.Events.LEVEL_SWITCHED, (_event, data) => {
+        const level = hls.levels[data.level];
+        quality.current?.level(level?.height ?? null, level?.bitrate ?? null);
+      });
       hls.on(Hls.Events.ERROR, (_event, data) => {
         if (data.fatal) {
           hls.destroy();
           hlsRef.current = null;
-          broken();
+          broken(errorCodeOf(data), errorWordsOf(data));
         }
       });
       hls.loadSource(playback.url);
@@ -429,9 +440,11 @@ function LivePlayer({ channel, channels, playback, onBroken, onZap }: LivePlayer
     } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
       video.src = playback.url;
       video.addEventListener('loadedmetadata', start, { once: true });
-      video.addEventListener('error', broken, { once: true });
+      video.addEventListener('error', () => broken('network', video.error?.message || undefined), {
+        once: true,
+      });
     } else {
-      broken();
+      broken('unsupported', 'no way to play HLS in this browser');
     }
 
     return () => {

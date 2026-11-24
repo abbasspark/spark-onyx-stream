@@ -24,6 +24,7 @@ import {
   Disc,
   Drama,
   Gauge,
+  HeartPulse,
   Network,
   Share2,
   Mail,
@@ -72,6 +73,14 @@ export const NAVIGATION: NavGroup[] = [
         icon: BarChart3,
         permission: 'analytics:read',
         keywords: 'views viewers watch time statistics figures audience popular top',
+      },
+      {
+        to: '/quality',
+        label: 'Playback quality',
+        icon: HeartPulse,
+        permission: 'analytics:read',
+        keywords:
+          'buffering rebuffering stalls startup time errors failures bitrate qoe health players',
       },
     ],
   },

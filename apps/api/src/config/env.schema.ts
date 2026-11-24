@@ -73,6 +73,14 @@ export const envSchema = z
     VIEWING_STATISTICS_DAYS: z.coerce.number().int().min(0).max(3650).default(730),
 
     /**
+     * Whether players report how playback went, for the quality figures in
+     * the panel. "off" records nothing: players get no place to report to.
+     */
+    PLAYBACK_REPORTS: z.enum(['on', 'off']).default('on'),
+    /** How long a report is kept, in days. 0 keeps them for good. */
+    PLAYBACK_REPORTS_DAYS: z.coerce.number().int().min(0).max(3650).default(90),
+
+    /**
      * On how many devices one viewer account plays at the same time. 0: no
      * limit. A plan, and an admin for a single viewer, can say otherwise.
      */
