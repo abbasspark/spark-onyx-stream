@@ -353,6 +353,7 @@ describe.skipIf(!TEST_DATABASE_URL)('Billing (e2e)', () => {
         grantedBy: { id: expect.any(String), displayName: expect.any(String) },
         renewsAt: null,
         online: false,
+        prepaid: false,
         externalId: null,
         externalUrl: null,
         createdAt: expect.any(String),
@@ -373,6 +374,7 @@ describe.skipIf(!TEST_DATABASE_URL)('Billing (e2e)', () => {
           cancelAtPeriodEnd: false,
           renewsAt: null,
           online: false,
+          prepaid: false,
         },
       });
       // Notes of admins and who granted it are not for the viewer.
@@ -656,6 +658,7 @@ describe.skipIf(!TEST_DATABASE_URL)('Billing (e2e)', () => {
         subscribers: 2,
         grantedByHand: 2,
         paidOnline: 0,
+        prepaid: 0,
         pastDue: 0,
         stripe: null,
         endingSoon: 1,

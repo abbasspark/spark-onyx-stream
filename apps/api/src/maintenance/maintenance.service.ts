@@ -136,7 +136,8 @@ export class MaintenanceService implements OnApplicationBootstrap, OnApplication
   }
 
   /**
-   * Marks access an admin granted as expired once its time has run out.
+   * Marks access an admin granted, or a prepaid code gave, as expired once
+   * its time has run out.
    * Whether a viewer may watch is decided by the end time itself: this only
    * keeps the stored state true for lists and counts.
    *
@@ -144,7 +145,11 @@ export class MaintenanceService implements OnApplicationBootstrap, OnApplication
    */
   async expireSubscriptions(now = new Date()): Promise<number> {
     const result = await this.prisma.subscription.updateMany({
-      where: { source: 'MANUAL', status: { in: ['ACTIVE', 'TRIALING'] }, endsAt: { lte: now } },
+      where: {
+        source: { in: ['MANUAL', 'PREPAID'] },
+        status: { in: ['ACTIVE', 'TRIALING'] },
+        endsAt: { lte: now },
+      },
       data: { status: 'EXPIRED' },
     });
     return result.count;

@@ -362,6 +362,7 @@ export async function createTestApp(
       await prisma.watchlistItem.deleteMany();
       await prisma.play.deleteMany();
       await prisma.playbackSession.deleteMany();
+      await prisma.prepaidBatch.deleteMany();
       await prisma.notification.deleteMany();
       await prisma.pushCampaign.deleteMany();
       await prisma.pushDevice.deleteMany();

@@ -29,6 +29,7 @@ import { BackupsPage } from './pages/backups-page';
 import { DiagnosticsPage } from './pages/diagnostics-page';
 import { P2pPage } from './pages/p2p-page';
 import { CouponsPage } from './pages/coupons-page';
+import { PrepaidCodesPage } from './pages/prepaid-codes-page';
 import { PackagesPage } from './pages/packages-page';
 import { PlansPage } from './pages/plans-page';
 import { RevenuePage } from './pages/revenue-page';
@@ -156,6 +157,7 @@ function Pages() {
             <Route path="plans" element={<PlansPage />} />
             <Route path="packages" element={<PackagesPage />} />
             <Route path="coupons" element={<CouponsPage />} />
+            <Route path="prepaid-codes" element={<PrepaidCodesPage />} />
             <Route path="channels" element={<ChannelsPage />} />
             <Route path="guide" element={<GuidePage />} />
             <Route path="recordings" element={<RecordingsPage />} />

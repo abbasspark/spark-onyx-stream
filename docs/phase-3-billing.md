@@ -278,3 +278,7 @@ A title's access is part of the title: `access`, `packageIds`, `rentAmount`, `bu
 - Gift codes that open something without a payment page, and batches of single-use codes
 - A code on a payment an admin writes down by hand
 - Payment providers other than Stripe
+
+## Prepaid codes
+
+Codes that give days of a plan, made in batches and entered by a viewer on the website, need no online payment at all. See [prepaid-codes.md](prepaid-codes.md).

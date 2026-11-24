@@ -210,3 +210,29 @@ export function startOfDay(date: string): string | null {
   const parsed = new Date(`${date}T12:00:00`);
   return Number.isNaN(parsed.getTime()) ? null : parsed.toISOString();
 }
+
+/** Where the subscribers come from, in a few words under their number. */
+export function describeSubscribers(overview: {
+  subscribers: number;
+  grantedByHand: number;
+  paidOnline: number;
+  prepaid?: number;
+}): string {
+  const parts = [
+    overview.paidOnline > 0 ? `${overview.paidOnline} paying online` : null,
+    (overview.prepaid ?? 0) > 0 ? `${overview.prepaid} through a prepaid code` : null,
+    overview.grantedByHand > 0 ? `${overview.grantedByHand} granted by hand` : null,
+  ].filter((part): part is string => part !== null);
+  if (parts.length === 0) {
+    return 'Nobody yet';
+  }
+  if (parts.length === 1) {
+    if (overview.grantedByHand === overview.subscribers) {
+      return 'All granted by hand';
+    }
+    if (overview.prepaid === overview.subscribers) {
+      return 'All through a prepaid code';
+    }
+  }
+  return parts.join(', ');
+}

@@ -37,6 +37,7 @@ import {
   Stethoscope,
   Shapes,
   Tag,
+  Ticket,
   Tags,
   Tv,
   Users,
@@ -254,6 +255,13 @@ export const NAVIGATION: NavGroup[] = [
         icon: Tag,
         permission: 'billing:read',
         keywords: 'codes discounts vouchers promotions promo offers percent off campaign',
+      },
+      {
+        to: '/prepaid-codes',
+        label: 'Prepaid codes',
+        icon: Ticket,
+        permission: 'billing:read',
+        keywords: 'vouchers gift cards scratch cards top up activation codes resellers kiosk cash',
       },
       {
         to: '/revenue',

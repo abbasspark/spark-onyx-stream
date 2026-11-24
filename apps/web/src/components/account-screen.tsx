@@ -14,6 +14,7 @@ import {
   MonitorSmartphone,
   Smartphone,
   Tablet,
+  Ticket,
   Tv,
   UsersRound,
 } from 'lucide-react';
@@ -921,6 +922,18 @@ function SubscriptionSection() {
                 </p>
               ) : null}
             </>
+          ) : own.endsAt ? (
+            <>
+              <Link href="/redeem" className="button button-quiet mt-5">
+                <Ticket />
+                {own.prepaid ? 'Add days with a code' : 'Enter a prepaid code'}
+              </Link>
+              <p className="mt-3 text-sm text-dust">
+                {own.prepaid
+                  ? 'Nothing renews by itself. A further code for the same plan adds its days to the end.'
+                  : 'A code for the same plan adds its days to the end.'}
+              </p>
+            </>
           ) : null}
         </>
       ) : (
@@ -928,9 +941,17 @@ function SubscriptionSection() {
           <p className="mb-5 text-smoke">
             You have no subscription. Titles marked with a lock need one.
           </p>
-          <Link href="/plans" className="button button-quiet">
-            See the plans
-          </Link>
+          <div className="flex flex-wrap gap-3">
+            {plansOffered ? (
+              <Link href="/plans" className="button button-quiet">
+                See the plans
+              </Link>
+            ) : null}
+            <Link href="/redeem" className="button button-quiet">
+              <Ticket />
+              Enter a prepaid code
+            </Link>
+          </div>
         </>
       )}
     </Section>

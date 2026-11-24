@@ -229,6 +229,7 @@ export class SubscriptionsService {
       subscribers,
       grantedByHand,
       paidOnline,
+      prepaid,
       pastDue,
       endingSoon,
       paidTitles,
@@ -239,12 +240,13 @@ export class SubscriptionsService {
       this.prisma.subscription.count({ where: running }),
       this.prisma.subscription.count({ where: { ...running, source: 'MANUAL' } }),
       this.prisma.subscription.count({ where: { ...running, source: 'STRIPE' } }),
+      this.prisma.subscription.count({ where: { ...running, source: 'PREPAID' } }),
       this.prisma.subscription.count({ where: { ...running, status: 'PAST_DUE' } }),
       this.prisma.subscription.count({
         where: {
           status: running.status,
           endsAt: { gt: now, lte: new Date(now.getTime() + SEVEN_DAYS_MS) },
-          OR: [{ source: 'MANUAL' }, { cancelAtPeriodEnd: true }],
+          OR: [{ source: { in: ['MANUAL', 'PREPAID'] } }, { cancelAtPeriodEnd: true }],
         },
       }),
       this.prisma.title.count({ where: { status: 'PUBLISHED', access: 'PAID' } }),
@@ -267,6 +269,7 @@ export class SubscriptionsService {
       subscribers,
       grantedByHand,
       paidOnline,
+      prepaid,
       pastDue,
       stripe,
       endingSoon,
@@ -340,7 +343,8 @@ export class SubscriptionsService {
     if (!subscription) {
       throw new NotFoundException('Subscription not found');
     }
-    if (subscription.source !== 'MANUAL') {
+    // What an admin granted and what a prepaid code gave are both the platform's own to change.
+    if (subscription.source === 'STRIPE') {
       throw new ConflictException(
         'This subscription is paid online and follows the payment provider.',
       );

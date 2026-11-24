@@ -47,7 +47,13 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/overlay';
-import { formatMoney, parsePrice, toPriceText, yearlySaving } from '@/lib/billing';
+import {
+  describeSubscribers,
+  formatMoney,
+  parsePrice,
+  toPriceText,
+  yearlySaving,
+} from '@/lib/billing';
 import { cn } from '@/lib/cn';
 import { parseStreamLimit } from '@/lib/viewers';
 
@@ -197,11 +203,7 @@ function Overview({ overview }: { overview: BillingOverview }) {
     {
       label: 'Subscribers',
       value: String(overview.subscribers),
-      note: overview.stripe
-        ? `${overview.paidOnline} paying online, ${overview.grantedByHand} granted by hand`
-        : overview.subscribers === overview.grantedByHand
-          ? 'All granted by hand'
-          : `${overview.grantedByHand} granted by hand`,
+      note: describeSubscribers(overview),
     },
     overview.stripe
       ? {

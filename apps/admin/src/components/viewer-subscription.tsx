@@ -5,6 +5,7 @@ import {
   CreditCard,
   ExternalLink,
   Gift,
+  Ticket,
   Pencil,
   RefreshCw,
   XCircle,
@@ -154,10 +155,16 @@ export function ViewerSubscription({
                 <Badge>
                   {current.source === 'MANUAL' ? (
                     <Gift className="size-3" aria-hidden="true" />
+                  ) : current.source === 'PREPAID' ? (
+                    <Ticket className="size-3" aria-hidden="true" />
                   ) : (
                     <CreditCard className="size-3" aria-hidden="true" />
                   )}
-                  {current.source === 'MANUAL' ? 'Granted by hand' : 'Paid online'}
+                  {current.source === 'MANUAL'
+                    ? 'Granted by hand'
+                    : current.source === 'PREPAID'
+                      ? 'Prepaid code'
+                      : 'Paid online'}
                 </Badge>
               </p>
               <p className="mt-1.5 flex items-center gap-1.5 text-sm text-muted-foreground">
@@ -220,7 +227,7 @@ export function ViewerSubscription({
                 ) : null}
               </div>
             ) : null}
-            {mayWrite && current.source === 'MANUAL' ? (
+            {mayWrite && current.source !== 'STRIPE' ? (
               <div className="flex shrink-0 gap-1.5">
                 <Button size="sm" onClick={() => setDialog('change')}>
                   <Pencil />

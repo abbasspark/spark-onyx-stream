@@ -96,7 +96,7 @@ A comparison with other platforms named ten things that change what the API says
 6. Similar titles: found by comparing genres, keywords, people and collections and by what the same viewers watch, corrected by an editor who pins and hides, shown on the page of a title, at the end of a video and as rows made from what a profile watched. **Done.** See [phase-2-catalog.md](phase-2-catalog.md#similar-titles).
 7. Reports from players about how playback went: the time to start, waiting, quality and what broke, for videos and live channels, with a page in the panel that grades them and compares devices, servers and players. **Done.** See [playback-quality.md](playback-quality.md).
 8. Notifications: a list on every account, pushed to browsers with the installation's own key and to apps through the operator's Firebase project, sent by themselves for new episodes and new titles, and written by an admin for an audience, at once or at a set time. **Done.** See [notifications.md](notifications.md).
-9. Prepaid codes that start or extend a subscription. **Planned.**
+9. Prepaid codes: made in batches for a plan and a number of days, downloaded for cards and resellers, and entered by a viewer to start the plan or to add days to it, with every code kept unreadable and usable once. **Done.** See [prepaid-codes.md](prepaid-codes.md).
 10. Selling inside the apps, or sending viewers to the website. **To decide.**
 
 Content protection with DRM follows the first app release, as something an operator switches on with a licence service of their own.
