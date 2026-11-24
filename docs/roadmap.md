@@ -10,7 +10,7 @@ The project is built in phases. Each phase ends with something that works end to
 | 4. Live                       | Ingest, copy and transcode channels, DVR, EPG, channels in the catalog              | Done                |
 | 5. Edges and P2P              | Edge agent, tracker, P2P in the player, offload statistics                          | Done                |
 | 6. Operations                 | Installer, updates with rollback, backup and restore, diagnostics                   | Done                |
-| 7. Apps                       | Android mobile and Android TV                                                       | Planned             |
+| 7. Apps                       | Android mobile and Android TV                                                       | In progress         |
 | 8. Advanced                   | DRM, ads, analytics dashboards, further apps                                        | Planned             |
 
 ## Phase 1 in steps
@@ -38,6 +38,15 @@ See [phase-1-media-engine.md](phase-1-media-engine.md) for the design.
 6. Channels in the catalog, in packages and on the viewer website. **Done.** Built before steps 4 and 5, so that viewers can watch channels at all.
 
 See [phase-4-live.md](phase-4-live.md) for the design.
+
+## Phase 7 in steps
+
+1. The television app: the project, signing in without a keyboard, profiles, the home page, a title with its episodes, and the player with resume. **Done.**
+2. Live channels on the television: the lineup, the guide, going back in what a channel keeps. **Next.**
+3. Search, the list a viewer saves, and the settings of the app. **Planned.**
+4. The Android app for phones and tablets. **Planned.**
+
+See [phase-7-apps.md](phase-7-apps.md) for the design.
 
 ## Phase 5 in steps
 

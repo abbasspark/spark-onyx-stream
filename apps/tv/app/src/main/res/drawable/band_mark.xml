@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  SPDX-License-Identifier: AGPL-3.0-only
+
+  The mark of the site, as the television shows it: a cut through banded
+  stone, three bands of uneven weight with the middle one amber.
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="56dp"
+    android:height="56dp"
+    android:viewportWidth="28"
+    android:viewportHeight="28">
+    <path
+        android:fillColor="#F4F1EA"
+        android:pathData="M1,4 H27 V10 H1 Z" />
+    <path
+        android:fillColor="#E6A85C"
+        android:pathData="M1,13 H27 V15.5 H1 Z" />
+    <path
+        android:fillColor="#F4F1EA"
+        android:fillAlpha="0.55"
+        android:pathData="M1,18.5 H27 V24 H1 Z" />
+</vector>
