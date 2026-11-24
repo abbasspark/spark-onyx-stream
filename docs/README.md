@@ -20,6 +20,7 @@
 | [notifications.md](notifications.md)               | Notifications to browsers and apps, what is sent by itself, and the list of a viewer |
 | [prepaid-codes.md](prepaid-codes.md)               | Prepaid codes: batches, what entering a code does, what clients call, what is kept   |
 | [api.md](api.md)                                   | The API described for programs, generated clients, and app versions                  |
+| [phase-7-apps.md](phase-7-apps.md)                 | The television app: how it is built, how it signs in, what a remote control does     |
 | [extension-points.md](extension-points.md)         | Interfaces that let features be added without changing the core                      |
 
 These documents describe the plan. Where code and documents disagree, the code is right and the document needs an update.

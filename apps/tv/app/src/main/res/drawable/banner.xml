@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  SPDX-License-Identifier: AGPL-3.0-only
+
+  What the television's launcher shows for the app: 320 by 180, the mark on
+  the left over true black, with room for the name the launcher writes itself.
+-->
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:drawable="@color/onyx" />
+    <item
+        android:width="92dp"
+        android:height="92dp"
+        android:gravity="center_vertical|start"
+        android:start="28dp"
+        android:drawable="@drawable/band_mark" />
+</layer-list>

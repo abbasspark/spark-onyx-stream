@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- SPDX-License-Identifier: AGPL-3.0-only -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <group android:scaleX="1.6" android:scaleY="1.6" android:translateX="21.6" android:translateY="21.6">
+        <path
+            android:fillColor="#F4F1EA"
+            android:pathData="M2,8 H40 V17 H2 Z" />
+        <path
+            android:fillColor="#E6A85C"
+            android:pathData="M2,21 H40 V25 H2 Z" />
+        <path
+            android:fillColor="#F4F1EA"
+            android:fillAlpha="0.55"
+            android:pathData="M2,29 H40 V37 H2 Z" />
+    </group>
+</vector>
