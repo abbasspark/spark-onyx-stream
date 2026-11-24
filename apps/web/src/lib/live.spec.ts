@@ -1,12 +1,16 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 import { describe, expect, it } from 'vitest';
 import {
+  channelByNumber,
   formatBehind,
   isLocked,
   liveHref,
+  moreBeginWith,
   neighbour,
   onNow,
   placeOf,
+  positionAt,
+  programmeAt,
   progressOf,
   refusalOf,
   startOverPosition,
@@ -141,5 +145,90 @@ describe('going back in time', () => {
     expect(startOverPosition(began, zeroAt, 0, 610)).toBeNull();
     // The player cannot say what time its positions stand for.
     expect(startOverPosition(began, null, 0, 1500)).toBeNull();
+  });
+});
+
+describe('channelByNumber', () => {
+  const channels = [{ number: 1 }, { number: 2 }, { number: 12 }, { number: null }];
+
+  it('finds a channel by its whole number', () => {
+    expect(channelByNumber(channels, 12)).toEqual({ number: 12 });
+  });
+
+  it('does not take 1 for the start of 12', () => {
+    expect(channelByNumber(channels, 1)).toEqual({ number: 1 });
+  });
+
+  it('gives nothing for a number no channel has', () => {
+    expect(channelByNumber(channels, 7)).toBeNull();
+  });
+});
+
+describe('moreBeginWith', () => {
+  const channels = [{ number: 1 }, { number: 2 }, { number: 12 }];
+
+  it('says so while another channel begins with the digits typed', () => {
+    expect(moreBeginWith(channels, '1')).toBe(true);
+  });
+
+  it('says no once nothing longer could follow', () => {
+    expect(moreBeginWith(channels, '2')).toBe(false);
+    expect(moreBeginWith(channels, '12')).toBe(false);
+  });
+});
+
+describe('positionAt', () => {
+  const range = { start: 0, end: 600 };
+  // Position 0 of the video stands for this moment in the world.
+  const zeroAt = Date.parse('2026-11-24T20:00:00.000Z');
+
+  it('turns a moment of the world into a place in the video', () => {
+    expect(positionAt(zeroAt + 300_000, zeroAt, range)).toBe(300);
+  });
+
+  it('gives nothing without a moment to count from', () => {
+    expect(positionAt(zeroAt, null, range)).toBeNull();
+    expect(positionAt(zeroAt, zeroAt, null)).toBeNull();
+  });
+
+  it('gives nothing for a moment that is no longer kept', () => {
+    expect(positionAt(zeroAt - 60_000, zeroAt, range)).toBeNull();
+  });
+
+  it('gives nothing for a moment that has not come yet', () => {
+    expect(positionAt(zeroAt + 900_000, zeroAt, range)).toBeNull();
+  });
+});
+
+describe('programmeAt', () => {
+  const programmes = [
+    {
+      title: 'News',
+      subtitle: null,
+      description: null,
+      category: null,
+      startsAt: '2026-11-24T20:00:00.000Z',
+      endsAt: '2026-11-24T20:30:00.000Z',
+    },
+    {
+      title: 'Film',
+      subtitle: null,
+      description: null,
+      category: null,
+      startsAt: '2026-11-24T20:30:00.000Z',
+      endsAt: '2026-11-24T22:00:00.000Z',
+    },
+  ];
+
+  it('names what is on at a moment', () => {
+    expect(programmeAt(programmes, Date.parse('2026-11-24T21:00:00.000Z'))?.title).toBe('Film');
+  });
+
+  it('gives the next programme at the moment one ends', () => {
+    expect(programmeAt(programmes, Date.parse('2026-11-24T20:30:00.000Z'))?.title).toBe('Film');
+  });
+
+  it('gives nothing outside what the guide says', () => {
+    expect(programmeAt(programmes, Date.parse('2026-11-24T19:00:00.000Z'))).toBeNull();
   });
 });

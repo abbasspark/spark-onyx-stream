@@ -132,3 +132,65 @@ export function startOverPosition(
   }
   return position;
 }
+
+/**
+ * The channel a number stands for, as typed on a remote control. Numbers are
+ * matched whole, so 1 finds channel 1 and not channel 10.
+ */
+export function channelByNumber<T extends Pick<Channel, 'number'>>(
+  channels: readonly T[],
+  number: number,
+): T | null {
+  return channels.find((channel) => channel.number === number) ?? null;
+}
+
+/**
+ * Whether more channels begin with the digits typed so far, so that the
+ * player knows to wait for another digit instead of tuning at once.
+ */
+export function moreBeginWith(
+  channels: readonly Pick<Channel, 'number'>[],
+  digits: string,
+): boolean {
+  const typed = Number(digits);
+  return channels.some(
+    (channel) =>
+      channel.number !== null &&
+      channel.number !== typed &&
+      String(channel.number).startsWith(digits),
+  );
+}
+
+/**
+ * Where in the video a moment of the world lies, for a channel that keeps
+ * what it sent. Null when the moment is no longer kept or has not come yet.
+ *
+ * @param at The moment, in milliseconds.
+ * @param zeroAt The moment position 0 of the video stands for, in milliseconds.
+ */
+export function positionAt(
+  at: number,
+  zeroAt: number | null,
+  range: { start: number; end: number } | null,
+): number | null {
+  if (zeroAt === null || range === null) {
+    return null;
+  }
+  const position = (at - zeroAt) / 1000;
+  // A few seconds of slack at each end: those parts are about to go, or are
+  // not there yet.
+  if (!Number.isFinite(position) || position < range.start + 8 || position > range.end - 4) {
+    return null;
+  }
+  return position;
+}
+
+/** The programme a moment falls in, out of a channel's row of the guide. */
+export function programmeAt(programmes: readonly Programme[], at: number): Programme | null {
+  return (
+    programmes.find(
+      (programme) =>
+        new Date(programme.startsAt).getTime() <= at && new Date(programme.endsAt).getTime() > at,
+    ) ?? null
+  );
+}

@@ -86,6 +86,10 @@ export function SettingsMenu({ open, onOpenChange, settings }: SettingsMenuProps
   const panelId = useId();
   /** The way into the page that is showing, by the name of each row taken. */
   const [path, setPath] = useState<string[]>([]);
+  // How deep the menu is, for the key handler, which must not read state
+  // from inside an updater: that would set the page's state while it renders.
+  const depth = useRef(0);
+  depth.current = path.length;
 
   useEffect(() => {
     if (!open) {
@@ -103,14 +107,12 @@ export function SettingsMenu({ open, onOpenChange, settings }: SettingsMenuProps
       }
       event.stopPropagation();
       // Escape steps back a page before it closes the menu.
-      setPath((current) => {
-        if (current.length > 0) {
-          return current.slice(0, -1);
-        }
-        onOpenChange(false);
-        root.current?.querySelector<HTMLButtonElement>('button')?.focus();
-        return current;
-      });
+      if (depth.current > 0) {
+        setPath((current) => current.slice(0, -1));
+        return;
+      }
+      onOpenChange(false);
+      root.current?.querySelector<HTMLButtonElement>('button')?.focus();
     };
     document.addEventListener('pointerdown', onPointer);
     // Before the player's own keys, so Escape does this and nothing else.

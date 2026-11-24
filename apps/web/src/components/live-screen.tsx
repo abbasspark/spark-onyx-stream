@@ -18,13 +18,21 @@ import type { ErrorCode } from '@/lib/quality';
 import { errorCodeOf, errorWordsOf, useQualityReports } from './player/use-quality';
 import {
   ArrowLeft,
+  Cast,
+  CalendarDays,
+  ChevronDown,
+  ChevronUp,
+  Headphones,
   List,
   Lock,
   Maximize,
   Minimize,
   Pause,
+  PictureInPicture2,
   Play,
   RotateCcw,
+  SkipBack,
+  Star,
   Volume2,
   VolumeX,
   X,
@@ -33,20 +41,38 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
+  channelByNumber,
   formatBehind,
   type LiveRefusal,
   liveHref,
+  moreBeginWith,
   neighbour,
   onNow,
+  positionAt,
+  programmeAt,
   refusalOf,
   startOverPosition,
 } from '@/lib/live';
-import type { Channel, LivePlayback } from '@/lib/types';
+import { FIT_LABELS, type FitMode, fitStyle, setPlayerSettings } from '@/lib/player-settings';
+import type { Channel, Guide, LivePlayback } from '@/lib/types';
 import { readStreamLimit, type StreamLimitRefusal } from '@/lib/streams';
 import { authHref } from '@/lib/viewer-api';
 import { StreamLimitGate, StreamStoppedGate, useStreamPlace } from './stream-gates';
 import { ChannelLineup } from './channel-lineup';
+import { ChannelBanner, NumberTuner } from './live/channel-banner';
+import { GuideOverlay, type GuideChoice } from './live/guide-overlay';
+import { useFavourites } from './live/use-favourites';
+import { brightnessFilter } from './player/gestures';
 import { type Setting, SettingsMenu } from './player/settings-menu';
+import { type Shortcut, ShortcutsSheet } from './player/shortcuts-sheet';
+import { StatsPanel, usePlaybackStats } from './player/stats-panel';
+import { TouchSurface } from './player/touch-surface';
+import { usePlayerSettings } from './player/use-player-settings';
+import {
+  useAudioChain,
+  usePictureInPicture,
+  useRemotePlayback,
+} from './player/use-player-hardware';
 import { useViewerSession } from './viewer-session';
 
 /** How often a channel that is off air is asked for again. */
@@ -61,6 +87,13 @@ const HIDE_CONTROLS_MS = 3500;
 const BEHIND_SECONDS = 25;
 /** The value that stands for letting the player pick the rung itself. */
 const AUTOMATIC = -1;
+/** How long a typed channel number waits for another digit before it tunes. */
+const TUNE_AFTER_MS = 1400;
+/** How far ahead the guide over the picture reaches. */
+const GUIDE_HOURS = 12;
+/** The channel last watched, so one key flips back to it. */
+const LAST_KEY = 'onyx.web.last-channel';
+const FIT_ORDER: FitMode[] = ['fit', 'fill', 'zoom', 'stretch'];
 
 type Loaded =
   | { state: 'loading' }
@@ -317,6 +350,7 @@ interface LivePlayerProps {
 }
 
 function LivePlayer({ channel, channels, playback, onBroken, onZap }: LivePlayerProps) {
+  const router = useRouter();
   const frameRef = useRef<HTMLDivElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const hlsRef = useRef<Hls | null>(null);
@@ -336,6 +370,24 @@ function LivePlayer({ channel, channels, playback, onBroken, onZap }: LivePlayer
     setSharingOn(on);
     sharingRef.current?.setOn(on);
   }, []);
+  const [guideOpen, setGuideOpen] = useState(false);
+  const [guide, setGuide] = useState<Guide | null>(null);
+  const [shortcutsOpen, setShortcutsOpen] = useState(false);
+  const [statsOpen, setStatsOpen] = useState(false);
+  const [brightness, setBrightness] = useState(1);
+  /** Sound only, for watching on a connection that is paid for by the megabyte. */
+  const [audioOnly, setAudioOnly] = useState(false);
+  /** The digits of a channel number as they are typed, as on a remote control. */
+  const [digits, setDigits] = useState('');
+  /** Raised on every change, to show the banner again. */
+  const [bannerSignal, setBannerSignal] = useState(0);
+
+  const settings = usePlayerSettings();
+  const { marked, toggle: toggleFavourite } = useFavourites();
+  const pip = usePictureInPicture(videoRef);
+  const remote = useRemotePlayback(videoRef);
+  useAudioChain(videoRef, settings.boost, settings.nightMode, remote.connected);
+
   // The rungs the channel offers, and the one that is playing.
   const [levels, setLevels] = useState<{ index: number; height: number }[]>([]);
   const [level, setLevel] = useState(AUTOMATIC);
@@ -364,6 +416,63 @@ function LivePlayer({ channel, channels, playback, onBroken, onZap }: LivePlayer
       ],
     },
     {
+      kind: 'switch',
+      name: 'Sound only',
+      on: audioOnly,
+      onChange: setAudioOnly,
+      note: 'Holds the channel at its smallest picture, for a connection that is paid for.',
+    },
+    {
+      kind: 'page',
+      name: 'Picture and sound',
+      summary: FIT_LABELS[settings.fit],
+      items: [
+        {
+          kind: 'choice',
+          name: 'How it fills the window',
+          selected: FIT_ORDER.indexOf(settings.fit),
+          onChoose: (index) => setPlayerSettings({ fit: FIT_ORDER[index] ?? 'fit' }),
+          choices: FIT_ORDER.map((mode, index) => ({ value: index, label: FIT_LABELS[mode] })),
+        },
+        {
+          kind: 'range',
+          name: 'Brightness',
+          min: 0.2,
+          max: 1,
+          step: 0.05,
+          value: brightness,
+          format: (value) => `${Math.round(value * 100)}%`,
+          onChange: setBrightness,
+          onReset: brightness === 1 ? undefined : () => setBrightness(1),
+        },
+        {
+          kind: 'range',
+          name: 'Louder than the channel',
+          min: 1,
+          max: 3,
+          step: 0.1,
+          value: settings.boost,
+          format: (value) => `${Math.round(value * 100)}%`,
+          onChange: (boost) => setPlayerSettings({ boost }),
+          onReset: settings.boost === 1 ? undefined : () => setPlayerSettings({ boost: 1 }),
+        },
+        {
+          kind: 'switch',
+          name: 'Night mode',
+          on: settings.nightMode,
+          onChange: (nightMode) => setPlayerSettings({ nightMode }),
+          note: 'Pulls the loud parts down, so speech can be heard quietly.',
+        },
+      ],
+    },
+    {
+      kind: 'switch',
+      name: 'Show the figures',
+      on: statsOpen,
+      onChange: setStatsOpen,
+      note: 'What the picture, the line and the servers are doing.',
+    },
+    {
       kind: 'choice',
       name: 'Share with viewers',
       selected: sharingOn ? 1 : 0,
@@ -378,16 +487,34 @@ function LivePlayer({ channel, channels, playback, onBroken, onZap }: LivePlayer
       note: describeSharing(shared, sharingOn),
     },
   ];
+
   const [volume, setVolume] = useState(1);
   const [behind, setBehind] = useState(false);
   // For a channel that lets viewers go back: the stretch that is kept, and where the viewer is in it.
   const keeps = (channel.dvrMinutes ?? 0) > 0;
+
   const [range, setRange] = useState<{ start: number; end: number; current: number } | null>(null);
   /** The moment in the world that position 0 of the video stands for. */
   const [zeroAt, setZeroAt] = useState<number | null>(null);
   const [fullscreen, setFullscreen] = useState(false);
   const [controls, setControls] = useState(true);
   const [lineup, setLineup] = useState(false);
+
+  const shortcuts: Shortcut[] = [
+    { keys: ['0', '…', '9'], what: 'Tune to that channel number' },
+    { keys: ['↑', '↓'], what: 'The channel before and after' },
+    { keys: ['P'], what: 'Back to the channel before this one' },
+    { keys: ['G'], what: 'The guide' },
+    { keys: ['L'], what: 'The list of channels' },
+    { keys: ['Space', 'K'], what: 'Play and pause' },
+    ...(keeps ? [{ keys: ['←', '→'], what: 'Go back and forward in what is kept' }] : []),
+    { keys: ['M'], what: 'Mute' },
+    { keys: ['V'], what: 'How the picture fills the window' },
+    { keys: ['F'], what: 'Full screen' },
+    { keys: ['I'], what: 'The small floating window' },
+    { keys: ['D'], what: 'The figures behind the playback' },
+    { keys: ['?'], what: 'This list' },
+  ];
 
   // --- The stream -----------------------------------------------------------
 
@@ -553,6 +680,52 @@ function LivePlayer({ channel, channels, playback, onBroken, onZap }: LivePlayer
     return () => document.removeEventListener('fullscreenchange', onChange);
   }, []);
 
+  // --- The guide, the last channel and the sound-only mode -------------------
+
+  // The guide is asked for the first time it is opened, and kept afterwards.
+  useEffect(() => {
+    if (!guideOpen || guide) {
+      return undefined;
+    }
+    const controller = new AbortController();
+    fetch(`/v1/catalog/guide?hours=${GUIDE_HOURS}`, { signal: controller.signal })
+      .then((response) => (response.ok ? (response.json() as Promise<Guide>) : null))
+      .then((answer) => {
+        if (answer) {
+          setGuide(answer);
+        }
+      })
+      // Without the guide the overlay says so; the picture keeps playing.
+      .catch(() => undefined);
+    return () => controller.abort();
+  }, [guideOpen, guide]);
+
+  // The channel watched before this one, for the key that flips back.
+  const previous = useRef<string | null>(null);
+  useEffect(() => {
+    try {
+      previous.current = window.sessionStorage.getItem(LAST_KEY);
+      window.sessionStorage.setItem(LAST_KEY, channel.slug);
+    } catch {
+      // Storage can be switched off. The flip then works within this page.
+    }
+    setBannerSignal((signal) => signal + 1);
+  }, [channel.slug]);
+
+  // Sound only holds the ladder at its lowest rung, which is what makes it
+  // worth having on a connection paid for by the megabyte.
+  useEffect(() => {
+    const hls = hlsRef.current;
+    if (!hls) {
+      return;
+    }
+    hls.autoLevelCapping = audioOnly ? 0 : -1;
+    if (audioOnly) {
+      hls.currentLevel = 0;
+      setLevel(0);
+    }
+  }, [audioOnly, levels]);
+
   // --- What the viewer does ---------------------------------------------------
 
   const togglePlay = useCallback(() => {
@@ -638,6 +811,37 @@ function LivePlayer({ channel, channels, playback, onBroken, onZap }: LivePlayer
     return () => window.clearTimeout(hideTimer.current);
   }, [wake]);
 
+  /** Goes to a channel by the number typed on the keyboard. */
+  const tuneTo = useCallback(
+    (number: number) => {
+      const wanted = channelByNumber(channels, number);
+      if (wanted && wanted.slug !== channel.slug) {
+        router.push(liveHref(wanted.slug));
+      }
+      setDigits('');
+    },
+    [channels, channel.slug, router],
+  );
+
+  // Digits are gathered the way a remote control gathers them: 1 waits, in
+  // case 12 is coming, and tunes by itself when nothing longer could follow.
+  const tuneTimer = useRef<number | undefined>(undefined);
+  useEffect(() => {
+    if (digits === '') {
+      return undefined;
+    }
+    const wait = moreBeginWith(channels, digits) ? TUNE_AFTER_MS : 450;
+    tuneTimer.current = window.setTimeout(() => tuneTo(Number(digits)), wait);
+    return () => window.clearTimeout(tuneTimer.current);
+  }, [digits, channels, tuneTo]);
+
+  const goBack = useCallback(() => {
+    const slug = previous.current;
+    if (slug && slug !== channel.slug) {
+      router.push(liveHref(slug));
+    }
+  }, [channel.slug, router]);
+
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
       const target = event.target as HTMLElement | null;
@@ -648,8 +852,14 @@ function LivePlayer({ channel, channels, playback, onBroken, onZap }: LivePlayer
         setLineup(false);
         return;
       }
-      // Keys inside the list of channels move through the list.
-      if (lineup) {
+      // Keys inside the list of channels, or the guide, belong to them.
+      if (lineup || guideOpen || shortcutsOpen) {
+        return;
+      }
+      if (/^[0-9]$/.test(event.key)) {
+        event.preventDefault();
+        setDigits((typed) => (typed + event.key).slice(0, 4));
+        wake();
         return;
       }
       const actions: Record<string, () => void> = {
@@ -658,11 +868,21 @@ function LivePlayer({ channel, channels, playback, onBroken, onZap }: LivePlayer
         m: toggleMute,
         f: toggleFullscreen,
         l: () => setLineup(true),
+        g: () => setGuideOpen(true),
+        i: pip.toggle,
+        d: () => setStatsOpen((open) => !open),
+        p: goBack,
+        Backspace: () => setDigits((typed) => typed.slice(0, -1)),
+        '?': () => setShortcutsOpen(true),
+        v: () => {
+          const next = FIT_ORDER[(FIT_ORDER.indexOf(settings.fit) + 1) % FIT_ORDER.length];
+          setPlayerSettings({ fit: next ?? 'fit' });
+        },
         ArrowUp: () => onZap(-1),
         ArrowDown: () => onZap(1),
         ...(keeps ? { ArrowLeft: () => skip(-10), ArrowRight: () => skip(10) } : {}),
       };
-      const action = actions[event.key];
+      const action = actions[event.key.length === 1 ? event.key.toLowerCase() : event.key];
       // A button that has the focus answers the space bar itself.
       if (action && !(event.key === ' ' && target?.tagName === 'BUTTON')) {
         event.preventDefault();
@@ -672,7 +892,21 @@ function LivePlayer({ channel, channels, playback, onBroken, onZap }: LivePlayer
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [lineup, togglePlay, toggleMute, toggleFullscreen, onZap, wake, keeps, skip]);
+  }, [
+    lineup,
+    guideOpen,
+    shortcutsOpen,
+    togglePlay,
+    toggleMute,
+    toggleFullscreen,
+    onZap,
+    wake,
+    keeps,
+    skip,
+    pip.toggle,
+    goBack,
+    settings.fit,
+  ]);
 
   // The programme that is on, if it began within what is kept and the viewer is past its start.
   const running = onNow(channel, Date.now()).now;
@@ -682,7 +916,66 @@ function LivePlayer({ channel, channels, playback, onBroken, onZap }: LivePlayer
       : null;
   const behindSeconds = range ? Math.max(0, range.end - range.current) : 0;
 
-  const shown = controls || !playing || lineup || menuOpen;
+  /** Where in the video a moment of the world lies, for the guide to jump to. */
+  const positionOf = useCallback(
+    (at: number) => (keeps ? positionAt(at, zeroAt, range) : null),
+    [keeps, zeroAt, range],
+  );
+
+  // The row of this channel in the guide, for the marks on the bar and for
+  // naming what is playing while the viewer is behind.
+  const ownRow = guide?.channels.find((row) => row.slug === channel.slug)?.programmes ?? [];
+  /** What the picture is showing, which is not "now" once the viewer goes back. */
+  const watching =
+    zeroAt !== null && range && ownRow.length > 0
+      ? programmeAt(ownRow, zeroAt + range.current * 1000)
+      : null;
+
+  // The programmes inside what the channel keeps, drawn as marks on the bar
+  // so that going back lands on a beginning rather than in the middle.
+  const marks =
+    keeps && range && zeroAt !== null && range.end > range.start
+      ? ownRow
+          .map((programme) => ({
+            programme,
+            position: (new Date(programme.startsAt).getTime() - zeroAt) / 1000,
+          }))
+          .filter((mark) => mark.position > range.start + 8 && mark.position < range.end - 4)
+          .map((mark) => ({
+            ...mark,
+            at: (mark.position - range.start) / (range.end - range.start),
+          }))
+      : [];
+
+  /** The beginning of the programme before the one being watched, to step back. */
+  const previousStart = (() => {
+    if (!keeps || !range || zeroAt === null || !watching) {
+      return null;
+    }
+    const index = ownRow.indexOf(watching);
+    const before = index > 0 ? ownRow[index - 1] : undefined;
+    return before ? positionOf(new Date(before.startsAt).getTime()) : null;
+  })();
+
+  const picture = fitStyle(settings.fit);
+  const stats = usePlaybackStats(videoRef, hlsRef, statsOpen, true);
+
+  /** The guide hands back a channel to tune to, or a place to go back to. */
+  const onGuideChoice = useCallback(
+    (choice: GuideChoice) => {
+      setGuideOpen(false);
+      if (choice.channel.slug !== channel.slug) {
+        router.push(liveHref(choice.channel.slug));
+        return;
+      }
+      if (choice.position !== null) {
+        seekTo(choice.position);
+      }
+    },
+    [channel.slug, router, seekTo],
+  );
+
+  const shown = controls || !playing || lineup || menuOpen || guideOpen;
   const button =
     'flex size-11 items-center justify-center rounded-[3px] text-vein hover:bg-vein/15 focus-visible:bg-vein/15';
 
@@ -695,13 +988,50 @@ function LivePlayer({ channel, channels, playback, onBroken, onZap }: LivePlayer
     >
       <video
         ref={videoRef}
-        className="size-full"
+        className={`size-full transition-[transform,filter,opacity] duration-200 ${
+          audioOnly ? 'opacity-0' : ''
+        }`}
+        style={{
+          objectFit: picture.objectFit,
+          transform: picture.scale === 1 ? undefined : `scale(${picture.scale})`,
+          filter: brightnessFilter(brightness),
+        }}
         playsInline
-        onClick={togglePlay}
         aria-label={`${channel.name}, live`}
       />
 
-      {waiting ? (
+      {/* The picture itself, as something to click, tap, hold and drag. */}
+      <TouchSurface
+        step={10}
+        holdRate={1}
+        volume={muted ? 0 : volume}
+        brightness={brightness}
+        onSkip={keeps ? skip : () => undefined}
+        onTogglePlay={togglePlay}
+        onToggleFullscreen={toggleFullscreen}
+        onVolume={(value) => {
+          const video = videoRef.current;
+          if (video) {
+            video.volume = value;
+            video.muted = value === 0;
+          }
+        }}
+        onBrightness={setBrightness}
+        onRate={() => undefined}
+        onWake={wake}
+        onTap={wake}
+      />
+
+      {audioOnly ? (
+        <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center gap-3 px-6 text-center">
+          <Headphones className="size-10 text-sard" aria-hidden="true" />
+          <p className="heading text-xl">{channel.name}</p>
+          {running ? <p className="text-sm text-smoke">{running.title}</p> : null}
+          <p className="text-xs text-dust">Sound only. The picture is off to save data.</p>
+        </div>
+      ) : null}
+
+      {waiting && !audioOnly ? (
         <p
           role="status"
           className="pointer-events-none absolute inset-0 flex items-center justify-center text-smoke"
@@ -709,6 +1039,9 @@ function LivePlayer({ channel, channels, playback, onBroken, onZap }: LivePlayer
           Tuning in to {channel.name}
         </p>
       ) : null}
+
+      <ChannelBanner channel={channel} signal={bannerSignal} />
+      <NumberTuner digits={digits} />
 
       <div
         className={`absolute inset-x-0 top-0 flex items-center gap-4 bg-linear-to-b from-onyx/85 to-transparent px-4 pt-3 pb-10 transition-opacity duration-200 sm:px-6 ${
@@ -737,17 +1070,38 @@ function LivePlayer({ channel, channels, playback, onBroken, onZap }: LivePlayer
         }`}
       >
         {keeps && range && range.end - range.start > 30 ? (
-          <input
-            type="range"
-            min={Math.floor(range.start)}
-            max={Math.floor(range.end)}
-            step={1}
-            value={Math.floor(range.current)}
-            aria-label="Position in what the channel has kept"
-            aria-valuetext={behind ? `${formatBehind(behindSeconds)} behind live` : 'Live'}
-            className="mb-1 block h-5 w-full accent-sard"
-            onChange={(event) => seekTo(Number(event.target.value))}
-          />
+          <div className="relative mb-1">
+            <input
+              type="range"
+              min={Math.floor(range.start)}
+              max={Math.floor(range.end)}
+              step={1}
+              value={Math.floor(range.current)}
+              aria-label="Position in what the channel has kept"
+              aria-valuetext={behind ? `${formatBehind(behindSeconds)} behind live` : 'Live'}
+              className="block h-5 w-full accent-sard"
+              onChange={(event) => seekTo(Number(event.target.value))}
+            />
+            {/*
+              Where each programme began inside what is kept, so that going
+              back lands on a beginning and not in the middle of something.
+            */}
+            {marks.map((mark) => (
+              <button
+                key={mark.programme.startsAt}
+                type="button"
+                title={`${mark.programme.title}, from its beginning`}
+                className="absolute top-1/2 h-3 w-0.5 -translate-y-1/2 bg-vein/70 hover:h-4 hover:bg-vein"
+                style={{ left: `${mark.at * 100}%` }}
+                onClick={() => seekTo(mark.position)}
+              >
+                <span className="sr-only">Start {mark.programme.title} from its beginning</span>
+              </button>
+            ))}
+          </div>
+        ) : null}
+        {watching && behind ? (
+          <p className="mb-1 truncate text-xs text-smoke">Watching {watching.title}</p>
         ) : null}
         <div className="flex items-center gap-1">
           <button
@@ -821,16 +1175,93 @@ function LivePlayer({ channel, channels, playback, onBroken, onZap }: LivePlayer
             </button>
           ) : null}
 
+          {previousStart !== null ? (
+            <button
+              type="button"
+              className={button}
+              aria-label="The beginning of the programme before this one"
+              onClick={() => seekTo(previousStart)}
+            >
+              <SkipBack className="size-5" />
+            </button>
+          ) : null}
+
           <div className="ml-auto flex items-center gap-1">
+            <button
+              type="button"
+              className={button}
+              aria-label={
+                marked.includes(channel.slug)
+                  ? 'Take this channel out of the favourites'
+                  : 'Make this channel a favourite'
+              }
+              aria-pressed={marked.includes(channel.slug)}
+              onClick={() => toggleFavourite(channel.slug)}
+            >
+              <Star
+                className={`size-5 ${marked.includes(channel.slug) ? 'fill-sard text-sard' : ''}`}
+              />
+            </button>
+            <button
+              type="button"
+              className={button}
+              aria-label="Guide"
+              aria-expanded={guideOpen}
+              onClick={() => setGuideOpen(true)}
+            >
+              <CalendarDays className="size-6" />
+            </button>
             {channels.length > 1 ? (
+              <>
+                <button
+                  type="button"
+                  className={`${button} hidden sm:flex`}
+                  aria-label="The channel before this one"
+                  onClick={() => onZap(-1)}
+                >
+                  <ChevronUp className="size-6" />
+                </button>
+                <button
+                  type="button"
+                  className={`${button} hidden sm:flex`}
+                  aria-label="The channel after this one"
+                  onClick={() => onZap(1)}
+                >
+                  <ChevronDown className="size-6" />
+                </button>
+                <button
+                  type="button"
+                  className={button}
+                  aria-label="Channels"
+                  aria-expanded={lineup}
+                  onClick={() => setLineup((open) => !open)}
+                >
+                  <List className="size-6" />
+                </button>
+              </>
+            ) : null}
+            {remote.available ? (
               <button
                 type="button"
-                className={button}
-                aria-label="Channels"
-                aria-expanded={lineup}
-                onClick={() => setLineup((open) => !open)}
+                aria-label={
+                  remote.connected ? 'Playing on another device' : 'Play on another device'
+                }
+                aria-pressed={remote.connected}
+                className={`${button} ${remote.connected ? 'text-sard' : ''}`}
+                onClick={remote.prompt}
               >
-                <List className="size-6" />
+                <Cast className="size-6" />
+              </button>
+            ) : null}
+            {pip.supported ? (
+              <button
+                type="button"
+                aria-label={pip.active ? 'Back into the page' : 'Play in a small window'}
+                aria-pressed={pip.active}
+                className={`${button} ${pip.active ? 'text-sard' : ''}`}
+                onClick={pip.toggle}
+              >
+                <PictureInPicture2 className="size-6" />
               </button>
             ) : null}
             <SettingsMenu open={menuOpen} onOpenChange={setMenuOpen} settings={settingsList} />
@@ -874,9 +1305,34 @@ function LivePlayer({ channel, channels, playback, onBroken, onZap }: LivePlayer
             </button>
           </div>
           <div className="flex-1 overflow-y-auto">
-            <ChannelLineup channels={channels} current={channel.slug} compact />
+            <ChannelLineup channels={channels} current={channel.slug} compact searchable />
           </div>
         </aside>
+      ) : null}
+
+      {guideOpen ? (
+        <GuideOverlay
+          channels={channels}
+          guide={guide}
+          current={channel.slug}
+          favourites={marked}
+          onToggleFavourite={toggleFavourite}
+          positionOf={positionOf}
+          onChoose={onGuideChoice}
+          onClose={() => setGuideOpen(false)}
+        />
+      ) : null}
+
+      {statsOpen ? (
+        <StatsPanel
+          reading={stats}
+          sharing={playback.p2p && canShare() ? { on: sharingOn, figures: shared } : null}
+          onClose={() => setStatsOpen(false)}
+        />
+      ) : null}
+
+      {shortcutsOpen ? (
+        <ShortcutsSheet shortcuts={shortcuts} onClose={() => setShortcutsOpen(false)} />
       ) : null}
     </div>
   );
