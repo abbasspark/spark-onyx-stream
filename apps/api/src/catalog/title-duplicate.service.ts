@@ -96,6 +96,7 @@ export class TitleDuplicateService {
             synopsis: source.synopsis,
             releaseYear: source.releaseYear,
             ageRating: source.ageRating,
+            minAge: source.minAge,
             originalLanguage: source.originalLanguage,
             releaseDate: source.releaseDate,
             runtimeMinutes: source.runtimeMinutes,

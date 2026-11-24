@@ -171,23 +171,26 @@ model Viewer {
 /// A device a viewer is signed in on. As with admins, only a hash of the
 /// token is stored.
 model ViewerSession {
-  id         String         @id @default(uuid(7)) @db.Uuid
-  viewerId   String         @db.Uuid
-  viewer     Viewer         @relation(fields: [viewerId], references: [id], onDelete: Cascade)
+  id            String         @id @default(uuid(7)) @db.Uuid
+  viewerId      String         @db.Uuid
+  viewer        Viewer         @relation(fields: [viewerId], references: [id], onDelete: Cascade)
   /// The profile chosen on this device. Empty means the main profile.
-  profileId  String?        @db.Uuid
-  profile    ViewerProfile? @relation(fields: [profileId], references: [id], onDelete: SetNull)
+  profileId     String?        @db.Uuid
+  profile       ViewerProfile? @relation(fields: [profileId], references: [id], onDelete: SetNull)
   /// SHA-256 hash of the session token.
-  tokenHash  String         @unique
-  userAgent  String?
-  ipAddress  String?
-  expiresAt  DateTime
-  lastUsedAt DateTime       @default(now())
-  revokedAt  DateTime?
-  createdAt  DateTime       @default(now())
+  tokenHash     String         @unique
+  userAgent     String?
+  ipAddress     String?
+  expiresAt     DateTime
+  lastUsedAt    DateTime       @default(now())
+  revokedAt     DateTime?
+  /// The sign-in has to choose a profile first: the one it would start in has a PIN.
+  /// Until then it sees what suits every age.
+  profileLocked Boolean        @default(false)
+  createdAt     DateTime       @default(now())
   /// The app this sign-in belongs to. Empty for a browser, which has no identity of its own.
-  deviceId   String?        @db.Uuid
-  device     ViewerDevice?  @relation(fields: [deviceId], references: [id], onDelete: SetNull)
+  deviceId      String?        @db.Uuid
+  device        ViewerDevice?  @relation(fields: [deviceId], references: [id], onDelete: SetNull)
 
   streams ViewerStream[]
 
@@ -907,6 +910,9 @@ model Title {
   releaseYear      Int?
   /// Age rating as shown to viewers, for example "12" or "PG-13".
   ageRating        String?
+  /// The age from which the title suits. Filled from the rating, and changeable.
+  /// Empty means nobody said: profiles with an age limit do not see it.
+  minAge           Int?          @db.SmallInt
   /// Language code of the original audio, for example "en".
   originalLanguage String?
   /// The day of the premiere: in cinemas for a movie, the first episode for a series.
@@ -1408,16 +1414,25 @@ model Episode {
 /// One of the people who share a viewer account. Each has their own watch
 /// history. Every account has a main profile, which is created with it.
 model ViewerProfile {
-  id        String   @id @default(uuid(7)) @db.Uuid
-  viewerId  String   @db.Uuid
-  viewer    Viewer   @relation(fields: [viewerId], references: [id], onDelete: Cascade)
-  name      String
+  id             String    @id @default(uuid(7)) @db.Uuid
+  viewerId       String    @db.Uuid
+  viewer         Viewer    @relation(fields: [viewerId], references: [id], onDelete: Cascade)
+  name           String
   /// Name of one of the colours clients draw a profile in, such as "amber".
-  color     String
+  color          String
   /// The profile the account starts with. It cannot be deleted.
-  isMain    Boolean  @default(false)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  isMain         Boolean   @default(false)
+  /// The highest age a title may be for and still show. Empty: everything shows.
+  maxAge         Int?      @db.SmallInt
+  /// A profile for a child: clients give it a simpler look. It always has an age limit.
+  isKids         Boolean   @default(false)
+  /// Hash of the PIN that opens the profile. Empty: anyone on the account can use it.
+  pinHash        String?
+  /// Wrong PINs in a row, and until when the profile takes no more tries.
+  pinFailed      Int       @default(0)
+  pinLockedUntil DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
 
   sessions ViewerSession[]
   watching WatchProgress[]
@@ -2033,6 +2048,9 @@ model Channel {
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  /// The age from which the channel suits. Empty: profiles with an age limit do not see it.
+  minAge Int? @db.SmallInt
 
   @@index([enabled])
   @@map("channels")

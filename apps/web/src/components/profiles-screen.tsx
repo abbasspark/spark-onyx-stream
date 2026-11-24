@@ -1,23 +1,21 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 'use client';
 
-import { Check, Loader2, Pencil, Plus } from 'lucide-react';
+import { Check, Loader2, Lock, Pencil, Plus } from 'lucide-react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { type FormEvent, useCallback, useEffect, useState } from 'react';
-import { colorLabel, colorOf, type Profile, type Profiles, profilesApi } from '@/lib/profiles';
+import { useCallback, useEffect, useState } from 'react';
+import { describeLimit } from '@/lib/audience';
+import { type Profile, type Profiles, profilesApi } from '@/lib/profiles';
 import { authHref, safeNextPath, ViewerApiError } from '@/lib/viewer-api';
-import { FormField } from './form-field';
 import { ProfileAvatar } from './profile-avatar';
+import { ProfileEditor } from './profile-editor';
+import { ProfileGate } from './profile-gate';
 import { useViewerSession } from './viewer-session';
 
 function asError(caught: unknown): ViewerApiError {
   return caught instanceof ViewerApiError
     ? caught
     : new ViewerApiError(0, 'Something went wrong. Try again in a moment.');
-}
-
-function Spinner() {
-  return <Loader2 className="animate-[player-spin_0.9s_linear_infinite]" aria-hidden="true" />;
 }
 
 const TILE = 'size-[clamp(6.5rem,24vw,10rem)]';
@@ -30,7 +28,14 @@ export function ProfilesScreen() {
   const router = useRouter();
   const params = useSearchParams();
   const next = safeNextPath(params.get('next'));
-  const { state, viewer, profile: current, setProfile } = useViewerSession();
+  const {
+    state,
+    viewer,
+    profile: current,
+    restricted,
+    chooseProfile,
+    setProfile,
+  } = useViewerSession();
 
   const [data, setData] = useState<Profiles | null>(null);
   const [error, setError] = useState<ViewerApiError | null>(null);
@@ -38,6 +43,10 @@ export function ProfilesScreen() {
   /** The profile being changed, "new" for one being added, null for none. */
   const [editing, setEditing] = useState<Profile | 'new' | null>(null);
   const [choosing, setChoosing] = useState<string | null>(null);
+  /** The profile whose PIN is being asked for. */
+  const [gated, setGated] = useState<Profile | null>(null);
+  // A profile with a limit watches. It does not change who may watch what.
+  const canManage = !restricted;
 
   useEffect(() => {
     if (state === 'ready' && !viewer) {
@@ -62,6 +71,11 @@ export function ProfilesScreen() {
   }, [viewerId, load]);
 
   const choose = async (profile: Profile) => {
+    if (profile.locked) {
+      setError(null);
+      setGated(profile);
+      return;
+    }
     setChoosing(profile.id);
     try {
       setProfile(await profilesApi.select(profile.id));
@@ -83,13 +97,30 @@ export function ProfilesScreen() {
     );
   }
 
-  if (editing && data) {
+  if (gated) {
+    return (
+      <ProfileGate
+        profile={gated}
+        onCancel={() => setGated(null)}
+        onOpened={(opened) => {
+          setProfile(opened);
+          router.replace(next);
+        }}
+      />
+    );
+  }
+
+  if (editing && data && canManage) {
     return (
       <ProfileEditor
         profile={editing === 'new' ? null : editing}
         colors={data.colors}
         isCurrent={editing !== 'new' && editing.id === current?.id}
-        onCancel={() => setEditing(null)}
+        onCancel={() => {
+          setEditing(null);
+          // A PIN may have been set or lifted in the meantime.
+          void load();
+        }}
         onSaved={(saved) => {
           if (saved && saved.id === current?.id) {
             setProfile(saved);
@@ -102,7 +133,9 @@ export function ProfilesScreen() {
   }
 
   const profiles = data?.profiles ?? [];
-  const canAdd = data !== null && profiles.length < data.limit;
+  const canAdd = canManage && data !== null && profiles.length < data.limit;
+  // Until a sign-in said who is watching, no profile is the one in use.
+  const inUse = chooseProfile ? null : current?.id;
 
   return (
     <div className="gutter grid min-h-[80dvh] content-center justify-items-center pt-28 pb-10 text-center">
@@ -111,7 +144,7 @@ export function ProfilesScreen() {
       </h1>
       <p className="mt-4 max-w-md text-smoke">
         {managing
-          ? 'Choose a profile to change its name or colour, or to delete it.'
+          ? 'Choose a profile to change its name, what it can watch or its PIN, or to delete it.'
           : 'Each profile has its own "Continue watching" and its own watched marks.'}
       </p>
 
@@ -127,7 +160,11 @@ export function ProfilesScreen() {
             <button
               type="button"
               disabled={choosing !== null}
-              aria-label={managing ? `Change ${profile.name}` : `Watch as ${profile.name}`}
+              aria-label={
+                managing
+                  ? `Change ${profile.name}`
+                  : `Watch as ${profile.name}${profile.locked ? ', asks for a PIN' : ''}`
+              }
               className="group grid justify-items-center gap-3 outline-offset-8"
               onClick={() => (managing ? setEditing(profile) : void choose(profile))}
             >
@@ -143,16 +180,33 @@ export function ProfilesScreen() {
                     <Pencil className="size-8" aria-hidden="true" />
                   </span>
                 ) : null}
+                {profile.locked && !managing ? (
+                  <span className="absolute -right-2 -bottom-2 grid size-8 place-items-center rounded-full border border-line bg-coal">
+                    <Lock className="size-3.5" aria-label="Asks for a PIN" />
+                  </span>
+                ) : null}
                 {choosing === profile.id ? (
                   <span className="absolute inset-0 grid place-items-center bg-onyx/60">
                     <Loader2 className="size-8 animate-[player-spin_0.9s_linear_infinite]" />
                   </span>
                 ) : null}
               </span>
-              <span className="flex max-w-40 items-center gap-1.5 text-smoke group-hover:text-vein">
-                <span className="truncate">{profile.name}</span>
-                {!managing && profile.id === current?.id ? (
-                  <Check className="size-4 shrink-0 text-sard" aria-label="In use on this device" />
+              <span className="grid justify-items-center gap-0.5">
+                <span className="flex max-w-40 items-center gap-1.5 text-smoke group-hover:text-vein">
+                  <span className="truncate">{profile.name}</span>
+                  {!managing && profile.id === inUse ? (
+                    <Check
+                      className="size-4 shrink-0 text-sard"
+                      aria-label="In use on this device"
+                    />
+                  ) : null}
+                </span>
+                {describeLimit(profile.maxAge) ? (
+                  <span className="text-xs text-dust">
+                    {profile.isKids
+                      ? `Kids, ${describeLimit(profile.maxAge)?.toLowerCase()}`
+                      : describeLimit(profile.maxAge)}
+                  </span>
                 ) : null}
               </span>
             </button>
@@ -180,200 +234,21 @@ export function ProfilesScreen() {
         <p className="mt-8 text-sm text-dust">An account can have {data.limit} profiles.</p>
       ) : null}
 
-      <button
-        type="button"
-        className="button button-quiet mt-12"
-        onClick={() => setManaging((value) => !value)}
-      >
-        {managing ? 'Done' : 'Manage profiles'}
-      </button>
-    </div>
-  );
-}
-
-interface ProfileEditorProps {
-  /** Null to add a profile. */
-  profile: Profile | null;
-  colors: readonly string[];
-  isCurrent: boolean;
-  onCancel: () => void;
-  /** Called with the saved profile, or with null after a profile was deleted. */
-  onSaved: (profile: Profile | null) => void;
-}
-
-function ProfileEditor({ profile, colors, isCurrent, onCancel, onSaved }: ProfileEditorProps) {
-  const { setProfile } = useViewerSession();
-  const [name, setName] = useState(profile?.name ?? '');
-  const [color, setColor] = useState(profile?.color ?? null);
-  const [busy, setBusy] = useState<'save' | 'delete' | null>(null);
-  const [error, setError] = useState<ViewerApiError | null>(null);
-  const [confirming, setConfirming] = useState(false);
-
-  const submit = async (event: FormEvent) => {
-    event.preventDefault();
-    setBusy('save');
-    setError(null);
-    try {
-      const input = { name: name.trim(), ...(color ? { color } : {}) };
-      onSaved(
-        profile ? await profilesApi.update(profile.id, input) : await profilesApi.create(input),
-      );
-    } catch (caught) {
-      setError(asError(caught));
-      setBusy(null);
-    }
-  };
-
-  const remove = async () => {
-    if (!profile) {
-      return;
-    }
-    setBusy('delete');
-    setError(null);
-    try {
-      await profilesApi.remove(profile.id);
-      if (isCurrent) {
-        // This device was using it, and is back on the main profile.
-        const { profiles, currentId } = await profilesApi.list();
-        const now = profiles.find((candidate) => candidate.id === currentId);
-        if (now) {
-          setProfile(now);
-        }
-      }
-      onSaved(null);
-    } catch (caught) {
-      setError(asError(caught));
-      setBusy(null);
-    }
-  };
-
-  const shown = { name: name.trim() || '?', color: color ?? colors[0] ?? 'slate' };
-  const nameError = error?.fields.name ?? (error?.status === 409 ? error.message : undefined);
-
-  return (
-    <div className="gutter grid min-h-[80dvh] content-center pt-28 pb-10">
-      <div className="w-full max-w-xl">
-        <h1 className="display text-4xl sm:text-5xl">
-          {profile ? 'Change profile' : 'Add a profile'}
-        </h1>
-        <form onSubmit={(event) => void submit(event)} className="mt-10 grid gap-8">
-          <div className="flex items-end gap-5">
-            <ProfileAvatar profile={shown} className="size-24 sm:size-28" />
-            <div className="min-w-0 flex-1">
-              <FormField
-                label="Name"
-                name="profile-name"
-                autoComplete="off"
-                required
-                autoFocus
-                maxLength={40}
-                value={name}
-                error={nameError}
-                onValue={(value) => {
-                  setName(value);
-                  // The complaint was about the name as it was.
-                  setError(null);
-                }}
-              />
-            </div>
-          </div>
-
-          <fieldset>
-            <legend className="mb-3 text-sm text-smoke">Colour</legend>
-            <div className="flex flex-wrap gap-3">
-              {colors.map((option) => (
-                <label key={option} className="relative block size-11 cursor-pointer">
-                  <input
-                    type="radio"
-                    name="profile-color"
-                    value={option}
-                    checked={shown.color === option}
-                    onChange={() => setColor(option)}
-                    className="peer absolute inset-0 cursor-pointer opacity-0"
-                    aria-label={colorLabel(option)}
-                  />
-                  <span
-                    className="block size-full rounded-[3px] outline-2 outline-offset-3 outline-transparent peer-checked:outline-vein peer-focus-visible:outline-sard"
-                    style={{ background: colorOf(option) }}
-                  />
-                  {shown.color === option ? (
-                    <Check
-                      className="pointer-events-none absolute inset-0 m-auto size-5 text-onyx"
-                      aria-hidden="true"
-                    />
-                  ) : null}
-                </label>
-              ))}
-            </div>
-          </fieldset>
-
-          {error && !nameError ? (
-            <p role="alert" className="border-l-2 border-alarm pl-3 text-alarm">
-              {error.message}
-            </p>
-          ) : null}
-
-          <div className="flex flex-wrap gap-3">
-            <button type="submit" className="button button-play" disabled={busy !== null}>
-              {busy === 'save' ? <Spinner /> : null}
-              {profile ? 'Save' : 'Add profile'}
-            </button>
-            <button
-              type="button"
-              className="button button-quiet"
-              disabled={busy !== null}
-              onClick={onCancel}
-            >
-              Cancel
-            </button>
-          </div>
-        </form>
-
-        {profile && !profile.isMain ? (
-          <div className="mt-14 border-t border-line pt-8">
-            {confirming ? (
-              <div className="grid gap-4">
-                <p>
-                  Deleting {profile.name} also deletes what this profile watched. This cannot be
-                  undone.
-                </p>
-                <div className="flex flex-wrap gap-3">
-                  <button
-                    type="button"
-                    className="button button-danger"
-                    disabled={busy !== null}
-                    onClick={() => void remove()}
-                  >
-                    {busy === 'delete' ? <Spinner /> : null}
-                    Delete {profile.name}
-                  </button>
-                  <button
-                    type="button"
-                    className="button button-quiet"
-                    disabled={busy !== null}
-                    onClick={() => setConfirming(false)}
-                  >
-                    Keep it
-                  </button>
-                </div>
-              </div>
-            ) : (
-              <button
-                type="button"
-                className="button button-quiet"
-                onClick={() => setConfirming(true)}
-              >
-                Delete this profile
-              </button>
-            )}
-          </div>
-        ) : null}
-        {profile?.isMain ? (
-          <p className="mt-14 border-t border-line pt-8 text-sm text-dust">
-            This is the main profile. It stays with the account and cannot be deleted.
-          </p>
-        ) : null}
-      </div>
+      {canManage ? (
+        <button
+          type="button"
+          className="button button-quiet mt-12"
+          onClick={() => setManaging((value) => !value)}
+        >
+          {managing ? 'Done' : 'Manage profiles'}
+        </button>
+      ) : (
+        <p className="mt-12 max-w-sm text-sm text-dust">
+          {chooseProfile
+            ? 'Choose a profile to start watching.'
+            : 'Profiles are managed from a profile without an age limit.'}
+        </p>
+      )}
     </div>
   );
 }

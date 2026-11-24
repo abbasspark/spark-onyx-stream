@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-only
+import { assertUnrestricted } from '../audience/audience.js';
 import {
   Body,
   Controller,
@@ -106,6 +107,8 @@ export class ViewerDevicesController {
     @CurrentViewer() identity: ViewerIdentity,
     @Param('code') code: string,
   ): Promise<DeviceCodeRequest> {
+    // A child's profile does not sign other devices in.
+    assertUnrestricted();
     return this.codes.approve(code, identity.viewer.id);
   }
 
@@ -138,6 +141,8 @@ export class ViewerDevicesController {
     @Param('id', ParseUUIDPipe) id: string,
     @Body(new ZodValidationPipe(renameDeviceSchema)) body: RenameDeviceInput,
   ): Promise<{ id: string; name: string }> {
+    // An account is managed from a profile without a limit.
+    assertUnrestricted();
     const device = await this.devices.rename(identity.viewer.id, id, body.name);
     return { id: device.id, name: device.name };
   }
@@ -151,6 +156,8 @@ export class ViewerDevicesController {
     @CurrentViewer() identity: ViewerIdentity,
     @Param('id', ParseUUIDPipe) id: string,
   ): Promise<void> {
+    // An account is managed from a profile without a limit.
+    assertUnrestricted();
     await this.devices.remove(identity.viewer.id, id);
   }
 }

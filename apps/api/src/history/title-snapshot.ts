@@ -40,6 +40,8 @@ export interface SnapshotFields {
   releaseDate: string | null;
   runtimeMinutes: number | null;
   ageRating: string | null;
+  /** Left out of snapshots older than this field. */
+  minAge?: number | null;
   originalLanguage: string | null;
   imdbId: string | null;
   seriesStatus: string | null;

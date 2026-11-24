@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 import type { Viewer, ViewerDevice, ViewerSession, ViewerStatus } from '@onyx/database';
 import { type DeviceRef, type DeviceView, toDeviceRef } from './viewer-devices.service.js';
+import type { ProfileView } from './viewer-profiles.service.js';
 
 /** A viewer as they see themselves. */
 export interface ViewerView {
@@ -96,7 +97,7 @@ export interface ViewerSessionAdminView extends Omit<ViewerSessionView, 'current
 
 export interface ViewerAdminDetail extends ViewerAdminView {
   /** The people who share the account, the main profile first. */
-  profiles: { id: string; name: string; color: string; isMain: boolean }[];
+  profiles: ProfileView[];
   sessions: ViewerSessionAdminView[];
   /** The apps the viewer is, or was, signed in on. */
   devices: Omit<DeviceView, 'current'>[];

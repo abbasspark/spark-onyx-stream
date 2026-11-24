@@ -176,6 +176,8 @@ describe.skipIf(!TEST_DATABASE_URL)('Public catalog (e2e)', () => {
         tagline: 'One night.',
         releaseYear: 2024,
         ageRating: '16',
+        // Read from the rating.
+        minAge: 16,
         isFeatured: false,
         access: 'FREE',
         packageIds: [],

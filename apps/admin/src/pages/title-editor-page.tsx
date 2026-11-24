@@ -1,4 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-only
+import { AgeField } from '@/components/age-field';
+import { ageFromRating } from '@/lib/age-rating';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   Archive,
@@ -841,7 +843,17 @@ function DetailsTab({ title, disabled, save }: DetailsTabProps) {
                   maxLength={16}
                   disabled={disabled}
                   value={form.ageRating}
-                  onChange={(event) => set('ageRating', event.target.value)}
+                  onChange={(event) => {
+                    const rating = event.target.value;
+                    // The age follows the rating while it says what the rating
+                    // said before. An age chosen by hand stays.
+                    const follows = form.minAge === ageFromRating(form.ageRating);
+                    setForm((current) => ({
+                      ...current,
+                      ageRating: rating,
+                      minAge: follows ? ageFromRating(rating) : current.minAge,
+                    }));
+                  }}
                 />
               )}
             </Field>
@@ -859,6 +871,13 @@ function DetailsTab({ title, disabled, save }: DetailsTabProps) {
               )}
             </Field>
           </div>
+          <AgeField
+            what="title"
+            disabled={disabled}
+            value={form.minAge}
+            suggestion={ageFromRating(form.ageRating)}
+            onChange={(minAge) => set('minAge', minAge)}
+          />
         </CardContent>
       </Card>
 

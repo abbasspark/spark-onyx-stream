@@ -38,6 +38,7 @@ interface Row {
   name: string;
   status: 'DRAFT' | 'PUBLISHED' | 'ARCHIVED';
   isFeatured: boolean;
+  minAge: number | null;
   availableFrom: Date | null;
   availableUntil: Date | null;
   categories: { categoryId: string }[];
@@ -140,6 +141,7 @@ export class BulkService {
           name: true,
           status: true,
           isFeatured: true,
+          minAge: true,
           availableFrom: true,
           availableUntil: true,
           categories: { select: { categoryId: true } },
@@ -224,6 +226,8 @@ export class BulkService {
           row.id,
           row.isFeatured === action.value ? null : { isFeatured: action.value },
         );
+      case 'age':
+        return this.update(row.id, row.minAge === action.minAge ? null : { minAge: action.minAge });
       case 'categories': {
         const categoryIds = merged(
           row.categories.map((entry) => entry.categoryId),

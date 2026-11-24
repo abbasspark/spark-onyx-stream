@@ -37,6 +37,7 @@ const channel = (change: Partial<Channel> = {}): Channel => ({
   qualities: [],
   outputs: null,
   dvrMinutes: 0,
+  minAge: null,
   guideId: null,
   published: false,
   access: 'FREE',

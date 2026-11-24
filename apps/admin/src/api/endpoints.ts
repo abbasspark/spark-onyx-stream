@@ -420,6 +420,9 @@ export const viewersApi = {
   /** Signs one device out and forgets it. */
   removeDevice: (id: string, deviceId: string) =>
     request<void>(`/v1/viewers/${id}/devices/${deviceId}`, { method: 'DELETE' }),
+  /** Takes the PIN off a profile, for a viewer who forgot it. */
+  clearProfilePin: (id: string, profileId: string) =>
+    request<void>(`/v1/viewers/${id}/profiles/${profileId}/pin`, { method: 'DELETE' }),
   remove: (id: string) => request<void>(`/v1/viewers/${id}`, { method: 'DELETE' }),
   /** What is open to the public. Needs no permission. */
   access: (signal?: AbortSignal) => request<ViewerAccessConfig>('/v1/viewer/config', { signal }),
@@ -468,6 +471,8 @@ export interface TitleListQuery {
   packageId?: string;
   /** "none": paid titles in no package. */
   packaged?: 'none';
+  /** "no": titles nobody said an age for. "yes": the others. */
+  rated?: 'yes' | 'no';
   q?: string;
   sort?: TitleSortField;
   order?: SortOrder;

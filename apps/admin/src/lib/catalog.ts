@@ -30,6 +30,7 @@ const SHARED_FILTERS = [
   'person',
   'package',
   'packaged',
+  'rated',
   'collection',
   'shown',
 ];
@@ -233,6 +234,8 @@ export interface DetailsForm {
   synopsis: string;
   releaseYear: string;
   ageRating: string;
+  /** The age the title suits from. Null: nobody said. */
+  minAge: number | null;
   originalLanguage: string;
   /** "1999-03-31", as a date field holds it. */
   releaseDate: string;
@@ -271,6 +274,7 @@ export function toForm(title: TitleDetail, currency = 'EUR'): DetailsForm {
     synopsis: title.synopsis ?? '',
     releaseYear: title.releaseYear === null ? '' : String(title.releaseYear),
     ageRating: title.ageRating ?? '',
+    minAge: title.minAge ?? null,
     originalLanguage: title.originalLanguage ?? '',
     releaseDate: title.releaseDate ?? '',
     runtimeMinutes: title.runtimeMinutes === null ? '' : String(title.runtimeMinutes),
@@ -345,6 +349,11 @@ export function changedFields(
     if (form[key].trim() !== saved[key]) {
       changes[key] = text(form[key]);
     }
+  }
+  // Always said together with a changed rating: left out, the API would read
+  // the age from the rating and undo what was chosen here.
+  if (form.minAge !== saved.minAge || changes.ageRating !== undefined) {
+    changes.minAge = form.minAge;
   }
   if (form.releaseYear.trim() !== saved.releaseYear) {
     changes.releaseYear = form.releaseYear.trim() ? Number(form.releaseYear) : null;

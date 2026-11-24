@@ -60,10 +60,16 @@ export class ViewerSessionService {
     deviceId: string | null = null,
   ): Promise<CreatedViewerSession> {
     const { token, tokenHash } = generateViewerToken();
+    // A sign-in starts in the main profile. Where that has a PIN, it has to be entered first.
+    const main = await this.prisma.viewerProfile.findFirst({
+      where: { viewerId, isMain: true },
+      select: { pinHash: true },
+    });
     const session = await this.prisma.viewerSession.create({
       data: {
         viewerId,
         deviceId,
+        profileLocked: Boolean(main?.pinHash),
         tokenHash,
         ipAddress: info.ipAddress,
         userAgent: info.userAgent,

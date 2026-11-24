@@ -105,7 +105,7 @@ function Saved({ when, label = 'Saved' }: { when: number; label?: string }) {
 /** The viewer's own account: name, password, devices, and leaving. */
 export function AccountScreen() {
   const router = useRouter();
-  const { state, viewer, access, setViewer, signOut } = useViewerSession();
+  const { state, viewer, profile, restricted, access, setViewer, signOut } = useViewerSession();
   // Set when the viewer signs out or deletes the account here. They are then
   // on their way to the home page and must not be sent to sign in instead.
   const [leaving, setLeaving] = useState(false);
@@ -126,6 +126,35 @@ export function AccountScreen() {
       <div className="gutter flex min-h-[60dvh] items-center pt-28" role="status">
         <Loader2 className="size-10 animate-[player-spin_0.9s_linear_infinite]" />
         <span className="sr-only">Loading your account</span>
+      </div>
+    );
+  }
+
+  if (restricted) {
+    // A profile with an age limit watches. The account is for the others.
+    return (
+      <div className="gutter grid min-h-[60dvh] content-center pt-28">
+        <h1 className="display text-4xl sm:text-5xl">Account</h1>
+        <p className="mt-5 max-w-prose text-lg text-smoke">
+          {profile?.name ?? 'This profile'} has an age limit. The account, its payments and its
+          devices are managed from a profile without one.
+        </p>
+        <div className="mt-8 flex flex-wrap gap-3">
+          <Link href="/profiles?next=/account" className="button button-play">
+            Switch profile
+          </Link>
+          <button
+            type="button"
+            className="button button-quiet"
+            onClick={() => {
+              leave();
+              void signOut();
+            }}
+          >
+            <LogOut />
+            Sign out
+          </button>
+        </div>
       </div>
     );
   }

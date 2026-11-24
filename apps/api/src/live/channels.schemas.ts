@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 import { z } from 'zod';
+import { MAX_TITLE_AGE } from '../catalog/age-rating.js';
 import { MAX_SLUG_LENGTH, SLUG_PATTERN } from '../catalog/slug.js';
 import { DVR_WINDOWS, LIVE_QUALITIES, type LiveQuality } from './live-ladder.js';
 import { InvalidSourceError, parseSource } from './live-source.js';
@@ -114,6 +115,8 @@ function checkSource(
   }
 }
 
+const minAge = z.number().int().min(0).max(MAX_TITLE_AGE).nullable();
+
 export const createChannelSchema = z
   .object({
     name,
@@ -128,6 +131,8 @@ export const createChannelSchema = z
     qualities: qualities.optional(),
     /** Whether viewers find the channel on the website and in the apps. */
     published: z.boolean().default(false),
+    /** The age from which the channel suits. Null: profiles with an age limit do not see it. */
+    minAge: minAge.default(null),
     access: access.default('FREE'),
     packageIds: packageIds.default([]),
     guideId: guideId.default(null),
@@ -149,6 +154,7 @@ export const updateChannelSchema = z
     mode,
     qualities,
     published: z.boolean(),
+    minAge,
     access,
     packageIds,
     guideId,

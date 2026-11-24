@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 'use client';
 
-import { ListPlus, LogOut, Tv, UserRound, UsersRound } from 'lucide-react';
+import { ListPlus, Lock, LogOut, Tv, UserRound, UsersRound } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
@@ -12,7 +12,7 @@ import { useViewerSession } from './viewer-session';
 
 /** In the header: "Sign in" for a visitor, who is watching for a viewer. */
 export function AccountMenu() {
-  const { state, viewer, profile, setProfile, signOut } = useViewerSession();
+  const { state, viewer, profile, restricted, setProfile, signOut } = useViewerSession();
   const router = useRouter();
   const pathname = usePathname();
   const params = useSearchParams();
@@ -69,6 +69,11 @@ export function AccountMenu() {
   }, [open, profileId]);
 
   const switchTo = async (next: Profile) => {
+    if (next.locked) {
+      // The page of the profiles asks for the PIN.
+      router.push(`/profiles?next=${encodeURIComponent(here)}`);
+      return;
+    }
     setSwitching(next.id);
     try {
       setProfile(await profilesApi.select(next.id));
@@ -136,6 +141,12 @@ export function AccountMenu() {
                   >
                     <ProfileAvatar profile={other} className="size-7" />
                     <span className="truncate">{other.name}</span>
+                    {other.locked ? (
+                      <Lock
+                        className="ml-auto size-3.5 shrink-0 text-dust"
+                        aria-label="Asks for a PIN"
+                      />
+                    ) : null}
                   </button>
                 </li>
               ))}
@@ -145,18 +156,28 @@ export function AccountMenu() {
             <ListPlus className="size-4" aria-hidden="true" />
             My list
           </Link>
-          <Link href="/profiles" className={item}>
-            <UsersRound className="size-4" aria-hidden="true" />
-            {others.length > 0 ? 'Manage profiles' : 'Add a profile'}
-          </Link>
-          <Link href="/activate" className={item}>
-            <Tv className="size-4" aria-hidden="true" />
-            Sign in a TV
-          </Link>
-          <Link href="/account" className={item}>
-            <UserRound className="size-4" aria-hidden="true" />
-            Account
-          </Link>
+          {restricted ? (
+            // A profile with an age limit watches. The account is for the others.
+            <Link href="/profiles" className={item}>
+              <UsersRound className="size-4" aria-hidden="true" />
+              Switch profile
+            </Link>
+          ) : (
+            <>
+              <Link href="/profiles" className={item}>
+                <UsersRound className="size-4" aria-hidden="true" />
+                {others.length > 0 ? 'Manage profiles' : 'Add a profile'}
+              </Link>
+              <Link href="/activate" className={item}>
+                <Tv className="size-4" aria-hidden="true" />
+                Sign in a TV
+              </Link>
+              <Link href="/account" className={item}>
+                <UserRound className="size-4" aria-hidden="true" />
+                Account
+              </Link>
+            </>
+          )}
           <button
             type="button"
             className={item}

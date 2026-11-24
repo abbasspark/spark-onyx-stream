@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-only
+import { assertUnrestricted } from '../audience/audience.js';
 import {
   Body,
   Controller,
@@ -104,10 +105,19 @@ export class ViewerAuthController {
     entitled: boolean;
     access: ViewerAccess;
     purchases: OwnedTitleRef[];
+    /** Whether a profile has to be chosen before anything else: the main one has a PIN. */
+    chooseProfile: boolean;
   }> {
     const identity = await this.viewerSessions.identify(request);
     if (!identity) {
-      return { viewer: null, profile: null, entitled: false, access: null, purchases: [] };
+      return {
+        viewer: null,
+        profile: null,
+        entitled: false,
+        access: null,
+        purchases: [],
+        chooseProfile: false,
+      };
     }
     const [profile, access, purchases] = await Promise.all([
       this.profiles.current(identity),
@@ -124,6 +134,7 @@ export class ViewerAuthController {
       access,
       // Titles rented or bought, which are open whatever the plan.
       purchases,
+      chooseProfile: identity.session.profileLocked,
     };
   }
 
@@ -182,6 +193,8 @@ export class ViewerAuthController {
     @CurrentViewer() identity: ViewerIdentity,
     @Body(new ZodValidationPipe(updateOwnViewerSchema)) body: UpdateOwnViewerInput,
   ): Promise<ViewerView> {
+    // An account is managed from a profile without a limit.
+    assertUnrestricted();
     return this.auth.updateOwn(identity, body);
   }
 
@@ -193,6 +206,8 @@ export class ViewerAuthController {
     @CurrentViewer() identity: ViewerIdentity,
     @Body(new ZodValidationPipe(changeViewerPasswordSchema)) body: ChangeViewerPasswordInput,
   ): Promise<void> {
+    // An account is managed from a profile without a limit.
+    assertUnrestricted();
     await this.auth.changePassword(identity, body);
   }
 
@@ -262,6 +277,8 @@ export class ViewerAuthController {
     @CurrentViewer() identity: ViewerIdentity,
     @Param('id', ParseUUIDPipe) id: string,
   ): Promise<void> {
+    // An account is managed from a profile without a limit.
+    assertUnrestricted();
     if (!(await this.auth.revokeSession(identity, id))) {
       throw new NotFoundException('Session not found');
     }
@@ -277,6 +294,8 @@ export class ViewerAuthController {
     @Req() request: Request,
     @Res({ passthrough: true }) response: Response,
   ): Promise<void> {
+    // An account is managed from a profile without a limit.
+    assertUnrestricted();
     await this.auth.deleteOwn(identity, body.password);
     response.clearCookie(VIEWER_COOKIE, viewerCookieOptions(request));
   }

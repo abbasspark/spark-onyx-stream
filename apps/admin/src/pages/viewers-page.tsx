@@ -8,6 +8,8 @@ import {
   Copy,
   Film,
   KeyRound,
+  Lock,
+  LockOpen,
   LogOut,
   Mail,
   MailCheck,
@@ -41,6 +43,7 @@ import {
   type ViewerSortField,
   type ViewerStatus,
   type ViewerDevice,
+  type ViewerProfile,
 } from '@/api/types';
 import { useSession } from '@/auth/session';
 import { useConfirm } from '@/components/confirm';
@@ -79,6 +82,7 @@ import { ViewerSubscription } from '@/components/viewer-subscription';
 import { useAddressParams } from '@/lib/address-params';
 import { titlePath } from '@/lib/catalog';
 import { cn } from '@/lib/cn';
+import { describeLimit } from '@/lib/age-rating';
 import { formatDateTime, formatRelative, humanize } from '@/lib/format';
 import {
   describeApp,
@@ -1046,6 +1050,25 @@ function DetailSheet({
     onError: (error: Error) => toast.error(error.message),
     onSettled: () => queryClient.invalidateQueries({ queryKey: ['viewers'] }),
   });
+  const clearPin = useMutation({
+    mutationFn: (profile: ViewerProfile) =>
+      viewersApi.clearProfilePin(viewer?.id ?? '', profile.id),
+    onSuccess: (_, profile) => toast.success(`${profile.name} no longer asks for a PIN`),
+    onError: (error: Error) => toast.error(error.message),
+    onSettled: () => queryClient.invalidateQueries({ queryKey: ['viewers'] }),
+  });
+  const askClearPin = async (profile: ViewerProfile) => {
+    const confirmed = await confirm({
+      title: `Take the PIN off ${profile.name}?`,
+      description:
+        'For a viewer who forgot the PIN and cannot get in. Anyone on the account can then choose this profile, until the viewer sets a new PIN.',
+      confirmLabel: 'Take the PIN off',
+      destructive: true,
+    });
+    if (confirmed) {
+      clearPin.mutate(profile);
+    }
+  };
   const askRemoveDevice = async (device: ViewerDevice) => {
     const confirmed = await confirm({
       title: `Remove ${device.name}?`,
@@ -1101,22 +1124,46 @@ function DetailSheet({
                     ? '1 profile'
                     : `${detail.data.profiles.length} profiles`}
                 </h3>
-                <ul className="flex flex-wrap gap-2">
+                <ul className="divide-y rounded-md border">
                   {detail.data.profiles.map((profile) => (
-                    <li
-                      key={profile.id}
-                      className="flex items-center gap-2 rounded-md border py-1 pr-2.5 pl-1 text-sm"
-                    >
+                    <li key={profile.id} className="flex items-center gap-3 px-3 py-2">
                       <span
                         aria-hidden="true"
-                        className="grid size-6 place-items-center rounded-[3px] text-xs font-bold text-black"
+                        className="grid size-8 shrink-0 place-items-center rounded-[4px] text-sm font-bold text-black"
                         style={{ background: profileColor(profile.color) }}
                       >
                         {[...profile.name.trim()][0]?.toUpperCase() ?? '?'}
                       </span>
-                      {profile.name}
-                      {profile.isMain ? (
-                        <span className="text-xs text-muted-foreground">main</span>
+                      <div className="min-w-0 flex-1">
+                        <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm font-medium">
+                          <span className="truncate">{profile.name}</span>
+                          {profile.isMain ? <Badge>Main</Badge> : null}
+                          {profile.isKids ? <Badge tone="info">Kids</Badge> : null}
+                        </p>
+                        <p className="mt-0.5 text-xs text-muted-foreground">
+                          {describeLimit(profile.maxAge) ?? 'Watches everything'}
+                          {profile.locked ? ', asks for a PIN' : ''}
+                        </p>
+                      </div>
+                      {profile.locked ? (
+                        mayWrite ? (
+                          <Tooltip content="For a viewer who forgot the PIN">
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              disabled={clearPin.isPending}
+                              onClick={() => void askClearPin(profile)}
+                            >
+                              <LockOpen />
+                              Take the PIN off
+                            </Button>
+                          </Tooltip>
+                        ) : (
+                          <Lock
+                            className="size-4 shrink-0 text-muted-foreground"
+                            aria-label="Asks for a PIN"
+                          />
+                        )
                       ) : null}
                     </li>
                   ))}

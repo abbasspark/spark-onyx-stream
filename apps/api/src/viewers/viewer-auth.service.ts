@@ -54,6 +54,11 @@ export interface ViewerSignIn {
   /** For apps, which send it in the Authorization header. The website gets it as a cookie. */
   token: string;
   expiresAt: Date;
+  /**
+   * Whether a profile has to be chosen before anything else: the main one
+   * has a PIN. Until then the sign-in sees only what suits every age.
+   */
+  chooseProfile: boolean;
 }
 
 /** What a client needs to know before showing sign-in or a player. */
@@ -154,6 +159,7 @@ export class ViewerAuthService {
       profile: toProfileView(await this.profiles.main(viewer)),
       token,
       expiresAt: session.expiresAt,
+      chooseProfile: session.profileLocked,
     };
   }
 
@@ -201,6 +207,7 @@ export class ViewerAuthService {
       profile: toProfileView(await this.profiles.main(updated)),
       token,
       expiresAt: session.expiresAt,
+      chooseProfile: session.profileLocked,
     };
   }
 

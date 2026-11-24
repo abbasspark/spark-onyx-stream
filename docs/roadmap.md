@@ -90,7 +90,7 @@ A comparison with other platforms named ten things that change what the API says
 
 1. The API described for programs: an OpenAPI description produced from the code, types generated from it, an API reference in the panel, and a way to tell an app that it is too old. **Done.** See [api.md](api.md).
 2. Devices, and sign-in on a television with a code: a device has an identity that outlasts its sign-ins, and a television shows a code that the viewer confirms on their phone. **Done.** See [phase-2-viewers.md](phase-2-viewers.md#devices-and-signing-in-with-a-code).
-3. Parental controls: kids profiles, a rating limit and a PIN per profile. **Planned.**
+3. Parental controls: an age on titles and channels, profiles with a limit, profiles for children, and a PIN per profile. **Done.** See [phase-2-viewers.md](phase-2-viewers.md#parental-controls).
 4. Several audio tracks per video, and the preferred languages of a profile. **Planned.**
 5. Skip intro and credits. **Planned.**
 6. Similar titles. **Planned.**

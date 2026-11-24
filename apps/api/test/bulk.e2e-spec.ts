@@ -171,6 +171,47 @@ describe.skipIf(!TEST_DATABASE_URL)('Bulk actions (e2e)', () => {
       expect((await detail(second)).isFeatured).toBe(true);
     });
 
+    it('says from which age many titles suit, and finds the ones nobody rated', async () => {
+      const first = await movie('One');
+      const second = await movie('Two');
+      const third = await movie('Three');
+      await patch(`/v1/titles/${first}`, { ageRating: 'FSK 12' }).expect(200);
+
+      const unrated = await testApp
+        .http()
+        .get('/v1/titles?rated=no&sort=name&order=asc')
+        .set(testApp.bearer(ownerToken))
+        .expect(200);
+      expect(unrated.body.items.map((item: { name: string }) => item.name)).toEqual([
+        'Three',
+        'Two',
+      ]);
+
+      // Everything nobody rated, in one go.
+      const response = await bulk({
+        filter: { rated: 'no' },
+        action: { type: 'age', minAge: 6 },
+      }).expect(200);
+      expect(response.body).toMatchObject({ matched: 2, changed: 2, unchanged: 0 });
+      expect((await detail(second)).minAge).toBe(6);
+      expect((await detail(third)).minAge).toBe(6);
+      // The one that was rated keeps its age, and the rating as written stays.
+      expect(await detail(first)).toMatchObject({ minAge: 12, ageRating: 'FSK 12' });
+
+      const again = await bulk({
+        ids: [first, second],
+        action: { type: 'age', minAge: 12 },
+      }).expect(200);
+      expect(again.body).toMatchObject({ changed: 1, unchanged: 1 });
+
+      const cleared = await bulk({ ids: [second], action: { type: 'age', minAge: null } }).expect(
+        200,
+      );
+      expect(cleared.body.changed).toBe(1);
+      expect((await detail(second)).minAge).toBeNull();
+      await bulk({ ids: [first], action: { type: 'age', minAge: 30 } }).expect(400);
+    });
+
     it('adds and removes categories, genres and collections without touching the others', async () => {
       const first = await movie('One');
       const second = await movie('Two');

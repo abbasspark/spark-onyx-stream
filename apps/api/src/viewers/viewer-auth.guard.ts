@@ -16,7 +16,7 @@ import { AppConfig } from '../config/app-config.js';
 import { isSameSiteRequest } from './cookies.js';
 import { type ViewerIdentity, ViewerSessionService } from './viewer-session.service.js';
 
-type ViewerRequest = Request & { viewerIdentity?: ViewerIdentity };
+export type ViewerRequest = Request & { viewerIdentity?: ViewerIdentity };
 
 const SAFE_METHODS = new Set(['GET', 'HEAD', 'OPTIONS']);
 

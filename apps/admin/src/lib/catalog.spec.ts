@@ -73,6 +73,7 @@ const title: TitleDetail = {
   tagline: 'One night. One way out.',
   synopsis: null,
   ageRating: null,
+  minAge: null,
   originalLanguage: 'en',
   backdrop: null,
   logo: null,
@@ -92,6 +93,20 @@ describe('changedFields', () => {
   it('ignores spaces around a value and the order of the categories', () => {
     const form = { ...saved, name: '  Night Train ', categoryIds: ['c2', 'c1'] };
     expect(changedFields(saved, form)).toEqual({});
+  });
+
+  it('says the age whenever the age or the rating changed', () => {
+    expect(changedFields(saved, { ...saved, minAge: 12 })).toEqual({ minAge: 12 });
+    // With a new rating the age goes along, so the API does not read its own
+    // from the rating over what was chosen.
+    expect(changedFields(saved, { ...saved, ageRating: 'FSK 16', minAge: 16 })).toEqual({
+      ageRating: 'FSK 16',
+      minAge: 16,
+    });
+    expect(changedFields(saved, { ...saved, ageRating: 'Livre' })).toEqual({
+      ageRating: 'Livre',
+      minAge: null,
+    });
   });
 
   it('sends the packages when one was added or taken away', () => {

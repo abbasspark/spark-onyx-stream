@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-only
+import { suitsAudience } from '../audience/audience.js';
 import {
   ConflictException,
   ForbiddenException,
@@ -30,6 +31,8 @@ export interface PublicChannel {
   number: number | null;
   description: string | null;
   access: TitleAccess;
+  /** The age from which the channel suits. Null: not said. */
+  minAge: number | null;
   /** The packages the channel is in, for the site to say whether a plan opens it. */
   packageIds: string[];
   /** Whether the channel is sending right now. */
@@ -86,6 +89,7 @@ const PUBLIC_SELECT = {
   number: true,
   description: true,
   access: true,
+  minAge: true,
   enabled: true,
   status: true,
   dvrMinutes: true,
@@ -99,6 +103,7 @@ interface PublicRecord {
   number: number | null;
   description: string | null;
   access: TitleAccess;
+  minAge: number | null;
   enabled: boolean;
   status: string;
   dvrMinutes: number;
@@ -118,7 +123,7 @@ export class PublicChannelsService {
 
   async list(): Promise<PublicChannel[]> {
     const channels = await this.prisma.channel.findMany({
-      where: { published: true },
+      where: { published: true, ...suitsAudience() },
       orderBy: [{ number: { sort: 'asc', nulls: 'last' } }, { name: 'asc' }],
       select: PUBLIC_SELECT,
     });
@@ -137,7 +142,7 @@ export class PublicChannelsService {
    */
   async guide(from: Date, to: Date): Promise<PublicGuideRow[]> {
     const channels = await this.prisma.channel.findMany({
-      where: { published: true },
+      where: { published: true, ...suitsAudience() },
       orderBy: [{ number: { sort: 'asc', nulls: 'last' } }, { name: 'asc' }],
       select: { id: true, slug: true },
     });
@@ -222,7 +227,7 @@ export class PublicChannelsService {
 
   private async find(slug: string): Promise<PublicRecord> {
     const channel = await this.prisma.channel.findFirst({
-      where: { slug, published: true },
+      where: { slug, published: true, ...suitsAudience() },
       select: PUBLIC_SELECT,
     });
     if (!channel) {
@@ -296,6 +301,7 @@ function toPublic(channel: PublicRecord, upcoming: ProgrammeRow[], at: Date): Pu
     number: channel.number,
     description: channel.description,
     access: channel.access,
+    minAge: channel.minAge,
     packageIds: channel.packages.map((link) => link.packageId).sort(),
     onAir: isOnAir(channel),
     dvrMinutes: channel.dvrMinutes,

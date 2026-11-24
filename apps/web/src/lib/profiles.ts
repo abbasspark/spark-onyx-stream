@@ -10,6 +10,20 @@ export interface Profile {
   color: string;
   /** The profile the account started with. It cannot be deleted. */
   isMain: boolean;
+  /** A profile for a child. An API from before parental controls leaves these three out. */
+  isKids?: boolean;
+  /** The oldest age rating this profile sees. Null is everything. */
+  maxAge?: number | null;
+  /** Whether choosing this profile asks for its PIN. */
+  locked?: boolean;
+}
+
+/** What can be said about a profile when it is added or changed. */
+export interface ProfileInput {
+  name?: string;
+  color?: string;
+  isKids?: boolean;
+  maxAge?: number | null;
 }
 
 export interface Profiles {
@@ -55,10 +69,16 @@ export function initialOf(name: string): string {
 
 export const profilesApi = {
   list: () => call<Profiles>('GET', '/profiles'),
-  create: (input: { name: string; color?: string }) => call<Profile>('POST', '/profiles', input),
-  update: (id: string, input: { name?: string; color?: string }) =>
-    call<Profile>('PATCH', `/profiles/${id}`, input),
+  create: (input: ProfileInput & { name: string }) => call<Profile>('POST', '/profiles', input),
+  update: (id: string, input: ProfileInput) => call<Profile>('PATCH', `/profiles/${id}`, input),
   remove: (id: string) => call<void>('DELETE', `/profiles/${id}`),
-  /** Chooses who is watching on this device. */
-  select: (id: string) => call<Profile>('POST', `/profiles/${id}/select`),
+  /**
+   * Chooses who is watching on this device. A profile with a PIN needs it:
+   * the error then carries the code "pin_required", "pin_wrong" or "pin_locked".
+   */
+  select: (id: string, pin?: string) =>
+    call<Profile>('POST', `/profiles/${id}/select`, pin ? { pin } : {}),
+  /** Puts a PIN on a profile, or takes it off with null. Asks for the account's password. */
+  setPin: (id: string, pin: string | null, password: string) =>
+    call<Profile>('PUT', `/profiles/${id}/pin`, { pin, password }),
 };

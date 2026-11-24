@@ -3,6 +3,7 @@
 // Calls the browser makes about the viewer's own account. They go to the same
 // origin, so the session cookie travels with them by itself.
 import type { Opens, OwnedTitle, OwnPayment, OwnSubscription } from './plans';
+import type { Profile } from './profiles';
 
 export interface Viewer {
   id: string;
@@ -17,7 +18,12 @@ export interface Viewer {
 /** A viewer with the profile in use. The type of a profile lives in lib/profiles. */
 export interface SignedIn {
   viewer: Viewer;
-  profile: { id: string; name: string; color: string; isMain: boolean };
+  profile: Profile;
+  /**
+   * Whether a profile has to be chosen before anything else: the main one
+   * has a PIN. Left out by an API older than parental controls.
+   */
+  chooseProfile?: boolean;
   /** Whether the viewer has a running subscription. */
   entitled?: boolean;
   /** Which paid titles it opens. Left out by an API older than packages. */
@@ -63,6 +69,10 @@ export class ViewerApiError extends Error {
     message: string,
     /** Messages per form field, for a request that failed validation. */
     readonly fields: Readonly<Record<string, string>> = {},
+    /** What the API calls the refusal, such as "pin_wrong", for code that reacts to it. */
+    readonly code: string | null = null,
+    /** After a wrong PIN: how many more tries the profile takes. */
+    readonly attemptsLeft: number | null = null,
   ) {
     super(message);
     this.name = 'ViewerApiError';
@@ -74,6 +84,11 @@ interface ErrorBody {
   issues?: { field: string; message: string }[];
   retryAfterSeconds?: number;
   code?: string;
+  attemptsLeft?: number;
+}
+
+function minutesOf(seconds: number | undefined): number | null {
+  return seconds ? Math.ceil(seconds / 60) : null;
 }
 
 /** Turns a refused response into words for the person in front of the screen. */
@@ -84,8 +99,33 @@ export function toViewerApiError(status: number, body: ErrorBody | null): Viewer
       'An email was sent a moment ago. Check your inbox, and the spam folder. You can ask again in two minutes.',
     );
   }
+  if (body?.code === 'pin_locked') {
+    const minutes = minutesOf(body.retryAfterSeconds);
+    return new ViewerApiError(
+      status,
+      minutes
+        ? `Too many wrong PINs. Try again in ${minutes} ${minutes === 1 ? 'minute' : 'minutes'}.`
+        : 'Too many wrong PINs. Try again in a few minutes.',
+      {},
+      body.code,
+    );
+  }
+  if (body?.code === 'pin_wrong') {
+    const left = body.attemptsLeft ?? null;
+    return new ViewerApiError(
+      status,
+      left === null
+        ? 'That PIN is not right.'
+        : left === 0
+          ? 'That PIN is not right. This profile takes no more tries for five minutes.'
+          : `That PIN is not right. ${left} ${left === 1 ? 'try' : 'tries'} left.`,
+      {},
+      body.code,
+      left,
+    );
+  }
   if (status === 429) {
-    const minutes = body?.retryAfterSeconds ? Math.ceil(body.retryAfterSeconds / 60) : null;
+    const minutes = minutesOf(body?.retryAfterSeconds);
     return new ViewerApiError(
       status,
       minutes
@@ -101,7 +141,12 @@ export function toViewerApiError(status: number, body: ErrorBody | null): Viewer
     return new ViewerApiError(status, body.issues[0]?.message ?? 'Check what you entered.', fields);
   }
   const message = Array.isArray(body?.message) ? body.message.join('. ') : body?.message;
-  return new ViewerApiError(status, message || 'Something went wrong. Try again in a moment.');
+  return new ViewerApiError(
+    status,
+    message || 'Something went wrong. Try again in a moment.',
+    {},
+    body?.code ?? null,
+  );
 }
 
 /**
@@ -143,6 +188,7 @@ export const viewerApi = {
       | {
           viewer: null;
           profile: null;
+          chooseProfile?: boolean;
           entitled?: boolean;
           access?: Opens;
           purchases?: OwnedTitle[];

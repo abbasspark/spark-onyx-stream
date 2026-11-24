@@ -3,6 +3,7 @@ import { isEmptyHome, normalizeHome, type RawHome } from './home';
 import 'server-only';
 import { cookies } from 'next/headers';
 import { connection } from 'next/server';
+import { AUDIENCE_COOKIE, readAudience, withAudience } from './audience';
 import { siteConfig } from './config';
 import { LANGUAGE_COOKIE, readLanguage, withLanguage } from './language';
 import { NO_PLANS, type Plans } from './plans';
@@ -84,11 +85,30 @@ export async function currentLanguage(): Promise<string | undefined> {
 }
 
 /**
- * Reads texts that exist in more than one language, in the viewer's. Every
- * language has its own address and with it its own shared answer.
+ * The age limit of the profile in use, from its cookie. Undefined is none.
+ * The API enforces the limit of the sign-in whatever this says: the cookie
+ * only decides which catalog the pages are drawn from.
+ */
+export async function currentAudience(): Promise<number | undefined> {
+  return readAudience((await cookies()).get(AUDIENCE_COOKIE)?.value);
+}
+
+/** The address of an answer for this viewer: in their language, within their age limit. */
+async function addressFor(path: string): Promise<string> {
+  const store = await cookies();
+  return withAudience(
+    withLanguage(path, readLanguage(store.get(LANGUAGE_COOKIE)?.value)),
+    readAudience(store.get(AUDIENCE_COOKIE)?.value),
+  );
+}
+
+/**
+ * Reads what differs by viewer: texts that exist in more than one language,
+ * and lists that are shorter for a profile with an age limit. Every language
+ * and every limit has its own address and with it its own shared answer.
  */
 async function readLocal<Result>(path: string): Promise<Result> {
-  return read<Result>(withLanguage(path, await currentLanguage()));
+  return read<Result>(await addressFor(path));
 }
 
 /**
@@ -100,7 +120,7 @@ async function readLocal<Result>(path: string): Promise<Result> {
  */
 async function findLocal<Result>(path: string): Promise<Result | null> {
   await connection();
-  const address = withLanguage(path, await currentLanguage());
+  const address = await addressFor(path);
   const answer = await answers.get(address, async () => {
     try {
       return await load(address);
@@ -275,7 +295,8 @@ export function getTitle(slug: string): Promise<TitleDetail | null> {
  * channels is kept for a much shorter time than the rest of the catalog.
  */
 const KEEP_CHANNELS_MS = 8000;
-const channelAnswers = new TtlCache<Channel[]>(KEEP_CHANNELS_MS, 1);
+/** One list for everyone, and one for each age limit. */
+const channelAnswers = new TtlCache<Channel[]>(KEEP_CHANNELS_MS, 24);
 
 /**
  * The live channels of the site, in the order of their numbers. A site
@@ -283,9 +304,10 @@ const channelAnswers = new TtlCache<Channel[]>(KEEP_CHANNELS_MS, 1);
  */
 export async function getChannels(): Promise<Channel[]> {
   await connection();
-  return channelAnswers.get('channels', async () => {
+  const address = withAudience('/channels', await currentAudience());
+  return channelAnswers.get(address, async () => {
     try {
-      return (await load('/channels')) as Channel[];
+      return (await load(address)) as Channel[];
     } catch (error) {
       if (error instanceof CatalogError && error.status === 404) {
         return [];
@@ -306,7 +328,7 @@ export async function getChannel(slug: string): Promise<Channel | null> {
  */
 export async function getGuide(): Promise<Guide | null> {
   try {
-    return await read<Guide>('/guide');
+    return await read<Guide>(withAudience('/guide', await currentAudience()));
   } catch (error) {
     if (error instanceof CatalogError && error.status === 404) {
       return null;

@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 import { z } from 'zod';
+import { MAX_TITLE_AGE } from './age-rating.js';
 import { paginationSchema } from '../common/pagination.js';
 import { MAX_SLUG_LENGTH, SLUG_PATTERN } from './slug.js';
 
@@ -124,6 +125,11 @@ export const titleFiltersSchema = z.object({
   packageId: z.uuid().optional(),
   /** "none": paid titles in no package, which only plans that open everything show. */
   packaged: z.enum(['none']).optional(),
+  /**
+   * "no": titles nobody said an age for, which profiles with an age limit do
+   * not see. "yes": the others.
+   */
+  rated: z.enum(['yes', 'no']).optional(),
   /** Matches the name and the original name, ignoring case. */
   q: z.string().trim().min(1).max(200).optional(),
 });
@@ -160,6 +166,11 @@ export const updateTitleSchema = z
       .max(currentYear + 10)
       .nullable(),
     ageRating: optionalText(16),
+    /**
+     * The age from which the title suits. Left out with a rating, it is read
+     * from the rating. Null: nobody said, and profiles with a limit do not see it.
+     */
+    minAge: z.number().int().min(0).max(MAX_TITLE_AGE).nullable(),
     originalLanguage: languageCode.nullable(),
     /** The day of the premiere. */
     releaseDate: day,

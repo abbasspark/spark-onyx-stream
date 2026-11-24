@@ -171,6 +171,7 @@ describe.skipIf(!TEST_DATABASE_URL)('Viewer accounts (e2e)', () => {
         entitled: false,
         access: null,
         purchases: [],
+        chooseProfile: false,
       });
       expect(visitor.headers['cache-control']).toBe('no-store');
       const known = await http().get('/v1/viewer/session').set('Cookie', cookie).expect(200);
@@ -185,6 +186,7 @@ describe.skipIf(!TEST_DATABASE_URL)('Viewer accounts (e2e)', () => {
         entitled: false,
         access: null,
         purchases: [],
+        chooseProfile: false,
       });
     });
 
