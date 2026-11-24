@@ -15,10 +15,13 @@ import {
 import Hls from 'hls.js';
 import {
   ArrowLeft,
+  Cast,
   Loader2,
   Maximize,
   Minimize,
+  Moon,
   Pause,
+  PictureInPicture2,
   Play,
   RotateCcw,
   RotateCw,
@@ -28,32 +31,70 @@ import {
   VolumeX,
 } from 'lucide-react';
 import Link from 'next/link';
-import {
-  type PointerEvent,
-  type ReactNode,
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from 'react';
+import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { formatClock } from '@/lib/format';
 import { errorCodeOf, errorWordsOf, useQualityReports } from './use-quality';
-import { endOf, runningMarker, skipLabel } from '@/lib/markers';
+import { endOf, markerBands, runningMarker, skipLabel } from '@/lib/markers';
+import {
+  type AutoSkip,
+  type DataSaver,
+  DEFAULT_SETTINGS,
+  FIT_LABELS,
+  type FitMode,
+  fitStyle,
+  heightCap,
+  SEEK_STEPS,
+  SUBTITLE_COLORS,
+  setPlayerSettings,
+  setSubtitleLook,
+} from '@/lib/player-settings';
 import { type PlaybackPreferences, profilesApi } from '@/lib/profiles';
 import { pickTrack } from '@/lib/tracks';
 import type { Playback } from '@/lib/types';
 import { parsePreviewTrack, type PreviewCue } from '@/lib/vtt';
 import { useViewerSession } from '../viewer-session';
+import { brightnessFilter } from './gestures';
 import { SeekBar } from './seek-bar';
-import { type ChoiceGroup, SettingsMenu } from './settings-menu';
+import { type Setting, SettingsMenu } from './settings-menu';
+import { type Shortcut, ShortcutsSheet } from './shortcuts-sheet';
+import { StatsPanel, usePlaybackStats } from './stats-panel';
+import { createCueAdjuster, subtitleProperties } from './subtitle-look';
+import { TouchSurface } from './touch-surface';
+import { usePlayerSettings } from './use-player-settings';
+import {
+  useAudioChain,
+  useElementHeight,
+  usePictureInPicture,
+  useRemotePlayback,
+} from './use-player-hardware';
 
-const SKIP_SECONDS = 10;
 const HIDE_CONTROLS_AFTER_MS = 3000;
-const SPEEDS = [0.5, 0.75, 1, 1.25, 1.5, 2];
+const SPEEDS = [0.5, 0.75, 1, 1.25, 1.5, 1.75, 2];
+/** How fast the picture runs while a finger rests on it. */
+const HOLD_RATE = 2;
 const VOLUME_KEY = 'onyx.web.volume';
 /** Value that stands for "automatic" quality and "no" subtitles. */
 const NONE = -1;
+/** What the sleep timer offers, in minutes. 0 is off, -1 the end of this video. */
+const SLEEP_CHOICES = [
+  { value: 0, label: 'Off' },
+  { value: 15, label: 'In 15 minutes' },
+  { value: 30, label: 'In 30 minutes' },
+  { value: 60, label: 'In an hour' },
+  { value: -1, label: 'At the end of this' },
+];
+const FIT_ORDER: FitMode[] = ['fit', 'fill', 'zoom', 'stretch'];
+const SAVER_CHOICES: { value: DataSaver; label: string }[] = [
+  { value: 'off', label: 'As good as it gets' },
+  { value: '1080', label: 'Up to 1080p' },
+  { value: '720', label: 'Up to 720p' },
+  { value: '480', label: 'Up to 480p' },
+];
+const AUTO_SKIP_CHOICES: { value: AutoSkip; label: string }[] = [
+  { value: 'off', label: 'Ask me' },
+  { value: 'intro', label: 'Recap and opening' },
+  { value: 'all', label: 'Recap, opening and credits' },
+];
 
 interface Quality {
   /** Index of the level in hls.js. */
@@ -92,6 +133,11 @@ interface PlayerProps {
    * them: the next episode. Null when nothing comes next.
    */
   afterCredits?: { label: string; onPress: () => void } | null;
+  /**
+   * The viewer set the sleep timer to the end of this video, or took it off
+   * again. Nothing that follows should start by itself while it is set.
+   */
+  onStopAtEnd?: (stop: boolean) => void;
 }
 
 /** The name of a language for a code such as "en", for subtitle tracks without a name. */
@@ -157,14 +203,15 @@ export function Player({
   onFatal,
   overlay,
   afterCredits = null,
+  onStopAtEnd,
 }: PlayerProps) {
   const container = useRef<HTMLDivElement>(null);
   const video = useRef<HTMLVideoElement>(null);
   const hlsRef = useRef<Hls | null>(null);
   const hideTimer = useRef<number | undefined>(undefined);
   // The newest callbacks, so the effects below do not restart when they change.
-  const callbacks = useRef({ onTime, onEnded, onFatal });
-  callbacks.current = { onTime, onEnded, onFatal };
+  const callbacks = useRef({ onTime, onEnded, onFatal, onStopAtEnd });
+  callbacks.current = { onTime, onEnded, onFatal, onStopAtEnd };
 
   const [paused, setPaused] = useState(true);
   const [waiting, setWaiting] = useState(true);
@@ -225,6 +272,26 @@ export function Player({
   const [fullscreen, setFullscreen] = useState(false);
   const [controlsShown, setControlsShown] = useState(true);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [shortcutsOpen, setShortcutsOpen] = useState(false);
+
+  // What this device is set to: how the subtitles look, how the picture
+  // fills the window, how loud it may get, what is skipped by itself.
+  const settings = usePlayerSettings();
+  const [statsOpen, setStatsOpen] = useState(settings.stats);
+  /** Dimming by hand, for watching in the dark. 1 is the picture as it is. */
+  const [brightness, setBrightness] = useState(1);
+  /** When the sleep timer stops the video, or null while none is set. */
+  const [sleepAt, setSleepAt] = useState<number | null>(null);
+  /** The sleep timer as it was chosen, for the menu to show. */
+  const [sleepChoice, setSleepChoice] = useState(0);
+  const [sleptOff, setSleptOff] = useState(false);
+
+  const pip = usePictureInPicture(video);
+  const remote = useRemotePlayback(video);
+  const pictureHeight = useElementHeight(container);
+  // Sound goes through the sound card only when it has something to do there,
+  // and never while the picture is playing on another device.
+  useAudioChain(video, settings.boost, settings.nightMode, remote.connected);
 
   // --- Loading the stream ---------------------------------------------------
 
@@ -460,6 +527,56 @@ export function Player({
     return () => controller.abort();
   }, [playback.thumbnailTrackUrl]);
 
+  // --- What the device is set to --------------------------------------------
+
+  // A data saver holds the ladder down without taking the choice of quality
+  // away: picking a rung by hand still works, and still wins.
+  useEffect(() => {
+    const hls = hlsRef.current;
+    if (!hls) {
+      return;
+    }
+    const cap = heightCap(settings.dataSaver);
+    hls.autoLevelCapping =
+      cap === null
+        ? -1
+        : hls.levels.reduce(
+            (best, level, index) => (level.height <= cap && level.height > 0 ? index : best),
+            -1,
+          );
+  }, [settings.dataSaver, qualities]);
+
+  // Subtitles are drawn by the browser from the cues of the track that shows.
+  // How they look is CSS; when they show and where they sit is on the cues
+  // themselves, so every showing cue is gone over whenever a setting changes.
+  const cues = useRef(createCueAdjuster());
+  useEffect(() => {
+    const element = video.current;
+    if (!element) {
+      return undefined;
+    }
+    const apply = () => {
+      for (const track of element.textTracks) {
+        if (track.mode === 'showing') {
+          cues.current.apply(
+            [...(track.cues ?? [])] as unknown as Parameters<typeof cues.current.apply>[0],
+            settings.subtitles,
+          );
+        }
+      }
+    };
+    apply();
+    // Cues of a track arrive part by part as the video plays, and each new
+    // one has to be placed like the rest.
+    const tracks = element.textTracks;
+    tracks.addEventListener('change', apply);
+    const timer = window.setInterval(apply, 2000);
+    return () => {
+      tracks.removeEventListener('change', apply);
+      window.clearInterval(timer);
+    };
+  }, [settings.subtitles, textTrack]);
+
   // --- Following the video element -----------------------------------------
 
   useEffect(() => {
@@ -644,8 +761,49 @@ export function Player({
   }, []);
 
   const chooseRate = useCallback((index: number) => {
-    if (video.current) {
-      video.current.playbackRate = SPEEDS[index] ?? 1;
+    const element = video.current;
+    if (element) {
+      element.playbackRate = SPEEDS[index] ?? 1;
+      // Without this the sound of a fast picture turns into chipmunks.
+      element.preservesPitch = true;
+    }
+  }, []);
+
+  /** One speed up or down the list, for the < and > keys. */
+  const stepRate = useCallback((direction: number) => {
+    const element = video.current;
+    if (!element) {
+      return;
+    }
+    const at = SPEEDS.indexOf(element.playbackRate);
+    const next = Math.min(
+      SPEEDS.length - 1,
+      Math.max(0, (at === -1 ? SPEEDS.indexOf(1) : at) + direction),
+    );
+    element.playbackRate = SPEEDS[next] ?? 1;
+    element.preservesPitch = true;
+  }, []);
+
+  /**
+   * One frame forward or back, for finding an exact moment. The video has to
+   * be paused, and 25 frames a second is close enough for any of them.
+   */
+  const stepFrame = useCallback((direction: number) => {
+    const element = video.current;
+    if (element && !element.paused) {
+      element.pause();
+    }
+    if (element) {
+      element.currentTime = Math.max(0, element.currentTime + direction * 0.04);
+    }
+  }, []);
+
+  /** The speed a finger resting on the picture runs it at. */
+  const holdRate = useCallback((rate: number) => {
+    const element = video.current;
+    if (element) {
+      element.playbackRate = rate;
+      element.preservesPitch = true;
     }
   }, []);
 
@@ -694,6 +852,61 @@ export function Player({
   skipRef.current = skipAction;
   const skipRunning = useCallback(() => skipRef.current?.onPress(), []);
 
+  // Skipping without being asked, for a viewer who never wants to see an
+  // opening again. Credits are only skipped when something follows them;
+  // otherwise the end screen has its say.
+  const wantsSkipped =
+    running !== null &&
+    (settings.autoSkip === 'all' || (settings.autoSkip === 'intro' && running.kind !== 'CREDITS'));
+  /** The stretches already skipped by themselves, so none is skipped twice. */
+  const autoSkipped = useRef(new Set<string>());
+  useEffect(() => {
+    autoSkipped.current = new Set();
+  }, [playback.manifestUrl]);
+  useEffect(() => {
+    if (!wantsSkipped || !running || !skipRef.current) {
+      return;
+    }
+    // A viewer who goes back into a stretch on purpose is not thrown out of
+    // it again, so each stretch is passed over only the first time.
+    const mark = `${running.kind}:${running.startMs}`;
+    if (autoSkipped.current.has(mark)) {
+      return;
+    }
+    autoSkipped.current.add(mark);
+    skipRef.current.onPress();
+  }, [wantsSkipped, running, playback.manifestUrl]);
+
+  // --- The sleep timer ------------------------------------------------------
+
+  const chooseSleep = useCallback((minutes: number) => {
+    setSleepChoice(minutes);
+    setSleptOff(false);
+    setSleepAt(minutes > 0 ? Date.now() + minutes * 60_000 : null);
+  }, []);
+
+  useEffect(() => {
+    if (sleepAt === null) {
+      return undefined;
+    }
+    const timer = window.setInterval(() => {
+      if (Date.now() < sleepAt) {
+        return;
+      }
+      video.current?.pause();
+      setSleepAt(null);
+      setSleepChoice(0);
+      setSleptOff(true);
+    }, 1000);
+    return () => window.clearInterval(timer);
+  }, [sleepAt]);
+
+  // "At the end of this" needs no clock. It is the page above that has to
+  // know, so that it does not start the next episode by itself.
+  useEffect(() => {
+    callbacks.current.onStopAtEnd?.(sleepChoice === -1);
+  }, [sleepChoice]);
+
   // --- Keys -----------------------------------------------------------------
 
   useEffect(() => {
@@ -702,24 +915,46 @@ export function Player({
         return;
       }
       const element = video.current;
+      const step = settings.seekStep;
       const actions: Record<string, () => void> = {
         ' ': togglePlay,
         k: togglePlay,
-        ArrowLeft: () => skip(-SKIP_SECONDS),
-        ArrowRight: () => skip(SKIP_SECONDS),
-        j: () => skip(-SKIP_SECONDS),
-        l: () => skip(SKIP_SECONDS),
+        ArrowLeft: () => skip(-step),
+        ArrowRight: () => skip(step),
+        j: () => skip(-step),
+        l: () => skip(step),
+        ',': () => stepFrame(-1),
+        '.': () => stepFrame(1),
         ArrowUp: () => changeVolume((element?.volume ?? 1) + 0.1),
         ArrowDown: () => changeVolume((element?.volume ?? 1) - 0.1),
+        Home: () => seekTo(0),
+        End: () => seekTo((element?.duration ?? 0) - 1),
         m: toggleMute,
         f: toggleFullscreen,
         s: skipRunning,
+        i: pip.toggle,
+        d: () => setStatsOpen((open) => !open),
+        '?': () => setShortcutsOpen(true),
+        '<': () => stepRate(-1),
+        '>': () => stepRate(1),
         c: () => {
           if (textTracks.length > 0) {
             chooseTextTrack(textTrack === NONE ? (textTracks[0]?.id ?? NONE) : NONE);
           }
         },
+        v: () => {
+          // Round the picture through the ways it can fill the window.
+          const next = FIT_ORDER[(FIT_ORDER.indexOf(settings.fit) + 1) % FIT_ORDER.length];
+          setPlayerSettings({ fit: next ?? 'fit' });
+        },
       };
+      // A number jumps to that tenth of the video, as every player does.
+      if (/^[0-9]$/.test(event.key) && Number.isFinite(element?.duration)) {
+        event.preventDefault();
+        seekTo(((element?.duration ?? 0) * Number(event.key)) / 10);
+        wake();
+        return;
+      }
       const action = actions[event.key.length === 1 ? event.key.toLowerCase() : event.key];
       if (action) {
         event.preventDefault();
@@ -732,39 +967,38 @@ export function Player({
   }, [
     togglePlay,
     skip,
+    seekTo,
+    stepFrame,
+    stepRate,
     changeVolume,
     toggleMute,
     toggleFullscreen,
     chooseTextTrack,
     textTrack,
     textTracks,
+    pip.toggle,
+    settings.seekStep,
+    settings.fit,
     wake,
   ]);
 
-  // --- Pointer on the picture ----------------------------------------------
+  // --- Tapping the picture ---------------------------------------------------
 
-  const onSurfacePointerUp = (event: PointerEvent<HTMLDivElement>) => {
-    if (event.target !== event.currentTarget) {
-      return;
-    }
-    if (event.pointerType === 'mouse') {
-      if (event.button === 0) {
-        togglePlay();
-      }
-      return;
-    }
-    // A finger first brings the controls back. A second tap hides them again.
-    if (visible && !pinned) {
+  // A finger first brings the controls back. A second tap puts them away.
+  const onSurfaceTapped = useCallback(() => {
+    if (controlsShown && !pinned) {
       window.clearTimeout(hideTimer.current);
       setControlsShown(false);
     } else {
       wake();
     }
-  };
+  }, [controlsShown, pinned, wake]);
 
-  const groups = useMemo<ChoiceGroup[]>(
+  const look = settings.subtitles;
+  const settingsList = useMemo<Setting[]>(
     () => [
       {
+        kind: 'choice',
         name: 'Quality',
         selected: quality,
         onChoose: chooseQuality,
@@ -778,12 +1012,14 @@ export function Player({
         ],
       },
       {
+        kind: 'choice',
         name: 'Sound',
         selected: audioTrack,
         onChoose: chooseAudioTrack,
         choices: audioTracks.map((track) => ({ value: track.id, label: track.label })),
       },
       {
+        kind: 'choice',
         name: 'Subtitles',
         selected: textTrack,
         onChoose: chooseTextTrack,
@@ -796,6 +1032,7 @@ export function Player({
             : [],
       },
       {
+        kind: 'choice',
         name: 'Speed',
         selected: Math.max(0, SPEEDS.indexOf(rate)),
         onChoose: chooseRate,
@@ -805,6 +1042,180 @@ export function Player({
         })),
       },
       {
+        kind: 'page',
+        name: 'How subtitles look',
+        summary: `${Math.round((look.size / 4.2) * 100)}%`,
+        items: [
+          {
+            kind: 'range',
+            name: 'Size',
+            min: 2.4,
+            max: 9,
+            step: 0.2,
+            value: look.size,
+            format: (value) => `${Math.round((value / 4.2) * 100)}%`,
+            onChange: (size) => setSubtitleLook({ size }),
+          },
+          {
+            kind: 'choice',
+            name: 'Colour',
+            selected: Math.max(
+              0,
+              SUBTITLE_COLORS.findIndex((entry) => entry.value === look.color),
+            ),
+            onChoose: (index) =>
+              setSubtitleLook({
+                color: SUBTITLE_COLORS[index]?.value ?? DEFAULT_SETTINGS.subtitles.color,
+              }),
+            choices: SUBTITLE_COLORS.map((entry, index) => ({
+              value: index,
+              label: entry.label,
+            })),
+          },
+          {
+            kind: 'choice',
+            name: 'Set off from the picture',
+            selected: ['none', 'outline', 'shadow', 'box'].indexOf(look.edge),
+            onChoose: (index) =>
+              setSubtitleLook({
+                edge: (['none', 'outline', 'shadow', 'box'] as const)[index] ?? 'shadow',
+              }),
+            choices: [
+              { value: 0, label: 'Nothing' },
+              { value: 1, label: 'An outline' },
+              { value: 2, label: 'A shadow' },
+              { value: 3, label: 'A band behind' },
+            ],
+          },
+          {
+            kind: 'range',
+            name: 'Height on the picture',
+            min: 2,
+            max: 40,
+            step: 1,
+            value: look.bottom,
+            format: (value) => `${value}%`,
+            onChange: (bottom) => setSubtitleLook({ bottom }),
+          },
+          {
+            kind: 'range',
+            name: 'Timing',
+            min: -10,
+            max: 10,
+            step: 0.25,
+            value: look.offset,
+            format: (value) => (value === 0 ? 'As written' : `${value > 0 ? '+' : ''}${value} s`),
+            onChange: (offset) => setSubtitleLook({ offset }),
+            onReset: () => setSubtitleLook({ offset: 0 }),
+          },
+        ],
+      },
+      {
+        kind: 'page',
+        name: 'Picture and sound',
+        summary: FIT_LABELS[settings.fit],
+        items: [
+          {
+            kind: 'choice',
+            name: 'How it fills the window',
+            selected: FIT_ORDER.indexOf(settings.fit),
+            onChoose: (index) => setPlayerSettings({ fit: FIT_ORDER[index] ?? 'fit' }),
+            choices: FIT_ORDER.map((mode, index) => ({ value: index, label: FIT_LABELS[mode] })),
+          },
+          {
+            kind: 'range',
+            name: 'Brightness',
+            min: 0.2,
+            max: 1,
+            step: 0.05,
+            value: brightness,
+            format: (value) => `${Math.round(value * 100)}%`,
+            onChange: setBrightness,
+            onReset: brightness === 1 ? undefined : () => setBrightness(1),
+          },
+          {
+            kind: 'range',
+            name: 'Louder than the recording',
+            min: 1,
+            max: 3,
+            step: 0.1,
+            value: settings.boost,
+            format: (value) => `${Math.round(value * 100)}%`,
+            onChange: (boost) => setPlayerSettings({ boost }),
+            onReset: settings.boost === 1 ? undefined : () => setPlayerSettings({ boost: 1 }),
+          },
+          {
+            kind: 'switch',
+            name: 'Night mode',
+            on: settings.nightMode,
+            onChange: (nightMode) => setPlayerSettings({ nightMode }),
+            note: 'Pulls the loud parts down, so speech can be heard quietly.',
+          },
+        ],
+      },
+      {
+        kind: 'page',
+        name: 'Playing',
+        summary:
+          settings.dataSaver === 'off'
+            ? (AUTO_SKIP_CHOICES.find((entry) => entry.value === settings.autoSkip)?.label ?? '')
+            : `Up to ${settings.dataSaver}p`,
+        items: [
+          {
+            kind: 'choice',
+            name: 'Skip openings and credits',
+            selected: AUTO_SKIP_CHOICES.findIndex((entry) => entry.value === settings.autoSkip),
+            onChoose: (index) =>
+              setPlayerSettings({
+                autoSkip: AUTO_SKIP_CHOICES[index]?.value ?? 'off',
+              }),
+            choices: AUTO_SKIP_CHOICES.map((entry, index) => ({
+              value: index,
+              label: entry.label,
+            })),
+          },
+          {
+            kind: 'choice',
+            name: 'Most it may use',
+            selected: SAVER_CHOICES.findIndex((entry) => entry.value === settings.dataSaver),
+            onChoose: (index) =>
+              setPlayerSettings({
+                dataSaver: SAVER_CHOICES[index]?.value ?? 'off',
+              }),
+            choices: SAVER_CHOICES.map((entry, index) => ({ value: index, label: entry.label })),
+          },
+          {
+            kind: 'choice',
+            name: 'A skip moves',
+            selected: SEEK_STEPS.indexOf(settings.seekStep as never),
+            onChoose: (index) =>
+              setPlayerSettings({ seekStep: SEEK_STEPS[index] ?? SEEK_STEPS[1] }),
+            choices: SEEK_STEPS.map((seconds, index) => ({
+              value: index,
+              label: `${seconds} seconds`,
+            })),
+          },
+          {
+            kind: 'choice',
+            name: 'Stop playing',
+            selected: sleepChoice,
+            onChoose: chooseSleep,
+            choices: SLEEP_CHOICES,
+          },
+          {
+            kind: 'switch',
+            name: 'Show the figures',
+            on: statsOpen,
+            onChange: (on) => {
+              setStatsOpen(on);
+              setPlayerSettings({ stats: on });
+            },
+            note: 'What the picture, the line and the servers are doing.',
+          },
+        ],
+      },
+      {
+        kind: 'choice',
         name: 'Share with viewers',
         selected: sharingOn ? 1 : 0,
         onChoose: chooseSharing,
@@ -834,7 +1245,46 @@ export function Player({
       chooseTextTrack,
       chooseAudioTrack,
       chooseRate,
+      look,
+      settings.fit,
+      settings.boost,
+      settings.nightMode,
+      settings.autoSkip,
+      settings.dataSaver,
+      settings.seekStep,
+      brightness,
+      sleepChoice,
+      chooseSleep,
+      statsOpen,
     ],
+  );
+
+  const shortcuts = useMemo<Shortcut[]>(
+    () => [
+      { keys: ['Space', 'K'], what: 'Play and pause' },
+      { keys: ['←', '→'], what: `Skip ${settings.seekStep} seconds` },
+      { keys: [',', '.'], what: 'One frame back and forward' },
+      { keys: ['↑', '↓'], what: 'Volume' },
+      { keys: ['0', '…', '9'], what: 'Jump to that tenth' },
+      { keys: ['Home', 'End'], what: 'The beginning and the end' },
+      { keys: ['<', '>'], what: 'Slower and faster' },
+      { keys: ['M'], what: 'Mute' },
+      { keys: ['C'], what: 'Subtitles on and off' },
+      { keys: ['S'], what: 'Skip the opening or the credits' },
+      { keys: ['V'], what: 'How the picture fills the window' },
+      { keys: ['F'], what: 'Full screen' },
+      { keys: ['I'], what: 'The small floating window' },
+      { keys: ['D'], what: 'The figures behind the playback' },
+      { keys: ['?'], what: 'This list' },
+    ],
+    [settings.seekStep],
+  );
+
+  const stats = usePlaybackStats(video, hlsRef, statsOpen, false);
+  const picture = fitStyle(settings.fit);
+  const bands = useMemo(
+    () => markerBands(playback.markers, duration),
+    [playback.markers, duration],
   );
 
   const VolumeIcon = muted || volume === 0 ? VolumeX : volume < 0.5 ? Volume1 : Volume2;
@@ -843,6 +1293,7 @@ export function Player({
   return (
     <div
       ref={container}
+      style={subtitleProperties(look, pictureHeight)}
       className={`relative h-dvh w-full overflow-hidden bg-onyx select-none ${visible ? '' : 'cursor-none'}`}
       onPointerMove={(event) => {
         if (event.pointerType === 'mouse') {
@@ -855,18 +1306,28 @@ export function Player({
         playsInline
         poster={playback.posterUrl ?? undefined}
         aria-label={detail ? `${heading}, ${detail}` : heading}
-        className="absolute inset-0 size-full object-contain"
+        style={{
+          objectFit: picture.objectFit,
+          transform: picture.scale === 1 ? undefined : `scale(${picture.scale})`,
+          filter: brightnessFilter(brightness),
+        }}
+        className="absolute inset-0 size-full transition-[transform,filter] duration-200"
       />
 
-      {/* The surface that takes clicks and taps on the picture itself. */}
-      <div
-        className="absolute inset-0"
-        onPointerUp={onSurfacePointerUp}
-        onDoubleClick={(event) => {
-          if (event.target === event.currentTarget) {
-            toggleFullscreen();
-          }
-        }}
+      {/* The picture itself, as something to click, tap, hold and drag. */}
+      <TouchSurface
+        step={settings.seekStep}
+        holdRate={HOLD_RATE}
+        volume={muted ? 0 : volume}
+        brightness={brightness}
+        onSkip={skip}
+        onTogglePlay={togglePlay}
+        onToggleFullscreen={toggleFullscreen}
+        onVolume={changeVolume}
+        onBrightness={setBrightness}
+        onRate={holdRate}
+        onWake={wake}
+        onTap={onSurfaceTapped}
       />
 
       {waiting && !paused ? (
@@ -935,6 +1396,7 @@ export function Player({
           duration={duration}
           buffered={buffered}
           previews={previews}
+          bands={bands}
           onSeek={seekTo}
         />
         <div className="mt-1 flex items-center gap-1">
@@ -948,17 +1410,17 @@ export function Player({
           </button>
           <button
             type="button"
-            aria-label={`Back ${SKIP_SECONDS} seconds`}
+            aria-label={`Back ${settings.seekStep} seconds`}
             className="player-button"
-            onClick={() => skip(-SKIP_SECONDS)}
+            onClick={() => skip(-settings.seekStep)}
           >
             <RotateCcw />
           </button>
           <button
             type="button"
-            aria-label={`Forward ${SKIP_SECONDS} seconds`}
+            aria-label={`Forward ${settings.seekStep} seconds`}
             className="player-button"
-            onClick={() => skip(SKIP_SECONDS)}
+            onClick={() => skip(settings.seekStep)}
           >
             <RotateCw />
           </button>
@@ -991,8 +1453,42 @@ export function Player({
             <span className="text-vein/60"> / {formatClock(duration)}</span>
           </p>
 
+          {settings.nightMode || settings.boost > 1 ? (
+            <span
+              title="Night mode"
+              className="ml-2 hidden items-center gap-1.5 text-xs text-smoke sm:flex"
+            >
+              <Moon className="size-3.5" aria-hidden="true" />
+              {settings.boost > 1 ? `${Math.round(settings.boost * 100)}%` : 'Night'}
+            </span>
+          ) : null}
+
           <div className="ml-auto flex items-center gap-1">
-            <SettingsMenu open={menuOpen} onOpenChange={setMenuOpen} groups={groups} />
+            {remote.available ? (
+              <button
+                type="button"
+                aria-label={
+                  remote.connected ? 'Playing on another device' : 'Play on another device'
+                }
+                aria-pressed={remote.connected}
+                className={`player-button ${remote.connected ? 'text-sard' : ''}`}
+                onClick={remote.prompt}
+              >
+                <Cast />
+              </button>
+            ) : null}
+            {pip.supported ? (
+              <button
+                type="button"
+                aria-label={pip.active ? 'Back into the page' : 'Play in a small window'}
+                aria-pressed={pip.active}
+                className={`player-button ${pip.active ? 'text-sard' : ''}`}
+                onClick={pip.toggle}
+              >
+                <PictureInPicture2 />
+              </button>
+            ) : null}
+            <SettingsMenu open={menuOpen} onOpenChange={setMenuOpen} settings={settingsList} />
             <button
               type="button"
               aria-label={fullscreen ? 'Leave full screen' : 'Full screen'}
@@ -1004,6 +1500,40 @@ export function Player({
           </div>
         </div>
       </div>
+
+      {statsOpen ? (
+        <StatsPanel
+          reading={stats}
+          sharing={canShareThis ? { on: sharingOn, figures: shared } : null}
+          onClose={() => {
+            setStatsOpen(false);
+            setPlayerSettings({ stats: false });
+          }}
+        />
+      ) : null}
+
+      {shortcutsOpen ? (
+        <ShortcutsSheet shortcuts={shortcuts} onClose={() => setShortcutsOpen(false)} />
+      ) : null}
+
+      {sleptOff ? (
+        <div role="status" className="absolute inset-x-0 top-20 flex justify-center px-4">
+          <p className="flex items-center gap-3 border border-line bg-coal/95 px-4 py-2 text-sm backdrop-blur-sm">
+            <Moon className="size-4 text-sard" aria-hidden="true" />
+            Stopped by the sleep timer.
+            <button
+              type="button"
+              className="text-sard underline underline-offset-2"
+              onClick={() => {
+                setSleptOff(false);
+                togglePlay();
+              }}
+            >
+              Keep watching
+            </button>
+          </p>
+        </div>
+      ) : null}
     </div>
   );
 }

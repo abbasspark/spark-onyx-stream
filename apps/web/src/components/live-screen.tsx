@@ -46,7 +46,7 @@ import { readStreamLimit, type StreamLimitRefusal } from '@/lib/streams';
 import { authHref } from '@/lib/viewer-api';
 import { StreamLimitGate, StreamStoppedGate, useStreamPlace } from './stream-gates';
 import { ChannelLineup } from './channel-lineup';
-import { type ChoiceGroup, SettingsMenu } from './player/settings-menu';
+import { type Setting, SettingsMenu } from './player/settings-menu';
 import { useViewerSession } from './viewer-session';
 
 /** How often a channel that is off air is asked for again. */
@@ -59,6 +59,8 @@ const STALL_GIVE_UP_MS = 12_000;
 const HIDE_CONTROLS_MS = 3500;
 /** Further behind the newest picture than this, the viewer is offered to catch up. */
 const BEHIND_SECONDS = 25;
+/** The value that stands for letting the player pick the rung itself. */
+const AUTOMATIC = -1;
 
 type Loaded =
   | { state: 'loading' }
@@ -334,8 +336,35 @@ function LivePlayer({ channel, channels, playback, onBroken, onZap }: LivePlayer
     setSharingOn(on);
     sharingRef.current?.setOn(on);
   }, []);
-  const groups: ChoiceGroup[] = [
+  // The rungs the channel offers, and the one that is playing.
+  const [levels, setLevels] = useState<{ index: number; height: number }[]>([]);
+  const [level, setLevel] = useState(AUTOMATIC);
+  const [playingHeight, setPlayingHeight] = useState<number | null>(null);
+
+  const chooseLevel = useCallback((index: number) => {
+    setLevel(index);
+    if (hlsRef.current) {
+      hlsRef.current.currentLevel = index;
+    }
+  }, []);
+
+  const settingsList: Setting[] = [
     {
+      kind: 'choice',
+      name: 'Quality',
+      selected: level,
+      onChoose: chooseLevel,
+      choices: [
+        {
+          value: AUTOMATIC,
+          label:
+            level === AUTOMATIC && playingHeight ? `Automatic (${playingHeight}p)` : 'Automatic',
+        },
+        ...levels.map((rung) => ({ value: rung.index, label: `${rung.height}p` })),
+      ],
+    },
+    {
+      kind: 'choice',
       name: 'Share with viewers',
       selected: sharingOn ? 1 : 0,
       onChoose: chooseSharing,
@@ -423,10 +452,21 @@ function LivePlayer({ channel, channels, playback, onBroken, onZap }: LivePlayer
       });
       sharing?.bind(hls);
       hlsRef.current = hls;
-      hls.on(Hls.Events.MANIFEST_PARSED, start);
+      hls.on(Hls.Events.MANIFEST_PARSED, (_event, data) => {
+        const seen = new Set<number>();
+        setLevels(
+          data.levels
+            .map((rung, index) => ({ index, height: rung.height }))
+            .filter((rung) => rung.height > 0 && !seen.has(rung.height) && seen.add(rung.height))
+            .sort((a, b) => b.height - a.height),
+        );
+        setLevel(AUTOMATIC);
+        start();
+      });
       hls.on(Hls.Events.LEVEL_SWITCHED, (_event, data) => {
-        const level = hls.levels[data.level];
-        quality.current?.level(level?.height ?? null, level?.bitrate ?? null);
+        const rung = hls.levels[data.level];
+        setPlayingHeight(rung?.height ?? null);
+        quality.current?.level(rung?.height ?? null, rung?.bitrate ?? null);
       });
       hls.on(Hls.Events.ERROR, (_event, data) => {
         if (data.fatal) {
@@ -793,7 +833,7 @@ function LivePlayer({ channel, channels, playback, onBroken, onZap }: LivePlayer
                 <List className="size-6" />
               </button>
             ) : null}
-            <SettingsMenu open={menuOpen} onOpenChange={setMenuOpen} groups={groups} />
+            <SettingsMenu open={menuOpen} onOpenChange={setMenuOpen} settings={settingsList} />
             <button
               type="button"
               className={button}

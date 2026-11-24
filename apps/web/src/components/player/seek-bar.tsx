@@ -3,6 +3,7 @@
 
 import { type KeyboardEvent, type PointerEvent, useRef, useState } from 'react';
 import { formatClock } from '@/lib/format';
+import { bandAt, type MarkerBand } from '@/lib/markers';
 import { findPreview, type PreviewCue } from '@/lib/vtt';
 
 interface SeekBarProps {
@@ -11,6 +12,8 @@ interface SeekBarProps {
   /** Seconds up to which the video is loaded. */
   buffered: number;
   previews: readonly PreviewCue[];
+  /** The marked stretches — recap, opening, credits — drawn across the bar. */
+  bands?: readonly MarkerBand[];
   onSeek: (seconds: number) => void;
 }
 
@@ -21,7 +24,7 @@ const STEP_SECONDS = 10;
  * lighter, what was watched in amber. Pointing at it shows the time and, when
  * the video has them, a small picture of that moment.
  */
-export function SeekBar({ time, duration, buffered, previews, onSeek }: SeekBarProps) {
+export function SeekBar({ time, duration, buffered, previews, bands = [], onSeek }: SeekBarProps) {
   const track = useRef<HTMLDivElement>(null);
   /** Where the pointer is, as a fraction of the bar. Null when it is elsewhere. */
   const [hover, setHover] = useState<number | null>(null);
@@ -86,6 +89,7 @@ export function SeekBar({ time, duration, buffered, previews, onSeek }: SeekBarP
   const shown = dragging && hover !== null ? hover : usable ? time / duration : 0;
   const hoverTime = hover !== null ? hover * duration : null;
   const preview = hoverTime !== null ? findPreview(previews, hoverTime) : undefined;
+  const band = hoverTime !== null ? bandAt(bands, hoverTime) : null;
 
   return (
     <div
@@ -119,6 +123,21 @@ export function SeekBar({ time, duration, buffered, previews, onSeek }: SeekBarP
           style={{ width: `${usable ? Math.min(1, buffered / duration) * 100 : 0}%` }}
         />
         <div className="absolute inset-y-0 left-0 bg-sard" style={{ width: `${shown * 100}%` }} />
+        {/*
+          The marked stretches, drawn over the bar in pale strokes so a viewer
+          can see where the opening and the credits are before reaching them.
+        */}
+        {bands.map((marked) => (
+          <span
+            key={`${marked.kind}-${marked.from}`}
+            aria-hidden="true"
+            className="absolute inset-y-0 border-x border-onyx/70 bg-vein/35 mix-blend-screen"
+            style={{
+              left: `${marked.from * 100}%`,
+              width: `${Math.max(0.4, (marked.to - marked.from) * 100)}%`,
+            }}
+          />
+        ))}
       </div>
       <div
         aria-hidden="true"
@@ -144,8 +163,9 @@ export function SeekBar({ time, duration, buffered, previews, onSeek }: SeekBarP
               }}
             />
           ) : null}
-          <span className="rounded-[2px] bg-onyx/85 px-1.5 py-0.5 text-xs font-medium tabular-nums">
-            {formatClock(hoverTime)}
+          <span className="flex items-baseline gap-2 rounded-[2px] bg-onyx/85 px-1.5 py-0.5 text-xs font-medium">
+            {band ? <span className="text-sard">{band.name}</span> : null}
+            <span className="tabular-nums">{formatClock(hoverTime)}</span>
           </span>
         </div>
       ) : null}

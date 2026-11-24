@@ -104,6 +104,8 @@ export function WatchScreen({
   const [countdown, setCountdown] = useState<number | null>(null);
   const [resumedAt, setResumedAt] = useState<number | null>(null);
   const [restartSignal, setRestartSignal] = useState(0);
+  // The sleep timer was set to the end of this video: nothing starts by itself.
+  const [stopAtEnd, setStopAtEnd] = useState(false);
   const position = useRef({ time: 0, duration: 0, savedAt: 0 });
 
   // --- Asking for the addresses --------------------------------------------
@@ -330,8 +332,8 @@ export function WatchScreen({
     // Nothing is saved any more: the position is the end, which is not worth resuming.
     position.current.duration = 0;
     setEnded(true);
-    setCountdown(next ? NEXT_AFTER_SECONDS : null);
-  }, [progress, next, report]);
+    setCountdown(next && !stopAtEnd ? NEXT_AFTER_SECONDS : null);
+  }, [progress, next, report, stopAtEnd]);
 
   useEffect(() => {
     if (countdown === null || !next) {
@@ -644,7 +646,10 @@ export function WatchScreen({
       onEnded={onEnded}
       onFatal={onFatal}
       overlay={endScreen}
-      afterCredits={next ? { label: 'Next episode', onPress: () => router.push(next.href) } : null}
+      afterCredits={
+        next && !stopAtEnd ? { label: 'Next episode', onPress: () => router.push(next.href) } : null
+      }
+      onStopAtEnd={setStopAtEnd}
     />
   );
 }
