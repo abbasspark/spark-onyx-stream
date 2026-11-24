@@ -64,9 +64,11 @@ function CollectionCover({ collection }: { collection: Collection }) {
   }
   return (
     <span className="grid aspect-[2/3] w-full grid-cols-2 grid-rows-2 gap-px bg-border">
-      {pictures.slice(0, 4).map((picture) => (
+      {/* Two titles of a collection can share one picture, so the place in the
+          mosaic is what tells the four apart. */}
+      {pictures.slice(0, 4).map((picture, index) => (
         <img
-          key={picture.id}
+          key={`${picture.id}-${index}`}
           src={apiUrl(picture.url)}
           alt=""
           loading="lazy"

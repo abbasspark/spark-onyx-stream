@@ -1,8 +1,11 @@
 // SPDX-License-Identifier: AGPL-3.0-only
+import { lookup } from 'node:dns/promises';
+import { isIP } from 'node:net';
 import { Readable } from 'node:stream';
 import { createGunzip } from 'node:zlib';
 import { Inject, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { type GuideSource, PrismaClient } from '@onyx/database';
+import { isForbiddenAddress } from '../common/outbound-address.js';
 import { SecretBox } from '../crypto/secret-box.js';
 import { readXmltv, type XmltvChannel, XmltvError, type XmltvProgramme } from './xmltv.js';
 
@@ -31,13 +34,69 @@ export interface ImportResult {
 /** Opens the file of a guide source. Replaced in tests. */
 export type GuideFetcher = (url: string, signal: AbortSignal) => Promise<AsyncIterable<Uint8Array>>;
 
-/** Fetches a guide file over HTTP, unpacking it when it is gzipped. */
+/** How many times a guide address may send the import somewhere else. */
+const MAX_REDIRECTS = 5;
+
+/**
+ * Refuses an address that would send the request to the machine itself.
+ *
+ * A guide often sits on the same network as the installation, so private
+ * addresses are allowed. What is never called is the place where a cloud
+ * hands out credentials to whoever asks from inside the machine.
+ *
+ * @throws XmltvError when the address must not be called.
+ */
+async function checkAddress(url: URL): Promise<void> {
+  if (url.protocol !== 'http:' && url.protocol !== 'https:') {
+    throw new XmltvError('A guide is fetched over http or https');
+  }
+  const host = url.hostname.replace(/^\[|\]$/g, '');
+  const addresses = isIP(host) ? [host] : (await lookup(host, { all: true })).map((e) => e.address);
+  for (const address of addresses) {
+    if (isForbiddenAddress(address)) {
+      throw new XmltvError(
+        isIP(host)
+          ? 'This address is reserved for the machine itself and is not fetched'
+          : `${host} leads to ${address}, which is reserved for the machine itself`,
+      );
+    }
+  }
+}
+
+/**
+ * Fetches a guide file over HTTP, unpacking it when it is gzipped.
+ *
+ * Every address is checked before it is called, redirects included: the
+ * address comes from the panel and would otherwise be a way to reach
+ * whatever the server itself can reach.
+ */
 export const fetchGuide: GuideFetcher = async (url, signal) => {
-  const response = await fetch(url, {
-    signal,
-    redirect: 'follow',
-    headers: { Accept: 'application/xml, text/xml, */*', 'User-Agent': 'OnyxStream guide import' },
-  });
+  let target = new URL(url);
+  let response: Response;
+  for (let hop = 0; ; hop += 1) {
+    await checkAddress(target);
+    response = await fetch(target, {
+      signal,
+      redirect: 'manual',
+      headers: {
+        Accept: 'application/xml, text/xml, */*',
+        'User-Agent': 'OnyxStream guide import',
+      },
+    });
+    const location =
+      response.status >= 300 && response.status < 400 && response.headers.get('location');
+    if (!location) {
+      break;
+    }
+    if (hop >= MAX_REDIRECTS) {
+      throw new XmltvError('The address of the guide sends the import in circles');
+    }
+    try {
+      target = new URL(location, target);
+    } catch {
+      throw new XmltvError('The server of the guide pointed at an address that cannot be read');
+    }
+  }
   if (!response.ok || !response.body) {
     throw new XmltvError(`The server of the guide answered ${response.status}`);
   }

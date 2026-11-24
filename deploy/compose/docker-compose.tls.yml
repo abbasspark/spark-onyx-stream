@@ -12,6 +12,13 @@
 # ports 80 and 443 reachable from the internet.
 
 services:
+  # With the proxy in front there are two of them before the API: the proxy
+  # and the gateway. The API counts them to find the address of the viewer,
+  # which the audit log, the sign-in limit and every rate limit go by.
+  api:
+    environment:
+      TRUST_PROXY_HOPS: ${TRUST_PROXY_HOPS:-2}
+
   tls:
     image: caddy:2-alpine
     restart: unless-stopped
