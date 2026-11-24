@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- SPDX-License-Identifier: AGPL-3.0-only -->
+<resources>
+    <!--
+      The window behind the app. True black, so that a video and the
+      application meet without a seam on a screen that can show black.
+    -->
+    <style name="Theme.Onyx" parent="android:Theme.Material.NoActionBar">
+        <item name="android:windowBackground">@color/onyx</item>
+        <item name="android:colorBackground">@color/onyx</item>
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:navigationBarColor">@android:color/transparent</item>
+        <item name="android:windowLightStatusBar">false</item>
+    </style>
+</resources>

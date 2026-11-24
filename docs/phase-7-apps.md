@@ -1,11 +1,28 @@
 # Phase 7: the apps
 
 A platform people install on their own server needs clients they can give to
-their viewers. The first is for the television, because that is where a VOD
-service is actually watched; the phone follows.
+their viewers. There are two: one for the television, because that is where a
+VOD service is actually watched, and one for the phone.
 
-The app lives in `apps/tv`, with a README of its own for building it. This
-document is about the decisions behind it.
+They live in `apps/android`, with a README of its own for building them. This
+document is about the decisions behind them.
+
+## One project, two apps, one core
+
+Everything behind a screen is the same on both: the API client, what a device
+remembers, and every view model — starting up, the catalog, a title, playing,
+live, searching, the saved list. All of it is in a `core` module that both
+apps depend on, and an app is its screens and little else.
+
+What is not shared is anything that would be a lie in the other place. A
+television is read from three metres away and driven with four arrows; a phone
+is read from thirty centimetres and driven with a thumb. So each app has its
+own theme, its own type scale, its own navigation and its own player chrome,
+built on the same palette and the same behaviour underneath.
+
+That split is why the phone app is mostly screens. Searching, resuming,
+reporting progress, tuning a channel, the arithmetic of a DVR window — none of
+it was written twice, and a change to any of it changes both apps at once.
 
 ## It is a client of an installation, not of a service
 
@@ -23,10 +40,10 @@ goes for the name the launcher shows and the id the app installs under: all
 three are set at build time, and the name, the logo and the accent colour of
 the service come from the server at run time, so rebranding needs no build.
 
-## Signing in without a keyboard
+## Signing in: two devices, two ways
 
 A television remote has four arrows. Spelling an email address with it is the
-worst minute in any television app, so the app never asks.
+worst minute in any television app, so that app never asks.
 
 The platform already had the answer: `POST /v1/viewer/device-codes` gives the
 app a short code to show and a secret to ask with, and the viewer enters the
@@ -38,6 +55,12 @@ The server decides how often the app may ask whether the viewer has answered,
 and the app obeys it: a room full of televisions must not be able to push a
 small server over by asking faster. A code that runs out is replaced without
 being asked, because the viewer is standing there with a phone in their hand.
+
+The phone does the opposite, and for the same reason. It has a keyboard, and
+it is the device somebody would reach for to approve a code anyway, so asking
+for an email address and a password directly is one step instead of three. The
+shared model takes which way it signs in as a setting; everything after that
+is identical.
 
 ## Being turned away politely
 
