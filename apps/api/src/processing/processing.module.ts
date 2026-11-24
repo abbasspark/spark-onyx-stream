@@ -11,6 +11,7 @@ import { PipelineService } from './pipeline.service.js';
 import { ProcessingSteps } from './processing-steps.js';
 import { ProcessingConsumer } from './processing.consumer.js';
 import { RunningJobs } from './running-jobs.js';
+import { AudioTracksService } from '../audio-tracks/audio-tracks.service.js';
 import { SubtitlesService } from '../subtitles/subtitles.service.js';
 
 /**
@@ -19,8 +20,20 @@ import { SubtitlesService } from '../subtitles/subtitles.service.js';
  */
 @Global()
 @Module({
-  providers: [JobsService, EncodingProfilesService, PipelineService, SubtitlesService],
-  exports: [JobsService, EncodingProfilesService, PipelineService, SubtitlesService],
+  providers: [
+    JobsService,
+    EncodingProfilesService,
+    PipelineService,
+    SubtitlesService,
+    AudioTracksService,
+  ],
+  exports: [
+    JobsService,
+    EncodingProfilesService,
+    PipelineService,
+    SubtitlesService,
+    AudioTracksService,
+  ],
 })
 export class ProcessingCoreModule {}
 

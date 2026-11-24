@@ -32,6 +32,15 @@ export interface PlaybackInfo {
   expiresAt: Date;
   /** What a player needs to share the video with other viewers. Null when P2P is off. */
   p2p: P2pInfo | null;
+  /**
+   * The sound tracks of the video, the one players start with marked. The
+   * playlist names the same tracks: a player picks by language from there.
+   * This is for a page that says what a video offers before it plays. Empty
+   * for a video with one sound that nobody named.
+   */
+  audio: { language: string; label: string | null; isDefault: boolean }[];
+  /** The subtitle tracks of the video. */
+  subtitles: { language: string; label: string | null; isForced: boolean }[];
 }
 
 /** Where a requested media file lives. */
@@ -110,7 +119,11 @@ export class PlaybackService {
   async createPlayback(assetId: string, audience: Audience = 'admin'): Promise<PlaybackInfo> {
     const asset = await this.prisma.asset.findUnique({
       where: { id: assetId },
-      include: { thumbnails: true },
+      include: {
+        thumbnails: true,
+        audioTracks: { where: { status: 'READY' }, orderBy: [{ createdAt: 'asc' }, { id: 'asc' }] },
+        subtitleTracks: { orderBy: [{ createdAt: 'asc' }, { id: 'asc' }] },
+      },
     });
 
     if (!asset || asset.status === 'DELETED') {
@@ -159,6 +172,19 @@ export class PlaybackService {
               expiresAtSeconds,
             )
           : null,
+      audio: [...asset.audioTracks]
+        // The sound inside the video first, as the playlist lists it.
+        .sort((a, b) => Number(a.playlistPath !== null) - Number(b.playlistPath !== null))
+        .map((track) => ({
+          language: track.language,
+          label: track.label,
+          isDefault: track.isDefault,
+        })),
+      subtitles: asset.subtitleTracks.map((track) => ({
+        language: track.language,
+        label: track.label,
+        isForced: track.isForced,
+      })),
     };
   }
 

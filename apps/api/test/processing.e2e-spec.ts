@@ -149,7 +149,8 @@ describe.skipIf(!TEST_DATABASE_URL || !hasFfmpeg)('Processing pipeline (e2e, rea
       'TRANSCODE:COMPLETED',
     ]);
     const probe = jobs.find((job) => job.type === 'PROBE');
-    expect(String(probe?.output?.reason)).toContain('mp3');
+    // The sound is no reason to transcode: it is made by itself. The keyframes are.
+    expect(String(probe?.output?.reason)).toContain('keyframes');
 
     // The source is 720p, so the 1080p quality of the profile is left out.
     const hls = path.join(storageDirectory, 'assets', assetId, 'hls');

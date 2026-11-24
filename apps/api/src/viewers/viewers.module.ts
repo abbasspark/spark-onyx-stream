@@ -9,7 +9,10 @@ import { ViewerAuthService } from './viewer-auth.service.js';
 import { ViewerDevicesController } from './viewer-devices.controller.js';
 import { ViewerDevicesService } from './viewer-devices.service.js';
 import { ViewerEmailService } from './viewer-email.service.js';
-import { ViewerProfilesController } from './viewer-profiles.controller.js';
+import {
+  ViewerPreferencesController,
+  ViewerProfilesController,
+} from './viewer-profiles.controller.js';
 import { ViewerProfilesService } from './viewer-profiles.service.js';
 import { ViewerSessionService } from './viewer-session.service.js';
 import { ViewersAdminController } from './viewers-admin.controller.js';
@@ -25,6 +28,7 @@ import { ViewersAdminService } from './viewers-admin.service.js';
     ViewerAuthController,
     ViewersAdminController,
     ViewerProfilesController,
+    ViewerPreferencesController,
     ViewerDevicesController,
   ],
   providers: [

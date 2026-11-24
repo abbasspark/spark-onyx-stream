@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   Activity,
   ArrowLeft,
+  AudioLines,
   Captions,
   Check,
   Copy,
@@ -23,6 +24,7 @@ import { toast } from 'sonner';
 import { ApiError } from '@/api/client';
 import { assetsApi, jobsApi } from '@/api/endpoints';
 import type { Asset, EncryptionMode } from '@/api/types';
+import { AudioTab } from '@/components/asset-audio';
 import { SubtitlesTab } from '@/components/asset-subtitles';
 import { useSession } from '@/auth/session';
 import { ActivityTab, QualitiesTab, ThumbnailsTab, useAssetMedia } from '@/components/asset-tabs';
@@ -370,6 +372,13 @@ function AssetTabs({ asset, jobs, jobCount }: { asset: Asset; jobs: ReactNode; j
             <Badge>{outputs.renditions.length}</Badge>
           ) : null}
         </TabsTrigger>
+        <TabsTrigger value="audio">
+          <AudioLines />
+          Sound
+          {outputs?.audio && outputs.audio.length > 1 ? (
+            <Badge>{outputs.audio.length}</Badge>
+          ) : null}
+        </TabsTrigger>
         <TabsTrigger value="subtitles">
           <Captions />
           Subtitles
@@ -401,6 +410,9 @@ function AssetTabs({ asset, jobs, jobCount }: { asset: Asset; jobs: ReactNode; j
       </TabsList>
       <TabsContent value="qualities">
         <QualitiesTab media={media} />
+      </TabsContent>
+      <TabsContent value="audio">
+        <AudioTab asset={asset} media={media} mayWrite={can('assets:write')} />
       </TabsContent>
       <TabsContent value="subtitles">
         <SubtitlesTab asset={asset} media={media} mayWrite={can('assets:write')} />

@@ -341,6 +341,12 @@ describe.skipIf(!TEST_DATABASE_URL)('Parental controls (e2e)', () => {
       refused(
         await http().post('/v1/viewer/device-codes/ABCD-EFGH/approve').set('Cookie', anna.cookie),
       );
+      // A child may choose the language of the sound and of the subtitles.
+      await http()
+        .patch('/v1/viewer/preferences')
+        .set('Cookie', anna.cookie)
+        .send({ audioLanguage: 'de' })
+        .expect(200);
       // Reading stays open: the menu of the website asks for these.
       await http().get('/v1/viewer/me').set('Cookie', anna.cookie).expect(200);
 

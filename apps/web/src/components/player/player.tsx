@@ -37,8 +37,11 @@ import {
   useState,
 } from 'react';
 import { formatClock } from '@/lib/format';
+import { type PlaybackPreferences, profilesApi } from '@/lib/profiles';
+import { pickTrack } from '@/lib/tracks';
 import type { Playback } from '@/lib/types';
 import { parsePreviewTrack, type PreviewCue } from '@/lib/vtt';
+import { useViewerSession } from '../viewer-session';
 import { SeekBar } from './seek-bar';
 import { type ChoiceGroup, SettingsMenu } from './settings-menu';
 
@@ -180,6 +183,34 @@ export function Player({
   const [playingHeight, setPlayingHeight] = useState<number | null>(null);
   const [textTracks, setTextTracks] = useState<TextTrackChoice[]>([]);
   const [textTrack, setTextTrack] = useState(NONE);
+  const [audioTracks, setAudioTracks] = useState<TextTrackChoice[]>([]);
+  const [audioTrack, setAudioTrack] = useState(NONE);
+  /** The language of each track, by its position, to remember what was chosen. */
+  const audioLanguages = useRef<(string | undefined)[]>([]);
+  const textLanguages = useRef<(string | undefined)[]>([]);
+
+  // What the profile in use likes to hear and to read. A video starts with
+  // it, and what the viewer picks in the menu becomes it.
+  const { viewer, profile, chooseProfile, setProfile } = useViewerSession();
+  const session = useRef({ viewer, profile, chooseProfile, setProfile });
+  session.current = { viewer, profile, chooseProfile, setProfile };
+  const remember = useCallback((change: Partial<PlaybackPreferences>) => {
+    const { viewer: who, profile: current, chooseProfile: choosing } = session.current;
+    if (!who || !current || choosing) {
+      return;
+    }
+    const same = (Object.keys(change) as (keyof PlaybackPreferences)[]).every(
+      (key) => (current[key] ?? null) === change[key],
+    );
+    if (same) {
+      return;
+    }
+    // The page knows at once. The account learns it for the next device.
+    session.current.setProfile({ ...current, ...change });
+    profilesApi.setPreferences(change).catch(() => {
+      // A choice that could not be kept still holds for this video.
+    });
+  }, []);
   const [previews, setPreviews] = useState<PreviewCue[]>([]);
   const [fullscreen, setFullscreen] = useState(false);
   const [controlsShown, setControlsShown] = useState(true);
@@ -201,7 +232,15 @@ export function Player({
     setPlayingHeight(null);
     setTextTracks([]);
     setTextTrack(NONE);
+    setAudioTracks([]);
+    setAudioTrack(NONE);
+    audioLanguages.current = [];
+    textLanguages.current = [];
     setWaiting(true);
+    const liked = {
+      audio: session.current.profile?.audioLanguage ?? null,
+      subtitles: session.current.profile?.subtitleLanguage ?? null,
+    };
 
     const stored = readVolume();
     element.volume = stored.volume;
@@ -222,6 +261,8 @@ export function Player({
         startPosition: startAt > 0 ? startAt : -1,
         // No point in loading 1080p into a small window.
         capLevelToPlayerSize: true,
+        // The player then starts with that sound, without loading another first.
+        ...(liked.audio ? { audioPreference: { lang: liked.audio } } : {}),
         ...sharing?.hlsConfig,
       });
       sharing?.bind(hls);
@@ -243,13 +284,53 @@ export function Player({
       hls.on(Hls.Events.LEVEL_SWITCHED, (_event, data) => {
         setPlayingHeight(hls.levels[data.level]?.height ?? null);
       });
+      let audioChosen = false;
+      hls.on(Hls.Events.AUDIO_TRACKS_UPDATED, (_event, data) => {
+        audioLanguages.current = data.audioTracks.map((track) => track.lang);
+        setAudioTracks(
+          data.audioTracks.map((track) => ({
+            id: track.id,
+            label: track.name || languageLabel(track.lang, `Track ${track.id + 1}`),
+          })),
+        );
+        // Once per video: the language the profile likes, when the video has it.
+        if (!audioChosen && data.audioTracks.length > 0) {
+          audioChosen = true;
+          const wanted = pickTrack(data.audioTracks, liked.audio);
+          // After the player made its own first choice, which comes right after this.
+          window.setTimeout(() => {
+            if (hlsRef.current !== hls) {
+              return;
+            }
+            if (wanted !== -1 && wanted !== hls.audioTrack) {
+              hls.audioTrack = wanted;
+            }
+            setAudioTrack(wanted !== -1 ? wanted : hls.audioTrack);
+          }, 0);
+        }
+      });
+      hls.on(Hls.Events.AUDIO_TRACK_SWITCHED, (_event, data) => setAudioTrack(data.id));
+      let subtitlesChosen = false;
       hls.on(Hls.Events.SUBTITLE_TRACKS_UPDATED, (_event, data) => {
+        textLanguages.current = data.subtitleTracks.map((track) => track.lang);
         setTextTracks(
           data.subtitleTracks.map((track) => ({
             id: track.id,
             label: track.name || languageLabel(track.lang, `Track ${track.id + 1}`),
           })),
         );
+        if (!subtitlesChosen && data.subtitleTracks.length > 0) {
+          subtitlesChosen = true;
+          const wanted = pickTrack(data.subtitleTracks, liked.subtitles);
+          if (wanted !== -1) {
+            window.setTimeout(() => {
+              if (hlsRef.current === hls) {
+                hls.subtitleDisplay = true;
+                hls.subtitleTrack = wanted;
+              }
+            }, 0);
+          }
+        }
       });
       hls.on(Hls.Events.SUBTITLE_TRACK_SWITCH, (_event, data) => setTextTrack(data.id));
       // The player tries a part that fails again and again, for most of a
@@ -490,12 +571,36 @@ export function Player({
     }
   }, []);
 
+  const rememberRef = useRef(remember);
+  rememberRef.current = remember;
+
+  const chooseAudioTrack = useCallback(
+    (id: number) => {
+      const hls = hlsRef.current;
+      if (!hls) {
+        return;
+      }
+      setAudioTrack(id);
+      hls.audioTrack = id;
+      const language = audioLanguages.current[id];
+      if (language) {
+        remember({ audioLanguage: language });
+      }
+    },
+    [remember],
+  );
+
   const chooseTextTrack = useCallback((id: number) => {
     setTextTrack(id);
     const hls = hlsRef.current;
     if (hls) {
       hls.subtitleDisplay = id !== NONE;
       hls.subtitleTrack = id;
+      // "Off" is remembered too. A track without a language cannot be.
+      const language = id === NONE ? null : textLanguages.current[id];
+      if (language !== undefined) {
+        rememberRef.current({ subtitleLanguage: language });
+      }
       return;
     }
     const tracks = [...(video.current?.textTracks ?? [])].filter(
@@ -615,6 +720,12 @@ export function Player({
         ],
       },
       {
+        name: 'Sound',
+        selected: audioTrack,
+        onChoose: chooseAudioTrack,
+        choices: audioTracks.map((track) => ({ value: track.id, label: track.label })),
+      },
+      {
         name: 'Subtitles',
         selected: textTrack,
         onChoose: chooseTextTrack,
@@ -658,9 +769,12 @@ export function Player({
       playingHeight,
       textTrack,
       textTracks,
+      audioTrack,
+      audioTracks,
       rate,
       chooseQuality,
       chooseTextTrack,
+      chooseAudioTrack,
       chooseRate,
     ],
   );

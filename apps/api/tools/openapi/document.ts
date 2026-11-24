@@ -25,6 +25,10 @@ const AREAS: Record<string, { name: string; description: string }> = {
   assets: { name: 'Videos', description: 'Uploaded videos and their processing.' },
   uploads: { name: 'Uploads', description: 'Resumable uploads of video files.' },
   subtitles: { name: 'Subtitles', description: 'Subtitle files of a video.' },
+  'audio-tracks': {
+    name: 'Sound tracks',
+    description: 'The languages and versions of the sound of a video.',
+  },
   jobs: { name: 'Jobs', description: 'The queue of processing work.' },
   'encoding-profiles': {
     name: 'Encoding profiles',

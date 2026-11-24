@@ -1,4 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-only
+import { toAudioTrackView } from '../audio-tracks/audio-track.view.js';
+import { AudioTracksService } from '../audio-tracks/audio-tracks.service.js';
 import { BadRequestException, Inject, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { type Asset, type Prisma, PrismaClient } from '@onyx/database';
 import { AuditService } from '../audit/audit.service.js';
@@ -53,6 +55,7 @@ export class AssetsService {
     @Inject(PipelineService) private readonly pipeline: PipelineService,
     @Inject(PlaybackService) private readonly playback: PlaybackService,
     @Inject(EventPublisher) private readonly events: EventPublisher,
+    @Inject(AudioTracksService) private readonly audioTracks: AudioTracksService,
   ) {}
 
   async list(input: ListAssetsInput): Promise<Page<AssetView>> {
@@ -192,6 +195,7 @@ export class AssetsService {
       path && asset.status === 'READY' ? this.playback.signedUrl(asset.id, path) : null;
     const thumbnail = (type: 'POSTER' | 'SPRITE' | 'SPRITE_VTT') =>
       asset.thumbnails.find((item) => item.type === type);
+    const audio = await this.audioTracks.list(id);
 
     return {
       renditions: asset.renditions.map((rendition) => ({
@@ -203,6 +207,7 @@ export class AssetsService {
         codec: rendition.codec,
         sizeBytes: rendition.sizeBytes.toString(),
       })),
+      audio: audio.map(toAudioTrackView),
       subtitles: asset.subtitleTracks.map((track) => ({
         id: track.id,
         language: track.language,

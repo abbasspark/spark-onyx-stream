@@ -100,6 +100,8 @@ describe.skipIf(!TEST_DATABASE_URL)('Viewer profiles (e2e)', () => {
       isKids: false,
       maxAge: null,
       locked: false,
+      audioLanguage: null,
+      subtitleLanguage: null,
     });
 
     const profiles = await list(cookie);
@@ -149,6 +151,8 @@ describe.skipIf(!TEST_DATABASE_URL)('Viewer profiles (e2e)', () => {
       isKids: false,
       maxAge: null,
       locked: false,
+      audioLanguage: null,
+      subtitleLanguage: null,
     });
     const picked = await add(cookie, { name: 'Sam', color: 'teal' }).expect(201);
     expect(picked.body.color).toBe('teal');
@@ -164,6 +168,45 @@ describe.skipIf(!TEST_DATABASE_URL)('Viewer profiles (e2e)', () => {
       'Lea',
       'Guest',
     ]);
+  });
+
+  it('remembers the languages a profile likes to hear and to read', async () => {
+    const { cookie, profile } = await register();
+    const preferences = () => http().get('/v1/viewer/preferences').set('Cookie', cookie);
+    const change = (body: object) =>
+      http().patch('/v1/viewer/preferences').set('Cookie', cookie).send(body);
+    await http().get('/v1/viewer/preferences').expect(401);
+
+    expect((await preferences().expect(200)).body).toEqual({
+      audioLanguage: null,
+      subtitleLanguage: null,
+    });
+    // What a player sends when the viewer picks a language in its menu.
+    expect((await change({ audioLanguage: 'DE' }).expect(200)).body).toEqual({
+      audioLanguage: 'de',
+      subtitleLanguage: null,
+    });
+    expect((await change({ subtitleLanguage: 'pt-br' }).expect(200)).body).toEqual({
+      audioLanguage: 'de',
+      subtitleLanguage: 'pt-BR',
+    });
+    await change({ audioLanguage: 'german' }).expect(400);
+    await change({}).expect(400);
+
+    // They belong to the profile in use, and the sign-in says them.
+    const sam = await add(cookie, { name: 'Sam', subtitleLanguage: 'fr' }).expect(201);
+    expect(sam.body).toMatchObject({ audioLanguage: null, subtitleLanguage: 'fr' });
+    await select(cookie, sam.body.id).expect(200);
+    expect((await preferences().expect(200)).body.subtitleLanguage).toBe('fr');
+    await change({ subtitleLanguage: null }).expect(200);
+    const session = await http().get('/v1/viewer/session').set('Cookie', cookie).expect(200);
+    expect(session.body.profile).toMatchObject({ id: sam.body.id, subtitleLanguage: null });
+
+    const all = await list(cookie);
+    expect(all.profiles.find((item) => item.id === profile.id)).toMatchObject({
+      audioLanguage: 'de',
+      subtitleLanguage: 'pt-BR',
+    });
   });
 
   it('checks names and colours', async () => {
@@ -192,6 +235,8 @@ describe.skipIf(!TEST_DATABASE_URL)('Viewer profiles (e2e)', () => {
       isKids: false,
       maxAge: null,
       locked: false,
+      audioLanguage: null,
+      subtitleLanguage: null,
     });
     await patch('00000000-0000-7000-8000-000000000000', { name: 'Nobody' }).expect(404);
   });

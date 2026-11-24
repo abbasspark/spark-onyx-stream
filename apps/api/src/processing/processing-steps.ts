@@ -4,7 +4,8 @@ import { mkdir, readdir, readFile, rm, stat, writeFile } from 'node:fs/promises'
 import path from 'node:path';
 import { pipeline } from 'node:stream/promises';
 import { ConflictException, Inject, Injectable, Logger } from '@nestjs/common';
-import { type Asset, type JobType, Prisma, PrismaClient } from '@onyx/database';
+import { type Asset, type AudioTrack, type JobType, Prisma, PrismaClient } from '@onyx/database';
+import { AudioTracksService, folderOf } from '../audio-tracks/audio-tracks.service.js';
 import { AppConfig } from '../config/app-config.js';
 import { type ContentKey, ContentKeysService } from '../crypto/content-keys.service.js';
 import { EncodingProfilesService } from '../encoding-profiles/encoding-profiles.service.js';
@@ -13,6 +14,15 @@ import { StorageService } from '../storage/storage.service.js';
 import { SubtitlesService } from '../subtitles/subtitles.service.js';
 import { FfmpegRunner } from './ffmpeg/ffmpeg-runner.js';
 import { toPercent } from './ffmpeg/progress.js';
+import {
+  ALTERNATE_AUDIO_CHANNELS,
+  type AudioMediaEntry,
+  type AudioTrackPlan,
+  buildAudioArgs,
+  DEFAULT_ALTERNATE_BITRATE,
+  planAudio,
+  withAudioTracks,
+} from './media/audio.js';
 import { decideProcessingMode } from './media/decision.js';
 import {
   buildCopyArgs,
@@ -80,6 +90,7 @@ const POSTER_POSITION_CAP_SECONDS = 30;
 const CONTENT_TYPES: Record<string, string> = {
   '.m3u8': 'application/vnd.apple.mpegurl',
   '.m4s': 'video/iso.segment',
+  '.ts': 'video/mp2t',
   '.mp4': 'video/mp4',
   '.jpg': 'image/jpeg',
   '.vtt': 'text/vtt',
@@ -120,6 +131,7 @@ export class ProcessingSteps {
     @Inject(AppConfig) private readonly config: AppConfig,
     @Inject(ContentKeysService) private readonly contentKeys: ContentKeysService,
     @Inject(SubtitlesService) private readonly subtitleFiles: SubtitlesService,
+    @Inject(AudioTracksService) private readonly audioTracks: AudioTracksService,
   ) {}
 
   /** Runs the step for a job type and returns what is stored as the job's output. */
@@ -134,6 +146,8 @@ export class ProcessingSteps {
         );
       case 'THUMBNAILS':
         return this.withWorkDirectory(context, (directory) => this.thumbnails(context, directory));
+      case 'AUDIO':
+        return this.withWorkDirectory(context, (directory) => this.addAudio(context, directory));
       case 'CLEANUP':
         return this.cleanup(context);
       default:
@@ -275,7 +289,9 @@ export class ProcessingSteps {
     const outputDirectory = path.join(workDirectory, 'hls');
     await mkdir(outputDirectory, { recursive: true });
 
-    const audioStream = info.audio.find((stream) => stream.isDefault) ?? info.audio[0] ?? null;
+    // The qualities hold the picture only. Every sound stream becomes a track
+    // of its own, taken as it is where the picture is too.
+    const audioPlan = planAudio(info, type === 'REMUX');
     const sourceHeight = info.video.rotation % 180 === 0 ? info.video.height : info.video.width;
 
     const planned = type === 'TRANSCODE' ? planRenditions(profile.renditions, sourceHeight) : [];
@@ -303,7 +319,7 @@ export class ProcessingSteps {
             outputDirectory,
             renditions: planned,
             videoStreamIndex: info.video.index,
-            audioStreamIndex: audioStream?.index ?? null,
+            audioStreamIndex: null,
             timing: {
               segmentSeconds: profile.segmentSeconds,
               keyframeSeconds: profile.keyframeSeconds,
@@ -315,17 +331,33 @@ export class ProcessingSteps {
             outputDirectory,
             renditionName: renditionNames[0] as string,
             videoStreamIndex: info.video.index,
-            audioStreamIndex: audioStream?.index ?? null,
+            audioStreamIndex: null,
             segmentSeconds: profile.segmentSeconds,
             encryption,
           });
 
-    // Encoding is 0 to 90 percent of the job, uploading the results the rest.
+    // Encoding the picture is 0 to 80 percent of the job, the sound the next
+    // ten, uploading the results the rest.
     await this.ffmpeg.ffmpeg(args, {
       signal: context.signal,
       onPosition: (positionMs) =>
-        context.onProgress(Math.round(toPercent(positionMs, info.durationMs) * 0.9)),
+        context.onProgress(Math.round(toPercent(positionMs, info.durationMs) * 0.8)),
     });
+
+    const audioBitrate = Math.max(
+      DEFAULT_ALTERNATE_BITRATE,
+      ...profile.renditions.map((rendition) => rendition.audioBitrate),
+    );
+    const sound = await this.encodeTracks(
+      asset,
+      driver,
+      sourcePath,
+      audioPlan.tracks,
+      { outputDirectory, workDirectory },
+      { segmentSeconds: profile.segmentSeconds, bitrate: audioBitrate, encryption },
+      contentKey !== null,
+      context,
+    );
 
     // Subtitles are written into the same output and listed in the multivariant
     // playlist before anything is uploaded, so players never see a half-finished asset.
@@ -338,25 +370,27 @@ export class ProcessingSteps {
       subtitles.tracks,
     );
 
-    const audioCodec = audioStream
-      ? aacCodecString(type === 'TRANSCODE' ? 'LC' : audioStream.profile)
-      : null;
     const variants: MasterVariant[] = [];
     for (const name of renditionNames) {
       variants.push(
-        await this.measureVariant(
-          outputDirectory,
-          name,
-          info,
-          audioCodec,
-          contentKey,
-          context.signal,
-        ),
+        await this.measureVariant(outputDirectory, name, info, null, contentKey, context.signal),
       );
     }
+    // What a player needs for a quality is its picture and the sound with it.
+    const withSound = variants.map((variant) => ({
+      ...variant,
+      bitrates: {
+        peak: variant.bitrates.peak + sound.bitrate,
+        average: variant.bitrates.average + sound.bitrate,
+      },
+    }));
     await writeFile(
       path.join(outputDirectory, MASTER_PLAYLIST_NAME),
-      buildMasterPlaylist(variants, [...subtitles.tracks, ...added]),
+      withAudioTracks(
+        buildMasterPlaylist(withSound, [...subtitles.tracks, ...added]),
+        sound.entries,
+        sound.codec,
+      ),
     );
 
     if (contentKey) {
@@ -384,10 +418,49 @@ export class ProcessingSteps {
       };
     });
     const totalBytes = [...sizes.values()].reduce((sum, size) => sum + size, 0);
+    const folderBytes = (folder: string | null): bigint =>
+      BigInt(
+        folder
+          ? files
+              .filter((file) => file.startsWith(`${folder}/`))
+              .reduce((sum, file) => sum + (sizes.get(file) ?? 0), 0)
+          : 0,
+      );
 
     await this.prisma.$transaction([
       this.prisma.rendition.deleteMany({ where: { assetId: asset.id } }),
       this.prisma.rendition.createMany({ data: renditions }),
+      this.prisma.audioTrack.deleteMany({ where: { assetId: asset.id, source: 'EMBEDDED' } }),
+      this.prisma.audioTrack.createMany({
+        data: sound.embedded.map((track) => ({
+          assetId: asset.id,
+          language: track.language,
+          label: track.label,
+          codec: track.codec,
+          channels: track.channels,
+          bitrate: track.bitrate,
+          isDefault: track.isDefault,
+          source: 'EMBEDDED' as const,
+          streamIndex: track.streamIndex,
+          playlistPath: `${hlsPrefix}/${track.folder}/${MEDIA_PLAYLIST_NAME}`,
+          sizeBytes: folderBytes(track.folder),
+        })),
+      }),
+      ...sound.added.map((track) =>
+        this.prisma.audioTrack.updateMany({
+          where: { id: track.id },
+          data: track.ok
+            ? {
+                status: 'READY' as const,
+                error: null,
+                channels: ALTERNATE_AUDIO_CHANNELS,
+                bitrate: track.bitrate,
+                isDefault: track.isDefault,
+                sizeBytes: folderBytes(track.folder),
+              }
+            : { status: 'FAILED' as const, error: track.error, isDefault: false },
+        }),
+      ),
       this.prisma.subtitleTrack.deleteMany({ where: { assetId: asset.id, source: 'EMBEDDED' } }),
       this.prisma.subtitleTrack.createMany({
         data: subtitles.tracks.map((track) => ({
@@ -420,6 +493,8 @@ export class ProcessingSteps {
     if ((await this.subtitleFiles.countAdded(asset.id)) !== added.length) {
       await this.subtitleFiles.publish(asset.id);
     }
+    // So is a sound track added or changed while this ran.
+    await this.audioTracks.publish(asset.id);
     await this.webhooks.announceAsset(asset.id);
 
     this.logger.log(
@@ -428,12 +503,402 @@ export class ProcessingSteps {
 
     return {
       renditions: renditions.map((rendition) => rendition.name),
+      audio: sound.entries.map((track) => track.label),
+      ...(sound.skipped.length > 0 || audioPlan.skipped.length > 0
+        ? { audioSkipped: [...audioPlan.skipped, ...sound.skipped] }
+        : {}),
       subtitles: subtitles.tracks.map((track) => track.label),
       ...(subtitles.skipped.length > 0 ? { subtitlesSkipped: subtitles.skipped } : {}),
       encrypted: contentKey !== null,
       files: files.length,
       bytes: totalBytes,
     };
+  }
+
+  /**
+   * Makes the sound tracks of a video beside its picture: the streams of the
+   * source, and the files that were added to the video before. A track that
+   * cannot be made is reported and left out.
+   *
+   * What an admin said about a track of the source (its name, its language,
+   * that players start with it) is kept, by the position of its stream.
+   *
+   * @throws Error when the source has sound and none of it could be made:
+   *   a video that lost its sound is not one to publish.
+   */
+  private async encodeTracks(
+    asset: Asset,
+    driver: StorageDriver,
+    sourcePath: string,
+    plan: readonly AudioTrackPlan[],
+    directories: { outputDirectory: string; workDirectory: string },
+    encoding: { segmentSeconds: number; bitrate: number; encryption?: { keyInfoPath: string } },
+    encrypted: boolean,
+    context: StepContext,
+  ): Promise<{
+    embedded: (AudioTrackPlan & { bitrate: number })[];
+    added: (
+      | { id: string; ok: true; folder: string; bitrate: number; isDefault: boolean }
+      | { id: string; ok: false; error: string }
+    )[];
+    entries: AudioMediaEntry[];
+    skipped: string[];
+    /** The most bits per second any track takes, to add to what a quality needs. */
+    bitrate: number;
+    /** The codec string of the sound, for the qualities to name. */
+    codec: string;
+  }> {
+    const { outputDirectory, workDirectory } = directories;
+    const before = await this.prisma.audioTrack.findMany({ where: { assetId: asset.id } });
+    const said = new Map(
+      before
+        .filter((track) => track.source === 'EMBEDDED' && track.streamIndex !== null)
+        .map((track) => [track.streamIndex as number, track]),
+    );
+    const uploaded = before.filter((track) => track.source === 'UPLOADED' && track.sourcePath);
+    const steps = plan.length + uploaded.length;
+    let done = 0;
+    const advance = () => {
+      done += 1;
+      context.onProgress(80 + Math.round((done / Math.max(1, steps)) * 10));
+    };
+
+    const skipped: string[] = [];
+    const embedded: (AudioTrackPlan & { bitrate: number })[] = [];
+    for (const track of plan) {
+      const kept = said.get(track.streamIndex);
+      const described = {
+        ...track,
+        language: kept?.language ?? track.language,
+        label: kept?.label ?? track.label,
+        isDefault: kept ? kept.isDefault : track.isDefault,
+      };
+      const directory = path.join(outputDirectory, track.folder);
+      const source = { sourcePath, streamIndex: track.streamIndex };
+      try {
+        let made;
+        try {
+          made = await this.encodeAudio(
+            source,
+            directory,
+            { ...encoding, copy: track.copy },
+            encrypted,
+            context.signal,
+          );
+        } catch (error) {
+          context.signal.throwIfAborted();
+          if (!track.copy) {
+            throw error;
+          }
+          // A stream that cannot be taken as it is can still be encoded.
+          await rm(directory, { recursive: true, force: true });
+          made = await this.encodeAudio(source, directory, encoding, encrypted, context.signal);
+          described.copy = false;
+          described.channels = ALTERNATE_AUDIO_CHANNELS;
+          described.profile = 'LC';
+        }
+        embedded.push({ ...described, bitrate: made.bitrate });
+      } catch (error) {
+        context.signal.throwIfAborted();
+        await rm(directory, { recursive: true, force: true });
+        skipped.push(
+          `Sound track "${track.label}" could not be made: ${error instanceof Error ? error.message : String(error)}`,
+        );
+      }
+      advance();
+    }
+    if (plan.length > 0 && embedded.length === 0) {
+      throw new Error(`The sound of the file could not be made. ${skipped.join('. ')}`);
+    }
+
+    const added: Awaited<ReturnType<ProcessingSteps['encodeTracks']>>['added'] = [];
+    for (const track of uploaded) {
+      const folder = folderOf(track) as string;
+      try {
+        const file = await this.localFile(
+          driver,
+          track.sourcePath as string,
+          path.join(workDirectory, `added-${track.id}`),
+        );
+        const made = await this.encodeAudio(
+          { sourcePath: file, streamIndex: 0 },
+          path.join(outputDirectory, folder),
+          encoding,
+          encrypted,
+          context.signal,
+        );
+        added.push({
+          id: track.id,
+          ok: true,
+          folder,
+          bitrate: made.bitrate,
+          isDefault: track.isDefault,
+        });
+      } catch (error) {
+        context.signal.throwIfAborted();
+        await rm(path.join(outputDirectory, folder), { recursive: true, force: true });
+        const reason = error instanceof Error ? error.message : String(error);
+        added.push({ id: track.id, ok: false, error: reason.slice(0, 500) });
+        skipped.push(
+          `Added sound track "${track.label ?? track.language}" could not be made: ${reason}`,
+        );
+      }
+      advance();
+    }
+
+    // One track is the one players start with: an added one that was chosen, or one of the file.
+    const chosenAdded = added.find((track) => track.ok && track.isDefault);
+    const chosenEmbedded = embedded.find((track) => track.isDefault) ?? embedded[0];
+    for (const track of embedded) {
+      track.isDefault = !chosenAdded && track === chosenEmbedded;
+    }
+    const startsWith =
+      chosenAdded ?? (chosenEmbedded ? undefined : added.find((track) => track.ok));
+    for (const track of added) {
+      if (track.ok) {
+        track.isDefault = track === startsWith;
+      }
+    }
+    const byId = new Map(uploaded.map((track) => [track.id, track]));
+    const entries: AudioMediaEntry[] = [
+      ...embedded.map((track) => ({
+        folder: track.folder,
+        language: track.language,
+        label: track.label,
+        isDefault: track.isDefault,
+        channels: track.channels,
+      })),
+      ...added.flatMap((track) => {
+        const row = byId.get(track.id) as AudioTrack;
+        return track.ok
+          ? [
+              {
+                folder: track.folder,
+                language: row.language,
+                label: row.label ?? row.language,
+                isDefault: track.isDefault,
+                channels: ALTERNATE_AUDIO_CHANNELS,
+              },
+            ]
+          : [];
+      }),
+    ];
+    const first = embedded.find((track) => track.isDefault) ?? embedded[0];
+    return {
+      embedded,
+      added,
+      entries,
+      skipped,
+      bitrate: Math.max(
+        0,
+        ...embedded.map((track) => track.bitrate),
+        ...added.map((track) => (track.ok ? track.bitrate : 0)),
+      ),
+      codec: aacCodecString(first?.profile ?? 'LC'),
+    };
+  }
+
+  /**
+   * Makes one sound stream into a folder of its own and says how many bits
+   * per second it came to.
+   *
+   * @throws Error when FFmpeg produced nothing to play, or left it unencrypted when asked to encrypt.
+   */
+  private async encodeAudio(
+    source: { sourcePath: string; streamIndex: number },
+    directory: string,
+    encoding: {
+      segmentSeconds: number;
+      bitrate: number;
+      copy?: boolean;
+      encryption?: { keyInfoPath: string };
+    },
+    encrypted: boolean,
+    signal: AbortSignal,
+    onPosition?: (positionMs: number) => void,
+  ): Promise<{ bitrate: number; bytes: number; durationMs: number }> {
+    await mkdir(directory, { recursive: true });
+    await this.ffmpeg.ffmpeg(
+      buildAudioArgs({ ...source, outputDirectory: directory, ...encoding }),
+      { signal, onPosition },
+    );
+    const playlist = parseMediaPlaylist(
+      await readFile(path.join(directory, MEDIA_PLAYLIST_NAME), 'utf8'),
+    );
+    if (playlist.segments.length === 0) {
+      throw new Error('FFmpeg produced no sound to play');
+    }
+    if (encrypted && !playlist.encrypted) {
+      // Never publish plain segments for an asset that was asked to be encrypted.
+      throw new Error('FFmpeg did not encrypt the sound');
+    }
+    const segments = await Promise.all(
+      playlist.segments.map(async (segment) => ({
+        bytes: (await stat(path.join(directory, segment.uri))).size,
+        duration: segment.duration,
+      })),
+    );
+    return {
+      bitrate: measureBitrates(segments).average,
+      bytes: segments.reduce((sum, segment) => sum + segment.bytes, 0),
+      durationMs: Math.round(segments.reduce((sum, segment) => sum + segment.duration, 0) * 1000),
+    };
+  }
+
+  // --- Sound added to a video ------------------------------------------------
+
+  /**
+   * Makes a track of a sound file that was added to a video that is ready:
+   * encodes it beside the qualities, uploads it and names it in the
+   * multivariant playlist. The picture is not touched.
+   */
+  private async addAudio(
+    context: StepContext,
+    workDirectory: string,
+  ): Promise<Record<string, unknown>> {
+    const job = await this.prisma.job.findUnique({ where: { id: context.jobId } });
+    const trackId = (job?.input as { trackId?: unknown } | null)?.trackId;
+    const track =
+      typeof trackId === 'string'
+        ? await this.prisma.audioTrack.findFirst({
+            where: { id: trackId, assetId: context.assetId },
+          })
+        : null;
+    if (!track || !track.sourcePath || !track.playlistPath) {
+      // Removed while it waited. There is nothing to do, and nothing went wrong.
+      return { skipped: 'The track is no longer there' };
+    }
+
+    try {
+      const asset = await this.prisma.asset.findUnique({ where: { id: context.assetId } });
+      if (!asset || asset.status !== 'READY' || !asset.manifestPath) {
+        // Processing the video makes the track when it gets there.
+        return { skipped: 'The video is being processed and will make the track itself' };
+      }
+      const driver = await this.storage.getDriver(asset.storagePoolId);
+      const file = await this.localFile(driver, track.sourcePath, path.join(workDirectory, 'in'));
+
+      let info: MediaInfo;
+      try {
+        info = parseProbe(
+          await this.ffmpeg.ffprobe(
+            ['-print_format', 'json', '-show_format', '-show_streams', file],
+            context.signal,
+          ),
+        );
+      } catch {
+        context.signal.throwIfAborted();
+        throw new NonRetryableProcessingError('The file is not a media file that can be read');
+      }
+      const stream = info.audio.find((candidate) => candidate.isDefault) ?? info.audio[0];
+      if (!stream) {
+        throw new NonRetryableProcessingError('The file has no sound in it');
+      }
+
+      const profile = asset.encodingProfileId
+        ? await this.profiles.get(asset.encodingProfileId)
+        : await this.profiles.getDefault();
+      const contentKey =
+        asset.encryption === 'AES_128' ? await this.contentKeys.find(asset.id) : null;
+      if (asset.encryption === 'AES_128' && !contentKey) {
+        throw new NonRetryableProcessingError(
+          'The video is encrypted and its key is not there. Process the video again',
+        );
+      }
+      let encryption: { keyInfoPath: string } | undefined;
+      const keyDirectory = path.join(workDirectory, 'keys');
+      if (contentKey) {
+        const keyPath = path.join(keyDirectory, 'content.key');
+        const keyInfoPath = path.join(keyDirectory, 'key.info');
+        await mkdir(keyDirectory, { recursive: true, mode: 0o700 });
+        await writeFile(keyPath, contentKey.key, { mode: 0o600 });
+        await writeFile(keyInfoPath, buildKeyInfo(CONTENT_KEY_URI, keyPath, contentKey.iv), {
+          mode: 0o600,
+        });
+        encryption = { keyInfoPath };
+      }
+
+      const folder = folderOf(track) as string;
+      const outputDirectory = path.join(workDirectory, 'out', folder);
+      const made = await this.encodeAudio(
+        { sourcePath: file, streamIndex: stream.index },
+        outputDirectory,
+        {
+          segmentSeconds: profile.segmentSeconds,
+          bitrate: Math.max(
+            DEFAULT_ALTERNATE_BITRATE,
+            ...profile.renditions.map((rendition) => rendition.audioBitrate),
+          ),
+          encryption,
+        },
+        contentKey !== null,
+        context.signal,
+        (positionMs) =>
+          context.onProgress(Math.round(toPercent(positionMs, info.durationMs) * 0.9)),
+      );
+      await rm(keyDirectory, { recursive: true, force: true });
+
+      const prefix = track.playlistPath.slice(0, track.playlistPath.lastIndexOf('/'));
+      // A second try starts clean.
+      let replaced = 0;
+      for await (const entry of driver.list(prefix)) {
+        replaced += entry.size;
+      }
+      await driver.deletePrefix(prefix);
+      const files = await listFiles(outputDirectory);
+      const sizes = await this.uploadFiles(driver, outputDirectory, prefix, files, context);
+      const bytes = [...sizes.values()].reduce((sum, size) => sum + size, 0);
+
+      // Removed in the meantime: what was just uploaded goes again.
+      if ((await this.prisma.audioTrack.count({ where: { id: track.id } })) === 0) {
+        await driver.deletePrefix(prefix);
+        await this.audioTracks.account(asset, -replaced);
+        return { skipped: 'The track was removed while it was made' };
+      }
+      await this.audioTracks.settle(track.id, {
+        ok: true,
+        channels: ALTERNATE_AUDIO_CHANNELS,
+        bitrate: made.bitrate,
+        sizeBytes: bytes,
+      });
+      await this.audioTracks.account(asset, bytes - replaced);
+      await this.audioTracks.publish(asset.id);
+
+      // Sound that is much shorter or longer than the picture belongs to another cut.
+      const difference = asset.durationMs ? made.durationMs - asset.durationMs : 0;
+      const warning =
+        Math.abs(difference) > 5000
+          ? `The sound is ${Math.round(Math.abs(difference) / 1000)} seconds ${difference > 0 ? 'longer' : 'shorter'} than the video. Check that the file belongs to this cut of it.`
+          : null;
+      this.logger.log(
+        `Asset ${asset.id}: added the sound track "${track.label ?? track.language}"`,
+      );
+      return {
+        track: track.label ?? track.language,
+        from: `${stream.codec}, ${stream.channels} channels`,
+        files: files.length,
+        bytes,
+        ...(warning ? { warning } : {}),
+      };
+    } catch (error) {
+      // A file that cannot be made into sound will not become one on a second try.
+      const reason = context.signal.aborted
+        ? 'Cancelled'
+        : error instanceof Error
+          ? error.message
+          : String(error);
+      await this.audioTracks.settle(track.id, { ok: false, error: reason });
+      this.announce(context.assetId);
+      if (context.signal.aborted || error instanceof NonRetryableProcessingError) {
+        throw error;
+      }
+      throw new NonRetryableProcessingError(reason);
+    }
+  }
+
+  /** Tells the panel that the tracks of a video changed. */
+  private announce(assetId: string): void {
+    void this.audioTracks.publish(assetId).catch(() => undefined);
   }
 
   /**
@@ -688,6 +1153,17 @@ export class ProcessingSteps {
     const target = path.join(workDirectory, `source${path.extname(asset.sourcePath)}`);
     await pipeline(await driver.read(asset.sourcePath), createWriteStream(target));
     return target;
+  }
+
+  /** The same for any other file of the pool, such as an added sound file. */
+  private async localFile(driver: StorageDriver, key: string, target: string): Promise<string> {
+    if (driver.localPath) {
+      return driver.localPath(key);
+    }
+    const file = `${target}${path.extname(key)}`;
+    await mkdir(path.dirname(file), { recursive: true });
+    await pipeline(await driver.read(key), createWriteStream(file));
+    return file;
   }
 
   /** Uploads files from a directory and returns the size of each. */

@@ -73,14 +73,11 @@ describe('decideProcessingMode', () => {
     );
   });
 
-  it('transcodes when any audio stream is not AAC', () => {
-    const decision = decideProcessingMode({
-      info: media({ audioCodecs: ['aac', 'ac3'] }),
-      ...base,
-    });
-
-    expect(decision.mode).toBe('TRANSCODE');
-    expect(decision.reason).toContain('ac3');
+  it('copies the picture whatever the sound is: each sound stream is made by itself', () => {
+    for (const audioCodecs of [['ac3'], ['aac', 'ac3'], ['mp3', 'dts']]) {
+      const decision = decideProcessingMode({ info: media({ audioCodecs }), ...base });
+      expect(decision.mode).toBe('COPY');
+    }
   });
 
   it('transcodes when keyframes are too far apart or missing', () => {
@@ -100,12 +97,14 @@ describe('decideProcessingMode', () => {
 
   it('lists every reason', () => {
     const decision = decideProcessingMode({
-      info: media({ video: { codec: 'vp9' }, audioCodecs: ['opus'] }),
+      info: media({ video: { codec: 'vp9', rotation: 90 }, audioCodecs: ['opus'] }),
       ...base,
     });
 
     expect(decision.reason).toContain('vp9');
-    expect(decision.reason).toContain('opus');
+    expect(decision.reason).toContain('rotated');
+    // The sound is no reason: it is made by itself.
+    expect(decision.reason).not.toContain('opus');
   });
 
   it('honors a forced mode', () => {

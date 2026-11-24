@@ -157,6 +157,16 @@ All under `/v1/viewer`. `GET /session`, `POST /register` and `POST /login` also 
 
 On the website, signing in to an account with more than one profile asks "Who is watching?". The header shows the profile in use and switches between them, and other open tabs follow. In the panel, a viewer's sheet lists the profiles and says who watched what.
 
+## Languages of a profile
+
+A profile says which language it likes to hear and which it reads subtitles in: `audioLanguage` and `subtitleLanguage`, tags such as `de` or `pt-BR`.
+
+- **A video starts with them when it has them.** `pt` finds a `pt-BR` track, and `pt-PT` finds it when there is no other. Without a fitting track the video plays in its default, and nothing is said.
+- **No language for sound** means each video in its own default. **No language for subtitles** means off. Forced subtitles, which only translate what is spoken in another language, show either way.
+- **What a viewer picks in the player is remembered,** for the profile, on every device: the player sends it with `PATCH /v1/viewer/preferences`. `GET` reads them. Both work on the profile in use and are open to a profile with an age limit: a child may choose a language.
+- They are part of the profile wherever a profile is answered (`/session`, `/login`, `/profiles`), and can be set with the profile.
+- A playback answer lists the `audio` and `subtitles` of the video, and the page of a title says the languages it has (`audioLanguages`, `subtitleLanguages`).
+
 ## Parental controls
 
 A household shares an account, and not everything in a catalog is for a child. Three things work together: an age on what can be watched, a limit on a profile, and a PIN.

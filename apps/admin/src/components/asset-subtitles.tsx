@@ -79,7 +79,7 @@ const nameOf = (language: string) =>
   language === UNKNOWN ? 'Language not known' : languageName(language);
 
 /** A choice of language: the common ones, "not known", or a tag that is typed. */
-function LanguageSelect({
+export function LanguageSelect({
   id,
   value,
   onChange,

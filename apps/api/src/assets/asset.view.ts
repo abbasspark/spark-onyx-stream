@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 import type { Asset } from '@onyx/database';
+import type { AudioTrackView } from '../audio-tracks/audio-track.view.js';
 
 /** An asset as returned by the API. */
 export interface AssetView {
@@ -82,6 +83,8 @@ export interface AssetMediaView {
     /** Bytes as text. */
     sizeBytes: string;
   }[];
+  /** The sound tracks: the one inside the video first, then the other languages and versions. */
+  audio: AudioTrackView[];
   subtitles: {
     id: string;
     /** Language code, for example "en". */
