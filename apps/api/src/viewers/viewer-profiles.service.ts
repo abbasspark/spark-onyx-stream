@@ -10,7 +10,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { PrismaClient, type Viewer, type ViewerProfile } from '@onyx/database';
-import { assertUnrestricted } from '../audience/audience.js';
+import { assertUnrestricted, PROFILE_RESTRICTED } from '../audience/audience.js';
 import { hashPassword, verifyPassword } from '../auth/password-hasher.js';
 import { KIDS_DEFAULT_AGE } from '../catalog/age-rating.js';
 import type { CreateProfileInput, UpdateProfileInput } from './viewer.schemas.js';
@@ -54,6 +54,20 @@ export interface ProfileView {
   isKids: boolean;
   /** Whether choosing it asks for a PIN. */
   locked: boolean;
+  /**
+   * The language this profile likes to hear, as a tag such as "de". Null:
+   * each video in its own default. A player starts with the track of this
+   * language when a video has one.
+   */
+  audioLanguage: string | null;
+  /** The language this profile reads subtitles in. Null: subtitles are off. */
+  subtitleLanguage: string | null;
+}
+
+/** What a profile likes to hear and to read. */
+export interface PlaybackPreferences {
+  audioLanguage: string | null;
+  subtitleLanguage: string | null;
 }
 
 export function toProfileView(profile: ViewerProfile): ProfileView {
@@ -65,6 +79,8 @@ export function toProfileView(profile: ViewerProfile): ProfileView {
     maxAge: profile.maxAge,
     isKids: profile.isKids,
     locked: profile.pinHash !== null,
+    audioLanguage: profile.audioLanguage,
+    subtitleLanguage: profile.subtitleLanguage,
   };
 }
 
@@ -139,6 +155,8 @@ export class ViewerProfilesService {
         color,
         isKids,
         maxAge: input.maxAge ?? (isKids ? KIDS_DEFAULT_AGE : null),
+        audioLanguage: input.audioLanguage ?? null,
+        subtitleLanguage: input.subtitleLanguage ?? null,
       },
     });
   }
@@ -176,7 +194,40 @@ export class ViewerProfilesService {
     }
     return this.prisma.viewerProfile.update({
       where: { id },
-      data: { name: input.name, color: input.color, isKids, maxAge },
+      data: {
+        name: input.name,
+        color: input.color,
+        isKids,
+        maxAge,
+        audioLanguage: input.audioLanguage,
+        subtitleLanguage: input.subtitleLanguage,
+      },
+    });
+  }
+
+  /**
+   * Changes what the profile in use likes to hear and to read. Open to a
+   * profile with an age limit: a child may choose a language. A sign-in that
+   * still has to choose a profile has none to change.
+   *
+   * @throws ForbiddenException while no profile was chosen.
+   */
+  async setPreferences(
+    identity: ViewerIdentity,
+    input: Partial<PlaybackPreferences>,
+  ): Promise<ViewerProfile> {
+    if (identity.session.profileLocked) {
+      throw new ForbiddenException({
+        statusCode: 403,
+        error: 'Forbidden',
+        code: PROFILE_RESTRICTED,
+        message: 'Choose a profile first.',
+      });
+    }
+    const profile = await this.current(identity);
+    return this.prisma.viewerProfile.update({
+      where: { id: profile.id },
+      data: { audioLanguage: input.audioLanguage, subtitleLanguage: input.subtitleLanguage },
     });
   }
 

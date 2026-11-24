@@ -56,10 +56,8 @@ export function decideProcessingMode(input: DecisionInput): Decision {
     reasonsToTranscode.push('the video is stored rotated');
   }
 
-  const incompatibleAudio = info.audio.find((stream) => stream.codec !== 'aac');
-  if (incompatibleAudio) {
-    reasonsToTranscode.push(`the audio codec is ${incompatibleAudio.codec}, not AAC`);
-  }
+  // The sound does not decide: it is kept apart from the picture, and each
+  // stream is copied or encoded by itself.
 
   if (maxKeyframeGapSeconds === null) {
     reasonsToTranscode.push('no keyframes were found');
@@ -75,5 +73,5 @@ export function decideProcessingMode(input: DecisionInput): Decision {
       reason: `Transcoding because ${reasonsToTranscode.join(', and ')}`,
     };
   }
-  return { mode: 'COPY', reason: 'The streams are already H.264 and AAC with regular keyframes' };
+  return { mode: 'COPY', reason: 'The picture is already H.264 with regular keyframes' };
 }

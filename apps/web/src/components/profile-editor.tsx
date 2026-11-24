@@ -2,8 +2,10 @@
 'use client';
 
 import { Check, Loader2, Lock, LockOpen } from 'lucide-react';
-import { type FormEvent, useState } from 'react';
+import { type FormEvent, useId, useState } from 'react';
 import { AGE_CHOICES, isPin } from '@/lib/audience';
+import { nativeLanguageName } from '@/lib/language';
+import { languageChoices } from '@/lib/tracks';
 import { colorLabel, colorOf, type Profile, type ProfileInput, profilesApi } from '@/lib/profiles';
 import { ViewerApiError } from '@/lib/viewer-api';
 import { FormField } from './form-field';
@@ -47,6 +49,8 @@ export function ProfileEditor({
   const [color, setColor] = useState(profile?.color ?? null);
   const [isKids, setIsKids] = useState(profile?.isKids ?? false);
   const [maxAge, setMaxAge] = useState<number | null>(profile?.maxAge ?? null);
+  const [audioLanguage, setAudioLanguage] = useState(profile?.audioLanguage ?? '');
+  const [subtitleLanguage, setSubtitleLanguage] = useState(profile?.subtitleLanguage ?? '');
   /** The profile as the API last answered, which knows whether it has a PIN. */
   const [saved, setSaved] = useState(profile);
   const [busy, setBusy] = useState<'save' | 'delete' | null>(null);
@@ -61,6 +65,8 @@ export function ProfileEditor({
       const input: ProfileInput & { name: string } = {
         name: name.trim(),
         ...(color ? { color } : {}),
+        audioLanguage: audioLanguage || null,
+        subtitleLanguage: subtitleLanguage || null,
         // The main profile is the way back into the account and has no limit.
         ...(profile?.isMain ? {} : { isKids, maxAge }),
       };
@@ -153,6 +159,28 @@ export function ProfileEditor({
                   ) : null}
                 </label>
               ))}
+            </div>
+          </fieldset>
+
+          <fieldset>
+            <legend className="mb-1 text-sm text-smoke">Languages</legend>
+            <p className="mb-3 max-w-prose text-sm text-dust">
+              A video starts with these when it has them. What is chosen in the player is remembered
+              here.
+            </p>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <LanguageSelect
+                label="Sound"
+                none="Each video in its own"
+                value={audioLanguage}
+                onValue={setAudioLanguage}
+              />
+              <LanguageSelect
+                label="Subtitles"
+                none="Off"
+                value={subtitleLanguage}
+                onValue={setSubtitleLanguage}
+              />
             </div>
           </fieldset>
 
@@ -284,6 +312,42 @@ export function ProfileEditor({
           </p>
         ) : null}
       </div>
+    </div>
+  );
+}
+
+/** A language a profile likes, or none. Languages are named in themselves, as a viewer looks for them. */
+function LanguageSelect({
+  label,
+  none,
+  value,
+  onValue,
+}: {
+  label: string;
+  /** What choosing no language means. */
+  none: string;
+  value: string;
+  onValue: (value: string) => void;
+}) {
+  const id = useId();
+  return (
+    <div>
+      <label htmlFor={id} className="mb-1.5 block text-sm font-medium">
+        {label}
+      </label>
+      <select
+        id={id}
+        className="input"
+        value={value}
+        onChange={(event) => onValue(event.target.value)}
+      >
+        <option value="">{none}</option>
+        {languageChoices(value || null, nativeLanguageName).map((choice) => (
+          <option key={choice.value} value={choice.value} lang={choice.value}>
+            {choice.label}
+          </option>
+        ))}
+      </select>
     </div>
   );
 }

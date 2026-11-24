@@ -204,6 +204,51 @@ export async function uploadFile<Result>(path: string, file: Blob): Promise<Resu
 }
 
 /**
+ * Sends a large file as the body of a request and says how far it is, for
+ * files that take minutes, such as the sound of a film.
+ *
+ * @throws ApiError when the server refuses the upload.
+ * @throws DOMException named "AbortError" when the signal stops it.
+ */
+export function uploadLargeFile<Result>(
+  path: string,
+  file: Blob,
+  options: { onProgress?: (fraction: number) => void; signal?: AbortSignal } = {},
+): Promise<Result> {
+  const token = readToken();
+  return new Promise((resolve, reject) => {
+    // fetch cannot say how much of a body was sent. This can.
+    const request = new XMLHttpRequest();
+    request.open('POST', `${API_ORIGIN}${path}`);
+    request.setRequestHeader('Accept', 'application/json');
+    request.setRequestHeader('Content-Type', 'application/octet-stream');
+    if (token) {
+      request.setRequestHeader('Authorization', `Bearer ${token}`);
+    }
+    request.upload.onprogress = (event) => {
+      if (event.lengthComputable && event.total > 0) {
+        options.onProgress?.(event.loaded / event.total);
+      }
+    };
+    request.onerror = () =>
+      reject(new Error('The server cannot be reached. Check that the API is running'));
+    request.onabort = () => reject(new DOMException('The upload was stopped', 'AbortError'));
+    request.onload = () => {
+      if (request.status >= 200 && request.status < 300) {
+        resolve(JSON.parse(request.responseText) as Result);
+        return;
+      }
+      if (request.status === 401 && token) {
+        onUnauthorized();
+      }
+      void toApiError(new Response(request.responseText, { status: request.status })).then(reject);
+    };
+    options.signal?.addEventListener('abort', () => request.abort(), { once: true });
+    request.send(file);
+  });
+}
+
+/**
  * Reads a text file from the API, such as the subtitles of a video.
  *
  * @throws ApiError when the server refuses the request.

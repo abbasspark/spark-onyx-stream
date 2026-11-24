@@ -16,6 +16,16 @@ export interface Profile {
   maxAge?: number | null;
   /** Whether choosing this profile asks for its PIN. */
   locked?: boolean;
+  /** The language this profile likes to hear, such as "de". Null or missing: each video in its own. */
+  audioLanguage?: string | null;
+  /** The language this profile reads subtitles in. Null or missing: subtitles are off. */
+  subtitleLanguage?: string | null;
+}
+
+/** What a profile likes to hear and to read. */
+export interface PlaybackPreferences {
+  audioLanguage: string | null;
+  subtitleLanguage: string | null;
 }
 
 /** What can be said about a profile when it is added or changed. */
@@ -24,6 +34,8 @@ export interface ProfileInput {
   color?: string;
   isKids?: boolean;
   maxAge?: number | null;
+  audioLanguage?: string | null;
+  subtitleLanguage?: string | null;
 }
 
 export interface Profiles {
@@ -78,6 +90,12 @@ export const profilesApi = {
    */
   select: (id: string, pin?: string) =>
     call<Profile>('POST', `/profiles/${id}/select`, pin ? { pin } : {}),
+  /**
+   * Remembers what the profile in use chose in the player, so the next
+   * video starts the same way on every device.
+   */
+  setPreferences: (input: Partial<PlaybackPreferences>) =>
+    call<PlaybackPreferences>('PATCH', '/preferences', input),
   /** Puts a PIN on a profile, or takes it off with null. Asks for the account's password. */
   setPin: (id: string, pin: string | null, password: string) =>
     call<Profile>('PUT', `/profiles/${id}/pin`, { pin, password }),

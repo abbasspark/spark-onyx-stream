@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-only
+import { isMakingTracks } from '@/lib/audio-tracks';
 import { useQuery } from '@tanstack/react-query';
 import { Download, History, ImageOff, Layers } from 'lucide-react';
 import { apiUrl } from '@/api/client';
@@ -28,6 +29,8 @@ export function useAssetMedia(asset: Asset) {
     queryKey: ['asset-media', asset.id, asset.readyAt],
     queryFn: ({ signal }) => assetsApi.media(asset.id, signal),
     staleTime: 60_000,
+    // A sound track that is being made is done within seconds or minutes.
+    refetchInterval: (query) => (isMakingTracks(query.state.data?.audio) ? 4000 : false),
   });
 }
 

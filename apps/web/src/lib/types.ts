@@ -71,6 +71,10 @@ export interface TitleDetail extends TitleCard {
   originalLanguage: string | null;
   hasTrailer: boolean;
   // Everything from here to "seasons" is left out by an API older than it.
+  /** The languages there is sound in, as tags such as "de". */
+  audioLanguages?: string[];
+  /** The languages there are subtitles in. */
+  subtitleLanguages?: string[];
   /** What kind of story it is. */
   genres?: GenreRef[];
   /** The day of the premiere, such as "1999-03-31". */
@@ -240,6 +244,10 @@ export interface Playback {
    * operator. Missing or null when the installation records nothing.
    */
   playId?: string | null;
+  /** The sound tracks of the video. Missing from an API older than them. */
+  audio?: { language: string; label: string | null; isDefault: boolean }[];
+  /** The subtitle tracks of the video. Missing from an older API. */
+  subtitles?: { language: string; label: string | null; isForced: boolean }[];
 }
 
 /** A live channel as viewers see it. */

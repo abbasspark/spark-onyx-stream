@@ -7,6 +7,7 @@ import {
   type ProcessingMode,
   PrismaClient,
 } from '@onyx/database';
+import { audioPrefix } from '../audio-tracks/audio-paths.js';
 import { JobsService } from '../jobs/jobs.service.js';
 import { StorageService } from '../storage/storage.service.js';
 import { subtitlePrefix } from '../subtitles/subtitle-paths.js';
@@ -116,6 +117,12 @@ export class PipelineService {
       throw new NotFoundException('The asset of this job no longer exists');
     }
 
+    if (type === 'AUDIO') {
+      // Such a job belongs to one track, which a new job of the type would not know.
+      throw new ConflictException(
+        'Try the track again where the sound of the video is listed, not the job',
+      );
+    }
     if (ESSENTIAL_JOB_TYPES.includes(type)) {
       if (asset.status === 'PROCESSING') {
         throw new ConflictException('The asset is already being processed');
@@ -205,7 +212,12 @@ export class PipelineService {
 
     const driver = await this.storage.getDriver(asset.storagePoolId);
     let bytes = 0n;
-    for (const prefix of [outputPrefix(assetId), sourcePrefix(assetId), subtitlePrefix(assetId)]) {
+    for (const prefix of [
+      outputPrefix(assetId),
+      sourcePrefix(assetId),
+      subtitlePrefix(assetId),
+      audioPrefix(assetId),
+    ]) {
       for await (const entry of driver.list(prefix)) {
         bytes += BigInt(entry.size);
       }
@@ -216,6 +228,7 @@ export class PipelineService {
       this.prisma.rendition.deleteMany({ where: { assetId } }),
       this.prisma.thumbnail.deleteMany({ where: { assetId } }),
       this.prisma.subtitleTrack.deleteMany({ where: { assetId } }),
+      this.prisma.audioTrack.deleteMany({ where: { assetId } }),
       this.prisma.encryptionKey.deleteMany({ where: { assetId } }),
       // An empty source path marks the asset as cleaned up.
       this.prisma.asset.update({
@@ -247,6 +260,16 @@ export class PipelineService {
       this.prisma.rendition.deleteMany({ where: { assetId: asset.id } }),
       this.prisma.thumbnail.deleteMany({ where: { assetId: asset.id } }),
       this.prisma.subtitleTrack.deleteMany({ where: { assetId: asset.id, source: 'EMBEDDED' } }),
+      // The rows of the sound tracks stay: processing reads from them what an
+      // admin said about each, and makes the added ones again from their files.
+      this.prisma.audioTrack.updateMany({
+        where: { assetId: asset.id, source: 'UPLOADED' },
+        data: { status: 'PROCESSING', error: null, sizeBytes: 0 },
+      }),
+      this.prisma.audioTrack.updateMany({
+        where: { assetId: asset.id, source: 'EMBEDDED' },
+        data: { sizeBytes: 0 },
+      }),
       this.prisma.encryptionKey.deleteMany({ where: { assetId: asset.id } }),
       this.prisma.$executeRaw`
         UPDATE storage_pools

@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-only
+import { normalizeLanguage } from '../catalog/language.js';
 import { z } from 'zod';
 import { displayNameSchema, emailSchema, MAX_PASSWORD_LENGTH } from '../auth/auth.schemas.js';
 import { paginationSchema } from '../common/pagination.js';
@@ -60,6 +61,23 @@ const profileNameSchema = z
 
 /** The highest age a title may be for and still show. Null: no limit. */
 const maxAgeSchema = z.number().int().min(0).max(MAX_PROFILE_AGE).nullable();
+/**
+ * A language a profile likes, as a tag such as "de" or "pt-BR". Null: none.
+ * For sound that means each video in its own default, for subtitles "off".
+ */
+const preferredLanguageSchema = z
+  .string()
+  .max(20)
+  .transform((value, context) => {
+    const tag = normalizeLanguage(value);
+    if (!tag) {
+      context.addIssue({ code: 'custom', message: 'Write the language as a tag such as "de"' });
+      return z.NEVER;
+    }
+    return tag;
+  })
+  .nullable();
+
 /** Four to six digits. */
 const pinSchema = z.string().regex(/^\d{4,6}$/, 'A PIN is four to six digits');
 
@@ -70,6 +88,8 @@ export const createProfileSchema = z.object({
   /** A profile for a child. Without a limit of its own it gets the one for children. */
   isKids: z.boolean().optional(),
   maxAge: maxAgeSchema.optional(),
+  audioLanguage: preferredLanguageSchema.optional(),
+  subtitleLanguage: preferredLanguageSchema.optional(),
 });
 export type CreateProfileInput = z.infer<typeof createProfileSchema>;
 
@@ -79,10 +99,19 @@ export const updateProfileSchema = z
     color: profileColorSchema,
     isKids: z.boolean(),
     maxAge: maxAgeSchema,
+    audioLanguage: preferredLanguageSchema,
+    subtitleLanguage: preferredLanguageSchema,
   })
   .partial()
   .refine((value) => Object.keys(value).length > 0, { message: 'Nothing to change' });
 export type UpdateProfileInput = z.infer<typeof updateProfileSchema>;
+
+/** The languages the profile in use likes to hear and to read. */
+export const updatePreferencesSchema = z
+  .object({ audioLanguage: preferredLanguageSchema, subtitleLanguage: preferredLanguageSchema })
+  .partial()
+  .refine((value) => Object.keys(value).length > 0, { message: 'Nothing to change' });
+export type UpdatePreferencesInput = z.infer<typeof updatePreferencesSchema>;
 
 export const selectProfileSchema = z.preprocess(
   // Apps from before PINs send nothing at all.

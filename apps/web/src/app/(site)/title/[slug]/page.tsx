@@ -309,6 +309,18 @@ export default async function TitlePage({ params }: TitlePageProps) {
               <dd className="mt-1">{languageName(title.originalLanguage)}</dd>
             </div>
           ) : null}
+          {title.audioLanguages?.length ? (
+            <div>
+              <dt className="text-dust">Sound</dt>
+              <dd className="mt-1">{title.audioLanguages.map(languageName).join(', ')}</dd>
+            </div>
+          ) : null}
+          {title.subtitleLanguages?.length ? (
+            <div>
+              <dt className="text-dust">Subtitles</dt>
+              <dd className="mt-1">{title.subtitleLanguages.map(languageName).join(', ')}</dd>
+            </div>
+          ) : null}
           {title.countries?.length ? (
             <div>
               <dt className="text-dust">Made in</dt>

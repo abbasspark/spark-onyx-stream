@@ -251,6 +251,74 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/assets/{assetId}/audio-tracks": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The sound tracks of a video: the one inside the video first
+         * @description For an admin or an API key. Needs assets:read.
+         */
+        get: operations["AudioTracks_list"];
+        put?: never;
+        /**
+         * Adds a sound file to a video as another language or version
+         * @description The body is the file itself (MP3, AAC, M4A, WAV, FLAC, Opus, AC-3, or a video file whose sound is taken), not a form. The answer comes at once with the track as "PROCESSING": a job encodes it, and the player offers it when that is done. The picture is not processed again. For an admin or an API key. Needs assets:write.
+         */
+        post: operations["AudioTracks_add"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/assets/{assetId}/audio-tracks/{trackId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Takes a track out of a video
+         * @description The sound inside the video itself cannot be taken out. For an admin or an API key. Needs assets:write.
+         */
+        delete: operations["AudioTracks_remove"];
+        options?: never;
+        head?: never;
+        /**
+         * Renames a track, changes its language, or makes it the one players start with
+         * @description For an admin or an API key. Needs assets:write.
+         */
+        patch: operations["AudioTracks_update"];
+        trace?: never;
+    };
+    "/v1/assets/{assetId}/audio-tracks/{trackId}/retry": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Tries an added track again that could not be made
+         * @description For an admin or an API key. Needs assets:write.
+         */
+        post: operations["AudioTracks_retry"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/assets/{assetId}/subtitles": {
         parameters: {
             query?: never;
@@ -4223,6 +4291,30 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/viewer/preferences": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The languages the profile in use likes: for the sound of a video, and for subtitles
+         * @description A player starts with them when a video has them. For a signed-in viewer.
+         */
+        get: operations["ViewerPreferences_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Changes them
+         * @description A player sends what the viewer chose in its menu, so the next video starts the same way, on every device of the profile. "subtitleLanguage": null turns subtitles off. For a signed-in viewer.
+         */
+        patch: operations["ViewerPreferences_update"];
+        trace?: never;
+    };
     "/v1/viewer/profiles": {
         parameters: {
             query?: never;
@@ -5381,6 +5473,8 @@ export interface components {
                 /** @description Bytes as text. */
                 sizeBytes: string;
             }[];
+            /** @description The sound tracks: the one inside the video first, then the other languages and versions. */
+            audio: components["schemas"]["AudioTrackView"][];
             subtitles: {
                 id: string;
                 /** @description Language code, for example "en". */
@@ -5447,6 +5541,37 @@ export interface components {
             createdAt: string;
             /** Format: date-time */
             updatedAt: string;
+        };
+        /** @enum {string} */
+        AudioSource: "UPLOADED" | "EMBEDDED";
+        /** @enum {string} */
+        AudioTrackStatus: "PROCESSING" | "READY" | "FAILED";
+        AudioTrackView: {
+            id: string;
+            /** @description Language tag, for example "en". "und" when not known. */
+            language: string;
+            label: string | null;
+            /** @description EMBEDDED: came with the source file. UPLOADED: a file added afterwards. */
+            source: components["schemas"]["AudioSource"];
+            /** @description PROCESSING while an added file is made into a track, FAILED when it could not be. */
+            status: components["schemas"]["AudioTrackStatus"];
+            /** @description Why it failed. */
+            error: string | null;
+            /** @description The track players start with when the viewer has no preference. */
+            isDefault: boolean;
+            /** @description Whether the sound is inside the video segments. Such a track cannot be removed. */
+            inVideo: boolean;
+            codec: string;
+            /** @description 0 while not known. */
+            channels: number;
+            /** @description Bits per second. 0 while not known, and for sound inside the video. */
+            bitrate: number;
+            /** @description Bytes as text. "0" for sound inside the video. */
+            sizeBytes: string;
+            /** @description The name of the file an added track was made from. */
+            fileName: string | null;
+            /** Format: date-time */
+            createdAt: string;
         };
         BackupOverview: {
             settings: {
@@ -6206,11 +6331,11 @@ export interface components {
             id: string;
             name: string;
             description: string | null;
+            isDefault: boolean;
             /** Format: date-time */
             createdAt: string;
             /** Format: date-time */
             updatedAt: string;
-            isDefault: boolean;
             /** @description Segment length in seconds. All renditions share it so they stay aligned. */
             segmentSeconds: number;
             /** @description Keyframe interval in seconds. Must divide segmentSeconds evenly. */
@@ -6455,7 +6580,7 @@ export interface components {
         /** @enum {string} */
         JobStatus: "FAILED" | "RUNNING" | "CANCELLED" | "QUEUED" | "COMPLETED";
         /** @enum {string} */
-        JobType: "TRANSCODE" | "PROBE" | "REMUX" | "PACKAGE" | "THUMBNAILS" | "SUBTITLES" | "CLEANUP";
+        JobType: "TRANSCODE" | "PROBE" | "REMUX" | "PACKAGE" | "THUMBNAILS" | "SUBTITLES" | "CLEANUP" | "AUDIO";
         JobView: {
             id: string;
             type: components["schemas"]["JobType"];
@@ -7119,6 +7244,23 @@ export interface components {
             expiresAt: string;
             /** @description What a player needs to share the video with other viewers. Null when P2P is off. */
             p2p: components["schemas"]["P2pInfo"] | null;
+            /**
+             * @description The sound tracks of the video, the one players start with marked. The
+             *     playlist names the same tracks: a player picks by language from there.
+             *     This is for a page that says what a video offers before it plays. Empty
+             *     for a video with one sound that nobody named.
+             */
+            audio: {
+                language: string;
+                label: string | null;
+                isDefault: boolean;
+            }[];
+            /** @description The subtitle tracks of the video. */
+            subtitles: {
+                language: string;
+                label: string | null;
+                isForced: boolean;
+            }[];
             /** @description For `POST /catalog/plays/{playId}/beat`. Null when the installation records nothing. */
             playId: string | null;
             /**
@@ -7146,6 +7288,27 @@ export interface components {
             expiresAt: string;
             /** @description What a player needs to share the video with other viewers. Null when P2P is off. */
             p2p: components["schemas"]["P2pInfo"] | null;
+            /**
+             * @description The sound tracks of the video, the one players start with marked. The
+             *     playlist names the same tracks: a player picks by language from there.
+             *     This is for a page that says what a video offers before it plays. Empty
+             *     for a video with one sound that nobody named.
+             */
+            audio: {
+                language: string;
+                label: string | null;
+                isDefault: boolean;
+            }[];
+            /** @description The subtitle tracks of the video. */
+            subtitles: {
+                language: string;
+                label: string | null;
+                isForced: boolean;
+            }[];
+        };
+        PlaybackPreferences: {
+            audioLanguage: string | null;
+            subtitleLanguage: string | null;
         };
         /** @enum {string} */
         PlayDevice: "TV" | "MOBILE" | "TABLET" | "DESKTOP" | "OTHER";
@@ -7215,6 +7378,14 @@ export interface components {
             isKids: boolean;
             /** @description Whether choosing it asks for a PIN. */
             locked: boolean;
+            /**
+             * @description The language this profile likes to hear, as a tag such as "de". Null:
+             *     each video in its own default. A player starts with the track of this
+             *     language when a video has one.
+             */
+            audioLanguage: string | null;
+            /** @description The language this profile reads subtitles in. Null: subtitles are off. */
+            subtitleLanguage: string | null;
         };
         ProgrammeView: {
             id: string;
@@ -7573,6 +7744,14 @@ export interface components {
              *     ask to be named where their material is shown. Null for a title typed by hand.
              */
             metadataSource: string | null;
+            /**
+             * @description The languages there is sound in, as tags such as "de", in the order of
+             *     the alphabet. For a series: of any of its episodes. A video whose sound
+             *     nobody gave a language is not counted.
+             */
+            audioLanguages: string[];
+            /** @description The languages there are subtitles in. */
+            subtitleLanguages: string[];
             /** @description Series: seasons that have something to watch, in order. Movies: empty. */
             seasons: components["schemas"]["PublicSeason"][];
             id: string;
@@ -9935,6 +10114,283 @@ export interface operations {
             };
             /** @description Signed in, but not allowed to do this. */
             403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    AudioTracks_list: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                assetId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The answer. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AudioTrackView"][];
+                };
+            };
+            /** @description Not signed in, or the sign-in ran out. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Signed in, but not allowed to do this. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description What the address names does not exist. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    AudioTracks_add: {
+        parameters: {
+            query?: {
+                language?: string;
+                label?: string;
+                filename?: string;
+            };
+            header?: never;
+            path: {
+                assetId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The answer. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AudioTrackView"];
+                };
+            };
+            /** @description The input was refused. "issues" names every field. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Not signed in, or the sign-in ran out. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Signed in, but not allowed to do this. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description What the address names does not exist. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    AudioTracks_remove: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                assetId: string;
+                trackId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Done. Nothing comes back. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Not signed in, or the sign-in ran out. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Signed in, but not allowed to do this. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description What the address names does not exist. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    AudioTracks_update: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                assetId: string;
+                trackId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    language?: string;
+                    label?: string;
+                    /** @constant */
+                    isDefault?: true;
+                };
+            };
+        };
+        responses: {
+            /** @description The answer. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AudioTrackView"];
+                };
+            };
+            /** @description The input was refused. "issues" names every field. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Not signed in, or the sign-in ran out. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Signed in, but not allowed to do this. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description What the address names does not exist. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    AudioTracks_retry: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                assetId: string;
+                trackId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The answer. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AudioTrackView"];
+                };
+            };
+            /** @description Not signed in, or the sign-in ran out. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Signed in, but not allowed to do this. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description What the address names does not exist. */
+            404: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -23277,6 +23733,89 @@ export interface operations {
             };
         };
     };
+    ViewerPreferences_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The answer. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PlaybackPreferences"];
+                };
+            };
+            /** @description Not signed in, or the sign-in ran out. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    ViewerPreferences_update: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    audioLanguage?: string | null;
+                    subtitleLanguage?: string | null;
+                };
+            };
+        };
+        responses: {
+            /** @description The answer. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PlaybackPreferences"];
+                };
+            };
+            /** @description The input was refused. "issues" names every field. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Not signed in, or the sign-in ran out. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Too many requests. "Retry-After" says when to try again. */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
     ViewerProfiles_list: {
         parameters: {
             query?: never;
@@ -23321,6 +23860,8 @@ export interface operations {
                     color?: "amber" | "coral" | "rose" | "violet" | "blue" | "teal" | "green" | "slate";
                     isKids?: boolean;
                     maxAge?: number | null;
+                    audioLanguage?: string | null;
+                    subtitleLanguage?: string | null;
                 };
             };
         };
@@ -23427,6 +23968,8 @@ export interface operations {
                     color?: "amber" | "coral" | "rose" | "violet" | "blue" | "teal" | "green" | "slate";
                     isKids?: boolean;
                     maxAge?: number | null;
+                    audioLanguage?: string | null;
+                    subtitleLanguage?: string | null;
                 };
             };
         };

@@ -23,6 +23,8 @@ import {
   type SelectProfileInput,
   selectProfileSchema,
   type SetProfilePinInput,
+  type UpdatePreferencesInput,
+  updatePreferencesSchema,
   setProfilePinSchema,
   updateProfileSchema,
 } from './viewer.schemas.js';
@@ -30,6 +32,7 @@ import { CurrentViewer, ViewerOnly } from './viewer-auth.guard.js';
 import {
   MAX_PROFILES,
   PROFILE_COLORS,
+  type PlaybackPreferences,
   type ProfileView,
   toProfileView,
   ViewerProfilesService,
@@ -51,6 +54,41 @@ export interface ProfilesView {
 
 /** Setting a PIN asks for the password of the account. This stops guessing it here. */
 const PINS = { name: 'viewer-profile-pin', limit: 10, windowSeconds: 900 };
+
+/** What the profile in use on this device likes to hear and to read. */
+@Controller('viewer/preferences')
+export class ViewerPreferencesController {
+  constructor(@Inject(ViewerProfilesService) private readonly profiles: ViewerProfilesService) {}
+
+  /**
+   * The languages the profile in use likes: for the sound of a video, and
+   * for subtitles. A player starts with them when a video has them.
+   */
+  @ViewerOnly()
+  @Get()
+  @Header('Cache-Control', 'no-store')
+  async get(@CurrentViewer() identity: ViewerIdentity): Promise<PlaybackPreferences> {
+    const profile = await this.profiles.current(identity);
+    return { audioLanguage: profile.audioLanguage, subtitleLanguage: profile.subtitleLanguage };
+  }
+
+  /**
+   * Changes them. A player sends what the viewer chose in its menu, so the
+   * next video starts the same way, on every device of the profile.
+   * "subtitleLanguage": null turns subtitles off.
+   */
+  @ViewerOnly()
+  @RateLimit(CHANGES)
+  @Patch()
+  @Header('Cache-Control', 'no-store')
+  async update(
+    @CurrentViewer() identity: ViewerIdentity,
+    @Body(new ZodValidationPipe(updatePreferencesSchema)) body: UpdatePreferencesInput,
+  ): Promise<PlaybackPreferences> {
+    const profile = await this.profiles.setPreferences(identity, body);
+    return { audioLanguage: profile.audioLanguage, subtitleLanguage: profile.subtitleLanguage };
+  }
+}
 
 /** The profiles of the signed-in viewer's account. */
 @Controller('viewer/profiles')

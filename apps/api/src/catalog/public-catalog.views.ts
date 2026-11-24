@@ -119,6 +119,14 @@ export interface PublicTitleDetail extends PublicTitleCard {
    * ask to be named where their material is shown. Null for a title typed by hand.
    */
   metadataSource: string | null;
+  /**
+   * The languages there is sound in, as tags such as "de", in the order of
+   * the alphabet. For a series: of any of its episodes. A video whose sound
+   * nobody gave a language is not counted.
+   */
+  audioLanguages: string[];
+  /** The languages there are subtitles in. */
+  subtitleLanguages: string[];
   /** Series: seasons that have something to watch, in order. Movies: empty. */
   seasons: PublicSeason[];
 }

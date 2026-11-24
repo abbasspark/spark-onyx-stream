@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 import type { DuplicateParts } from '@/lib/duplicate';
-import { download, request, requestText, uploadFile } from './client';
+import { download, request, requestText, uploadFile, uploadLargeFile } from './client';
 import type {
+  AudioTrack,
   Branding,
   BrandingSettings,
   ChangeGroup,
@@ -502,6 +503,40 @@ export interface AddSubtitleOptions {
   /** For files that are not Unicode, when the guess from the language is wrong. */
   encoding?: string;
 }
+
+/** The sound tracks of a video. They are listed with its media. */
+export const audioTracksApi = {
+  /** Sends a sound file. The answer is the track, which is then made in the background. */
+  add: (
+    assetId: string,
+    file: Blob,
+    options: { filename?: string; language?: string; label?: string },
+    upload: { onProgress?: (fraction: number) => void; signal?: AbortSignal } = {},
+  ) => {
+    const query = new URLSearchParams();
+    for (const [key, value] of Object.entries(options)) {
+      if (value !== undefined && value !== '') {
+        query.set(key, String(value));
+      }
+    }
+    return uploadLargeFile<AudioTrack>(`/v1/assets/${assetId}/audio-tracks?${query}`, file, upload);
+  },
+  update: (
+    assetId: string,
+    trackId: string,
+    body: { language?: string; label?: string; isDefault?: true },
+  ) =>
+    request<AudioTrack>(`/v1/assets/${assetId}/audio-tracks/${trackId}`, {
+      method: 'PATCH',
+      body,
+    }),
+  retry: (assetId: string, trackId: string) =>
+    request<AudioTrack>(`/v1/assets/${assetId}/audio-tracks/${trackId}/retry`, {
+      method: 'POST',
+    }),
+  remove: (assetId: string, trackId: string) =>
+    request<void>(`/v1/assets/${assetId}/audio-tracks/${trackId}`, { method: 'DELETE' }),
+};
 
 /** The subtitle tracks of a video. They are listed with its media. */
 export const subtitlesApi = {

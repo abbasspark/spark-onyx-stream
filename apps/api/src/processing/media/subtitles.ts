@@ -31,6 +31,21 @@ const LANGUAGES: Record<string, { code: string; name: string }> = {
   hin: { code: 'hi', name: 'हिन्दी' },
 };
 
+/**
+ * What a language tag found in a media file is to a player: its short code
+ * and its own name. Undefined for a tag that is not in the list.
+ */
+export function knownLanguage(
+  tag: string | null | undefined,
+): { code: string; name: string } | undefined {
+  return tag ? LANGUAGES[tag] : undefined;
+}
+
+/** The name of a language in itself, by its short code: "Deutsch" for "de". Undefined when not known. */
+export function languageNameOf(code: string): string | undefined {
+  return Object.values(LANGUAGES).find((language) => language.code === code)?.name;
+}
+
 /** A subtitle stream of the source that will become a WebVTT track. */
 export interface SubtitleTrackPlan {
   /** Position among the source's subtitle streams, for "-map 0:s:N". */
@@ -122,7 +137,7 @@ export function buildSubtitlePlaylist(durationMs: number): string {
 }
 
 /** Quotes a value for an HLS attribute. Quotes and line breaks cannot appear inside one. */
-function quoted(value: string): string {
+export function quoted(value: string): string {
   return `"${value.replace(/["\r\n]/g, ' ').trim()}"`;
 }
 

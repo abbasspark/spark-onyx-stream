@@ -647,19 +647,50 @@ model Rendition {
   @@map("renditions")
 }
 
+enum AudioSource {
+  /// A sound stream of the source file.
+  EMBEDDED
+  /// A sound file added afterwards, such as a dubbed version.
+  UPLOADED
+}
+
+enum AudioTrackStatus {
+  /// An added file is being made into a track.
+  PROCESSING
+  READY
+  /// An added file could not be made into a track.
+  FAILED
+}
+
+/// One language, or one version, of the sound of a video.
 model AudioTrack {
-  id           String   @id @default(uuid(7)) @db.Uuid
-  assetId      String   @db.Uuid
-  asset        Asset    @relation(fields: [assetId], references: [id], onDelete: Cascade)
-  /// BCP 47 language tag, for example "en" or "de".
-  language     String
-  label        String?
-  codec        String
-  channels     Int
-  bitrate      Int
-  isDefault    Boolean  @default(false)
-  playlistPath String
-  createdAt    DateTime @default(now())
+  id             String           @id @default(uuid(7)) @db.Uuid
+  assetId        String           @db.Uuid
+  asset          Asset            @relation(fields: [assetId], references: [id], onDelete: Cascade)
+  /// BCP 47 language tag, for example "en" or "de". "und" when not known.
+  language       String
+  label          String?
+  codec          String
+  channels       Int
+  /// Bits per second.
+  bitrate        Int
+  /// The track a player starts with when the viewer has no preference.
+  isDefault      Boolean          @default(false)
+  source         AudioSource      @default(EMBEDDED)
+  status         AudioTrackStatus @default(READY)
+  /// Why an added file could not be made into a track.
+  error          String?
+  /// Path of the media playlist, relative to the storage pool root. Null for
+  /// the track whose sound is inside the video segments.
+  playlistPath   String?
+  /// Position among the sound streams of the source file. Null for an added track.
+  streamIndex    Int?
+  /// The added file as it came, kept so that the video can be processed again.
+  sourcePath     String?
+  sourceFilename String?
+  /// Bytes of the playlist and segments of the track. 0 for sound inside the video.
+  sizeBytes      BigInt           @default(0)
+  createdAt      DateTime         @default(now())
 
   @@index([assetId])
   @@map("audio_tracks")
@@ -782,6 +813,8 @@ enum JobType {
   PACKAGE
   THUMBNAILS
   SUBTITLES
+  /// Makes an added sound file into a track of a video.
+  AUDIO
   CLEANUP
 }
 
@@ -1414,25 +1447,30 @@ model Episode {
 /// One of the people who share a viewer account. Each has their own watch
 /// history. Every account has a main profile, which is created with it.
 model ViewerProfile {
-  id             String    @id @default(uuid(7)) @db.Uuid
-  viewerId       String    @db.Uuid
-  viewer         Viewer    @relation(fields: [viewerId], references: [id], onDelete: Cascade)
-  name           String
+  id               String    @id @default(uuid(7)) @db.Uuid
+  viewerId         String    @db.Uuid
+  viewer           Viewer    @relation(fields: [viewerId], references: [id], onDelete: Cascade)
+  name             String
   /// Name of one of the colours clients draw a profile in, such as "amber".
-  color          String
+  color            String
   /// The profile the account starts with. It cannot be deleted.
-  isMain         Boolean   @default(false)
+  isMain           Boolean   @default(false)
   /// The highest age a title may be for and still show. Empty: everything shows.
-  maxAge         Int?      @db.SmallInt
+  maxAge           Int?      @db.SmallInt
   /// A profile for a child: clients give it a simpler look. It always has an age limit.
-  isKids         Boolean   @default(false)
+  isKids           Boolean   @default(false)
   /// Hash of the PIN that opens the profile. Empty: anyone on the account can use it.
-  pinHash        String?
+  pinHash          String?
   /// Wrong PINs in a row, and until when the profile takes no more tries.
-  pinFailed      Int       @default(0)
-  pinLockedUntil DateTime?
-  createdAt      DateTime  @default(now())
-  updatedAt      DateTime  @updatedAt
+  pinFailed        Int       @default(0)
+  pinLockedUntil   DateTime?
+  /// The language this profile likes to hear, as a tag such as "de". Null:
+  /// each video in its own default.
+  audioLanguage    String?
+  /// The language this profile reads subtitles in. Null: subtitles are off.
+  subtitleLanguage String?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
 
   sessions ViewerSession[]
   watching WatchProgress[]

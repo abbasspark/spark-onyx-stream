@@ -259,6 +259,24 @@ export class PublicCatalogService {
           })
         : [];
 
+    // What there is to hear and to read: of the film, or of any episode.
+    const assetIds = [
+      title.assetId,
+      ...seasons.flatMap((season) => season.episodes.map((episode) => episode.assetId)),
+    ].filter((id): id is string => id !== null);
+    const [audioLanguages, subtitleLanguages] = await Promise.all([
+      this.prisma.audioTrack.findMany({
+        where: { assetId: { in: assetIds }, status: 'READY', language: { not: 'und' } },
+        distinct: ['language'],
+        select: { language: true },
+      }),
+      this.prisma.subtitleTrack.findMany({
+        where: { assetId: { in: assetIds }, language: { not: 'und' } },
+        distinct: ['language'],
+        select: { language: true },
+      }),
+    ]);
+
     const [translated, [card], genreNames, collectionNames, people] = await Promise.all([
       this.translations.forTitle(title.id, language),
       this.cards([toPublicCard(title, this.config.mediaBaseUrl)], language),
@@ -320,6 +338,8 @@ export class PublicCatalogService {
           name: collectionNames.get(collectionSlug) ?? name,
         })),
       metadataSource: title.metadataSource,
+      audioLanguages: audioLanguages.map((track) => track.language).sort(),
+      subtitleLanguages: subtitleLanguages.map((track) => track.language).sort(),
       seasons: seasons.map((season) => ({
         number: season.number,
         name: translated.season(season.id)?.name ?? season.name,

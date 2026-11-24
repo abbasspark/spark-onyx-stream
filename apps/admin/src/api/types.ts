@@ -180,7 +180,7 @@ export const JOB_STATUSES = ['QUEUED', 'RUNNING', 'COMPLETED', 'FAILED', 'CANCEL
 export type JobStatus = (typeof JOB_STATUSES)[number];
 
 export type JobType =
-  'PROBE' | 'REMUX' | 'TRANSCODE' | 'PACKAGE' | 'THUMBNAILS' | 'SUBTITLES' | 'CLEANUP';
+  'PROBE' | 'REMUX' | 'TRANSCODE' | 'PACKAGE' | 'THUMBNAILS' | 'SUBTITLES' | 'AUDIO' | 'CLEANUP';
 
 export interface Job {
   id: string;
@@ -403,6 +403,33 @@ export interface OverviewStats {
   }[];
 }
 
+/** One language, or one version, of the sound of a video. */
+export interface AudioTrack {
+  id: string;
+  /** Language tag, for example "en". "und" when not known. */
+  language: string;
+  label: string | null;
+  /** EMBEDDED: came with the source file. UPLOADED: a file added afterwards. */
+  source: 'EMBEDDED' | 'UPLOADED';
+  status: 'PROCESSING' | 'READY' | 'FAILED';
+  /** Why an added file could not be made into a track. */
+  error: string | null;
+  /** The track players start with when the viewer has no preference. */
+  isDefault: boolean;
+  /** Whether the sound is inside the video segments. Such a track cannot be removed. */
+  inVideo: boolean;
+  codec: string;
+  /** 0 while not known. */
+  channels: number;
+  /** Bits per second. 0 while not known. */
+  bitrate: number;
+  /** Bytes as text. */
+  sizeBytes: string;
+  /** The name of the file an added track was made from. */
+  fileName: string | null;
+  createdAt: string;
+}
+
 /** The generated outputs of an asset, from GET /v1/assets/{id}/media. */
 export interface AssetMedia {
   /** Qualities, highest first. */
@@ -417,6 +444,8 @@ export interface AssetMedia {
     /** Bytes as text. */
     sizeBytes: string;
   }[];
+  /** The sound tracks: the one inside the video first. Missing from an API older than them. */
+  audio?: AudioTrack[];
   subtitles: (SubtitleTrack & { url: string | null })[];
   thumbnails: {
     posterUrl: string | null;

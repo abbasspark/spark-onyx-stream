@@ -57,6 +57,10 @@
       "description": "Subtitle files of a video."
     },
     {
+      "name": "Sound tracks",
+      "description": "The languages and versions of the sound of a video."
+    },
+    {
       "name": "Jobs",
       "description": "The queue of processing work."
     },
@@ -1926,6 +1930,488 @@
           },
           "403": {
             "description": "Signed in, but not allowed to do this.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/assets/{assetId}/audio-tracks": {
+      "get": {
+        "operationId": "AudioTracks_list",
+        "tags": [
+          "Sound tracks"
+        ],
+        "summary": "The sound tracks of a video: the one inside the video first",
+        "description": "For an admin or an API key. Needs assets:read.",
+        "security": [
+          {
+            "adminSession": []
+          },
+          {
+            "apiKey": []
+          }
+        ],
+        "x-onyx-access": {
+          "kind": "admin",
+          "permissions": [
+            "assets:read"
+          ],
+          "sessionOnly": false
+        },
+        "parameters": [
+          {
+            "name": "assetId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The answer.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/AudioTrackView"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or the sign-in ran out.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Signed in, but not allowed to do this.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "What the address names does not exist.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "operationId": "AudioTracks_add",
+        "tags": [
+          "Sound tracks"
+        ],
+        "summary": "Adds a sound file to a video as another language or version",
+        "description": "The body is the file itself (MP3, AAC, M4A, WAV, FLAC, Opus, AC-3, or a video file whose sound is taken), not a form. The answer comes at once with the track as \"PROCESSING\": a job encodes it, and the player offers it when that is done. The picture is not processed again. For an admin or an API key. Needs assets:write.",
+        "security": [
+          {
+            "adminSession": []
+          },
+          {
+            "apiKey": []
+          }
+        ],
+        "x-onyx-access": {
+          "kind": "admin",
+          "permissions": [
+            "assets:write"
+          ],
+          "sessionOnly": false
+        },
+        "parameters": [
+          {
+            "name": "assetId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "language",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "maxLength": 20
+            }
+          },
+          {
+            "name": "label",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 80
+            }
+          },
+          {
+            "name": "filename",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "maxLength": 300
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "The answer.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AudioTrackView"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The input was refused. \"issues\" names every field.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or the sign-in ran out.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Signed in, but not allowed to do this.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "What the address names does not exist.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/assets/{assetId}/audio-tracks/{trackId}": {
+      "delete": {
+        "operationId": "AudioTracks_remove",
+        "tags": [
+          "Sound tracks"
+        ],
+        "summary": "Takes a track out of a video",
+        "description": "The sound inside the video itself cannot be taken out. For an admin or an API key. Needs assets:write.",
+        "security": [
+          {
+            "adminSession": []
+          },
+          {
+            "apiKey": []
+          }
+        ],
+        "x-onyx-access": {
+          "kind": "admin",
+          "permissions": [
+            "assets:write"
+          ],
+          "sessionOnly": false
+        },
+        "parameters": [
+          {
+            "name": "assetId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "trackId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Done. Nothing comes back."
+          },
+          "401": {
+            "description": "Not signed in, or the sign-in ran out.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Signed in, but not allowed to do this.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "What the address names does not exist.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "operationId": "AudioTracks_update",
+        "tags": [
+          "Sound tracks"
+        ],
+        "summary": "Renames a track, changes its language, or makes it the one players start with",
+        "description": "For an admin or an API key. Needs assets:write.",
+        "security": [
+          {
+            "adminSession": []
+          },
+          {
+            "apiKey": []
+          }
+        ],
+        "x-onyx-access": {
+          "kind": "admin",
+          "permissions": [
+            "assets:write"
+          ],
+          "sessionOnly": false
+        },
+        "parameters": [
+          {
+            "name": "assetId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "trackId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "language": {
+                    "type": "string",
+                    "maxLength": 20
+                  },
+                  "label": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 80
+                  },
+                  "isDefault": {
+                    "type": "boolean",
+                    "const": true
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The answer.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AudioTrackView"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The input was refused. \"issues\" names every field.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or the sign-in ran out.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Signed in, but not allowed to do this.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "What the address names does not exist.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/assets/{assetId}/audio-tracks/{trackId}/retry": {
+      "post": {
+        "operationId": "AudioTracks_retry",
+        "tags": [
+          "Sound tracks"
+        ],
+        "summary": "Tries an added track again that could not be made",
+        "description": "For an admin or an API key. Needs assets:write.",
+        "security": [
+          {
+            "adminSession": []
+          },
+          {
+            "apiKey": []
+          }
+        ],
+        "x-onyx-access": {
+          "kind": "admin",
+          "permissions": [
+            "assets:write"
+          ],
+          "sessionOnly": false
+        },
+        "parameters": [
+          {
+            "name": "assetId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "trackId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The answer.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AudioTrackView"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or the sign-in ran out.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Signed in, but not allowed to do this.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "What the address names does not exist.",
             "content": {
               "application/json": {
                 "schema": {
@@ -26089,6 +26575,148 @@
         }
       }
     },
+    "/v1/viewer/preferences": {
+      "get": {
+        "operationId": "ViewerPreferences_get",
+        "tags": [
+          "Viewers"
+        ],
+        "summary": "The languages the profile in use likes: for the sound of a video, and for subtitles",
+        "description": "A player starts with them when a video has them. For a signed-in viewer.",
+        "security": [
+          {
+            "viewerSession": []
+          },
+          {
+            "viewerCookie": []
+          }
+        ],
+        "x-onyx-access": {
+          "kind": "viewer",
+          "permissions": [],
+          "sessionOnly": false
+        },
+        "responses": {
+          "200": {
+            "description": "The answer.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlaybackPreferences"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or the sign-in ran out.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "operationId": "ViewerPreferences_update",
+        "tags": [
+          "Viewers"
+        ],
+        "summary": "Changes them",
+        "description": "A player sends what the viewer chose in its menu, so the next video starts the same way, on every device of the profile. \"subtitleLanguage\": null turns subtitles off. For a signed-in viewer.",
+        "security": [
+          {
+            "viewerSession": []
+          },
+          {
+            "viewerCookie": []
+          }
+        ],
+        "x-onyx-access": {
+          "kind": "viewer",
+          "permissions": [],
+          "sessionOnly": false
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "audioLanguage": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "maxLength": 20
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "subtitleLanguage": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "maxLength": 20
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The answer.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlaybackPreferences"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The input was refused. \"issues\" names every field.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or the sign-in ran out.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests. \"Retry-After\" says when to try again.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/v1/viewer/profiles": {
       "get": {
         "operationId": "ViewerProfiles_list",
@@ -26185,6 +26813,28 @@
                         "type": "integer",
                         "minimum": 0,
                         "maximum": 18
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "audioLanguage": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "maxLength": 20
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "subtitleLanguage": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "maxLength": 20
                       },
                       {
                         "type": "null"
@@ -26374,6 +27024,28 @@
                         "type": "integer",
                         "minimum": 0,
                         "maximum": 18
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "audioLanguage": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "maxLength": 20
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "subtitleLanguage": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "maxLength": 20
                       },
                       {
                         "type": "null"
@@ -32893,6 +33565,13 @@
             },
             "description": "Qualities, highest first."
           },
+          "audio": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AudioTrackView"
+            },
+            "description": "The sound tracks: the one inside the video first, then the other languages and versions."
+          },
           "subtitles": {
             "type": "array",
             "items": {
@@ -32975,6 +33654,7 @@
         },
         "required": [
           "renditions",
+          "audio",
           "subtitles",
           "thumbnails",
           "outputBytes"
@@ -33203,6 +33883,112 @@
           "deletedAt",
           "createdAt",
           "updatedAt"
+        ]
+      },
+      "AudioSource": {
+        "type": "string",
+        "enum": [
+          "UPLOADED",
+          "EMBEDDED"
+        ]
+      },
+      "AudioTrackStatus": {
+        "type": "string",
+        "enum": [
+          "PROCESSING",
+          "READY",
+          "FAILED"
+        ]
+      },
+      "AudioTrackView": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "language": {
+            "type": "string",
+            "description": "Language tag, for example \"en\". \"und\" when not known."
+          },
+          "label": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "source": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/AudioSource"
+              }
+            ],
+            "description": "EMBEDDED: came with the source file. UPLOADED: a file added afterwards."
+          },
+          "status": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/AudioTrackStatus"
+              }
+            ],
+            "description": "PROCESSING while an added file is made into a track, FAILED when it could not be."
+          },
+          "error": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Why it failed."
+          },
+          "isDefault": {
+            "type": "boolean",
+            "description": "The track players start with when the viewer has no preference."
+          },
+          "inVideo": {
+            "type": "boolean",
+            "description": "Whether the sound is inside the video segments. Such a track cannot be removed."
+          },
+          "codec": {
+            "type": "string"
+          },
+          "channels": {
+            "type": "number",
+            "description": "0 while not known."
+          },
+          "bitrate": {
+            "type": "number",
+            "description": "Bits per second. 0 while not known, and for sound inside the video."
+          },
+          "sizeBytes": {
+            "type": "string",
+            "description": "Bytes as text. \"0\" for sound inside the video."
+          },
+          "fileName": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The name of the file an added track was made from."
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "language",
+          "label",
+          "source",
+          "status",
+          "error",
+          "isDefault",
+          "inVideo",
+          "codec",
+          "channels",
+          "bitrate",
+          "sizeBytes",
+          "fileName",
+          "createdAt"
         ]
       },
       "BackupOverview": {
@@ -36247,6 +37033,9 @@
               "null"
             ]
           },
+          "isDefault": {
+            "type": "boolean"
+          },
           "createdAt": {
             "type": "string",
             "format": "date-time"
@@ -36254,9 +37043,6 @@
           "updatedAt": {
             "type": "string",
             "format": "date-time"
-          },
-          "isDefault": {
-            "type": "boolean"
           },
           "segmentSeconds": {
             "type": "number",
@@ -36323,9 +37109,9 @@
           "id",
           "name",
           "description",
+          "isDefault",
           "createdAt",
           "updatedAt",
-          "isDefault",
           "segmentSeconds",
           "keyframeSeconds",
           "renditions"
@@ -37227,7 +38013,8 @@
           "PACKAGE",
           "THUMBNAILS",
           "SUBTITLES",
-          "CLEANUP"
+          "CLEANUP",
+          "AUDIO"
         ]
       },
       "JobView": {
@@ -39863,6 +40650,58 @@
             ],
             "description": "What a player needs to share the video with other viewers. Null when P2P is off."
           },
+          "audio": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "language": {
+                  "type": "string"
+                },
+                "label": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "isDefault": {
+                  "type": "boolean"
+                }
+              },
+              "required": [
+                "language",
+                "label",
+                "isDefault"
+              ]
+            },
+            "description": "The sound tracks of the video, the one players start with marked. The\nplaylist names the same tracks: a player picks by language from there.\nThis is for a page that says what a video offers before it plays. Empty\nfor a video with one sound that nobody named."
+          },
+          "subtitles": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "language": {
+                  "type": "string"
+                },
+                "label": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "isForced": {
+                  "type": "boolean"
+                }
+              },
+              "required": [
+                "language",
+                "label",
+                "isForced"
+              ]
+            },
+            "description": "The subtitle tracks of the video."
+          },
           "playId": {
             "type": [
               "string",
@@ -39889,6 +40728,8 @@
           "thumbnailTrackUrl",
           "expiresAt",
           "p2p",
+          "audio",
+          "subtitles",
           "playId",
           "stream"
         ]
@@ -39933,6 +40774,58 @@
               }
             ],
             "description": "What a player needs to share the video with other viewers. Null when P2P is off."
+          },
+          "audio": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "language": {
+                  "type": "string"
+                },
+                "label": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "isDefault": {
+                  "type": "boolean"
+                }
+              },
+              "required": [
+                "language",
+                "label",
+                "isDefault"
+              ]
+            },
+            "description": "The sound tracks of the video, the one players start with marked. The\nplaylist names the same tracks: a player picks by language from there.\nThis is for a page that says what a video offers before it plays. Empty\nfor a video with one sound that nobody named."
+          },
+          "subtitles": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "language": {
+                  "type": "string"
+                },
+                "label": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "isForced": {
+                  "type": "boolean"
+                }
+              },
+              "required": [
+                "language",
+                "label",
+                "isForced"
+              ]
+            },
+            "description": "The subtitle tracks of the video."
           }
         },
         "required": [
@@ -39941,7 +40834,30 @@
           "posterUrl",
           "thumbnailTrackUrl",
           "expiresAt",
-          "p2p"
+          "p2p",
+          "audio",
+          "subtitles"
+        ]
+      },
+      "PlaybackPreferences": {
+        "type": "object",
+        "properties": {
+          "audioLanguage": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "subtitleLanguage": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "audioLanguage",
+          "subtitleLanguage"
         ]
       },
       "PlayDevice": {
@@ -40172,6 +41088,20 @@
           "locked": {
             "type": "boolean",
             "description": "Whether choosing it asks for a PIN."
+          },
+          "audioLanguage": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The language this profile likes to hear, as a tag such as \"de\". Null:\neach video in its own default. A player starts with the track of this\nlanguage when a video has one."
+          },
+          "subtitleLanguage": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The language this profile reads subtitles in. Null: subtitles are off."
           }
         },
         "required": [
@@ -40181,7 +41111,9 @@
           "isMain",
           "maxAge",
           "isKids",
-          "locked"
+          "locked",
+          "audioLanguage",
+          "subtitleLanguage"
         ]
       },
       "ProgrammeView": {
@@ -41688,6 +42620,20 @@
             ],
             "description": "Where details and artwork were imported from, for example \"tmdb\". Sources\nask to be named where their material is shown. Null for a title typed by hand."
           },
+          "audioLanguages": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "The languages there is sound in, as tags such as \"de\", in the order of\nthe alphabet. For a series: of any of its episodes. A video whose sound\nnobody gave a language is not counted."
+          },
+          "subtitleLanguages": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "The languages there are subtitles in."
+          },
           "seasons": {
             "type": "array",
             "items": {
@@ -41843,6 +42789,8 @@
           "extras",
           "collections",
           "metadataSource",
+          "audioLanguages",
+          "subtitleLanguages",
           "seasons",
           "id",
           "type",
