@@ -19,14 +19,19 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.tv.material3.ExperimentalTvMaterial3Api
 import androidx.tv.material3.Surface
+import androidx.compose.foundation.layout.Column
 import de.sparksystem.onyx.tv.ui.CatalogModel
+import de.sparksystem.onyx.tv.ui.LiveModel
 import de.sparksystem.onyx.tv.ui.PlayingModel
 import de.sparksystem.onyx.tv.ui.StartUpModel
 import de.sparksystem.onyx.tv.ui.Step
-import de.sparksystem.onyx.tv.ui.components.AccentButton
 import de.sparksystem.onyx.tv.ui.components.Page
+import de.sparksystem.onyx.tv.ui.components.TopNav
 import de.sparksystem.onyx.tv.ui.components.Waiting
+import de.sparksystem.onyx.tv.ui.screens.GuideScreen
 import de.sparksystem.onyx.tv.ui.screens.HomeScreen
+import de.sparksystem.onyx.tv.ui.screens.LineupScreen
+import de.sparksystem.onyx.tv.ui.screens.LivePlayerScreen
 import de.sparksystem.onyx.tv.ui.screens.PlayerScreen
 import de.sparksystem.onyx.tv.ui.screens.ProfilesScreen
 import de.sparksystem.onyx.tv.ui.screens.ServerScreen
@@ -49,6 +54,7 @@ private class Models(private val container: Container) : ViewModelProvider.Facto
         modelClass.isAssignableFrom(StartUpModel::class.java) -> StartUpModel(container) as T
         modelClass.isAssignableFrom(CatalogModel::class.java) -> CatalogModel(container) as T
         modelClass.isAssignableFrom(PlayingModel::class.java) -> PlayingModel(container) as T
+        modelClass.isAssignableFrom(LiveModel::class.java) -> LiveModel(container) as T
         else -> throw IllegalArgumentException("No model for ${modelClass.name}")
     }
 }
@@ -62,7 +68,13 @@ private sealed interface Where {
     data object Home : Where
     data class Title(val slug: String) : Where
     data class Playing(val titleSlug: String) : Where
+    data object Lineup : Where
+    data object Live : Where
+    data object Guide : Where
 }
+
+/** The two parts of the app the navigation across the top moves between. */
+private val PLACES = listOf("Home", "Live")
 
 @OptIn(ExperimentalTvMaterial3Api::class)
 @Composable
@@ -121,9 +133,12 @@ private fun App(container: Container) {
 private fun Catalog(models: ViewModelProvider.Factory, siteName: String, onSignedOut: () -> Unit) {
     val catalog: CatalogModel = viewModel(factory = models)
     val playing: PlayingModel = viewModel(factory = models)
+    val live: LiveModel = viewModel(factory = models)
     val home by catalog.homeFlow.collectAsStateWithLifecycle()
     val title by catalog.titleFlow.collectAsStateWithLifecycle()
     val player by playing.flow.collectAsStateWithLifecycle()
+    val liveState by live.flow.collectAsStateWithLifecycle()
+    val goBackTo by live.goBackFlow.collectAsStateWithLifecycle()
     val signedOut by catalog.signedOutFlow.collectAsStateWithLifecycle()
 
     var where by remember { mutableStateOf<Where>(Where.Home) }
@@ -137,38 +152,113 @@ private fun Catalog(models: ViewModelProvider.Factory, siteName: String, onSigne
     }
 
     BackHandler(enabled = where !is Where.Home) {
-        when (where) {
+        where = when (val place = where) {
             is Where.Playing -> {
                 playing.stop()
-                where = Where.Title((where as Where.Playing).titleSlug)
+                Where.Title(place.titleSlug)
             }
             is Where.Title -> {
                 catalog.forgetTitle()
-                where = Where.Home
+                Where.Home
             }
-            else -> Unit
+            // Out of the guide back to whatever was behind it.
+            is Where.Guide -> if (liveState.playback != null) Where.Live else Where.Lineup
+            is Where.Live -> {
+                live.stopWatching()
+                Where.Lineup
+            }
+            is Where.Lineup -> Where.Home
+            else -> Where.Home
         }
     }
 
+    /** Takes a channel, and goes to the picture. */
+    fun watch(channel: de.sparksystem.onyx.tv.data.Channel) {
+        live.tuneTo(channel)
+        where = Where.Live
+    }
+
     when (val place = where) {
-        is Where.Home -> HomeScreen(
-            state = home,
-            siteName = siteName,
-            onOpen = { slug ->
-                catalog.openTitle(slug)
-                where = Where.Title(slug)
+        is Where.Home -> WithNav(at = 0, onGo = { index ->
+            where = if (index == 1) {
+                live.loadChannels()
+                Where.Lineup
+            } else {
+                Where.Home
+            }
+        }) {
+            HomeScreen(
+                state = home,
+                siteName = siteName,
+                onOpen = { slug ->
+                    catalog.openTitle(slug)
+                    where = Where.Title(slug)
+                },
+                onResume = { item ->
+                    playing.play(
+                        titleSlug = item.title.slug,
+                        episodeId = item.episode?.id,
+                        heading = item.title.name,
+                        detail = item.episode?.let { "S${it.seasonNumber} E${it.number}  ${it.name}" },
+                        startAtSeconds = item.position,
+                    )
+                    where = Where.Playing(item.title.slug)
+                },
+                onRetry = catalog::loadHome,
+            )
+        }
+
+        is Where.Lineup -> WithNav(at = 1, onGo = { index ->
+            where = if (index == 0) Where.Home else Where.Lineup
+        }) {
+            LineupScreen(
+                state = liveState,
+                onWatch = ::watch,
+                onGuide = {
+                    live.loadGuide()
+                    where = Where.Guide
+                },
+                onRetry = live::loadChannels,
+            )
+        }
+
+        is Where.Live -> LivePlayerScreen(
+            state = liveState,
+            programmes = live.ownRow(),
+            goBackTo = goBackTo,
+            onWentBack = live::wentBack,
+            onZap = live::zap,
+            onNumber = { number -> live.tuneToNumber(number) },
+            onGuide = {
+                live.loadGuide()
+                where = Where.Guide
             },
-            onResume = { item ->
-                playing.play(
-                    titleSlug = item.title.slug,
-                    episodeId = item.episode?.id,
-                    heading = item.title.name,
-                    detail = item.episode?.let { "S${it.seasonNumber} E${it.number}  ${it.name}" },
-                    startAtSeconds = item.position,
-                )
-                where = Where.Playing(item.title.slug)
+            onLineup = {
+                live.stopWatching()
+                where = Where.Lineup
             },
-            onRetry = catalog::loadHome,
+            onBack = {
+                live.stopWatching()
+                where = Where.Lineup
+            },
+        )
+
+        is Where.Guide -> GuideScreen(
+            state = liveState,
+            onPick = { pick ->
+                val began = pick.beganAt
+                // A programme already sent, on a channel that keeps what it
+                // sent, is worth going back to. Anything else just tunes.
+                if (began != null && began < System.currentTimeMillis() && pick.channel.keeps) {
+                    live.goBackTo(pick.channel, began)
+                } else {
+                    live.tuneTo(pick.channel)
+                }
+                where = Where.Live
+            },
+            onBack = {
+                where = if (liveState.playback != null) Where.Live else Where.Lineup
+            },
         )
 
         is Where.Title -> TitleScreen(
@@ -203,5 +293,18 @@ private fun Catalog(models: ViewModelProvider.Factory, siteName: String, onSigne
                 where = Where.Title(place.titleSlug)
             },
         )
+    }
+}
+
+/** A screen with the navigation across the top of it. */
+@Composable
+private fun WithNav(
+    at: Int,
+    onGo: (Int) -> Unit,
+    content: @Composable () -> Unit,
+) {
+    Column(modifier = Modifier.fillMaxSize()) {
+        TopNav(places = PLACES, at = at, onGo = onGo)
+        content()
     }
 }

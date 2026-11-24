@@ -307,3 +307,58 @@ data class ApiError(
     val message: String = "",
     val code: String? = null,
 )
+
+// --- Live channels -----------------------------------------------------------
+
+@Serializable
+data class Programme(
+    val title: String,
+    val subtitle: String? = null,
+    val description: String? = null,
+    val category: String? = null,
+    val startsAt: String,
+    val endsAt: String,
+)
+
+@Serializable
+data class Channel(
+    val slug: String,
+    val name: String,
+    val number: Int? = null,
+    val description: String? = null,
+    val access: String = "FREE",
+    val minAge: Int? = null,
+    val packageIds: List<String> = emptyList(),
+    /** Whether the channel is sending right now. */
+    val onAir: Boolean = false,
+    /** Minutes a viewer can go back. 0 means only the present. */
+    val dvrMinutes: Int = 0,
+    val now: Programme? = null,
+    val next: Programme? = null,
+) {
+    val keeps: Boolean get() = dvrMinutes > 0
+}
+
+@Serializable
+data class GuideRow(val slug: String, val programmes: List<Programme> = emptyList())
+
+@Serializable
+data class Guide(
+    val from: String,
+    val to: String,
+    val channels: List<GuideRow> = emptyList(),
+)
+
+/**
+ * A live channel ready to play. The address is called `url` here, not
+ * `manifestUrl`: live and recordings are two endpoints and they do not agree
+ * on the name.
+ */
+@Serializable
+data class LivePlayback(
+    val protocol: String = "hls",
+    val url: String,
+    val expiresAt: String? = null,
+    val qualityId: String? = null,
+    val stream: StreamTicket? = null,
+)
