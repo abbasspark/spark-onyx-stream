@@ -170,6 +170,7 @@ import type {
   AppVersions,
 } from './types';
 import type { Marker, MarkerDetection } from '@/lib/markers';
+import type { SimilarView, SimilarWatching } from './types';
 import type { OpenApiDocument } from '@/lib/openapi';
 
 export const authApi = {
@@ -525,6 +526,21 @@ export const markersApi = {
         { signal },
       )
     ).detection,
+};
+
+/** Which titles are shown as similar to a title, and what an editor decided about it. */
+export const similarApi = {
+  get: (titleId: string, signal?: AbortSignal) =>
+    request<SimilarView>(`/v1/titles/${titleId}/similar`, { signal }),
+  /** Replaces the titles always shown, in their order, and the titles never shown. */
+  set: (titleId: string, choices: { pinned: string[]; hidden: string[] }) =>
+    request<SimilarView>(`/v1/titles/${titleId}/similar`, { method: 'PUT', body: choices }),
+  /** Counts now which titles the same people watch. */
+  rebuildWatching: () =>
+    request<{ state: SimilarWatching | null; minimumAccounts: number }>(
+      '/v1/similar/watching/rebuild',
+      { method: 'POST' },
+    ),
 };
 
 /** The sound tracks of a video. They are listed with its media. */

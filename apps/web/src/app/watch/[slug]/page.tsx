@@ -2,8 +2,8 @@
 import type { Metadata } from 'next';
 import { notFound, redirect } from 'next/navigation';
 import { WatchScreen } from '@/components/watch-screen';
-import { getTitle } from '@/lib/api';
-import { firstEpisode, movieKey, watchHref } from '@/lib/watch';
+import { getSimilar, getTitle } from '@/lib/api';
+import { END_SUGGESTIONS, firstEpisode, movieKey, toSuggestions, watchHref } from '@/lib/watch';
 
 interface WatchPageProps {
   params: Promise<{ slug: string }>;
@@ -71,6 +71,7 @@ export default async function WatchPage({ params, searchParams }: WatchPageProps
     redirect(first ? watchHref(title.slug, first.episode.id) : backHref);
   }
 
+  const similar = await getSimilar(title.slug, END_SUGGESTIONS);
   return (
     <WatchScreen
       playbackPath={`/v1/catalog/titles/${title.slug}/playback`}
@@ -84,6 +85,7 @@ export default async function WatchPage({ params, searchParams }: WatchPageProps
         image: (title.backdrop ?? title.poster)?.url ?? null,
       }}
       next={null}
+      suggestions={toSuggestions(similar)}
     />
   );
 }

@@ -41,6 +41,10 @@ const AREAS: Record<string, { name: string; description: string }> = {
   storage: { name: 'Storage', description: 'Where files are kept.' },
   playback: { name: 'Playback', description: 'Signed addresses and the files players load.' },
   catalog: { name: 'Catalog', description: 'Movies, series, people, genres and collections.' },
+  similar: {
+    name: 'Similar titles',
+    description: 'Which titles are like a title, why, and rows of them for a profile.',
+  },
   history: { name: 'Title history', description: 'What changed on a title, with a way back.' },
   bulk: { name: 'Bulk actions', description: 'Changes to many titles at once.' },
   metadata: { name: 'Import of details', description: 'Details and pictures from TMDB.' },

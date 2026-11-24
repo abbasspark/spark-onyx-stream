@@ -5,7 +5,7 @@ type Sort = 'CURATED' | 'NEWEST' | 'RELEASED' | 'RATING' | 'NAME';
 type TitleType = 'MOVIE' | 'SERIES' | null;
 
 export interface NamedSection {
-  kind: 'HERO' | 'CONTINUE_WATCHING' | 'MY_LIST' | 'TITLES';
+  kind: 'HERO' | 'CONTINUE_WATCHING' | 'MY_LIST' | 'BECAUSE_YOU_WATCHED' | 'TITLES';
   name: string | null;
   source: Source;
   sort: Sort;
@@ -29,6 +29,10 @@ export function defaultSectionName(section: NamedSection, pageType: TitleType = 
   }
   if (section.kind === 'MY_LIST') {
     return 'My list';
+  }
+  if (section.kind === 'BECAUSE_YOU_WATCHED') {
+    // Clients put the name of the title the row is about behind it.
+    return 'Because you watched';
   }
   // On the page for movies, "New" says enough: "New movies" would repeat the page.
   const kind =

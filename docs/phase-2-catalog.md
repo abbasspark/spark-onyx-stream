@@ -186,6 +186,7 @@ Three pages of the website are arranged in the panel, in the group **Layout**: t
 - **The opening shows one title large, or up to 8 that take turns** every few seconds. Its titles come from a source like those of a row. Titles with a backdrop are preferred; without any, the others are taken rather than leaving the page without an opening. The turn waits while the pointer or the keyboard is on the opening, and does not run for visitors who asked their system for less motion.
 - **"Continue watching" is a section too:** the place where a viewer finds what they started. Without it, a page does not show that row.
 - **So is "My list":** the place where a viewer finds what they saved to watch later. See [My list](phase-2-viewers.md#my-list). A page has one place for each at most. In the answer for clients these rows have the kind `continue` and `list` and carry no titles: the client fills them for the viewer.
+- **And "Because you watched":** the place for up to three rows of titles like the ones the viewer watched last. See [Similar titles](#similar-titles). In the answer for clients it has the kind `recommended` and carries no titles: the client asks `GET /viewer/recommendations` and heads each row with the name of this one, followed by the name of the title the row comes from. The home page that puts itself together has it below the newest titles.
 - **A section can be switched off, and can have dates.** With a start and an end, a row for a season appears and leaves by itself.
 - **A heading is optional.** Without one, a section is named after what it shows: "New movies", "Top rated", the name of the category or collection.
 - **Nothing a viewer may not see gets on a page.** Every section goes through the filter of the public catalog, so a draft that was picked by hand is left out, and the panel marks it. A section with nothing to show is not sent, and appears by itself once it has something.
@@ -220,6 +221,54 @@ Three more pages are arranged with the same builder.
 For viewers, `GET /catalog/pages/{page}` (`home`, `movies`, `series` or `live`) answers with `custom`, `hero` (`{ titles }` or null) and `rows`. `GET /catalog/home` is the same as `/catalog/pages/home`. For `movies` and `series`, `custom` is false and there are no rows while the page was not arranged: a client then shows its list. Each row has a `key`, a `name`, a `kind` (`titles`, or `continue` for the place of the viewer's own row, which carries no titles), a `layout` (`poster`, `landscape`, `numbered`), `browse` (the path "See all" leads to on the website, or null) and its `titles`. `GET /catalog/pages/category/{slug}` and `GET /catalog/pages/genre/{slug}` answer the same, with a `subject` (`slug`, `name`, `description`) beside it, and with 404 for one that does not exist or has nothing published.
 
 On the website, the pages are `/movies` and `/series`. Until they are arranged they lead on to `/browse?type=MOVIE` and `/browse?type=SERIES`.
+
+## Similar titles
+
+Every title has a list of the titles that are like it. Viewers get it on the page of the title as "More like this", at the end of a film or of the last episode of a series, and in rows on the home page made from what they watched.
+
+**How two titles are compared.** A pair of titles gets up to 100 points:
+
+| Reason                                                                                                              | Points           | Counts in full when                                                  |
+| ------------------------------------------------------------------------------------------------------------------- | ---------------- | -------------------------------------------------------------------- |
+| Both are in one collection                                                                                          | up to 20         | they share a collection                                              |
+| The same viewers watch both                                                                                         | up to 20         | the overlap of both audiences is 0.4 or more, see below              |
+| Genres                                                                                                              | up to 22         | both have exactly the same genres (shared genres out of all of both) |
+| Keywords                                                                                                            | up to 12         | four are shared                                                      |
+| Cast, among the first ten of each                                                                                   | up to 10         | three people are shared                                              |
+| Crew, among the first eight of each                                                                                 | up to 8          | two people are shared                                                |
+| Categories, both movies or both series, the time of release (fading over 15 years), a studio, the original language | up to 8 together | all hold                                                             |
+
+- **A title is offered from 10 points on,** and only when one of the first six reasons holds. Being a movie from the same year in the same language makes nothing similar: it only orders titles that are alike anyway.
+- **A title for a much older audience loses 15 points.** Next to a film from 6, a film from 12 or more is pushed down or falls out.
+- **Between equals, the better rated title leads.**
+- **Nothing is stored about the result.** It is worked out when asked for, so a new genre, a changed cast or a title that was just published shows at once.
+- **Only what a viewer can watch is offered.** The list goes through the filter of the public catalog, including the age limit of the profile.
+
+**What viewers watch together.** Every six hours the scheduler counts which titles are watched by the same profiles, from the last year of watching.
+
+- A profile watched a title when it finished the film or an episode, or got a third into it (ten minutes are enough for long videos).
+- A pair is kept only when at least **three accounts** watched both. Nothing can be read out of it about one household.
+- The strength of a pair is the overlap divided by the root of the product of both audiences, so a title everybody watched is not the partner of everything.
+- Per title the 40 strongest partners are kept, in the table `title_co_watch`. The panel shows when it was last counted and can count at once.
+
+**What an editor decides.** In the panel, the tab **Similar** of a title shows the list as viewers get it, with the points of each title, a bar that shows what the points come from, and the names of what is shared.
+
+- **Pin** a title, found in the list or by searching the catalog: it is always shown, in front of the titles found, in the order the editor gives. A pinned draft appears once it is published.
+- **Hide** a title: it is never shown next to this one.
+- Both hold for this title only: pinning B on A says nothing about A on B. Up to 30 titles can be pinned and 200 hidden.
+
+**Rows for a profile.** `GET /viewer/recommendations` answers up to three rows, one for each of the titles the profile watched last that has at least four similar titles left to offer. Titles the profile already started are left out, and no title is in two rows.
+
+| Method and path                      | Purpose                                                                       |
+| ------------------------------------ | ----------------------------------------------------------------------------- |
+| `GET /catalog/titles/{slug}/similar` | Public. Cards of the similar titles, `limit` 1 to 30 (12 without), `language` |
+| `GET /viewer/recommendations`        | For a signed-in viewer: `rows`, each with `because` (a card) and `titles`     |
+| `GET /titles/{id}/similar`           | The list with points, reasons, pinned and hidden titles. `catalog:read`       |
+| `PUT /titles/{id}/similar`           | Replaces `pinned` (ordered ids) and `hidden` (ids). `catalog:write`           |
+| `GET /similar/watching`              | When titles watched together were last counted. `catalog:read`                |
+| `POST /similar/watching/rebuild`     | Counts now. `catalog:write`                                                   |
+
+Not built: weights that an operator can change, recommendations that learn from one profile's whole history, and a reason shown to viewers.
 
 ## Artwork
 
@@ -282,6 +331,7 @@ The viewer website and the apps read the catalog through `/v1/catalog`. No sign-
 | `GET /catalog/categories`                          | Categories that have something to show, with the number of titles                                                                                    |
 | `GET /catalog/titles`                              | Page of titles. Filters: `type`, `category`, `genre`, `person`, `collection` (all slugs), `featured`, `q`. Sorts: `newest`, `name`, `year`, `rating` |
 | `GET /catalog/titles/{slug}`                       | One title, for a series with its seasons and episodes                                                                                                |
+| `GET /catalog/titles/{slug}/similar`               | Titles like it, most alike first. See [Similar titles](#similar-titles)                                                                              |
 | `POST /catalog/titles/{slug}/playback`             | Signed addresses for playing a movie                                                                                                                 |
 | `POST /catalog/titles/{slug}/trailer/playback`     | The same for the trailer                                                                                                                             |
 | `POST /catalog/titles/{slug}/extras/{id}/playback` | The same for one of the extras                                                                                                                       |

@@ -101,14 +101,15 @@ function sortFor(
 }
 
 /** A place a client fills with what belongs to the viewer: it carries no titles itself. */
-const isOwnRow = (kind: string): boolean => kind === 'CONTINUE_WATCHING' || kind === 'MY_LIST';
+const isOwnRow = (kind: string): boolean =>
+  kind === 'CONTINUE_WATCHING' || kind === 'MY_LIST' || kind === 'BECAUSE_YOU_WATCHED';
 
 /** One part of the page as the website gets it, before its titles are made into cards. */
 export interface HomeRow {
   /** Stable, for keys: "featured", "latest", "category:{slug}", or "section:{id}". */
   key: string;
   name: string;
-  kind: 'titles' | 'continue' | 'list';
+  kind: 'titles' | 'continue' | 'list' | 'recommended';
   layout: 'poster' | 'landscape' | 'numbered';
   category: { slug: string; name: string } | null;
   /** Where "See all" leads on the website. Null: the row shows everything. */
@@ -236,7 +237,9 @@ export class HomeService {
             ? 'continue'
             : section.kind === 'MY_LIST'
               ? 'list'
-              : 'titles',
+              : section.kind === 'BECAUSE_YOU_WATCHED'
+                ? 'recommended'
+                : 'titles',
         layout: section.layout.toLowerCase() as HomeRow['layout'],
         category:
           section.source === 'CATEGORY' && section.category
@@ -334,6 +337,15 @@ export class HomeService {
         ? [this.automaticRow('featured', 'Featured', '/browse?featured=true', featured)]
         : []),
       this.automaticRow('latest', 'New', '/browse', latest),
+      {
+        key: 'recommended',
+        name: 'Because you watched',
+        kind: 'recommended',
+        layout: 'poster',
+        category: null,
+        browse: null,
+        titles: [],
+      },
       ...categories.map((category, index) => ({
         ...this.automaticRow(
           `category:${category.slug}`,
@@ -580,7 +592,10 @@ export class HomeService {
         : []),
       { ...row, source: 'FEATURED', sort: 'NEWEST' },
       { ...row, source: 'ALL', sort: 'NEWEST' },
-      ...(page === 'HOME' ? [] : [{ ...row, source: 'ALL' as const, sort: 'RATING' as const }]),
+      // Rows made from what the profile watched, below what is new for everybody.
+      ...(page === 'HOME'
+        ? [{ kind: 'BECAUSE_YOU_WATCHED' as const }]
+        : [{ ...row, source: 'ALL' as const, sort: 'RATING' as const }]),
       ...categories.map((category) => ({
         ...row,
         source: 'CATEGORY' as const,
@@ -613,7 +628,9 @@ export class HomeService {
           ? 'The page has an opening already'
           : input.kind === 'MY_LIST'
             ? 'The page has a place for "My list" already'
-            : 'The page has a place for "Continue watching" already',
+            : input.kind === 'BECAUSE_YOU_WATCHED'
+              ? 'The page has a place for "Because you watched" already'
+              : 'The page has a place for "Continue watching" already',
       );
     }
     const { titleIds, kind, ...fields } = input;

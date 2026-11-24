@@ -63,6 +63,7 @@ import { HomeService } from '../home/home.service.js';
     TranslationsService,
     TermTranslationsService,
     HomeService,
+    PublicCatalogService,
   ],
 })
 export class CatalogModule {}

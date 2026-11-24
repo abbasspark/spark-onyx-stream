@@ -2014,7 +2014,8 @@ export interface AddedSubtitle {
 
 // --- The home page of the website ---------------------------------------------------------
 
-export type HomeSectionKind = 'HERO' | 'CONTINUE_WATCHING' | 'MY_LIST' | 'TITLES';
+export type HomeSectionKind =
+  'HERO' | 'CONTINUE_WATCHING' | 'MY_LIST' | 'BECAUSE_YOU_WATCHED' | 'TITLES';
 export type HomeSource = 'ALL' | 'FEATURED' | 'CATEGORY' | 'GENRE' | 'COLLECTION' | 'MANUAL';
 export type HomeSort = 'CURATED' | 'NEWEST' | 'RELEASED' | 'RATING' | 'NAME';
 export type HomeLayout = 'POSTER' | 'LANDSCAPE' | 'NUMBERED';
@@ -2450,3 +2451,70 @@ export type WebhookReference = Schemas['WebhookReference'];
 /** The oldest version of one app that may still use the installation. */
 export type AppVersionRule = Schemas['AppVersionRule'];
 export type AppVersions = Schemas['AppVersionsView'];
+
+// --- Similar titles ---------------------------------------------------------------------
+
+export type SimilarSignalKind =
+  | 'collection'
+  | 'watched'
+  | 'genres'
+  | 'keywords'
+  | 'cast'
+  | 'crew'
+  | 'categories'
+  | 'kind'
+  | 'era'
+  | 'studio'
+  | 'language';
+
+/** One reason two titles are alike. */
+export interface SimilarSignal {
+  signal: SimilarSignalKind;
+  /** What it gave of the 100 points. */
+  points: number;
+  /** How many genres, keywords or people are shared, or profiles that watched both. */
+  count: number;
+  /** The names of what is shared, where there are names. */
+  names: string[];
+}
+
+export interface SimilarItem {
+  title: {
+    id: string;
+    slug: string;
+    name: string;
+    type: TitleType;
+    releaseYear: number | null;
+    ageRating: string | null;
+    status: PublishStatus;
+    poster: CatalogImage | null;
+  };
+  pinned: boolean;
+  /** From 0 to 100. Null: the two share nothing. */
+  score: number | null;
+  signals: SimilarSignal[];
+  /** The place among what viewers get, from 1. Null while they do not see it. */
+  rank: number | null;
+  unseen: 'draft' | 'dates' | 'unplayable' | null;
+}
+
+/** What the last count of titles watched by the same people found. */
+export interface SimilarWatching {
+  rebuiltAt: string;
+  pairs: number;
+  titles: number;
+  profiles: number;
+  tookMs: number;
+}
+
+export interface SimilarView {
+  title: { id: string; name: string; type: TitleType };
+  /** Pinned titles in their order, then the titles found, most alike first. */
+  items: SimilarItem[];
+  hidden: SimilarItem[];
+  /** How many the website shows, and the most an app can ask for. */
+  shownByDefault: number;
+  most: number;
+  weights: Record<SimilarSignalKind, number>;
+  watching: (SimilarWatching & { minimumAccounts: number }) | null;
+}

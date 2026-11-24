@@ -291,6 +291,22 @@ export function getTitle(slug: string): Promise<TitleDetail | null> {
 }
 
 /**
+ * Titles like one, most alike first. Empty when nothing is alike, when the
+ * title is gone, or when the API is older than this.
+ */
+export async function getSimilar(slug: string, limit = 12): Promise<TitleCard[]> {
+  try {
+    const answer = await findLocal<{ items: TitleCard[] }>(
+      `/titles/${encodeURIComponent(slug)}/similar?limit=${limit}`,
+    );
+    return answer?.items ?? [];
+  } catch {
+    // A page is complete without this row.
+    return [];
+  }
+}
+
+/**
  * Whether a channel is on air changes at any moment, so what is known about
  * channels is kept for a much shorter time than the rest of the catalog.
  */

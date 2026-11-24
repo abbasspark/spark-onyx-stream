@@ -179,9 +179,10 @@ export interface HomeRow {
   name: string;
   /**
    * "continue": the place of the viewer's own row of started videos. "list":
-   * the place of the titles the viewer saved. Both are filled in the browser.
+   * the place of the titles the viewer saved. "recommended": the place of the
+   * rows made from what the viewer watched. All three are filled in the browser.
    */
-  kind: 'titles' | 'continue' | 'list';
+  kind: 'titles' | 'continue' | 'list' | 'recommended';
   /** Upright posters, wide cards with the backdrop, or a numbered top list. */
   layout: 'poster' | 'landscape' | 'numbered';
   category: CategoryRef | null;

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-only
-import type { Episode, Season, TitleDetail } from './types';
+import type { Episode, Season, TitleCard, TitleDetail } from './types';
 
 /** "S2 E5", the short way to name an episode. */
 export function episodeCode(seasonNumber: number, episodeNumber: number): string {
@@ -68,4 +68,18 @@ export function nextUnwatched(
     }
   });
   return all[furthest + 1] ?? all[0] ?? null;
+}
+
+/** How many titles the end of a video offers. They stand side by side on a phone too. */
+export const END_SUGGESTIONS = 3;
+
+/** What the end of a video shows of the titles like it: a name and a wide picture. */
+export function toSuggestions(
+  titles: readonly Pick<TitleCard, 'slug' | 'name' | 'backdrop' | 'poster'>[],
+): { slug: string; name: string; image: string | null }[] {
+  return titles.slice(0, END_SUGGESTIONS).map((title) => ({
+    slug: title.slug,
+    name: title.name,
+    image: (title.backdrop ?? title.poster)?.url ?? null,
+  }));
 }

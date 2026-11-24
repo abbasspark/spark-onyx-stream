@@ -1409,6 +1409,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/catalog/titles/{slug}/similar": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Titles like this one, most alike first: what an editor pinned, then what shares genres, keywords, people or a collection with it, or is watched by the same viewers
+         * @description Empty when nothing is alike. A profile with an age limit only gets what suits it. Open to everyone.
+         */
+        get: operations["PublicSimilar_forTitle"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/catalog/titles/{slug}/trailer/playback": {
         parameters: {
             query?: never;
@@ -3291,6 +3311,46 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/similar/watching": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * When titles watched by the same people were last counted, and what was found
+         * @description For an admin or an API key. Needs catalog:read.
+         */
+        get: operations["Similar_watching"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/similar/watching/rebuild": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Counts now, instead of waiting for the scheduler
+         * @description Takes a moment on a large audience. For an admin or an API key. Needs catalog:write.
+         */
+        post: operations["Similar_rebuild"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/stats/overview": {
         parameters: {
             query?: never;
@@ -3623,6 +3683,27 @@ export interface paths {
         put?: never;
         /** @description For an admin or an API key. Needs catalog:write. */
         post: operations["Catalog_createSeason"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/titles/{id}/similar": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description For an admin or an API key. Needs catalog:read. */
+        get: operations["Similar_get"];
+        /**
+         * Replaces what was decided for a title: the titles always shown, in their order, and the titles never shown
+         * @description It holds for this title only. For an admin or an API key. Needs catalog:write.
+         */
+        put: operations["Similar_set"];
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -4501,6 +4582,26 @@ export interface paths {
          * @description For a signed-in viewer.
          */
         post: operations["ViewerPurchases_start"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/viewer/recommendations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Up to three rows of titles like the ones the profile watched last, each named after the title it comes from
+         * @description Nothing the profile already started is in them, and no title is in two rows. Empty for a profile that watched nothing yet. For a signed-in viewer.
+         */
+        get: operations["Recommendations_rows"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -6115,6 +6216,16 @@ export interface components {
             /** Format: date-time */
             updatedAt: string;
         };
+        CoWatchState: {
+            rebuiltAt: string;
+            /** @description Pairs kept, each counted once. */
+            pairs: number;
+            /** @description Titles that have at least one partner. */
+            titles: number;
+            /** @description Profiles whose watching was counted. */
+            profiles: number;
+            tookMs: number;
+        };
         CreatedApiKey: {
             /** @description The full key. Shown once, at creation, and never again. */
             key: string;
@@ -6585,7 +6696,7 @@ export interface components {
             preview: components["schemas"]["PublicTitleCard"][];
         };
         /** @enum {string} */
-        HomeSectionKind: "TITLES" | "HERO" | "CONTINUE_WATCHING" | "MY_LIST";
+        HomeSectionKind: "TITLES" | "HERO" | "CONTINUE_WATCHING" | "MY_LIST" | "BECAUSE_YOU_WATCHED";
         /** @enum {string} */
         HomeSort: "CURATED" | "NEWEST" | "RELEASED" | "RATING" | "NAME";
         /** @enum {string} */
@@ -6882,6 +6993,16 @@ export interface components {
             /** @description Language and country that an import defaults to. */
             language: string;
             region: string;
+        };
+        NamedSignal: {
+            /** @description The genres, people, keywords, studios or collections both have. Empty for the others. */
+            names: string[];
+            /** @enum {string} */
+            signal: "language" | "kind" | "categories" | "keywords" | "genres" | "collection" | "watched" | "cast" | "crew" | "era" | "studio";
+            /** @description What it gave, rounded to one decimal. */
+            points: number;
+            /** @description How many genres, keywords or people are shared, or profiles that watched both. */
+            count: number;
         };
         OverviewPoint: [
             number,
@@ -7745,15 +7866,17 @@ export interface components {
             endsAt: string;
         };
         PublicRow: {
-            /** @description Stable, for keys: "featured", "latest", "category:{slug}", "continue" or "section:{id}". */
+            /** @description Stable, for keys: "featured", "latest", "category:{slug}", "continue", "list", "recommended" or "section:{id}". */
             key: string;
             name: string;
             /**
              * @description "continue": the place of the viewer's own row of started videos. "list":
-             *     the place of the titles the viewer saved. Neither has titles here.
+             *     the place of the titles the viewer saved. "recommended": the place of the
+             *     rows of `GET /viewer/recommendations`, each headed by this row's name
+             *     followed by the name of the title it is about. None of them has titles here.
              * @enum {string}
              */
-            kind: "titles" | "continue" | "list";
+            kind: "titles" | "continue" | "list" | "recommended";
             /**
              * @description How the cards look: posters, wide cards with the backdrop, or a numbered top list.
              * @enum {string}
@@ -7956,6 +8079,11 @@ export interface components {
         PurchaseKind: "RENT" | "BUY";
         /** @enum {string} */
         PurchaseStatus: "ACTIVE" | "REVOKED";
+        RecommendationRow: {
+            /** @description The title the row is about. */
+            because: components["schemas"]["PublicTitleCard"];
+            titles: components["schemas"]["PublicTitleCard"][];
+        };
         /** @enum {string} */
         RecordingStatus: "FAILED" | "CANCELLED" | "SCHEDULED" | "RECORDING" | "FINISHING" | "DONE";
         RecordingView: {
@@ -8219,6 +8347,69 @@ export interface components {
             hours: number;
             video: components["schemas"]["SharingPoint"][];
             live: components["schemas"]["SharingPoint"][];
+        };
+        SimilarAdminItem: {
+            title: {
+                id: string;
+                slug: string;
+                name: string;
+                type: string;
+                releaseYear: number | null;
+                ageRating: string | null;
+                status: components["schemas"]["PublishStatus"];
+                poster: components["schemas"]["ImageView"] | null;
+            };
+            pinned: boolean;
+            /** @description From 0 to 100. Null: the two share nothing, and an editor put it here. */
+            score: number | null;
+            signals: components["schemas"]["NamedSignal"][];
+            /**
+             * @description Where the title stands in what viewers get, from 1. Null while they do
+             *     not see it, for the reason in `unseen`.
+             */
+            rank: number | null;
+            /** @description "draft": not published. "dates": outside its dates. "unplayable": nothing to watch yet. */
+            unseen: ("draft" | "dates" | "unplayable") | null;
+        };
+        SimilarAdminView: {
+            title: {
+                id: string;
+                name: string;
+                type: string;
+            };
+            /** @description Pinned titles in their order, then the titles found, most alike first. */
+            items: components["schemas"]["SimilarAdminItem"][];
+            /** @description Titles an editor took out. */
+            hidden: components["schemas"]["SimilarAdminItem"][];
+            /** @description How many titles the website and the apps show unless they ask for more, and the most they get. */
+            shownByDefault: number;
+            most: number;
+            /** @description The most points each reason can give. */
+            weights: {
+                language: number;
+                kind: number;
+                categories: number;
+                keywords: number;
+                genres: number;
+                collection: number;
+                watched: number;
+                cast: number;
+                crew: number;
+                era: number;
+                studio: number;
+            };
+            /** @description What is known about titles watched by the same people. Null: never counted. */
+            watching: {
+                rebuiltAt: string;
+                /** @description Pairs kept, each counted once. */
+                pairs: number;
+                /** @description Titles that have at least one partner. */
+                titles: number;
+                /** @description Profiles whose watching was counted. */
+                profiles: number;
+                tookMs: number;
+                minimumAccounts: number;
+            } | null;
         };
         SourceStreams: {
             videoCodec: string;
@@ -9158,6 +9349,12 @@ export interface components {
                 title: components["schemas"]["TitleRef"];
                 watching: number;
             }[];
+        };
+        WatchingView: {
+            /** @description Null: never counted. */
+            state: components["schemas"]["CoWatchState"] | null;
+            /** @description A pair of titles only counts when this many accounts watched both. */
+            minimumAccounts: number;
         };
         WatchSummary: {
             locations: number;
@@ -13442,6 +13639,60 @@ export interface operations {
             };
         };
     };
+    PublicSimilar_forTitle: {
+        parameters: {
+            query?: {
+                limit?: number;
+                language?: string;
+            };
+            header?: never;
+            path: {
+                slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The answer. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["PublicTitleCard"][];
+                    };
+                };
+            };
+            /** @description The input was refused. "issues" names every field. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description What the address names does not exist. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Too many requests. "Retry-After" says when to try again. */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
     PublicCatalog_playTrailer: {
         parameters: {
             query?: never;
@@ -17694,7 +17945,7 @@ export interface operations {
             content: {
                 "application/json": {
                     /** @enum {string} */
-                    kind: "HERO" | "CONTINUE_WATCHING" | "MY_LIST" | "TITLES";
+                    kind: "HERO" | "CONTINUE_WATCHING" | "MY_LIST" | "BECAUSE_YOU_WATCHED" | "TITLES";
                     name?: string | null;
                     /** @enum {string} */
                     source?: "ALL" | "FEATURED" | "CATEGORY" | "GENRE" | "COLLECTION" | "MANUAL";
@@ -20602,6 +20853,91 @@ export interface operations {
             };
         };
     };
+    Similar_watching: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The answer. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WatchingView"];
+                };
+            };
+            /** @description Not signed in, or the sign-in ran out. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Signed in, but not allowed to do this. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    Similar_rebuild: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The answer. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WatchingView"];
+                };
+            };
+            /** @description Not signed in, or the sign-in ran out. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Signed in, but not allowed to do this. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Too many requests. "Retry-After" says when to try again. */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
     Stats_overview: {
         parameters: {
             query?: never;
@@ -21988,6 +22324,120 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["TitleDetail"];
+                };
+            };
+            /** @description The input was refused. "issues" names every field. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Not signed in, or the sign-in ran out. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Signed in, but not allowed to do this. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description What the address names does not exist. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    Similar_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The answer. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SimilarAdminView"];
+                };
+            };
+            /** @description Not signed in, or the sign-in ran out. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Signed in, but not allowed to do this. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description What the address names does not exist. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    Similar_set: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    pinned: string[];
+                    hidden: string[];
+                };
+            };
+        };
+        responses: {
+            /** @description The answer. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SimilarAdminView"];
                 };
             };
             /** @description The input was refused. "issues" names every field. */
@@ -24588,6 +25038,48 @@ export interface operations {
             };
             /** @description Too many requests. "Retry-After" says when to try again. */
             429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    Recommendations_rows: {
+        parameters: {
+            query?: {
+                language?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The answer. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        rows: components["schemas"]["RecommendationRow"][];
+                    };
+                };
+            };
+            /** @description The input was refused. "issues" names every field. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Not signed in, or the sign-in ran out. */
+            401: {
                 headers: {
                     [name: string]: unknown;
                 };

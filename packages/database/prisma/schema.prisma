@@ -1064,6 +1064,11 @@ model Title {
   revisions    TitleRevision[]
   watchedFiles WatchedFile[]
 
+  similarChoices  SimilarChoice[] @relation("SimilarChoiceOf")
+  chosenAsSimilar SimilarChoice[] @relation("SimilarChoiceOther")
+  watchedWith     TitleCoWatch[]  @relation("CoWatchOf")
+  watchedWithBy   TitleCoWatch[]  @relation("CoWatchOther")
+
   @@index([type, status])
   @@index([type, releaseDate])
   @@index([availableFrom])
@@ -1071,7 +1076,53 @@ model Title {
   @@index([metadataSource, metadataId])
   @@index([status, publishedAt])
   @@index([createdAt])
+  @@index([keywords], type: Gin)
   @@map("titles")
+}
+
+/// What an editor decided about the titles shown as similar to a title.
+enum SimilarChoiceKind {
+  /// Always shown, before the titles found by comparing.
+  PINNED
+  /// Never shown, however alike the two are.
+  HIDDEN
+}
+
+/// One decision of an editor about the similar titles of a title. It holds
+/// in one direction: pinning B on A says nothing about A on B.
+model SimilarChoice {
+  titleId  String            @db.Uuid
+  title    Title             @relation("SimilarChoiceOf", fields: [titleId], references: [id], onDelete: Cascade)
+  otherId  String            @db.Uuid
+  other    Title             @relation("SimilarChoiceOther", fields: [otherId], references: [id], onDelete: Cascade)
+  kind     SimilarChoiceKind
+  /// Order among the pinned titles, from 0. Not used for hidden ones.
+  position Int               @default(0)
+
+  createdAt DateTime @default(now())
+
+  @@id([titleId, otherId])
+  @@index([otherId])
+  @@map("similar_choices")
+}
+
+/// How much the audiences of two titles overlap, counted from what profiles
+/// watched. Worked out again every few hours, and kept only for pairs that
+/// enough profiles share, so nothing here can be traced to a viewer.
+model TitleCoWatch {
+  titleId  String @db.Uuid
+  title    Title  @relation("CoWatchOf", fields: [titleId], references: [id], onDelete: Cascade)
+  otherId  String @db.Uuid
+  other    Title  @relation("CoWatchOther", fields: [otherId], references: [id], onDelete: Cascade)
+  /// Profiles that watched both.
+  viewers  Int
+  /// From 0 to 1: the share of both audiences that the overlap is.
+  strength Float
+
+  @@id([titleId, otherId])
+  @@index([titleId, strength])
+  @@index([otherId])
+  @@map("title_co_watch")
 }
 
 /// A genre or another grouping that viewers browse by.
@@ -2422,6 +2473,8 @@ enum HomeSectionKind {
   CONTINUE_WATCHING
   /// Where the viewer's own list of saved titles goes.
   MY_LIST
+  /// Where rows of titles like the ones the viewer watched go.
+  BECAUSE_YOU_WATCHED
   /// A row of titles.
   TITLES
 }

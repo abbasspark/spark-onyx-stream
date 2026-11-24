@@ -98,6 +98,7 @@ const KIND_LOOKS: Record<HomeSectionKind, { icon: typeof PanelTop; label: string
   HERO: { icon: PanelTop, label: 'Opening' },
   CONTINUE_WATCHING: { icon: History, label: 'Continue watching' },
   MY_LIST: { icon: ListPlus, label: 'My list' },
+  BECAUSE_YOU_WATCHED: { icon: Sparkles, label: 'Because you watched' },
   TITLES: { icon: GalleryHorizontal, label: 'Row' },
 };
 
@@ -232,6 +233,7 @@ function LayoutBuilder({ page }: { page: LayoutPageSlug }) {
   const rows = all.filter((section) => section.kind !== 'HERO');
   const hasContinue = all.some((section) => section.kind === 'CONTINUE_WATCHING');
   const hasList = all.some((section) => section.kind === 'MY_LIST');
+  const hasBecause = all.some((section) => section.kind === 'BECAUSE_YOU_WATCHED');
 
   const saveOrder = (next: HomeSection[]) => {
     const ordered = hero ? [hero, ...next] : next;
@@ -253,7 +255,9 @@ function LayoutBuilder({ page }: { page: LayoutPageSlug }) {
           ? 'Viewers no longer see what they started on this page. Their progress is kept.'
           : section.kind === 'MY_LIST'
             ? 'Viewers no longer see their list on this page. The lists are kept, and stay on their own page.'
-            : 'Only the section goes. The titles it shows stay in the catalog.',
+            : section.kind === 'BECAUSE_YOU_WATCHED'
+              ? 'Viewers no longer get rows made from what they watched on this page. Similar titles stay on the page of each title.'
+              : 'Only the section goes. The titles it shows stay in the catalog.',
       confirmLabel: 'Remove',
       destructive: true,
     });
@@ -308,7 +312,9 @@ function LayoutBuilder({ page }: { page: LayoutPageSlug }) {
             </span>
           </DropdownMenuItem>
         ))}
-        {(hasOpening && !hero) || !hasContinue || !hasList ? <DropdownMenuSeparator /> : null}
+        {(hasOpening && !hero) || !hasContinue || !hasList || !hasBecause ? (
+          <DropdownMenuSeparator />
+        ) : null}
         {hasOpening && !hero ? (
           <DropdownMenuItem
             onSelect={() =>
@@ -339,6 +345,16 @@ function LayoutBuilder({ page }: { page: LayoutPageSlug }) {
               My list
               <span className="text-xs text-muted-foreground">
                 Where each viewer finds what they saved for later
+              </span>
+            </span>
+          </DropdownMenuItem>
+        ) : null}
+        {!hasBecause ? (
+          <DropdownMenuItem onSelect={() => create.mutate({ kind: 'BECAUSE_YOU_WATCHED' })}>
+            <span className="grid">
+              Because you watched
+              <span className="text-xs text-muted-foreground">
+                Rows of titles like the ones each viewer watched last
               </span>
             </span>
           </DropdownMenuItem>
@@ -1004,7 +1020,9 @@ function SectionEditor({
             : isContinue
               ? kind === 'MY_LIST'
                 ? 'The place on the page where a viewer finds what they saved to watch later.'
-                : 'The place on the page where a viewer finds what they started.'
+                : kind === 'BECAUSE_YOU_WATCHED'
+                  ? 'The place on the page for rows of titles like the ones a viewer watched last. Each row is named after the title it comes from.'
+                  : 'The place on the page where a viewer finds what they started.'
               : 'A heading and a strip of titles that scrolls sideways.'
         }
       >

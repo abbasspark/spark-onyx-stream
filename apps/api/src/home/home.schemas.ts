@@ -1,7 +1,13 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 import { z } from 'zod';
 
-export const HOME_KINDS = ['HERO', 'CONTINUE_WATCHING', 'MY_LIST', 'TITLES'] as const;
+export const HOME_KINDS = [
+  'HERO',
+  'CONTINUE_WATCHING',
+  'MY_LIST',
+  'BECAUSE_YOU_WATCHED',
+  'TITLES',
+] as const;
 export const HOME_SOURCES = [
   'ALL',
   'FEATURED',
