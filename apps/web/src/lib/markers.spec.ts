@@ -1,6 +1,14 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 import { describe, expect, it } from 'vitest';
-import { endOf, type Marker, runningMarker, skipLabel, watchedFrom } from './markers';
+import {
+  bandAt,
+  endOf,
+  type Marker,
+  markerBands,
+  runningMarker,
+  skipLabel,
+  watchedFrom,
+} from './markers';
 
 const recap: Marker = { kind: 'RECAP', startMs: 0, endMs: 55_000 };
 const intro: Marker = { kind: 'INTRO', startMs: 60_000, endMs: 120_000 };
@@ -58,5 +66,65 @@ describe('watchedFrom', () => {
     expect(watchedFrom([{ kind: 'CREDITS', startMs: 600_000, endMs: null }], 3600)).toBeUndefined();
     expect(watchedFrom(undefined, 3600)).toBeUndefined();
     expect(watchedFrom(all, 0)).toBeUndefined();
+  });
+});
+
+describe('markerBands', () => {
+  const markers: Marker[] = [
+    { kind: 'RECAP', startMs: 0, endMs: 40_000 },
+    { kind: 'INTRO', startMs: 40_000, endMs: 90_000 },
+    { kind: 'CREDITS', startMs: 3_400_000, endMs: null },
+  ];
+
+  it('has nothing to draw without markers or a length', () => {
+    expect(markerBands(undefined, 3600)).toEqual([]);
+    expect(markerBands(markers, 0)).toEqual([]);
+  });
+
+  it('places each stretch across the bar', () => {
+    const bands = markerBands(markers, 3600);
+    expect(bands).toHaveLength(3);
+    expect(bands[1]).toMatchObject({
+      kind: 'INTRO',
+      name: 'Opening titles',
+      startSeconds: 40,
+      endSeconds: 90,
+    });
+    expect(bands[1]?.from).toBeCloseTo(40 / 3600, 5);
+    expect(bands[1]?.to).toBeCloseTo(90 / 3600, 5);
+  });
+
+  it('runs credits without an end to the end of the video', () => {
+    expect(markerBands(markers, 3600)[2]).toMatchObject({ endSeconds: 3600, to: 1 });
+  });
+
+  it('leaves out a stretch too thin to point at', () => {
+    expect(markerBands([{ kind: 'INTRO', startMs: 10_000, endMs: 11_000 }], 3600)).toEqual([]);
+  });
+
+  it('keeps a stretch inside the video it belongs to', () => {
+    const [band] = markerBands([{ kind: 'CREDITS', startMs: 9_000_000, endMs: null }], 3600);
+    expect(band).toBeUndefined();
+  });
+});
+
+describe('bandAt', () => {
+  const bands = markerBands(
+    [
+      { kind: 'INTRO', startMs: 40_000, endMs: 90_000 },
+      { kind: 'CREDITS', startMs: 3_400_000, endMs: null },
+    ],
+    3600,
+  );
+
+  it('names the stretch a moment falls in', () => {
+    expect(bandAt(bands, 50)?.kind).toBe('INTRO');
+    expect(bandAt(bands, 3500)?.kind).toBe('CREDITS');
+  });
+
+  it('gives nothing between the stretches', () => {
+    expect(bandAt(bands, 600)).toBeNull();
+    // The end of a stretch belongs to what comes after it.
+    expect(bandAt(bands, 90)).toBeNull();
   });
 });

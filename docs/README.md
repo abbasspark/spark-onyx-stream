@@ -15,6 +15,7 @@
 | [watched-locations.md](watched-locations.md)       | Folders and buckets that import videos named by their TMDB id                        |
 | [viewing-statistics.md](viewing-statistics.md)     | What is recorded about watching, and the figures made of it                          |
 | [playback-quality.md](playback-quality.md)         | What players report about how playback went, and how to read it                      |
+| [player.md](player.md)                             | The player: what it does, what a viewer sets, the keys, the gestures, the figures    |
 | [notifications.md](notifications.md)               | Notifications to browsers and apps, what is sent by itself, and the list of a viewer |
 | [prepaid-codes.md](prepaid-codes.md)               | Prepaid codes: batches, what entering a code does, what clients call, what is kept   |
 | [api.md](api.md)                                   | The API described for programs, generated clients, and app versions                  |

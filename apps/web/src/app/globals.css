@@ -66,13 +66,19 @@
     border-radius: 2px;
   }
 
-  /* Subtitles drawn by the browser on top of the video. */
+  /*
+   * Subtitles drawn by the browser on top of the video. The player hands the
+   * viewer's settings down as custom properties, and sizes them against the
+   * height of the picture rather than the window, so that a small window and
+   * a full screen read the same.
+   */
   video::cue {
-    background: rgb(0 0 0 / 0.72);
-    color: #fff;
+    background: var(--cue-background, rgb(0 0 0 / 0.72));
+    color: var(--cue-color, #f4f1ea);
     font-family: var(--font-sans);
-    font-size: clamp(1rem, 2.4vw, 1.75rem);
+    font-size: var(--cue-size, clamp(1rem, 2.4vw, 1.75rem));
     line-height: 1.35;
+    text-shadow: var(--cue-shadow, none);
   }
 }
 

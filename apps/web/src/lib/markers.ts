@@ -72,3 +72,60 @@ export function watchedFrom(
   const seconds = credits.startMs / 1000;
   return seconds >= duration / 2 ? seconds : undefined;
 }
+
+/** What a marked stretch is called where it is shown rather than skipped. */
+export function markerName(kind: Marker['kind']): string {
+  switch (kind) {
+    case 'RECAP':
+      return 'Recap';
+    case 'INTRO':
+      return 'Opening titles';
+    default:
+      return 'Credits';
+  }
+}
+
+/** A marked stretch of a video, as a share of its length, for drawing on the seek bar. */
+export interface MarkerBand {
+  kind: Marker['kind'];
+  name: string;
+  /** Where it begins and ends, each from 0 to 1. */
+  from: number;
+  to: number;
+  startSeconds: number;
+  endSeconds: number;
+}
+
+/**
+ * The marked stretches as bands across the seek bar, so that a viewer can see
+ * where the opening and the credits are before reaching them.
+ *
+ * Stretches that would be too thin to see or to point at are left out.
+ */
+export function markerBands(
+  markers: readonly Marker[] | undefined,
+  duration: number,
+): MarkerBand[] {
+  if (!markers || !(duration > 0)) {
+    return [];
+  }
+  return markers
+    .map((marker) => {
+      const startSeconds = Math.max(0, Math.min(duration, marker.startMs / 1000));
+      const endSeconds = Math.max(startSeconds, endOf(marker, duration));
+      return {
+        kind: marker.kind,
+        name: markerName(marker.kind),
+        from: startSeconds / duration,
+        to: endSeconds / duration,
+        startSeconds,
+        endSeconds,
+      };
+    })
+    .filter((band) => band.endSeconds - band.startSeconds >= WORTH_SKIPPING_SECONDS);
+}
+
+/** The band a moment falls in, for naming it while the pointer rests there. */
+export function bandAt(bands: readonly MarkerBand[], seconds: number): MarkerBand | null {
+  return bands.find((band) => seconds >= band.startSeconds && seconds < band.endSeconds) ?? null;
+}
