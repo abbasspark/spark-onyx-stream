@@ -180,15 +180,7 @@ export const JOB_STATUSES = ['QUEUED', 'RUNNING', 'COMPLETED', 'FAILED', 'CANCEL
 export type JobStatus = (typeof JOB_STATUSES)[number];
 
 export type JobType =
-  | 'PROBE'
-  | 'REMUX'
-  | 'TRANSCODE'
-  | 'PACKAGE'
-  | 'THUMBNAILS'
-  | 'SUBTITLES'
-  | 'AUDIO'
-  | 'MARKERS'
-  | 'CLEANUP';
+  'PROBE' | 'REMUX' | 'TRANSCODE' | 'THUMBNAILS' | 'AUDIO' | 'MARKERS' | 'CLEANUP';
 
 export interface Job {
   id: string;

@@ -68,6 +68,7 @@ export class BackupsController {
     return backup;
   }
 
+  /** Sets when backups are made, how many are kept and where they go. */
   @Put('settings')
   @RequirePermissions('settings:write')
   async updateSettings(
@@ -129,6 +130,7 @@ export class BackupsController {
     stream.pipe(response);
   }
 
+  /** Deletes a backup and its file. */
   @Delete(':id')
   @HttpCode(HttpStatus.NO_CONTENT)
   @RequirePermissions('settings:write')

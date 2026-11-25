@@ -37,18 +37,21 @@ import {
 export class StoragePoolsController {
   constructor(@Inject(StoragePoolsService) private readonly pools: StoragePoolsService) {}
 
+  /** Lists the storage pools. */
   @Get()
   @RequirePermissions('storage:read')
   list(): Promise<StoragePoolView[]> {
     return this.pools.list();
   }
 
+  /** Returns one storage pool with how much it holds. */
   @Get(':id')
   @RequirePermissions('storage:read')
   get(@Param('id', ParseUUIDPipe) id: string): Promise<StoragePoolView> {
     return this.pools.get(id);
   }
 
+  /** Creates a storage pool. */
   @Post()
   @AdminSessionOnly()
   @RequirePermissions('storage:write')
@@ -60,6 +63,7 @@ export class StoragePoolsController {
     return this.pools.create(principal, body, requestInfo(request).ipAddress);
   }
 
+  /** Changes a storage pool. */
   @Patch(':id')
   @AdminSessionOnly()
   @RequirePermissions('storage:write')

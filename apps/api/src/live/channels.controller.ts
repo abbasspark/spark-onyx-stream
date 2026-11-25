@@ -48,6 +48,7 @@ export class ChannelsController {
     @Inject(AuditService) private readonly audit: AuditService,
   ) {}
 
+  /** Lists the channels. */
   @Get()
   @RequirePermissions('live:read')
   list(): Promise<ChannelView[]> {
@@ -68,6 +69,7 @@ export class ChannelsController {
     return this.channels.probe(body.source);
   }
 
+  /** Creates a channel. */
   @Post()
   @RequirePermissions('live:write')
   async create(
@@ -80,6 +82,7 @@ export class ChannelsController {
     return created;
   }
 
+  /** Returns one channel. */
   @Get(':id')
   @RequirePermissions('live:read')
   get(@Param('id', ParseUUIDPipe) id: string): Promise<ChannelDetails> {
@@ -93,6 +96,7 @@ export class ChannelsController {
     return this.channels.source(id);
   }
 
+  /** Changes a channel. */
   @Patch(':id')
   @RequirePermissions('live:write')
   async update(
@@ -108,6 +112,7 @@ export class ChannelsController {
     return updated;
   }
 
+  /** Deletes a channel. */
   @Delete(':id')
   @HttpCode(HttpStatus.NO_CONTENT)
   @RequirePermissions('live:write')
@@ -120,6 +125,7 @@ export class ChannelsController {
     await this.record('channel.delete', removed, principal, request);
   }
 
+  /** Starts the live process of a channel. */
   @Post(':id/start')
   @HttpCode(HttpStatus.OK)
   @RequirePermissions('live:write')
@@ -133,6 +139,7 @@ export class ChannelsController {
     return started;
   }
 
+  /** Stops the live process of a channel. */
   @Post(':id/stop')
   @HttpCode(HttpStatus.OK)
   @RequirePermissions('live:write')
@@ -146,6 +153,7 @@ export class ChannelsController {
     return stopped;
   }
 
+  /** Restarts the live process of a channel. */
   @Post(':id/restart')
   @HttpCode(HttpStatus.OK)
   @RequirePermissions('live:write')

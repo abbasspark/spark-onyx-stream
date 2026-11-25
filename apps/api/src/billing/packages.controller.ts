@@ -40,12 +40,14 @@ export class PackagesController {
     @Inject(AuditService) private readonly audit: AuditService,
   ) {}
 
+  /** Lists the packages. */
   @Get()
   @RequirePermissions('catalog:read')
   list(): Promise<PackageView[]> {
     return this.packages.list();
   }
 
+  /** Creates a package. */
   @Post()
   @RequirePermissions('billing:write')
   async create(
@@ -67,6 +69,7 @@ export class PackagesController {
     return this.packages.reorder(body.ids);
   }
 
+  /** Changes a package. */
   @Patch(':id')
   @RequirePermissions('billing:write')
   async update(
@@ -80,6 +83,7 @@ export class PackagesController {
     return updated;
   }
 
+  /** Deletes a package. */
   @Delete(':id')
   @RequirePermissions('billing:write')
   @HttpCode(HttpStatus.NO_CONTENT)

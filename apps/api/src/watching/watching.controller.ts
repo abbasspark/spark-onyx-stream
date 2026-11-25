@@ -101,6 +101,7 @@ export class WatchingController {
 export class ViewerWatchingAdminController {
   constructor(@Inject(WatchingService) private readonly watching: WatchingService) {}
 
+  /** Lists what a viewer has started watching, with their progress. */
   @Get(':id/watching')
   @RequirePermissions('viewers:read')
   forViewer(@Param('id', ParseUUIDPipe) id: string): Promise<ViewerWatchingAdminView> {

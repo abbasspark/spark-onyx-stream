@@ -10,10 +10,16 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** @description For an admin or an API key. Needs admins:read. */
+        /**
+         * Lists the admins, with the role of each
+         * @description For an admin or an API key. Needs admins:read.
+         */
         get: operations["Admins_list"];
         put?: never;
-        /** @description For a signed-in admin, not for API keys. Needs admins:write. */
+        /**
+         * Creates a admin
+         * @description For a signed-in admin, not for API keys. Needs admins:write.
+         */
         post: operations["Admins_create"];
         delete?: never;
         options?: never;
@@ -28,7 +34,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** @description For an admin or an API key. Needs admins:read. */
+        /**
+         * Returns one admin
+         * @description For an admin or an API key. Needs admins:read.
+         */
         get: operations["Admins_get"];
         put?: never;
         post?: never;
@@ -39,7 +48,10 @@ export interface paths {
         delete: operations["Admins_deactivate"];
         options?: never;
         head?: never;
-        /** @description For a signed-in admin, not for API keys. Needs admins:write. */
+        /**
+         * Changes the name, role or status of an admin
+         * @description For a signed-in admin, not for API keys. Needs admins:write.
+         */
         patch: operations["Admins_update"];
         trace?: never;
     };
@@ -70,7 +82,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** @description For an admin or an API key. Needs analytics:read. */
+        /**
+         * Returns who is watching right now, by title, device and quality
+         * @description For an admin or an API key. Needs analytics:read.
+         */
         get: operations["Analytics_now"];
         put?: never;
         post?: never;
@@ -87,7 +102,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** @description For an admin or an API key. Needs analytics:read. */
+        /**
+         * Returns how well playback went in a period: start times, stalls and failures
+         * @description For an admin or an API key. Needs analytics:read.
+         */
         get: operations["Quality_summary"];
         put?: never;
         post?: never;
@@ -124,7 +142,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** @description For an admin or an API key. Needs analytics:read. */
+        /**
+         * Ranks titles by how many viewers saved them to their list
+         * @description For an admin or an API key. Needs analytics:read.
+         */
         get: operations["SavedTitles_saved"];
         put?: never;
         post?: never;
@@ -141,7 +162,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** @description For an admin or an API key. Needs analytics:read. */
+        /**
+         * Returns viewing totals for a period, with a figure per day
+         * @description For an admin or an API key. Needs analytics:read.
+         */
         get: operations["Analytics_summary"];
         put?: never;
         post?: never;
@@ -158,7 +182,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** @description For an admin or an API key. Needs analytics:read. */
+        /**
+         * Ranks titles by how much they were watched in a period
+         * @description For an admin or an API key. Needs analytics:read.
+         */
         get: operations["Analytics_titles"];
         put?: never;
         post?: never;
@@ -175,7 +202,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** @description For an admin or an API key. Needs analytics:read. */
+        /**
+         * Returns the viewing statistics of one title, with a figure per day
+         * @description For an admin or an API key. Needs analytics:read.
+         */
         get: operations["Analytics_title"];
         put?: never;
         post?: never;
@@ -192,7 +222,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** @description For an admin or an API key. Needs api-keys:read. */
+        /**
+         * Lists the API keys
+         * @description For an admin or an API key. Needs api-keys:read.
+         */
         get: operations["ApiKeys_list"];
         put?: never;
         /**
@@ -216,7 +249,10 @@ export interface paths {
         get?: never;
         put?: never;
         post?: never;
-        /** @description For a signed-in admin, not for API keys. Needs api-keys:write. */
+        /**
+         * Revokes an API key
+         * @description It stops working at once. For a signed-in admin, not for API keys. Needs api-keys:write.
+         */
         delete: operations["ApiKeys_revoke"];
         options?: never;
         head?: never;
@@ -274,7 +310,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** @description For an admin or an API key. Needs assets:read. */
+        /**
+         * Lists the videos
+         * @description For an admin or an API key. Needs assets:read.
+         */
         get: operations["Assets_list"];
         put?: never;
         /**
@@ -410,11 +449,17 @@ export interface paths {
         get?: never;
         put?: never;
         post?: never;
-        /** @description For an admin or an API key. Needs assets:write. */
+        /**
+         * Removes a subtitle track from a video
+         * @description For an admin or an API key. Needs assets:write.
+         */
         delete: operations["Subtitles_remove"];
         options?: never;
         head?: never;
-        /** @description For an admin or an API key. Needs assets:write. */
+        /**
+         * Renames a subtitle track or changes its language and flags
+         * @description For an admin or an API key. Needs assets:write.
+         */
         patch: operations["Subtitles_update"];
         trace?: never;
     };
@@ -445,15 +490,24 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** @description For an admin or an API key. Needs assets:read. */
+        /**
+         * Returns one video
+         * @description For an admin or an API key. Needs assets:read.
+         */
         get: operations["Assets_get"];
         put?: never;
         post?: never;
-        /** @description For an admin or an API key. Needs assets:write. */
+        /**
+         * Deletes a video and, later, its files
+         * @description For an admin or an API key. Needs assets:write.
+         */
         delete: operations["Assets_delete"];
         options?: never;
         head?: never;
-        /** @description For an admin or an API key. Needs assets:write. */
+        /**
+         * Changes the title or the peer-to-peer setting of a video
+         * @description For an admin or an API key. Needs assets:write.
+         */
         patch: operations["Assets_update"];
         trace?: never;
     };
@@ -524,7 +578,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** @description For an admin or an API key. Needs audit:read. */
+        /**
+         * Lists what admins did, the newest first
+         * @description For an admin or an API key. Needs audit:read.
+         */
         get: operations["Audit_list"];
         put?: never;
         post?: never;
@@ -563,7 +620,10 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** @description For a signed-in admin, not for API keys. */
+        /**
+         * Signs the admin out of this session
+         * @description For a signed-in admin, not for API keys.
+         */
         post: operations["Auth_logout"];
         delete?: never;
         options?: never;
@@ -600,7 +660,10 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** @description For a signed-in admin, not for API keys. */
+        /**
+         * Changes the password of the signed-in admin and signs out their other sessions
+         * @description For a signed-in admin, not for API keys.
+         */
         post: operations["Auth_changePassword"];
         delete?: never;
         options?: never;
@@ -766,7 +829,10 @@ export interface paths {
         get?: never;
         put?: never;
         post?: never;
-        /** @description For an admin or an API key. Needs settings:write. */
+        /**
+         * Deletes a backup and its file
+         * @description For an admin or an API key. Needs settings:write.
+         */
         delete: operations["Backups_remove"];
         options?: never;
         head?: never;
@@ -821,7 +887,10 @@ export interface paths {
             cookie?: never;
         };
         get?: never;
-        /** @description For an admin or an API key. Needs settings:write. */
+        /**
+         * Sets when backups are made, how many are kept and where they go
+         * @description For an admin or an API key. Needs settings:write.
+         */
         put: operations["Backups_updateSettings"];
         post?: never;
         delete?: never;
@@ -837,7 +906,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** @description For an admin or an API key. Needs billing:read. */
+        /**
+         * Returns the billing overview: subscribers, plans and what is owed
+         * @description For an admin or an API key. Needs billing:read.
+         */
         get: operations["BillingAdmin_overview"];
         put?: never;
         post?: never;
@@ -854,7 +926,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** @description For an admin or an API key. Needs billing:read. */
+        /**
+         * Returns revenue for a period, with a figure per day
+         * @description For an admin or an API key. Needs billing:read.
+         */
         get: operations["PaymentsAdmin_revenue"];
         put?: never;
         post?: never;
@@ -951,9 +1026,15 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** @description For an admin or an API key. Needs settings:read. */
+        /**
+         * Returns the name, logo and colours of the installation
+         * @description For an admin or an API key. Needs settings:read.
+         */
         get: operations["Branding_get"];
-        /** @description For an admin or an API key. Needs settings:write. */
+        /**
+         * Sets the name, logo and colours of the installation
+         * @description For an admin or an API key. Needs settings:write.
+         */
         put: operations["Branding_update"];
         post?: never;
         /**
@@ -1493,10 +1574,16 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** @description For an admin or an API key. Needs catalog:read. */
+        /**
+         * Lists the categories
+         * @description For an admin or an API key. Needs catalog:read.
+         */
         get: operations["Catalog_listCategories"];
         put?: never;
-        /** @description For an admin or an API key. Needs catalog:write. */
+        /**
+         * Creates a category
+         * @description For an admin or an API key. Needs catalog:write.
+         */
         post: operations["Catalog_createCategory"];
         delete?: never;
         options?: never;
@@ -1514,11 +1601,17 @@ export interface paths {
         get?: never;
         put?: never;
         post?: never;
-        /** @description For an admin or an API key. Needs catalog:write. */
+        /**
+         * Deletes a category
+         * @description Titles in it are kept. For an admin or an API key. Needs catalog:write.
+         */
         delete: operations["Catalog_removeCategory"];
         options?: never;
         head?: never;
-        /** @description For an admin or an API key. Needs catalog:write. */
+        /**
+         * Changes a category
+         * @description For an admin or an API key. Needs catalog:write.
+         */
         patch: operations["Catalog_updateCategory"];
         trace?: never;
     };
@@ -1549,10 +1642,16 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** @description For an admin or an API key. Needs live:read. */
+        /**
+         * Lists the channels
+         * @description For an admin or an API key. Needs live:read.
+         */
         get: operations["Channels_list"];
         put?: never;
-        /** @description For an admin or an API key. Needs live:write. */
+        /**
+         * Creates a channel
+         * @description For an admin or an API key. Needs live:write.
+         */
         post: operations["Channels_create"];
         delete?: never;
         options?: never;
@@ -1567,10 +1666,16 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** @description For an admin or an API key. Needs live:read. */
+        /**
+         * Lists the programmes of a channel in a time range
+         * @description For an admin or an API key. Needs live:read.
+         */
         get: operations["Guide_listProgrammes"];
         put?: never;
-        /** @description For an admin or an API key. Needs live:write. */
+        /**
+         * Adds a programme to a channel by hand
+         * @description For an admin or an API key. Needs live:write.
+         */
         post: operations["Guide_createProgramme"];
         delete?: never;
         options?: never;
@@ -1585,15 +1690,24 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** @description For an admin or an API key. Needs live:read. */
+        /**
+         * Returns one channel
+         * @description For an admin or an API key. Needs live:read.
+         */
         get: operations["Channels_get"];
         put?: never;
         post?: never;
-        /** @description For an admin or an API key. Needs live:write. */
+        /**
+         * Deletes a channel
+         * @description For an admin or an API key. Needs live:write.
+         */
         delete: operations["Channels_remove"];
         options?: never;
         head?: never;
-        /** @description For an admin or an API key. Needs live:write. */
+        /**
+         * Changes a channel
+         * @description For an admin or an API key. Needs live:write.
+         */
         patch: operations["Channels_update"];
         trace?: never;
     };
@@ -1646,7 +1760,10 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** @description For an admin or an API key. Needs live:write. */
+        /**
+         * Restarts the live process of a channel
+         * @description For an admin or an API key. Needs live:write.
+         */
         post: operations["Channels_restart"];
         delete?: never;
         options?: never;
@@ -1683,7 +1800,10 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** @description For an admin or an API key. Needs live:write. */
+        /**
+         * Starts the live process of a channel
+         * @description For an admin or an API key. Needs live:write.
+         */
         post: operations["Channels_start"];
         delete?: never;
         options?: never;
@@ -1700,7 +1820,10 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** @description For an admin or an API key. Needs live:write. */
+        /**
+         * Stops the live process of a channel
+         * @description For an admin or an API key. Needs live:write.
+         */
         post: operations["Channels_stop"];
         delete?: never;
         options?: never;
@@ -1755,10 +1878,16 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** @description For an admin or an API key. Needs catalog:read. */
+        /**
+         * Lists the collections
+         * @description For an admin or an API key. Needs catalog:read.
+         */
         get: operations["Collections_list"];
         put?: never;
-        /** @description For an admin or an API key. Needs catalog:write. */
+        /**
+         * Creates a collection
+         * @description For an admin or an API key. Needs catalog:write.
+         */
         post: operations["Collections_create"];
         delete?: never;
         options?: never;
@@ -1773,15 +1902,24 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** @description For an admin or an API key. Needs catalog:read. */
+        /**
+         * Returns one collection
+         * @description For an admin or an API key. Needs catalog:read.
+         */
         get: operations["Collections_get"];
         put?: never;
         post?: never;
-        /** @description For an admin or an API key. Needs catalog:write. */
+        /**
+         * Deletes a collection
+         * @description For an admin or an API key. Needs catalog:write.
+         */
         delete: operations["Collections_remove"];
         options?: never;
         head?: never;
-        /** @description For an admin or an API key. Needs catalog:write. */
+        /**
+         * Changes a collection
+         * @description For an admin or an API key. Needs catalog:write.
+         */
         patch: operations["Collections_update"];
         trace?: never;
     };
@@ -1793,7 +1931,10 @@ export interface paths {
             cookie?: never;
         };
         get?: never;
-        /** @description For an admin or an API key. Needs catalog:write. */
+        /**
+         * Replaces the titles of a collection and their order
+         * @description For an admin or an API key. Needs catalog:write.
+         */
         put: operations["Collections_setTitles"];
         post?: never;
         delete?: never;
@@ -1829,10 +1970,16 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** @description For an admin or an API key. Needs billing:read. */
+        /**
+         * Lists the coupons
+         * @description For an admin or an API key. Needs billing:read.
+         */
         get: operations["Coupons_list"];
         put?: never;
-        /** @description For an admin or an API key. Needs billing:write. */
+        /**
+         * Creates a coupon
+         * @description For an admin or an API key. Needs billing:write.
+         */
         post: operations["Coupons_create"];
         delete?: never;
         options?: never;
@@ -1847,15 +1994,24 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** @description For an admin or an API key. Needs billing:read. */
+        /**
+         * Returns one coupon
+         * @description For an admin or an API key. Needs billing:read.
+         */
         get: operations["Coupons_get"];
         put?: never;
         post?: never;
-        /** @description For an admin or an API key. Needs billing:write. */
+        /**
+         * Deletes a coupon
+         * @description For an admin or an API key. Needs billing:write.
+         */
         delete: operations["Coupons_remove"];
         options?: never;
         head?: never;
-        /** @description For an admin or an API key. Needs billing:write. */
+        /**
+         * Changes a coupon
+         * @description For an admin or an API key. Needs billing:write.
+         */
         patch: operations["Coupons_update"];
         trace?: never;
     };
@@ -1907,7 +2063,10 @@ export interface paths {
             cookie?: never;
         };
         get?: never;
-        /** @description For an admin or an API key. Needs settings:write. */
+        /**
+         * Sets who is emailed when a problem appears and whether to check for new versions
+         * @description For an admin or an API key. Needs settings:write.
+         */
         put: operations["Diagnostics_updateSettings"];
         post?: never;
         delete?: never;
@@ -2023,7 +2182,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** @description For an admin or an API key. Needs delivery:read. */
+        /**
+         * Lists the edge servers, with live figures
+         * @description For an admin or an API key. Needs delivery:read.
+         */
         get: operations["Edges_list"];
         put?: never;
         /**
@@ -2044,15 +2206,24 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** @description For an admin or an API key. Needs delivery:read. */
+        /**
+         * Returns one edge server
+         * @description For an admin or an API key. Needs delivery:read.
+         */
         get: operations["Edges_get"];
         put?: never;
         post?: never;
-        /** @description For an admin or an API key. Needs delivery:write. */
+        /**
+         * Removes an edge server
+         * @description Viewers move to another one. For an admin or an API key. Needs delivery:write.
+         */
         delete: operations["Edges_remove"];
         options?: never;
         head?: never;
-        /** @description For an admin or an API key. Needs delivery:write. */
+        /**
+         * Changes the address, weight or content of an edge server
+         * @description For an admin or an API key. Needs delivery:write.
+         */
         patch: operations["Edges_update"];
         trace?: never;
     };
@@ -2143,10 +2314,16 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** @description For an admin or an API key. Needs encoding-profiles:read. */
+        /**
+         * Lists the encoding profiles
+         * @description For an admin or an API key. Needs encoding-profiles:read.
+         */
         get: operations["EncodingProfiles_list"];
         put?: never;
-        /** @description For an admin or an API key. Needs encoding-profiles:write. */
+        /**
+         * Creates a encoding profile
+         * @description For an admin or an API key. Needs encoding-profiles:write.
+         */
         post: operations["EncodingProfiles_create"];
         delete?: never;
         options?: never;
@@ -2161,15 +2338,24 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** @description For an admin or an API key. Needs encoding-profiles:read. */
+        /**
+         * Returns one encoding profile
+         * @description For an admin or an API key. Needs encoding-profiles:read.
+         */
         get: operations["EncodingProfiles_get"];
         put?: never;
         post?: never;
-        /** @description For an admin or an API key. Needs encoding-profiles:write. */
+        /**
+         * Deletes a encoding profile
+         * @description For an admin or an API key. Needs encoding-profiles:write.
+         */
         delete: operations["EncodingProfiles_delete"];
         options?: never;
         head?: never;
-        /** @description For an admin or an API key. Needs encoding-profiles:write. */
+        /**
+         * Changes a encoding profile
+         * @description For an admin or an API key. Needs encoding-profiles:write.
+         */
         patch: operations["EncodingProfiles_update"];
         trace?: never;
     };
@@ -2183,11 +2369,17 @@ export interface paths {
         get?: never;
         put?: never;
         post?: never;
-        /** @description For an admin or an API key. Needs catalog:write. */
+        /**
+         * Deletes an episode
+         * @description For an admin or an API key. Needs catalog:write.
+         */
         delete: operations["Catalog_removeEpisode"];
         options?: never;
         head?: never;
-        /** @description For an admin or an API key. Needs catalog:write. */
+        /**
+         * Changes an episode
+         * @description For an admin or an API key. Needs catalog:write.
+         */
         patch: operations["Catalog_updateEpisode"];
         trace?: never;
     };
@@ -2221,11 +2413,17 @@ export interface paths {
         get?: never;
         put?: never;
         post?: never;
-        /** @description For an admin or an API key. Needs catalog:write. */
+        /**
+         * Deletes a trailer or clip of a title
+         * @description For an admin or an API key. Needs catalog:write.
+         */
         delete: operations["Collections_removeExtra"];
         options?: never;
         head?: never;
-        /** @description For an admin or an API key. Needs catalog:write. */
+        /**
+         * Changes a trailer or clip of a title
+         * @description For an admin or an API key. Needs catalog:write.
+         */
         patch: operations["Collections_updateExtra"];
         trace?: never;
     };
@@ -2236,10 +2434,16 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** @description For an admin or an API key. Needs catalog:read. */
+        /**
+         * Lists the genres
+         * @description For an admin or an API key. Needs catalog:read.
+         */
         get: operations["People_listGenres"];
         put?: never;
-        /** @description For an admin or an API key. Needs catalog:write. */
+        /**
+         * Creates a genre
+         * @description For an admin or an API key. Needs catalog:write.
+         */
         post: operations["People_createGenre"];
         delete?: never;
         options?: never;
@@ -2257,11 +2461,17 @@ export interface paths {
         get?: never;
         put?: never;
         post?: never;
-        /** @description For an admin or an API key. Needs catalog:write. */
+        /**
+         * Deletes a genre
+         * @description For an admin or an API key. Needs catalog:write.
+         */
         delete: operations["People_removeGenre"];
         options?: never;
         head?: never;
-        /** @description For an admin or an API key. Needs catalog:write. */
+        /**
+         * Changes a genre
+         * @description For an admin or an API key. Needs catalog:write.
+         */
         patch: operations["People_updateGenre"];
         trace?: never;
     };
@@ -2292,10 +2502,16 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** @description For an admin or an API key. Needs live:read. */
+        /**
+         * Lists the XMLTV sources the guide is imported from
+         * @description For an admin or an API key. Needs live:read.
+         */
         get: operations["Guide_listSources"];
         put?: never;
-        /** @description For an admin or an API key. Needs live:write. */
+        /**
+         * Adds an XMLTV source for the guide
+         * @description For an admin or an API key. Needs live:write.
+         */
         post: operations["Guide_createSource"];
         delete?: never;
         options?: never;
@@ -2313,11 +2529,17 @@ export interface paths {
         get?: never;
         put?: never;
         post?: never;
-        /** @description For an admin or an API key. Needs live:write. */
+        /**
+         * Deletes a guide source and the programmes it brought
+         * @description For an admin or an API key. Needs live:write.
+         */
         delete: operations["Guide_removeSource"];
         options?: never;
         head?: never;
-        /** @description For an admin or an API key. Needs live:write. */
+        /**
+         * Changes a guide source
+         * @description For an admin or an API key. Needs live:write.
+         */
         patch: operations["Guide_updateSource"];
         trace?: never;
     };
@@ -2448,7 +2670,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** @description For an admin or an API key. Needs jobs:read. */
+        /**
+         * Lists the processing jobs
+         * @description For an admin or an API key. Needs jobs:read.
+         */
         get: operations["Jobs_list"];
         put?: never;
         post?: never;
@@ -2465,7 +2690,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** @description For an admin or an API key. Needs jobs:read. */
+        /**
+         * Returns one processing job
+         * @description For an admin or an API key. Needs jobs:read.
+         */
         get: operations["Jobs_get"];
         put?: never;
         post?: never;
@@ -2568,7 +2796,10 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** @description For an admin or an API key. Needs catalog:write. */
+        /**
+         * Adds a section to a page of the viewer website
+         * @description For an admin or an API key. Needs catalog:write.
+         */
         post: operations["Home_create"];
         delete?: never;
         options?: never;
@@ -2584,7 +2815,10 @@ export interface paths {
             cookie?: never;
         };
         get?: never;
-        /** @description For an admin or an API key. Needs catalog:write. */
+        /**
+         * Sets the order of the sections of a page
+         * @description For an admin or an API key. Needs catalog:write.
+         */
         put: operations["Home_order"];
         post?: never;
         delete?: never;
@@ -2623,7 +2857,10 @@ export interface paths {
         get?: never;
         put?: never;
         post?: never;
-        /** @description For an admin or an API key. Needs catalog:write. */
+        /**
+         * Deletes a section from a page
+         * @description For an admin or an API key. Needs catalog:write.
+         */
         delete: operations["Home_remove"];
         options?: never;
         head?: never;
@@ -2681,7 +2918,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** @description For an admin or an API key. Needs settings:read. */
+        /**
+         * Returns whether email is set up and works
+         * @description For an admin or an API key. Needs settings:read.
+         */
         get: operations["Mail_status"];
         put?: never;
         post?: never;
@@ -2818,7 +3058,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** @description For an admin or an API key. Needs catalog:write. */
+        /**
+         * Searches TMDB for a movie or series to import
+         * @description For an admin or an API key. Needs catalog:write.
+         */
         get: operations["Metadata_search"];
         put?: never;
         post?: never;
@@ -2855,7 +3098,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** @description For an admin or an API key. Needs viewers:read. */
+        /**
+         * Lists the notification campaigns, the newest first
+         * @description For an admin or an API key. Needs viewers:read.
+         */
         get: operations["PushAdmin_list"];
         put?: never;
         /**
@@ -2876,15 +3122,24 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** @description For an admin or an API key. Needs viewers:read. */
+        /**
+         * Returns one campaign with how many it reached
+         * @description For an admin or an API key. Needs viewers:read.
+         */
         get: operations["PushAdmin_get"];
         put?: never;
         post?: never;
-        /** @description For an admin or an API key. Needs viewers:write. */
+        /**
+         * Deletes a notification campaign
+         * @description For an admin or an API key. Needs viewers:write.
+         */
         delete: operations["PushAdmin_remove"];
         options?: never;
         head?: never;
-        /** @description For an admin or an API key. Needs viewers:write. */
+        /**
+         * Changes a campaign that has not been sent
+         * @description For an admin or an API key. Needs viewers:write.
+         */
         patch: operations["PushAdmin_update"];
         trace?: never;
     };
@@ -2999,7 +3254,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** @description For an admin or an API key. Needs viewers:read. */
+        /**
+         * Returns whether push notifications are set up, and how many devices can receive them
+         * @description For an admin or an API key. Needs viewers:read.
+         */
         get: operations["PushAdmin_overview"];
         put?: never;
         post?: never;
@@ -3096,10 +3354,16 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** @description For an admin or an API key. Needs catalog:read. */
+        /**
+         * Lists the packages
+         * @description For an admin or an API key. Needs catalog:read.
+         */
         get: operations["Packages_list"];
         put?: never;
-        /** @description For an admin or an API key. Needs billing:write. */
+        /**
+         * Creates a package
+         * @description For an admin or an API key. Needs billing:write.
+         */
         post: operations["Packages_create"];
         delete?: never;
         options?: never;
@@ -3117,11 +3381,17 @@ export interface paths {
         get?: never;
         put?: never;
         post?: never;
-        /** @description For an admin or an API key. Needs billing:write. */
+        /**
+         * Deletes a package
+         * @description For an admin or an API key. Needs billing:write.
+         */
         delete: operations["Packages_remove"];
         options?: never;
         head?: never;
-        /** @description For an admin or an API key. Needs billing:write. */
+        /**
+         * Changes a package
+         * @description For an admin or an API key. Needs billing:write.
+         */
         patch: operations["Packages_update"];
         trace?: never;
     };
@@ -3172,7 +3442,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** @description For an admin or an API key. Needs billing:read. */
+        /**
+         * Lists payments, the newest first
+         * @description For an admin or an API key. Needs billing:read.
+         */
         get: operations["PaymentsAdmin_list"];
         put?: never;
         post?: never;
@@ -3229,10 +3502,16 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** @description For an admin or an API key. Needs catalog:read. */
+        /**
+         * Lists the people in the catalog, with search and paging
+         * @description For an admin or an API key. Needs catalog:read.
+         */
         get: operations["People_listPeople"];
         put?: never;
-        /** @description For an admin or an API key. Needs catalog:write. */
+        /**
+         * Creates a person
+         * @description For an admin or an API key. Needs catalog:write.
+         */
         post: operations["People_createPerson"];
         delete?: never;
         options?: never;
@@ -3247,15 +3526,24 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** @description For an admin or an API key. Needs catalog:read. */
+        /**
+         * Returns one person with their credits
+         * @description For an admin or an API key. Needs catalog:read.
+         */
         get: operations["People_getPerson"];
         put?: never;
         post?: never;
-        /** @description For an admin or an API key. Needs catalog:write. */
+        /**
+         * Deletes a person from the catalog
+         * @description For an admin or an API key. Needs catalog:write.
+         */
         delete: operations["People_removePerson"];
         options?: never;
         head?: never;
-        /** @description For an admin or an API key. Needs catalog:write. */
+        /**
+         * Changes a person
+         * @description For an admin or an API key. Needs catalog:write.
+         */
         patch: operations["People_updatePerson"];
         trace?: never;
     };
@@ -3266,10 +3554,16 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** @description For an admin or an API key. Needs billing:read. */
+        /**
+         * Lists the plans
+         * @description For an admin or an API key. Needs billing:read.
+         */
         get: operations["BillingAdmin_list"];
         put?: never;
-        /** @description For an admin or an API key. Needs billing:write. */
+        /**
+         * Creates a plan
+         * @description For an admin or an API key. Needs billing:write.
+         */
         post: operations["BillingAdmin_create"];
         delete?: never;
         options?: never;
@@ -3287,11 +3581,17 @@ export interface paths {
         get?: never;
         put?: never;
         post?: never;
-        /** @description For an admin or an API key. Needs billing:write. */
+        /**
+         * Deletes a plan that no viewer ever had
+         * @description For an admin or an API key. Needs billing:write.
+         */
         delete: operations["BillingAdmin_remove"];
         options?: never;
         head?: never;
-        /** @description For an admin or an API key. Needs billing:write. */
+        /**
+         * Changes a plan
+         * @description For an admin or an API key. Needs billing:write.
+         */
         patch: operations["BillingAdmin_update"];
         trace?: never;
     };
@@ -3342,7 +3642,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** @description For an admin or an API key. Needs billing:read. */
+        /**
+         * Lists the batches of prepaid codes
+         * @description For an admin or an API key. Needs billing:read.
+         */
         get: operations["Prepaid_list"];
         put?: never;
         /**
@@ -3363,7 +3666,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** @description For an admin or an API key. Needs billing:read. */
+        /**
+         * Returns one batch with its codes and which were used
+         * @description For an admin or an API key. Needs billing:read.
+         */
         get: operations["Prepaid_get"];
         put?: never;
         post?: never;
@@ -3531,11 +3837,17 @@ export interface paths {
         get?: never;
         put?: never;
         post?: never;
-        /** @description For an admin or an API key. Needs live:write. */
+        /**
+         * Deletes a programme
+         * @description For an admin or an API key. Needs live:write.
+         */
         delete: operations["Guide_removeProgramme"];
         options?: never;
         head?: never;
-        /** @description For an admin or an API key. Needs live:write. */
+        /**
+         * Changes a programme
+         * @description For an admin or an API key. Needs live:write.
+         */
         patch: operations["Guide_updateProgramme"];
         trace?: never;
     };
@@ -3606,10 +3918,16 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** @description For an admin or an API key. Needs live:read. */
+        /**
+         * Lists the recordings
+         * @description For an admin or an API key. Needs live:read.
+         */
         get: operations["Recordings_list"];
         put?: never;
-        /** @description For an admin or an API key. Needs live:write. */
+        /**
+         * Starts recording a programme or a time range of a channel into the library
+         * @description For an admin or an API key. Needs live:write.
+         */
         post: operations["Recordings_create"];
         delete?: never;
         options?: never;
@@ -3627,7 +3945,10 @@ export interface paths {
         get?: never;
         put?: never;
         post?: never;
-        /** @description For an admin or an API key. Needs live:write. */
+        /**
+         * Deletes a recording
+         * @description For an admin or an API key. Needs live:write.
+         */
         delete: operations["Recordings_remove"];
         options?: never;
         head?: never;
@@ -3667,7 +3988,10 @@ export interface paths {
          */
         get: operations["AdminRoles_overview"];
         put?: never;
-        /** @description For a signed-in admin, not for API keys. Needs admins:write. */
+        /**
+         * Creates a custom role with a list of permissions
+         * @description For a signed-in admin, not for API keys. Needs admins:write.
+         */
         post: operations["AdminRoles_create"];
         delete?: never;
         options?: never;
@@ -3696,7 +4020,10 @@ export interface paths {
         delete: operations["AdminRoles_remove"];
         options?: never;
         head?: never;
-        /** @description For a signed-in admin, not for API keys. Needs admins:write. */
+        /**
+         * Changes the name or permissions of a custom role
+         * @description For a signed-in admin, not for API keys. Needs admins:write.
+         */
         patch: operations["AdminRoles_update"];
         trace?: never;
     };
@@ -3710,11 +4037,17 @@ export interface paths {
         get?: never;
         put?: never;
         post?: never;
-        /** @description For an admin or an API key. Needs catalog:write. */
+        /**
+         * Deletes a season with its episodes
+         * @description For an admin or an API key. Needs catalog:write.
+         */
         delete: operations["Catalog_removeSeason"];
         options?: never;
         head?: never;
-        /** @description For an admin or an API key. Needs catalog:write. */
+        /**
+         * Changes a season
+         * @description For an admin or an API key. Needs catalog:write.
+         */
         patch: operations["Catalog_updateSeason"];
         trace?: never;
     };
@@ -3727,7 +4060,10 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** @description For an admin or an API key. Needs catalog:write. */
+        /**
+         * Adds an episode to a season
+         * @description For an admin or an API key. Needs catalog:write.
+         */
         post: operations["Catalog_createEpisode"];
         delete?: never;
         options?: never;
@@ -3842,10 +4178,16 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** @description For an admin or an API key. Needs storage:read. */
+        /**
+         * Lists the storage pools
+         * @description For an admin or an API key. Needs storage:read.
+         */
         get: operations["StoragePools_list"];
         put?: never;
-        /** @description For a signed-in admin, not for API keys. Needs storage:write. */
+        /**
+         * Creates a storage pool
+         * @description For a signed-in admin, not for API keys. Needs storage:write.
+         */
         post: operations["StoragePools_create"];
         delete?: never;
         options?: never;
@@ -3860,14 +4202,20 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** @description For an admin or an API key. Needs storage:read. */
+        /**
+         * Returns one storage pool with how much it holds
+         * @description For an admin or an API key. Needs storage:read.
+         */
         get: operations["StoragePools_get"];
         put?: never;
         post?: never;
         delete?: never;
         options?: never;
         head?: never;
-        /** @description For a signed-in admin, not for API keys. Needs storage:write. */
+        /**
+         * Changes a storage pool
+         * @description For a signed-in admin, not for API keys. Needs storage:write.
+         */
         patch: operations["StoragePools_update"];
         trace?: never;
     };
@@ -3904,7 +4252,10 @@ export interface paths {
         delete?: never;
         options?: never;
         head?: never;
-        /** @description For an admin or an API key. Needs billing:write. */
+        /**
+         * Changes a subscription: grants, extends or ends it by hand
+         * @description For an admin or an API key. Needs billing:write.
+         */
         patch: operations["BillingAdmin_change"];
         trace?: never;
     };
@@ -3955,10 +4306,16 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** @description For an admin or an API key. Needs catalog:read. */
+        /**
+         * Lists movies and series, with filters, search and paging
+         * @description For an admin or an API key. Needs catalog:read.
+         */
         get: operations["Catalog_listTitles"];
         put?: never;
-        /** @description For an admin or an API key. Needs catalog:write. */
+        /**
+         * Creates a movie or a series
+         * @description For an admin or an API key. Needs catalog:write.
+         */
         post: operations["Catalog_createTitle"];
         delete?: never;
         options?: never;
@@ -3973,15 +4330,24 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** @description For an admin or an API key. Needs catalog:read. */
+        /**
+         * Returns one title with its seasons, episodes and artwork
+         * @description For an admin or an API key. Needs catalog:read.
+         */
         get: operations["Catalog_getTitle"];
         put?: never;
         post?: never;
-        /** @description For an admin or an API key. Needs catalog:write. */
+        /**
+         * Deletes a title with its seasons and episodes
+         * @description For an admin or an API key. Needs catalog:write.
+         */
         delete: operations["Catalog_removeTitle"];
         options?: never;
         head?: never;
-        /** @description For an admin or an API key. Needs catalog:write. */
+        /**
+         * Changes a title, and publishes or hides it
+         * @description For an admin or an API key. Needs catalog:write.
+         */
         patch: operations["Catalog_updateTitle"];
         trace?: never;
     };
@@ -4034,7 +4400,10 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** @description For an admin or an API key. Needs catalog:write. */
+        /**
+         * Adds a trailer or clip to a title
+         * @description For an admin or an API key. Needs catalog:write.
+         */
         post: operations["Collections_addExtra"];
         delete?: never;
         options?: never;
@@ -4050,7 +4419,10 @@ export interface paths {
             cookie?: never;
         };
         get?: never;
-        /** @description For an admin or an API key. Needs catalog:write. */
+        /**
+         * Sets the order of the extras of a title
+         * @description For an admin or an API key. Needs catalog:write.
+         */
         put: operations["Collections_orderExtras"];
         post?: never;
         delete?: never;
@@ -4066,7 +4438,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** @description For an admin or an API key. Needs catalog:read. */
+        /**
+         * Lists the changes made to a title, the newest first
+         * @description For an admin or an API key. Needs catalog:read.
+         */
         get: operations["TitleHistory_list"];
         put?: never;
         post?: never;
@@ -4145,7 +4520,10 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** @description For an admin or an API key. Needs catalog:write. */
+        /**
+         * Adds a season to a series
+         * @description For an admin or an API key. Needs catalog:write.
+         */
         post: operations["Catalog_createSeason"];
         delete?: never;
         options?: never;
@@ -4160,7 +4538,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** @description For an admin or an API key. Needs catalog:read. */
+        /**
+         * Returns titles viewers of this one also watched
+         * @description For an admin or an API key. Needs catalog:read.
+         */
         get: operations["Similar_get"];
         /**
          * Replaces what was decided for a title: the titles always shown, in their order, and the titles never shown
@@ -4201,7 +4582,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** @description For an admin or an API key. Needs catalog:read. */
+        /**
+         * Lists the translations of a title, a season or an episode
+         * @description For an admin or an API key. Needs catalog:read.
+         */
         get: operations["Translations_list"];
         put?: never;
         post?: never;
@@ -4219,10 +4603,16 @@ export interface paths {
             cookie?: never;
         };
         get?: never;
-        /** @description For an admin or an API key. Needs catalog:write. */
+        /**
+         * Sets the text of a title in one language
+         * @description For an admin or an API key. Needs catalog:write.
+         */
         put: operations["Translations_put"];
         post?: never;
-        /** @description For an admin or an API key. Needs catalog:write. */
+        /**
+         * Deletes one language of a title
+         * @description For an admin or an API key. Needs catalog:write.
+         */
         delete: operations["Translations_remove"];
         options?: never;
         head?: never;
@@ -4276,7 +4666,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** @description For an admin or an API key. Needs catalog:read. */
+        /**
+         * Lists the translation jobs
+         * @description For an admin or an API key. Needs catalog:read.
+         */
         get: operations["Bulk_list"];
         put?: never;
         post?: never;
@@ -4295,7 +4688,10 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** @description For an admin or an API key. Needs catalog:write. */
+        /**
+         * Cancels a translation job that is still running
+         * @description For an admin or an API key. Needs catalog:write.
+         */
         post: operations["Bulk_cancel"];
         delete?: never;
         options?: never;
@@ -4350,7 +4746,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** @description For an admin or an API key. Needs catalog:read. */
+        /**
+         * Lists genres, categories, collections or people with their translations
+         * @description For an admin or an API key. Needs catalog:read.
+         */
         get: operations["TermTranslations_list"];
         put?: never;
         post?: never;
@@ -5531,10 +5930,16 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** @description For an admin or an API key. Needs viewers:read. */
+        /**
+         * Lists the viewers
+         * @description For an admin or an API key. Needs viewers:read.
+         */
         get: operations["ViewersAdmin_list"];
         put?: never;
-        /** @description For an admin or an API key. Needs viewers:write. */
+        /**
+         * Creates a viewer
+         * @description For an admin or an API key. Needs viewers:write.
+         */
         post: operations["ViewersAdmin_create"];
         delete?: never;
         options?: never;
@@ -5549,15 +5954,24 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** @description For an admin or an API key. Needs viewers:read. */
+        /**
+         * Returns one viewer
+         * @description For an admin or an API key. Needs viewers:read.
+         */
         get: operations["ViewersAdmin_get"];
         put?: never;
         post?: never;
-        /** @description For an admin or an API key. Needs viewers:write. */
+        /**
+         * Deletes a viewer
+         * @description For an admin or an API key. Needs viewers:write.
+         */
         delete: operations["ViewersAdmin_remove"];
         options?: never;
         head?: never;
-        /** @description For an admin or an API key. Needs viewers:write. */
+        /**
+         * Changes a viewer
+         * @description For an admin or an API key. Needs viewers:write.
+         */
         patch: operations["ViewersAdmin_update"];
         trace?: never;
     };
@@ -5588,7 +6002,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** @description For an admin or an API key. Needs viewers:read. */
+        /**
+         * Lists the titles a viewer saved
+         * @description For an admin or an API key. Needs viewers:read.
+         */
         get: operations["ViewerListAdmin_forViewer"];
         put?: never;
         post?: never;
@@ -5645,7 +6062,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** @description For an admin or an API key. Needs billing:read. */
+        /**
+         * Lists the payments of one viewer
+         * @description For an admin or an API key. Needs billing:read.
+         */
         get: operations["PaymentsAdmin_forViewer"];
         put?: never;
         /**
@@ -5686,7 +6106,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** @description For an admin or an API key. Needs billing:read. */
+        /**
+         * Lists what a viewer bought or rented
+         * @description For an admin or an API key. Needs billing:read.
+         */
         get: operations["PurchasesAdmin_forViewer"];
         put?: never;
         /**
@@ -5709,7 +6132,10 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** @description For an admin or an API key. Needs viewers:write. */
+        /**
+         * Signs a viewer out of every device
+         * @description For an admin or an API key. Needs viewers:write.
+         */
         post: operations["ViewersAdmin_signOut"];
         delete?: never;
         options?: never;
@@ -5724,7 +6150,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** @description For an admin or an API key. Needs viewers:read. */
+        /**
+         * Lists what a viewer is playing right now
+         * @description For an admin or an API key. Needs viewers:read.
+         */
         get: operations["ViewerStreamsAdmin_forViewer"];
         put?: never;
         post?: never;
@@ -5805,7 +6234,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** @description For an admin or an API key. Needs viewers:read. */
+        /**
+         * Lists what a viewer has started watching, with their progress
+         * @description For an admin or an API key. Needs viewers:read.
+         */
         get: operations["ViewerWatchingAdmin_forViewer"];
         put?: never;
         post?: never;
@@ -5822,7 +6254,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** @description For an admin or an API key. Needs catalog:read. */
+        /**
+         * Lists the files found in watched locations and what became of each
+         * @description For an admin or an API key. Needs catalog:read.
+         */
         get: operations["Watch_listFiles"];
         put?: never;
         post?: never;
@@ -5841,7 +6276,10 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** @description For an admin or an API key. Needs catalog:write. */
+        /**
+         * Sets a found file aside
+         * @description For an admin or an API key. Needs catalog:write.
+         */
         post: operations["Watch_ignore"];
         delete?: never;
         options?: never;
@@ -5858,7 +6296,10 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** @description For an admin or an API key. Needs catalog:write. */
+        /**
+         * Says which title or episode a found file is
+         * @description For an admin or an API key. Needs catalog:write.
+         */
         post: operations["Watch_match"];
         delete?: never;
         options?: never;
@@ -5875,7 +6316,10 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** @description For an admin or an API key. Needs catalog:write. */
+        /**
+         * Tries a failed file again
+         * @description For an admin or an API key. Needs catalog:write.
+         */
         post: operations["Watch_retry"];
         delete?: never;
         options?: never;
@@ -5910,10 +6354,16 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** @description For an admin or an API key. Needs storage:read. */
+        /**
+         * Lists the watched folders and buckets
+         * @description For an admin or an API key. Needs storage:read.
+         */
         get: operations["Watch_listLocations"];
         put?: never;
-        /** @description For an admin or an API key. Needs storage:write. */
+        /**
+         * Adds a watched folder or bucket
+         * @description For an admin or an API key. Needs storage:write.
+         */
         post: operations["Watch_createLocation"];
         delete?: never;
         options?: never;
@@ -5928,15 +6378,24 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** @description For an admin or an API key. Needs storage:read. */
+        /**
+         * Returns one watched location
+         * @description For an admin or an API key. Needs storage:read.
+         */
         get: operations["Watch_getLocation"];
         put?: never;
         post?: never;
-        /** @description For an admin or an API key. Needs storage:write. */
+        /**
+         * Stops watching a folder or bucket
+         * @description For an admin or an API key. Needs storage:write.
+         */
         delete: operations["Watch_removeLocation"];
         options?: never;
         head?: never;
-        /** @description For an admin or an API key. Needs storage:write. */
+        /**
+         * Changes a watched location
+         * @description For an admin or an API key. Needs storage:write.
+         */
         patch: operations["Watch_updateLocation"];
         trace?: never;
     };
@@ -5949,7 +6408,10 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** @description For an admin or an API key. Needs catalog:write. */
+        /**
+         * Looks through a watched location now
+         * @description For an admin or an API key. Needs catalog:write.
+         */
         post: operations["Watch_scan"];
         delete?: never;
         options?: never;
@@ -5984,7 +6446,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** @description For an admin or an API key. Needs catalog:read. */
+        /**
+         * Returns how many files wait, import, conflict or failed
+         * @description For an admin or an API key. Needs catalog:read.
+         */
         get: operations["Watch_summary"];
         put?: never;
         post?: never;
@@ -6001,10 +6466,16 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** @description For an admin or an API key. Needs settings:read. */
+        /**
+         * Lists the webhooks
+         * @description For an admin or an API key. Needs settings:read.
+         */
         get: operations["Webhooks_list"];
         put?: never;
-        /** @description For a signed-in admin, not for API keys. Needs settings:write. */
+        /**
+         * Creates a webhook
+         * @description For a signed-in admin, not for API keys. Needs settings:write.
+         */
         post: operations["Webhooks_create"];
         delete?: never;
         options?: never;
@@ -6019,15 +6490,24 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** @description For an admin or an API key. Needs settings:read. */
+        /**
+         * Returns one webhook
+         * @description For an admin or an API key. Needs settings:read.
+         */
         get: operations["Webhooks_get"];
         put?: never;
         post?: never;
-        /** @description For an admin or an API key. Needs settings:write. */
+        /**
+         * Deletes a webhook
+         * @description For an admin or an API key. Needs settings:write.
+         */
         delete: operations["Webhooks_remove"];
         options?: never;
         head?: never;
-        /** @description For an admin or an API key. Needs settings:write. */
+        /**
+         * Changes a webhook
+         * @description For an admin or an API key. Needs settings:write.
+         */
         patch: operations["Webhooks_update"];
         trace?: never;
     };
@@ -6058,7 +6538,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** @description For an admin or an API key. Needs settings:read. */
+        /**
+         * Lists the messages sent to a webhook, with what became of each
+         * @description For an admin or an API key. Needs settings:read.
+         */
         get: operations["Webhooks_deliveries"];
         put?: never;
         post?: never;
@@ -6075,7 +6558,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** @description For an admin or an API key. Needs settings:read. */
+        /**
+         * Returns one delivery with what was sent and what the address answered
+         * @description For an admin or an API key. Needs settings:read.
+         */
         get: operations["Webhooks_delivery"];
         put?: never;
         post?: never;
@@ -7581,7 +8067,7 @@ export interface components {
         /** @enum {string} */
         JobStatus: "FAILED" | "RUNNING" | "CANCELLED" | "QUEUED" | "COMPLETED";
         /** @enum {string} */
-        JobType: "TRANSCODE" | "PROBE" | "REMUX" | "PACKAGE" | "THUMBNAILS" | "SUBTITLES" | "CLEANUP" | "AUDIO" | "MARKERS";
+        JobType: "TRANSCODE" | "PROBE" | "REMUX" | "THUMBNAILS" | "AUDIO" | "MARKERS" | "CLEANUP" | "PACKAGE" | "SUBTITLES";
         JobView: {
             id: string;
             type: components["schemas"]["JobType"];
@@ -18848,7 +19334,7 @@ export interface operations {
                 pageSize: number;
                 assetId?: string;
                 status?: "FAILED" | "RUNNING" | "CANCELLED" | "QUEUED" | "COMPLETED";
-                type?: "TRANSCODE" | "PROBE" | "REMUX" | "PACKAGE" | "THUMBNAILS" | "SUBTITLES" | "CLEANUP";
+                type?: "TRANSCODE" | "PROBE" | "REMUX" | "THUMBNAILS" | "AUDIO" | "MARKERS" | "CLEANUP";
             };
             header?: never;
             path?: never;

@@ -30,12 +30,14 @@ export class BrandingController {
     return this.branding.site();
   }
 
+  /** Returns the name, logo and colours of the installation. */
   @Get('branding')
   @RequirePermissions('settings:read')
   get(): Promise<BrandingView> {
     return this.branding.view();
   }
 
+  /** Sets the name, logo and colours of the installation. */
   @Put('branding')
   @RequirePermissions('settings:write')
   async update(

@@ -20,6 +20,7 @@ type AuditLogQuery = z.infer<typeof auditLogQuerySchema>;
 export class AuditController {
   constructor(@Inject(AuditService) private readonly audit: AuditService) {}
 
+  /** Lists what admins did, the newest first. */
   @Get()
   @RequirePermissions('audit:read')
   list(

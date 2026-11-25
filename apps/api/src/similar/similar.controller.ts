@@ -114,6 +114,7 @@ export class SimilarController {
     @Inject(AuditService) private readonly audit: AuditService,
   ) {}
 
+  /** Returns titles viewers of this one also watched. */
   @Get('titles/:id/similar')
   @RequirePermissions('catalog:read')
   get(@Param('id', ParseUUIDPipe) id: string): Promise<SimilarAdminView> {

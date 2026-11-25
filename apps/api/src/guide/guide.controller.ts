@@ -51,12 +51,14 @@ export class GuideController {
     @Inject(AuditService) private readonly audit: AuditService,
   ) {}
 
+  /** Lists the XMLTV sources the guide is imported from. */
   @Get('guide/sources')
   @RequirePermissions('live:read')
   listSources(): Promise<GuideSourceView[]> {
     return this.guide.listSources();
   }
 
+  /** Adds an XMLTV source for the guide. */
   @Post('guide/sources')
   @RequirePermissions('live:write')
   async createSource(
@@ -76,6 +78,7 @@ export class GuideController {
     return this.guide.sourceUrl(id);
   }
 
+  /** Changes a guide source. */
   @Patch('guide/sources/:id')
   @RequirePermissions('live:write')
   async updateSource(
@@ -89,6 +92,7 @@ export class GuideController {
     return updated;
   }
 
+  /** Deletes a guide source and the programmes it brought. */
   @Delete('guide/sources/:id')
   @HttpCode(HttpStatus.NO_CONTENT)
   @RequirePermissions('live:write')
@@ -131,6 +135,7 @@ export class GuideController {
     return this.guide.searchKnown(query.q);
   }
 
+  /** Lists the programmes of a channel in a time range. */
   @Get('channels/:channelId/programmes')
   @RequirePermissions('live:read')
   listProgrammes(
@@ -140,6 +145,7 @@ export class GuideController {
     return this.guide.listProgrammes(channelId, window);
   }
 
+  /** Adds a programme to a channel by hand. */
   @Post('channels/:channelId/programmes')
   @RequirePermissions('live:write')
   createProgramme(
@@ -149,6 +155,7 @@ export class GuideController {
     return this.guide.createProgramme(channelId, body);
   }
 
+  /** Changes a programme. */
   @Patch('programmes/:id')
   @RequirePermissions('live:write')
   updateProgramme(
@@ -158,6 +165,7 @@ export class GuideController {
     return this.guide.updateProgramme(id, body);
   }
 
+  /** Deletes a programme. */
   @Delete('programmes/:id')
   @HttpCode(HttpStatus.NO_CONTENT)
   @RequirePermissions('live:write')

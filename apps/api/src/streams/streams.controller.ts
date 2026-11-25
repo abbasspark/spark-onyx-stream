@@ -81,6 +81,7 @@ export class ViewerStreamsAdminController {
     @Inject(AuditService) private readonly audit: AuditService,
   ) {}
 
+  /** Lists what a viewer is playing right now. */
   @Get(':id/streams')
   @RequirePermissions('viewers:read')
   forViewer(@Param('id', ParseUUIDPipe) id: string): Promise<StreamsView> {

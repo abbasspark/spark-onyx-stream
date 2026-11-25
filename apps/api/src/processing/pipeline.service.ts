@@ -14,7 +14,7 @@ import { subtitlePrefix } from '../subtitles/subtitle-paths.js';
 import { WebhookDeliveryService } from '../webhooks/webhook-delivery.service.js';
 
 /** Job types whose failure makes the asset unusable. Thumbnails, for example, are not among them. */
-export const ESSENTIAL_JOB_TYPES: readonly JobType[] = ['PROBE', 'REMUX', 'TRANSCODE', 'PACKAGE'];
+export const ESSENTIAL_JOB_TYPES: readonly JobType[] = ['PROBE', 'REMUX', 'TRANSCODE'];
 
 /** Folder of an asset's uploaded source file inside its storage pool. */
 export function sourcePrefix(assetId: string): string {

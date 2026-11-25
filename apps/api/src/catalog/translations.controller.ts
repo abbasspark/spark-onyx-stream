@@ -42,12 +42,14 @@ export class TranslationsController {
     return this.translations.languages();
   }
 
+  /** Lists the translations of a title, a season or an episode. */
   @Get('titles/:id/translations')
   @RequirePermissions('catalog:read')
   list(@Param('id', ParseUUIDPipe) id: string): Promise<TranslationView[]> {
     return this.translations.list(id);
   }
 
+  /** Sets the text of a title in one language. */
   @Put('titles/:id/translations/:language')
   @RequirePermissions('catalog:write')
   async put(
@@ -70,6 +72,7 @@ export class TranslationsController {
     return translations;
   }
 
+  /** Deletes one language of a title. */
   @Delete('titles/:id/translations/:language')
   @RequirePermissions('catalog:write')
   @HttpCode(HttpStatus.NO_CONTENT)

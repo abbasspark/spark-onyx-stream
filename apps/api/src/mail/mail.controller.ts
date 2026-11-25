@@ -53,6 +53,7 @@ export class MailController {
     @Inject(AuditService) private readonly audit: AuditService,
   ) {}
 
+  /** Returns whether email is set up and works. */
   @Get()
   @RequirePermissions('settings:read')
   async status(): Promise<MailStatus> {

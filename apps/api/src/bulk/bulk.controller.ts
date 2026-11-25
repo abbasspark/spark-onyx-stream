@@ -64,6 +64,7 @@ export class BulkController {
     return result;
   }
 
+  /** Lists the translation jobs. */
   @Get('translation-jobs')
   @RequirePermissions('catalog:read')
   list(
@@ -72,6 +73,7 @@ export class BulkController {
     return this.jobs.list(query.active ?? false);
   }
 
+  /** Cancels a translation job that is still running. */
   @Post('translation-jobs/:id/cancel')
   @RequirePermissions('catalog:write')
   @HttpCode(HttpStatus.OK)

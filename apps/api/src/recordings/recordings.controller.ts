@@ -39,6 +39,7 @@ export class RecordingsController {
     @Inject(AuditService) private readonly audit: AuditService,
   ) {}
 
+  /** Lists the recordings. */
   @Get('recordings')
   @RequirePermissions('live:read')
   list(
@@ -47,6 +48,7 @@ export class RecordingsController {
     return this.recordings.list(query);
   }
 
+  /** Starts recording a programme or a time range of a channel into the library. */
   @Post('recordings')
   @RequirePermissions('live:write')
   async create(
@@ -86,6 +88,7 @@ export class RecordingsController {
     return stopped;
   }
 
+  /** Deletes a recording. */
   @Delete('recordings/:id')
   @HttpCode(HttpStatus.NO_CONTENT)
   @RequirePermissions('live:write')

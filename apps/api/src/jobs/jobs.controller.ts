@@ -27,7 +27,7 @@ const listJobsSchema = paginationSchema.extend({
   assetId: z.uuid().optional(),
   status: z.enum(['QUEUED', 'RUNNING', 'COMPLETED', 'FAILED', 'CANCELLED']).optional(),
   type: z
-    .enum(['PROBE', 'REMUX', 'TRANSCODE', 'PACKAGE', 'THUMBNAILS', 'SUBTITLES', 'CLEANUP'])
+    .enum(['PROBE', 'REMUX', 'TRANSCODE', 'THUMBNAILS', 'AUDIO', 'MARKERS', 'CLEANUP'])
     .optional(),
 });
 type ListJobsInput = z.infer<typeof listJobsSchema>;
@@ -40,6 +40,7 @@ export class JobsController {
     @Inject(AuditService) private readonly audit: AuditService,
   ) {}
 
+  /** Lists the processing jobs. */
   @Get()
   @RequirePermissions('jobs:read')
   list(@Query(new ZodValidationPipe(listJobsSchema)) query: ListJobsInput): Promise<Page<JobView>> {
@@ -47,6 +48,7 @@ export class JobsController {
     return this.jobs.list(filter, { page, pageSize });
   }
 
+  /** Returns one processing job. */
   @Get(':id')
   @RequirePermissions('jobs:read')
   async get(@Param('id', ParseUUIDPipe) id: string): Promise<JobView> {

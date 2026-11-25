@@ -24,6 +24,7 @@ import { type ApiKeyView, ApiKeysService, type CreatedApiKey } from './api-keys.
 export class ApiKeysController {
   constructor(@Inject(ApiKeysService) private readonly apiKeys: ApiKeysService) {}
 
+  /** Lists the API keys. */
   @Get()
   @RequirePermissions('api-keys:read')
   list(): Promise<ApiKeyView[]> {
@@ -42,6 +43,7 @@ export class ApiKeysController {
     return this.apiKeys.create(principal, body, requestInfo(request).ipAddress);
   }
 
+  /** Revokes an API key. It stops working at once. */
   @Delete(':id')
   @AdminSessionOnly()
   @RequirePermissions('api-keys:write')

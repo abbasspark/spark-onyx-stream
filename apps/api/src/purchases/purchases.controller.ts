@@ -78,6 +78,7 @@ export class PurchasesAdminController {
     @Inject(AuditService) private readonly audit: AuditService,
   ) {}
 
+  /** Lists what a viewer bought or rented. */
   @Get('viewers/:id/purchases')
   @RequirePermissions('billing:read')
   async forViewer(@Param('id', ParseUUIDPipe) id: string): Promise<{ items: PurchaseAdminView[] }> {

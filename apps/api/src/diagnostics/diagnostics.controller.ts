@@ -39,6 +39,7 @@ export class DiagnosticsController {
     return { summary: await this.diagnostics.summary() };
   }
 
+  /** Sets who is emailed when a problem appears and whether to check for new versions. */
   @Put('settings')
   @RequirePermissions('settings:write')
   async updateSettings(

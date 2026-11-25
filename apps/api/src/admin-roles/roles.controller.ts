@@ -55,6 +55,7 @@ export class AdminRolesController {
     return this.roles.get(id);
   }
 
+  /** Creates a custom role with a list of permissions. */
   @Post()
   @AdminSessionOnly()
   @RequirePermissions('admins:write')
@@ -66,6 +67,7 @@ export class AdminRolesController {
     return this.roles.create(principal, body, requestInfo(request).ipAddress);
   }
 
+  /** Changes the name or permissions of a custom role. */
   @Patch(':id')
   @AdminSessionOnly()
   @RequirePermissions('admins:write')

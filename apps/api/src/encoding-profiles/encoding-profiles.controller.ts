@@ -37,18 +37,21 @@ export class EncodingProfilesController {
     @Inject(AuditService) private readonly audit: AuditService,
   ) {}
 
+  /** Lists the encoding profiles. */
   @Get()
   @RequirePermissions('encoding-profiles:read')
   list(): Promise<EncodingProfileWithRenditions[]> {
     return this.profiles.list();
   }
 
+  /** Returns one encoding profile. */
   @Get(':id')
   @RequirePermissions('encoding-profiles:read')
   get(@Param('id', ParseUUIDPipe) id: string): Promise<EncodingProfileWithRenditions> {
     return this.profiles.get(id);
   }
 
+  /** Creates a encoding profile. */
   @Post()
   @RequirePermissions('encoding-profiles:write')
   async create(
@@ -63,6 +66,7 @@ export class EncodingProfilesController {
     return profile;
   }
 
+  /** Changes a encoding profile. */
   @Patch(':id')
   @RequirePermissions('encoding-profiles:write')
   async update(
@@ -80,6 +84,7 @@ export class EncodingProfilesController {
     return profile;
   }
 
+  /** Deletes a encoding profile. */
   @Delete(':id')
   @RequirePermissions('encoding-profiles:write')
   @HttpCode(HttpStatus.NO_CONTENT)

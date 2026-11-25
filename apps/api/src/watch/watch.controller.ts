@@ -76,6 +76,7 @@ export class WatchController {
     });
   }
 
+  /** Returns how many files wait, import, conflict or failed. */
   @Get('summary')
   @RequirePermissions('catalog:read')
   summary(): Promise<WatchSummary> {
@@ -84,6 +85,7 @@ export class WatchController {
 
   // --- Locations ----------------------------------------------------------------
 
+  /** Lists the watched folders and buckets. */
   @Get('locations')
   @RequirePermissions('storage:read')
   listLocations(): Promise<LocationView[]> {
@@ -98,6 +100,7 @@ export class WatchController {
     return this.watch.testPlace(body);
   }
 
+  /** Adds a watched folder or bucket. */
   @Post('locations')
   @RequirePermissions('storage:write')
   async createLocation(
@@ -113,12 +116,14 @@ export class WatchController {
     return location;
   }
 
+  /** Returns one watched location. */
   @Get('locations/:id')
   @RequirePermissions('storage:read')
   getLocation(@Param('id', ParseUUIDPipe) id: string): Promise<LocationView> {
     return this.watch.getLocation(id);
   }
 
+  /** Changes a watched location. */
   @Patch('locations/:id')
   @RequirePermissions('storage:write')
   async updateLocation(
@@ -136,6 +141,7 @@ export class WatchController {
     return location;
   }
 
+  /** Looks through a watched location now. */
   @Post('locations/:id/scan')
   @RequirePermissions('catalog:write')
   @HttpCode(HttpStatus.OK)
@@ -143,6 +149,7 @@ export class WatchController {
     return this.watch.requestScan(id);
   }
 
+  /** Stops watching a folder or bucket. */
   @Delete('locations/:id')
   @RequirePermissions('storage:write')
   @HttpCode(HttpStatus.NO_CONTENT)
@@ -157,6 +164,7 @@ export class WatchController {
 
   // --- Files --------------------------------------------------------------------
 
+  /** Lists the files found in watched locations and what became of each. */
   @Get('files')
   @RequirePermissions('catalog:read')
   listFiles(
@@ -175,6 +183,7 @@ export class WatchController {
     return this.watch.retryAll(body);
   }
 
+  /** Says which title or episode a found file is. */
   @Post('files/:id/match')
   @RequirePermissions('catalog:write')
   @HttpCode(HttpStatus.OK)
@@ -192,6 +201,7 @@ export class WatchController {
     return file;
   }
 
+  /** Tries a failed file again. */
   @Post('files/:id/retry')
   @RequirePermissions('catalog:write')
   @HttpCode(HttpStatus.OK)
@@ -210,6 +220,7 @@ export class WatchController {
     return file;
   }
 
+  /** Sets a found file aside. */
   @Post('files/:id/ignore')
   @RequirePermissions('catalog:write')
   @HttpCode(HttpStatus.OK)

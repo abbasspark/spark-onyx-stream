@@ -69,12 +69,14 @@ export class CollectionsController {
 
   // --- Collections --------------------------------------------------------------
 
+  /** Lists the collections. */
   @Get('collections')
   @RequirePermissions('catalog:read')
   list(): Promise<CollectionView[]> {
     return this.collections.list();
   }
 
+  /** Creates a collection. */
   @Post('collections')
   @RequirePermissions('catalog:write')
   async create(
@@ -102,12 +104,14 @@ export class CollectionsController {
     return collections;
   }
 
+  /** Returns one collection. */
   @Get('collections/:id')
   @RequirePermissions('catalog:read')
   get(@Param('id', ParseUUIDPipe) id: string): Promise<CollectionDetail> {
     return this.collections.get(id);
   }
 
+  /** Changes a collection. */
   @Patch('collections/:id')
   @RequirePermissions('catalog:write')
   async update(
@@ -124,6 +128,7 @@ export class CollectionsController {
     return collection;
   }
 
+  /** Replaces the titles of a collection and their order. */
   @Put('collections/:id/titles')
   @RequirePermissions('catalog:write')
   async setTitles(
@@ -140,6 +145,7 @@ export class CollectionsController {
     return collection;
   }
 
+  /** Deletes a collection. */
   @Delete('collections/:id')
   @RequirePermissions('catalog:write')
   @HttpCode(HttpStatus.NO_CONTENT)
@@ -154,6 +160,7 @@ export class CollectionsController {
 
   // --- Extras -------------------------------------------------------------------
 
+  /** Adds a trailer or clip to a title. */
   @Post('titles/:id/extras')
   @RequirePermissions('catalog:write')
   async addExtra(
@@ -171,6 +178,7 @@ export class CollectionsController {
     return extras;
   }
 
+  /** Sets the order of the extras of a title. */
   @Put('titles/:id/extras/order')
   @RequirePermissions('catalog:write')
   async orderExtras(
@@ -183,6 +191,7 @@ export class CollectionsController {
     return extras;
   }
 
+  /** Changes a trailer or clip of a title. */
   @Patch('extras/:id')
   @RequirePermissions('catalog:write')
   async updateExtra(
@@ -199,6 +208,7 @@ export class CollectionsController {
     return extras;
   }
 
+  /** Deletes a trailer or clip of a title. */
   @Delete('extras/:id')
   @RequirePermissions('catalog:write')
   @HttpCode(HttpStatus.NO_CONTENT)

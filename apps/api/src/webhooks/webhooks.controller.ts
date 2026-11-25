@@ -69,6 +69,7 @@ export class WebhooksController {
     });
   }
 
+  /** Lists the webhooks. */
   @Get()
   @RequirePermissions('settings:read')
   list(): Promise<WebhookView[]> {
@@ -82,6 +83,7 @@ export class WebhooksController {
     return this.webhooks.reference();
   }
 
+  /** Creates a webhook. */
   @Post()
   @AdminSessionOnly()
   @RequirePermissions('settings:write')
@@ -99,12 +101,14 @@ export class WebhooksController {
     return webhook;
   }
 
+  /** Returns one webhook. */
   @Get(':id')
   @RequirePermissions('settings:read')
   get(@Param('id', ParseUUIDPipe) id: string): Promise<WebhookView> {
     return this.webhooks.get(id);
   }
 
+  /** Changes a webhook. */
   @Patch(':id')
   @RequirePermissions('settings:write')
   async update(
@@ -123,6 +127,7 @@ export class WebhooksController {
     return webhook;
   }
 
+  /** Deletes a webhook. */
   @Delete(':id')
   @RequirePermissions('settings:write')
   @HttpCode(HttpStatus.NO_CONTENT)
@@ -172,6 +177,7 @@ export class WebhooksController {
     );
   }
 
+  /** Lists the messages sent to a webhook, with what became of each. */
   @Get(':id/deliveries')
   @RequirePermissions('settings:read')
   deliveries(
@@ -181,6 +187,7 @@ export class WebhooksController {
     return this.webhooks.listDeliveries(id, query);
   }
 
+  /** Returns one delivery with what was sent and what the address answered. */
   @Get(':id/deliveries/:deliveryId')
   @RequirePermissions('settings:read')
   delivery(

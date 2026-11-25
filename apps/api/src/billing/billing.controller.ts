@@ -171,6 +171,7 @@ export class BillingAdminController {
     @Inject(StripeWebhookService) private readonly webhooks: StripeWebhookService,
   ) {}
 
+  /** Returns the billing overview: subscribers, plans and what is owed. */
   @Get('billing')
   @RequirePermissions('billing:read')
   overview(): Promise<BillingOverview> {
@@ -192,12 +193,14 @@ export class BillingAdminController {
     return this.webhooks.recent(25);
   }
 
+  /** Lists the plans. */
   @Get('plans')
   @RequirePermissions('billing:read')
   list(): Promise<PlanAdminView[]> {
     return this.plans.list();
   }
 
+  /** Creates a plan. */
   @Post('plans')
   @RequirePermissions('billing:write')
   async create(
@@ -219,6 +222,7 @@ export class BillingAdminController {
     return this.plans.reorder(body.ids);
   }
 
+  /** Changes a plan. */
   @Patch('plans/:id')
   @RequirePermissions('billing:write')
   async update(
@@ -237,6 +241,7 @@ export class BillingAdminController {
     return plan;
   }
 
+  /** Deletes a plan that no viewer ever had. */
   @Delete('plans/:id')
   @RequirePermissions('billing:write')
   @HttpCode(HttpStatus.NO_CONTENT)
@@ -276,6 +281,7 @@ export class BillingAdminController {
     return subscription;
   }
 
+  /** Changes a subscription: grants, extends or ends it by hand. */
   @Patch('subscriptions/:id')
   @RequirePermissions('billing:write')
   async change(

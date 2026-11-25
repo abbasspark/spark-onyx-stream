@@ -230,6 +230,7 @@ export class PushAdminController {
     @Inject(NotificationRunner) private readonly runner: NotificationRunner,
   ) {}
 
+  /** Returns whether push notifications are set up, and how many devices can receive them. */
   @Get('setup')
   @RequirePermissions('viewers:read')
   async overview(): Promise<PushOverview> {
@@ -325,6 +326,7 @@ export class PushAdminController {
     return this.settings.setup();
   }
 
+  /** Lists the notification campaigns, the newest first. */
   @Get('campaigns')
   @RequirePermissions('viewers:read')
   list(
@@ -342,6 +344,7 @@ export class PushAdminController {
     return this.campaigns.reach(query.audience, query.planId ?? null);
   }
 
+  /** Returns one campaign with how many it reached. */
   @Get('campaigns/:id')
   @RequirePermissions('viewers:read')
   get(@Param('id', ParseUUIDPipe) id: string): Promise<CampaignView> {
@@ -369,6 +372,7 @@ export class PushAdminController {
     return campaign;
   }
 
+  /** Changes a campaign that has not been sent. */
   @Patch('campaigns/:id')
   @RequirePermissions('viewers:write')
   update(
@@ -439,6 +443,7 @@ export class PushAdminController {
     return result;
   }
 
+  /** Deletes a notification campaign. */
   @Delete('campaigns/:id')
   @HttpCode(HttpStatus.NO_CONTENT)
   @RequirePermissions('viewers:write')

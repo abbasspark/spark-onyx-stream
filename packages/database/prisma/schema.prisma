@@ -860,9 +860,7 @@ enum JobType {
   PROBE
   REMUX
   TRANSCODE
-  PACKAGE
   THUMBNAILS
-  SUBTITLES
   /// Makes an added sound file into a track of a video.
   AUDIO
   /// Finds intros and credits by comparing the episodes of a season.

@@ -30,6 +30,7 @@ export class TitleHistoryController {
     @Inject(AuditService) private readonly audit: AuditService,
   ) {}
 
+  /** Lists the changes made to a title, the newest first. */
   @Get()
   @RequirePermissions('catalog:read')
   list(
