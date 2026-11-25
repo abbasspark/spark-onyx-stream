@@ -224,6 +224,7 @@ services:
       WEB_SITE_URL: ${SITE_URL:-http://localhost:8080}
       WEB_API_URL: http://api:3000
       WEB_MEDIA_ORIGIN: ${MEDIA_BASE_URL:-}
+      WEB_AD_ORIGINS: ${AD_ORIGINS:-}
     depends_on:
       api:
         condition: service_healthy

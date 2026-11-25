@@ -15,6 +15,7 @@ import {
   KeyRound,
   Languages,
   Library,
+  Megaphone,
   LayoutDashboard,
   LayoutTemplate,
   Boxes,
@@ -269,6 +270,14 @@ export const NAVIGATION: NavGroup[] = [
         icon: Receipt,
         permission: 'billing:read',
         keywords: 'payments money income invoices refunds mrr export csv books accounting',
+      },
+      {
+        to: '/ads',
+        label: 'Ads',
+        icon: Megaphone,
+        permission: 'settings:read',
+        keywords:
+          'advertising vast preroll midroll postroll sponsor house ad impressions free tier',
       },
     ],
   },

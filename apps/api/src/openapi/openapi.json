@@ -149,6 +149,10 @@
       "description": "Renting and buying single titles."
     },
     {
+      "name": "Ads",
+      "description": "When viewers see ads, where they come from and how they did."
+    },
+    {
       "name": "Live channels",
       "description": "Channels and their sources."
     },
@@ -705,6 +709,689 @@
         "responses": {
           "204": {
             "description": "Done. Nothing comes back."
+          },
+          "401": {
+            "description": "Not signed in, or the sign-in ran out.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Signed in, but not allowed to do this.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "What the address names does not exist.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/ads/report": {
+      "get": {
+        "operationId": "Ads_report",
+        "tags": [
+          "Ads"
+        ],
+        "summary": "Returns how the ads did: shown, watched to the end, skipped, clicked",
+        "description": "For an admin or an API key. Needs analytics:read.",
+        "security": [
+          {
+            "adminSession": []
+          },
+          {
+            "apiKey": []
+          }
+        ],
+        "x-onyx-access": {
+          "kind": "admin",
+          "permissions": [
+            "analytics:read"
+          ],
+          "sessionOnly": false
+        },
+        "parameters": [
+          {
+            "name": "days",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "default": 30,
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 365
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The answer.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdReport"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The input was refused. \"issues\" names every field.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or the sign-in ran out.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Signed in, but not allowed to do this.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/ads/settings": {
+      "get": {
+        "operationId": "Ads_settings",
+        "tags": [
+          "Ads"
+        ],
+        "summary": "Returns when ads play, and whether there is a source to play them from",
+        "description": "For an admin or an API key. Needs settings:read.",
+        "security": [
+          {
+            "adminSession": []
+          },
+          {
+            "apiKey": []
+          }
+        ],
+        "x-onyx-access": {
+          "kind": "admin",
+          "permissions": [
+            "settings:read"
+          ],
+          "sessionOnly": false
+        },
+        "responses": {
+          "200": {
+            "description": "The answer.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdSettingsView"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or the sign-in ran out.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Signed in, but not allowed to do this.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "operationId": "Ads_saveSettings",
+        "tags": [
+          "Ads"
+        ],
+        "summary": "Sets when ads play",
+        "description": "Ads stay off until they are switched on here. For an admin or an API key. Needs settings:write.",
+        "security": [
+          {
+            "adminSession": []
+          },
+          {
+            "apiKey": []
+          }
+        ],
+        "x-onyx-access": {
+          "kind": "admin",
+          "permissions": [
+            "settings:write"
+          ],
+          "sessionOnly": false
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "enabled": {
+                    "type": "boolean"
+                  },
+                  "preRoll": {
+                    "type": "boolean"
+                  },
+                  "postRoll": {
+                    "type": "boolean"
+                  },
+                  "midRollEveryMinutes": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 120
+                  },
+                  "minDurationMinutes": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 240
+                  }
+                },
+                "required": [
+                  "enabled",
+                  "preRoll",
+                  "postRoll",
+                  "midRollEveryMinutes",
+                  "minDurationMinutes"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The answer.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdSettingsView"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The input was refused. \"issues\" names every field.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or the sign-in ran out.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Signed in, but not allowed to do this.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/ads/sources": {
+      "get": {
+        "operationId": "Ads_listSources",
+        "tags": [
+          "Ads"
+        ],
+        "summary": "Lists the places ads come from",
+        "description": "For an admin or an API key. Needs settings:read.",
+        "security": [
+          {
+            "adminSession": []
+          },
+          {
+            "apiKey": []
+          }
+        ],
+        "x-onyx-access": {
+          "kind": "admin",
+          "permissions": [
+            "settings:read"
+          ],
+          "sessionOnly": false
+        },
+        "responses": {
+          "200": {
+            "description": "The answer.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/AdSourceView"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or the sign-in ran out.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Signed in, but not allowed to do this.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "operationId": "Ads_createSource",
+        "tags": [
+          "Ads"
+        ],
+        "summary": "Adds a VAST tag or a video of the library as a source of ads",
+        "description": "For an admin or an API key. Needs settings:write.",
+        "security": [
+          {
+            "adminSession": []
+          },
+          {
+            "apiKey": []
+          }
+        ],
+        "x-onyx-access": {
+          "kind": "admin",
+          "permissions": [
+            "settings:write"
+          ],
+          "sessionOnly": false
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "oneOf": [
+                  {
+                    "type": "object",
+                    "properties": {
+                      "name": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 120
+                      },
+                      "weight": {
+                        "default": 1,
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 100
+                      },
+                      "isActive": {
+                        "default": true,
+                        "type": "boolean"
+                      },
+                      "kind": {
+                        "type": "string",
+                        "const": "VAST_TAG"
+                      },
+                      "vastUrl": {
+                        "type": "string",
+                        "maxLength": 2000
+                      }
+                    },
+                    "required": [
+                      "name",
+                      "kind",
+                      "vastUrl"
+                    ]
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "name": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 120
+                      },
+                      "weight": {
+                        "default": 1,
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 100
+                      },
+                      "isActive": {
+                        "default": true,
+                        "type": "boolean"
+                      },
+                      "kind": {
+                        "type": "string",
+                        "const": "HOUSE"
+                      },
+                      "assetId": {
+                        "type": "string",
+                        "format": "uuid",
+                        "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                      },
+                      "clickUrl": {
+                        "default": null,
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "maxLength": 2000
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      "skipAfterSeconds": {
+                        "default": null,
+                        "anyOf": [
+                          {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 60
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      }
+                    },
+                    "required": [
+                      "name",
+                      "kind",
+                      "assetId"
+                    ]
+                  }
+                ],
+                "properties": {}
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "The answer.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdSourceView"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The input was refused. \"issues\" names every field.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or the sign-in ran out.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Signed in, but not allowed to do this.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/ads/sources/{id}": {
+      "delete": {
+        "operationId": "Ads_removeSource",
+        "tags": [
+          "Ads"
+        ],
+        "summary": "Removes a source of ads, with its figures",
+        "description": "For an admin or an API key. Needs settings:write.",
+        "security": [
+          {
+            "adminSession": []
+          },
+          {
+            "apiKey": []
+          }
+        ],
+        "x-onyx-access": {
+          "kind": "admin",
+          "permissions": [
+            "settings:write"
+          ],
+          "sessionOnly": false
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Done. Nothing comes back."
+          },
+          "401": {
+            "description": "Not signed in, or the sign-in ran out.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Signed in, but not allowed to do this.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "What the address names does not exist.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "operationId": "Ads_updateSource",
+        "tags": [
+          "Ads"
+        ],
+        "summary": "Changes a source of ads",
+        "description": "For an admin or an API key. Needs settings:write.",
+        "security": [
+          {
+            "adminSession": []
+          },
+          {
+            "apiKey": []
+          }
+        ],
+        "x-onyx-access": {
+          "kind": "admin",
+          "permissions": [
+            "settings:write"
+          ],
+          "sessionOnly": false
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 120
+                  },
+                  "weight": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 100
+                  },
+                  "isActive": {
+                    "type": "boolean"
+                  },
+                  "vastUrl": {
+                    "type": "string",
+                    "maxLength": 2000
+                  },
+                  "assetId": {
+                    "type": "string",
+                    "format": "uuid",
+                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                  },
+                  "clickUrl": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "maxLength": 2000
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "skipAfterSeconds": {
+                    "anyOf": [
+                      {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 60
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The answer.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdSourceView"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The input was refused. \"issues\" names every field.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
           },
           "401": {
             "description": "Not signed in, or the sign-in ran out.",
@@ -6034,6 +6721,164 @@
           },
           "403": {
             "description": "Signed in, but not allowed to do this.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/catalog/ads/events": {
+      "post": {
+        "operationId": "AdsEvents_event",
+        "tags": [
+          "Ads"
+        ],
+        "summary": "Counts an ad that was shown, watched to a point, skipped, clicked or failed",
+        "description": "Open to everyone.",
+        "security": [],
+        "x-onyx-access": {
+          "kind": "public",
+          "permissions": [],
+          "sessionOnly": false
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "sourceId": {
+                    "type": "string",
+                    "format": "uuid",
+                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                  },
+                  "event": {
+                    "type": "string",
+                    "enum": [
+                      "IMPRESSION",
+                      "FIRST_QUARTILE",
+                      "MIDPOINT",
+                      "THIRD_QUARTILE",
+                      "COMPLETE",
+                      "SKIP",
+                      "CLICK",
+                      "ERROR"
+                    ]
+                  }
+                },
+                "required": [
+                  "sourceId",
+                  "event"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": "Done. Nothing comes back."
+          },
+          "400": {
+            "description": "The input was refused. \"issues\" names every field.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests. \"Retry-After\" says when to try again.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/catalog/ads/resolve": {
+      "post": {
+        "operationId": "AdsEvents_resolve",
+        "tags": [
+          "Ads"
+        ],
+        "summary": "Asks a source for the ad a break plays now",
+        "description": "Answers with the file to play and everyone to tell about it, or with null when there is no ad. Open to everyone.",
+        "security": [],
+        "x-onyx-access": {
+          "kind": "public",
+          "permissions": [],
+          "sessionOnly": false
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "sourceId": {
+                    "type": "string",
+                    "format": "uuid",
+                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                  }
+                },
+                "required": [
+                  "sourceId"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The answer.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ad": {
+                      "anyOf": [
+                        {
+                          "$ref": "#/components/schemas/ResolvedAd"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    }
+                  },
+                  "required": [
+                    "ad"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The input was refused. \"issues\" names every field.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests. \"Retry-After\" says when to try again.",
             "content": {
               "application/json": {
                 "schema": {
@@ -19915,6 +20760,10 @@
                       }
                     ]
                   },
+                  "removesAds": {
+                    "default": true,
+                    "type": "boolean"
+                  },
                   "packageIds": {
                     "default": [],
                     "maxItems": 100,
@@ -20157,6 +21006,9 @@
                         "type": "null"
                       }
                     ]
+                  },
+                  "removesAds": {
+                    "type": "boolean"
                   },
                   "packageIds": {
                     "maxItems": 100,
@@ -37967,6 +38819,39 @@
       }
     },
     "schemas": {
+      "AdBreakPlan": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "position": {
+            "type": "string",
+            "enum": [
+              "PRE",
+              "MID",
+              "POST"
+            ]
+          },
+          "atMs": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "description": "Milliseconds from the start of the video, for a break in the middle."
+          },
+          "sourceId": {
+            "type": "string",
+            "description": "The source this break takes its ad from. The player asks for the ad when\nthe break comes, so that what it gets is fresh."
+          }
+        },
+        "required": [
+          "id",
+          "position",
+          "atMs",
+          "sourceId"
+        ]
+      },
       "AddedSubtitleView": {
         "type": "object",
         "properties": {
@@ -37999,6 +38884,45 @@
           "format",
           "encoding",
           "warning"
+        ]
+      },
+      "AdFigures": {
+        "type": "object",
+        "properties": {
+          "impressions": {
+            "type": "number"
+          },
+          "firstQuartile": {
+            "type": "number"
+          },
+          "midpoint": {
+            "type": "number"
+          },
+          "thirdQuartile": {
+            "type": "number"
+          },
+          "completes": {
+            "type": "number"
+          },
+          "skips": {
+            "type": "number"
+          },
+          "clicks": {
+            "type": "number"
+          },
+          "errors": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "impressions",
+          "firstQuartile",
+          "midpoint",
+          "thirdQuartile",
+          "completes",
+          "skips",
+          "clicks",
+          "errors"
         ]
       },
       "AdminMarkerView": {
@@ -38210,6 +39134,248 @@
           "lastLoginAt",
           "createdAt",
           "updatedAt"
+        ]
+      },
+      "AdPlan": {
+        "type": "object",
+        "properties": {
+          "breaks": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AdBreakPlan"
+            }
+          }
+        },
+        "required": [
+          "breaks"
+        ]
+      },
+      "AdReport": {
+        "type": "object",
+        "properties": {
+          "days": {
+            "type": "number"
+          },
+          "totals": {
+            "$ref": "#/components/schemas/AdFigures"
+          },
+          "perDay": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "day": {
+                  "type": "string"
+                },
+                "impressions": {
+                  "type": "number"
+                },
+                "firstQuartile": {
+                  "type": "number"
+                },
+                "midpoint": {
+                  "type": "number"
+                },
+                "thirdQuartile": {
+                  "type": "number"
+                },
+                "completes": {
+                  "type": "number"
+                },
+                "skips": {
+                  "type": "number"
+                },
+                "clicks": {
+                  "type": "number"
+                },
+                "errors": {
+                  "type": "number"
+                }
+              },
+              "required": [
+                "day",
+                "impressions",
+                "firstQuartile",
+                "midpoint",
+                "thirdQuartile",
+                "completes",
+                "skips",
+                "clicks",
+                "errors"
+              ]
+            },
+            "description": "One entry per day of the period, the oldest first, days without ads included."
+          },
+          "perSource": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "sourceId": {
+                  "type": "string"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "impressions": {
+                  "type": "number"
+                },
+                "firstQuartile": {
+                  "type": "number"
+                },
+                "midpoint": {
+                  "type": "number"
+                },
+                "thirdQuartile": {
+                  "type": "number"
+                },
+                "completes": {
+                  "type": "number"
+                },
+                "skips": {
+                  "type": "number"
+                },
+                "clicks": {
+                  "type": "number"
+                },
+                "errors": {
+                  "type": "number"
+                }
+              },
+              "required": [
+                "sourceId",
+                "name",
+                "impressions",
+                "firstQuartile",
+                "midpoint",
+                "thirdQuartile",
+                "completes",
+                "skips",
+                "clicks",
+                "errors"
+              ]
+            }
+          }
+        },
+        "required": [
+          "days",
+          "totals",
+          "perDay",
+          "perSource"
+        ]
+      },
+      "AdSettingsView": {
+        "type": "object",
+        "properties": {
+          "hasActiveSource": {
+            "type": "boolean",
+            "description": "Whether a break would find a source to play now."
+          },
+          "enabled": {
+            "type": "boolean",
+            "description": "The master switch. Off, nobody sees an ad."
+          },
+          "preRoll": {
+            "type": "boolean",
+            "description": "An ad before the video starts."
+          },
+          "postRoll": {
+            "type": "boolean",
+            "description": "An ad after the video ends."
+          },
+          "midRollEveryMinutes": {
+            "type": "number",
+            "description": "An ad every so many minutes of the video. Zero: no breaks in the middle."
+          },
+          "minDurationMinutes": {
+            "type": "number",
+            "description": "Videos shorter than this are not interrupted at all, in minutes."
+          }
+        },
+        "required": [
+          "hasActiveSource",
+          "enabled",
+          "preRoll",
+          "postRoll",
+          "midRollEveryMinutes",
+          "minDurationMinutes"
+        ]
+      },
+      "AdSourceView": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "VAST_TAG",
+              "HOUSE"
+            ]
+          },
+          "vastUrl": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "asset": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "title": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "title"
+            ],
+            "description": "The video of a house ad, with its name for the panel."
+          },
+          "clickUrl": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "skipAfterSeconds": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "weight": {
+            "type": "number"
+          },
+          "isActive": {
+            "type": "boolean"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "kind",
+          "vastUrl",
+          "asset",
+          "clickUrl",
+          "skipAfterSeconds",
+          "weight",
+          "isActive",
+          "createdAt"
         ]
       },
       "AlertSettings": {
@@ -39719,10 +40885,10 @@
             "type": "string",
             "enum": [
               "delete",
+              "genres",
+              "collections",
               "categories",
               "availability",
-              "collections",
-              "genres",
               "publish",
               "unpublish",
               "archive",
@@ -43100,9 +44266,6 @@
           "source": {
             "$ref": "#/components/schemas/HomeSource"
           },
-          "visible": {
-            "type": "boolean"
-          },
           "layout": {
             "$ref": "#/components/schemas/HomeLayout"
           },
@@ -43122,6 +44285,9 @@
           },
           "limit": {
             "type": "number"
+          },
+          "visible": {
+            "type": "boolean"
           },
           "visibleFrom": {
             "type": [
@@ -43249,10 +44415,10 @@
           "kind",
           "sort",
           "source",
-          "visible",
           "layout",
           "titleType",
           "limit",
+          "visible",
           "visibleFrom",
           "visibleUntil",
           "position",
@@ -43550,9 +44716,7 @@
           "THUMBNAILS",
           "AUDIO",
           "MARKERS",
-          "CLEANUP",
-          "PACKAGE",
-          "SUBTITLES"
+          "CLEANUP"
         ]
       },
       "JobView": {
@@ -43660,9 +44824,9 @@
       "LayoutPage": {
         "type": "string",
         "enum": [
-          "SERIES",
           "CATEGORY",
           "GENRE",
+          "SERIES",
           "LIVE",
           "HOME",
           "MOVIES"
@@ -44509,10 +45673,10 @@
             "enum": [
               "language",
               "kind",
+              "collection",
+              "genres",
               "categories",
               "keywords",
-              "genres",
-              "collection",
               "watched",
               "cast",
               "crew",
@@ -46487,6 +47651,10 @@
               "null"
             ],
             "description": "On how many devices a subscriber plays at the same time. For viewers this\nis what applies: the plan's own limit, or that of the installation. Null:\nno limit."
+          },
+          "removesAds": {
+            "type": "boolean",
+            "description": "Whether subscribers watch without ads."
           }
         },
         "required": [
@@ -46505,7 +47673,8 @@
           "isRecommended",
           "includesAll",
           "packages",
-          "maxStreams"
+          "maxStreams",
+          "removesAds"
         ]
       },
       "PlayAnswer": {
@@ -46656,6 +47825,17 @@
               }
             ],
             "description": "The place this device holds among the streams of the account, for\n`POST /viewer/streams/{id}/beat`. Null for a visitor, a trailer or an extra."
+          },
+          "ads": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AdPlan"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "What the player does about ads while it plays this video: the breaks, and\nwhere each one's ad comes from. Null when there are none: ads are off, the\nviewer has a plan without ads or bought the title, or this is a trailer."
           }
         },
         "required": [
@@ -46670,7 +47850,8 @@
           "markers",
           "playId",
           "qualityId",
-          "stream"
+          "stream",
+          "ads"
         ]
       },
       "PlaybackInfo": {
@@ -47982,6 +49163,10 @@
               "null"
             ],
             "description": "On how many devices a subscriber plays at the same time. For viewers this\nis what applies: the plan's own limit, or that of the installation. Null:\nno limit."
+          },
+          "removesAds": {
+            "type": "boolean",
+            "description": "Whether subscribers watch without ads."
           }
         },
         "required": [
@@ -47995,7 +49180,8 @@
           "isRecommended",
           "includesAll",
           "packages",
-          "maxStreams"
+          "maxStreams",
+          "removesAds"
         ]
       },
       "PublicPlans": {
@@ -50005,6 +51191,116 @@
           "createdAt"
         ]
       },
+      "ResolvedAd": {
+        "type": "object",
+        "properties": {
+          "mediaUrl": {
+            "type": "string"
+          },
+          "mimeType": {
+            "type": "string",
+            "description": "\"application/x-mpegURL\" for HLS, otherwise the type of the file."
+          },
+          "durationMs": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "skipOffsetMs": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "description": "After how many milliseconds the ad may be skipped. Null: it cannot be."
+          },
+          "clickThrough": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "clickTracking": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "impressions": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "errors": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Addresses to call when the ad fails. They hold [ERRORCODE] where the code goes."
+          },
+          "tracking": {
+            "type": "object",
+            "properties": {
+              "start": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "firstQuartile": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "midpoint": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "thirdQuartile": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "complete": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "skip": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            },
+            "required": [
+              "start",
+              "firstQuartile",
+              "midpoint",
+              "thirdQuartile",
+              "complete",
+              "skip"
+            ]
+          }
+        },
+        "required": [
+          "mediaUrl",
+          "mimeType",
+          "durationMs",
+          "skipOffsetMs",
+          "clickThrough",
+          "clickTracking",
+          "impressions",
+          "errors",
+          "tracking"
+        ]
+      },
       "RestoreResult": {
         "type": "object",
         "properties": {
@@ -51032,16 +52328,16 @@
               "kind": {
                 "type": "number"
               },
-              "categories": {
-                "type": "number"
-              },
-              "keywords": {
+              "collection": {
                 "type": "number"
               },
               "genres": {
                 "type": "number"
               },
-              "collection": {
+              "categories": {
+                "type": "number"
+              },
+              "keywords": {
                 "type": "number"
               },
               "watched": {
@@ -51063,10 +52359,10 @@
             "required": [
               "language",
               "kind",
+              "collection",
+              "genres",
               "categories",
               "keywords",
-              "genres",
-              "collection",
               "watched",
               "cast",
               "crew",
@@ -51853,9 +53149,9 @@
           "kind": {
             "type": "string",
             "enum": [
-              "categories",
-              "collections",
               "genres",
+              "collections",
+              "categories",
               "people"
             ]
           },
@@ -51889,13 +53185,13 @@
           "translated": {
             "type": "object",
             "properties": {
-              "categories": {
+              "genres": {
                 "type": "number"
               },
               "collections": {
                 "type": "number"
               },
-              "genres": {
+              "categories": {
                 "type": "number"
               },
               "people": {
@@ -51903,9 +53199,9 @@
               }
             },
             "required": [
-              "categories",
-              "collections",
               "genres",
+              "collections",
+              "categories",
               "people"
             ],
             "description": "Per kind, how many terms have a text in this language."

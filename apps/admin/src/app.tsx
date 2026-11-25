@@ -38,6 +38,7 @@ import { ApiReferencePage } from './pages/api-reference-page';
 import { AppsPage } from './pages/apps-page';
 import { BrandingPage } from './pages/branding-page';
 import { WebhookPage } from './pages/webhook-page';
+import { AdsPage } from './pages/ads-page';
 import { WebhooksPage } from './pages/webhooks-page';
 import { RolesPage } from './pages/roles-page';
 import { TranslationsPage } from './pages/translations-page';
@@ -154,6 +155,7 @@ function Pages() {
             <Route path="jobs" element={<JobsPage />} />
             <Route path="encoding-profiles" element={<EncodingProfilesPage />} />
             <Route path="storage" element={<StoragePage />} />
+            <Route path="ads" element={<AdsPage />} />
             <Route path="plans" element={<PlansPage />} />
             <Route path="packages" element={<PackagesPage />} />
             <Route path="coupons" element={<CouponsPage />} />

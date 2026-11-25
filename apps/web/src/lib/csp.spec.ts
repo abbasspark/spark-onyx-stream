@@ -1,5 +1,36 @@
 // SPDX-License-Identifier: AGPL-3.0-only
-import { buildCsp, mediaOrigins, originOf, socketOriginOf } from './csp';
+import { adSources, buildCsp, mediaOrigins, originOf, socketOriginOf } from './csp';
+
+describe('ads in the policy', () => {
+  it('opens nothing until the operator names the hosts of the ads', () => {
+    const policy = buildCsp({ nonce: 'n', development: false });
+    expect(policy).toContain("media-src 'self' blob: data:;");
+    expect(policy).toContain("img-src 'self' data: blob:;");
+  });
+
+  it('lets pictures and video come from the hosts that are named, and from nowhere else', () => {
+    const policy = buildCsp({
+      nonce: 'n',
+      development: false,
+      adOrigins: 'https://ads.example.com, https://*.adcdn.example.net/x',
+    });
+    expect(policy).toContain(
+      "media-src 'self' blob: data: https://ads.example.com https://*.adcdn.example.net;",
+    );
+    expect(policy).toContain(
+      "img-src 'self' data: blob: https://ads.example.com https://*.adcdn.example.net;",
+    );
+    expect(policy).toContain("connect-src 'self';");
+    expect(policy).not.toMatch(/script-src[^;]*example/);
+  });
+
+  it('takes * for any https address, and only for pictures and video', () => {
+    expect(adSources('*')).toEqual(['https:']);
+    const policy = buildCsp({ nonce: 'n', development: false, adOrigins: '*' });
+    expect(policy).toContain("media-src 'self' blob: data: https:;");
+    expect(policy).toContain("connect-src 'self';");
+  });
+});
 
 describe('buildCsp', () => {
   it('lets scripts run only with the nonce', () => {

@@ -153,6 +153,7 @@ describe.skipIf(!TEST_DATABASE_URL)('Billing (e2e)', () => {
         maxStreams: null,
         packages: [],
         isOffered: true,
+        removesAds: true,
         position: 0,
         subscribers: 0,
         createdAt: expect.any(String),
@@ -179,6 +180,7 @@ describe.skipIf(!TEST_DATABASE_URL)('Billing (e2e)', () => {
             includesAll: true,
             maxStreams: null,
             packages: [],
+            removesAds: true,
           },
         ],
       });

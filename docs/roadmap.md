@@ -11,7 +11,7 @@ The project is built in phases. Each phase ends with something that works end to
 | 5. Edges and P2P              | Edge agent, tracker, P2P in the player, offload statistics                          | Done                |
 | 6. Operations                 | Installer, updates with rollback, backup and restore, diagnostics                   | Done                |
 | 7. Apps                       | Android mobile and Android TV                                                       | Built, never run    |
-| 8. Advanced                   | Ads, further apps (DRM is deferred)                                                 | Planned             |
+| 8. Advanced                   | Ads, further apps (DRM is deferred)                                                 | Ads built for VOD   |
 
 ## Phase 1 in steps
 

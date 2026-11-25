@@ -28,6 +28,8 @@ export interface PublicPlan {
    * no limit.
    */
   maxStreams: number | null;
+  /** Whether subscribers watch without ads. */
+  removesAds: boolean;
 }
 
 type PlanWithPackages = Plan & {
@@ -58,6 +60,7 @@ export interface PublicPlans {
 export function toPublicPlan(plan: PlanWithPackages, siteLimit = 0): PublicPlan {
   return {
     maxStreams: plan.maxStreams ?? (siteLimit > 0 ? siteLimit : null),
+    removesAds: plan.removesAds,
     id: plan.id,
     name: plan.name,
     description: plan.description,

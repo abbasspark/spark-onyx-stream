@@ -42,6 +42,7 @@ export async function proxy(request: NextRequest): Promise<NextResponse> {
     nonce,
     development: process.env.NODE_ENV === 'development',
     mediaOrigin: process.env.WEB_MEDIA_ORIGIN,
+    adOrigins: process.env.WEB_AD_ORIGINS,
     edgeOrigins,
     trackerOrigin: tracker,
   });

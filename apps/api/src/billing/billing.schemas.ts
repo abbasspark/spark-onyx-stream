@@ -40,6 +40,8 @@ const planFields = {
   includesAll: z.boolean(),
   /** Devices a subscriber plays on at the same time. Null: the limit of the installation. */
   maxStreams: z.number().int().min(1).max(20).nullable(),
+  /** Whether subscribers watch without ads. */
+  removesAds: z.boolean(),
   /** Replaces the packages of the plan. They count while it does not open everything. */
   packageIds: z.array(z.uuid()).max(100),
 };
@@ -66,6 +68,7 @@ export const createPlanSchema = z
     isRecommended: planFields.isRecommended.default(false),
     includesAll: planFields.includesAll.default(true),
     maxStreams: planFields.maxStreams.default(null),
+    removesAds: planFields.removesAds.default(true),
     packageIds: planFields.packageIds.default([]),
   })
   .refine((plan) => plan.monthlyAmount !== null || plan.yearlyAmount !== null, NEEDS_PRICE)
