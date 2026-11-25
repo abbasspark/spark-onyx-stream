@@ -2,6 +2,11 @@
 import type { DuplicateParts } from '@/lib/duplicate';
 import { download, request, requestText, uploadFile, uploadLargeFile } from './client';
 import type {
+  AdReport,
+  AdSettings,
+  AdSettingsView,
+  AdSource,
+  AdSourceInput,
   AudioTrack,
   Branding,
   BrandingSettings,
@@ -1161,4 +1166,18 @@ export const appVersionsApi = {
   /** Sets all rules at once. */
   save: (rules: AppVersionRule[]) =>
     request<AppVersions>('/v1/app-versions', { method: 'PUT', body: { rules } }),
+};
+
+export const adsApi = {
+  settings: (signal?: AbortSignal) => request<AdSettingsView>('/v1/ads/settings', { signal }),
+  saveSettings: (body: AdSettings) =>
+    request<AdSettingsView>('/v1/ads/settings', { method: 'PUT', body }),
+  sources: (signal?: AbortSignal) => request<AdSource[]>('/v1/ads/sources', { signal }),
+  createSource: (body: AdSourceInput) =>
+    request<AdSource>('/v1/ads/sources', { method: 'POST', body }),
+  updateSource: (id: string, body: Partial<Omit<AdSourceInput, 'kind'>>) =>
+    request<AdSource>(`/v1/ads/sources/${id}`, { method: 'PATCH', body }),
+  removeSource: (id: string) => request<void>(`/v1/ads/sources/${id}`, { method: 'DELETE' }),
+  report: (days: number, signal?: AbortSignal) =>
+    request<AdReport>('/v1/ads/report', { query: { days }, signal }),
 };

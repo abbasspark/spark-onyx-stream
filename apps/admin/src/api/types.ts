@@ -1012,6 +1012,8 @@ export interface Plan {
   maxStreams: number | null;
   /** Whether viewers are offered the plan. */
   isOffered: boolean;
+  /** Whether subscribers watch without ads. */
+  removesAds: boolean;
   position: number;
   /** Viewers who can watch through this plan right now. */
   subscribers: number;
@@ -1031,6 +1033,7 @@ export type PlanInput = Pick<
   | 'isOffered'
   | 'includesAll'
   | 'maxStreams'
+  | 'removesAds'
 > & {
   /** The packages the plan opens while it does not open everything. */
   packageIds: string[];
@@ -2707,4 +2710,67 @@ export interface PrepaidSummary {
   subscribers: number;
   /** Codes used on each of the last thirty days, the oldest first. */
   days: { day: string; redeemed: number }[];
+}
+
+// --- Ads -----------------------------------------------------------------------
+
+export interface AdSettings {
+  enabled: boolean;
+  preRoll: boolean;
+  postRoll: boolean;
+  /** Zero: no breaks in the middle. */
+  midRollEveryMinutes: number;
+  /** Videos shorter than this, in minutes, are not interrupted. */
+  minDurationMinutes: number;
+}
+
+export interface AdSettingsView extends AdSettings {
+  /** Whether a break would find a source to play now. */
+  hasActiveSource: boolean;
+}
+
+export type AdSourceKind = 'VAST_TAG' | 'HOUSE';
+
+export interface AdSource {
+  id: string;
+  name: string;
+  kind: AdSourceKind;
+  vastUrl: string | null;
+  asset: { id: string; title: string } | null;
+  clickUrl: string | null;
+  skipAfterSeconds: number | null;
+  weight: number;
+  isActive: boolean;
+  createdAt: string;
+}
+
+export type AdSourceInput =
+  | { kind: 'VAST_TAG'; name: string; vastUrl: string; weight: number; isActive: boolean }
+  | {
+      kind: 'HOUSE';
+      name: string;
+      assetId: string;
+      clickUrl: string | null;
+      skipAfterSeconds: number | null;
+      weight: number;
+      isActive: boolean;
+    };
+
+export interface AdFigures {
+  impressions: number;
+  firstQuartile: number;
+  midpoint: number;
+  thirdQuartile: number;
+  completes: number;
+  skips: number;
+  clicks: number;
+  errors: number;
+}
+
+export interface AdReport {
+  days: number;
+  totals: AdFigures;
+  /** The oldest day first, days without ads included. */
+  perDay: ({ day: string } & AdFigures)[];
+  perSource: ({ sourceId: string; name: string } & AdFigures)[];
 }

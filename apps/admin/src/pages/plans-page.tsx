@@ -468,6 +468,7 @@ function PlanDialog({
   const [features, setFeatures] = useState('');
   const [isOffered, setOffered] = useState(true);
   const [isRecommended, setRecommended] = useState(false);
+  const [removesAds, setRemovesAds] = useState(true);
   const [includesAll, setIncludesAll] = useState(true);
   const [packageIds, setPackageIds] = useState<string[]>([]);
   const [problem, setProblem] = useState<string | null>(null);
@@ -489,6 +490,7 @@ function PlanDialog({
       setFeatures((plan?.features ?? []).join('\n'));
       setOffered(plan?.isOffered ?? true);
       setRecommended(plan?.isRecommended ?? false);
+      setRemovesAds(plan?.removesAds ?? true);
       setIncludesAll(plan?.includesAll ?? true);
       setPackageIds(plan?.packages.map((item) => item.id) ?? []);
       setProblem(null);
@@ -547,6 +549,7 @@ function PlanDialog({
       maxStreams,
       isOffered,
       isRecommended,
+      removesAds,
       includesAll,
       packageIds: includesAll ? [] : packageIds,
     });
@@ -741,6 +744,12 @@ function PlanDialog({
               description="Off, the plan is not shown on the page of plans. Viewers who have it keep it."
               checked={isOffered}
               onCheckedChange={setOffered}
+            />
+            <ToggleRow
+              label="Watch without ads"
+              description="Subscribers of this plan are not shown ads. Turn it off for a cheaper plan that is paid for by ads."
+              checked={removesAds}
+              onCheckedChange={setRemovesAds}
             />
             <ToggleRow
               label="Recommend this plan"

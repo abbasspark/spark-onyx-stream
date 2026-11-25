@@ -41,13 +41,14 @@ In the Docker installation the website is the `web` service and the gateway serv
 
 They are read when the server starts: from the `.env` file at the repository root, or from the environment in Docker. A change needs a restart, not a new build.
 
-| Name                   | Default                               | Meaning                                                                                |
-| ---------------------- | ------------------------------------- | -------------------------------------------------------------------------------------- |
-| `WEB_SITE_NAME`        | `Onyx Stream`                         | Name in the header, the browser tab and link previews                                  |
-| `WEB_SITE_DESCRIPTION` | `Movies and series, streamed to you.` | One sentence for search engines                                                        |
-| `WEB_SITE_URL`         | `http://localhost:3001`               | Public address of the site, for the sitemap and link previews                          |
-| `WEB_API_URL`          | `http://localhost:3000`               | Where the server reaches the API                                                       |
-| `WEB_MEDIA_ORIGIN`     | empty                                 | Origin of media and artwork when it is not the site itself: the API's `MEDIA_BASE_URL` |
+| Name                   | Default                               | Meaning                                                                                                  |
+| ---------------------- | ------------------------------------- | -------------------------------------------------------------------------------------------------------- |
+| `WEB_SITE_NAME`        | `Onyx Stream`                         | Name in the header, the browser tab and link previews                                                    |
+| `WEB_SITE_DESCRIPTION` | `Movies and series, streamed to you.` | One sentence for search engines                                                                          |
+| `WEB_SITE_URL`         | `http://localhost:3001`               | Public address of the site, for the sitemap and link previews                                            |
+| `WEB_API_URL`          | `http://localhost:3000`               | Where the server reaches the API                                                                         |
+| `WEB_MEDIA_ORIGIN`     | empty                                 | Origin of media and artwork when it is not the site itself: the API's `MEDIA_BASE_URL`                   |
+| `WEB_AD_ORIGINS`       | empty                                 | Hosts ads load video and tracking pictures from, or `*` for any https host. See [ads](../../docs/ads.md) |
 
 ## How it works
 

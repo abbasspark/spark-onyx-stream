@@ -73,6 +73,7 @@ const AREAS: Record<string, { name: string; description: string }> = {
   streams: { name: 'Streams', description: 'How many devices of an account play at once.' },
   billing: { name: 'Billing', description: 'Plans, subscriptions, payments and coupons.' },
   purchases: { name: 'Purchases', description: 'Renting and buying single titles.' },
+  ads: { name: 'Ads', description: 'When viewers see ads, where they come from and how they did.' },
   stripe: { name: 'Stripe', description: 'Checkout and the events Stripe reports.' },
   live: { name: 'Live channels', description: 'Channels and their sources.' },
   guide: { name: 'Programme guide', description: 'What runs on a channel and when.' },

@@ -634,6 +634,7 @@ model Asset {
   extras        TitleExtra[]
   episodes      Episode[]
   watchedFiles  WatchedFile[]
+  adSources     AdSource[]
 
   @@index([status])
   @@index([storagePoolId])
@@ -1751,6 +1752,8 @@ model Plan {
   /// On how many devices a subscriber plays at the same time. Empty: the
   /// limit of the installation.
   maxStreams    Int?
+  /// Whether subscribers watch without ads. Off: an ad-supported plan.
+  removesAds    Boolean  @default(true)
   /// Order on the page of plans, lowest first.
   position      Int      @default(0)
   createdAt     DateTime @default(now())
@@ -2963,4 +2966,64 @@ model PrepaidCode {
   @@index([redeemedById])
   @@index([subscriptionId])
   @@map("prepaid_codes")
+}
+
+// ---------------------------------------------------------------------------
+// Ads
+// ---------------------------------------------------------------------------
+
+enum AdSourceKind {
+  /// An address of an ad server that answers with a VAST document.
+  VAST_TAG
+  /// A video of the library that the operator plays as an ad of their own.
+  HOUSE
+}
+
+/// Where the ads of a break come from. A break takes one active source,
+/// chosen by weight.
+model AdSource {
+  id               String       @id @default(uuid(7)) @db.Uuid
+  name             String
+  kind             AdSourceKind
+  /// The VAST tag. Set for VAST_TAG, and only then.
+  vastUrl          String?
+  /// The video played as the ad. Set for HOUSE, and only then.
+  assetId          String?      @db.Uuid
+  asset            Asset?       @relation(fields: [assetId], references: [id], onDelete: Restrict)
+  /// Where a click on a house ad leads.
+  clickUrl         String?
+  /// After how many seconds a viewer may skip a house ad. Empty: it cannot be skipped.
+  skipAfterSeconds Int?
+  /// How often it is chosen compared with the other sources.
+  weight           Int          @default(1)
+  isActive         Boolean      @default(true)
+  createdAt        DateTime     @default(now())
+  updatedAt        DateTime     @updatedAt
+
+  stats AdStat[]
+
+  @@index([isActive])
+  @@index([assetId])
+  @@map("ad_sources")
+}
+
+/// What happened to the ads of one source on one day. Counted without
+/// anything that says who watched.
+model AdStat {
+  sourceId      String   @db.Uuid
+  source        AdSource @relation(fields: [sourceId], references: [id], onDelete: Cascade)
+  day           DateTime @db.Date
+  impressions   Int      @default(0)
+  firstQuartile Int      @default(0)
+  midpoint      Int      @default(0)
+  thirdQuartile Int      @default(0)
+  completes     Int      @default(0)
+  skips         Int      @default(0)
+  clicks        Int      @default(0)
+  /// Breaks that ended without an ad: the server had none, or it failed.
+  errors        Int      @default(0)
+
+  @@id([sourceId, day])
+  @@index([day])
+  @@map("ad_stats")
 }

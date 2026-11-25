@@ -54,10 +54,12 @@ import type { Playback } from '@/lib/types';
 import { parsePreviewTrack, type PreviewCue } from '@/lib/vtt';
 import { useViewerSession } from '../viewer-session';
 import { brightnessFilter } from './gestures';
+import { AdLayer } from './ad-layer';
 import { SeekBar } from './seek-bar';
 import { type Setting, SettingsMenu } from './settings-menu';
 import { type Shortcut, ShortcutsSheet } from './shortcuts-sheet';
 import { StatsPanel, usePlaybackStats } from './stats-panel';
+import { useAds } from './use-ads';
 import { createCueAdjuster, subtitleProperties } from './subtitle-look';
 import { TouchSurface } from './touch-surface';
 import { usePlayerSettings } from './use-player-settings';
@@ -213,6 +215,11 @@ export function Player({
   const callbacks = useRef({ onTime, onEnded, onFatal, onStopAtEnd });
   callbacks.current = { onTime, onEnded, onFatal, onStopAtEnd };
 
+  // Ads in front of, in the middle of and after the video, for those who see them.
+  const ads = useAds(playback.ads, video);
+  const adsRef = useRef(ads);
+  adsRef.current = ads;
+
   const [paused, setPaused] = useState(true);
   const [waiting, setWaiting] = useState(true);
   const [started, setStarted] = useState(false);
@@ -327,10 +334,16 @@ export function Player({
     element.volume = stored.volume;
     element.muted = stored.muted;
 
-    const begin = () => {
+    const start = () => {
       // Browsers refuse to start with sound unless the viewer just clicked.
       // The big play button stays then, and one click starts it.
       void element.play().catch(() => reports.current?.hold());
+    };
+    // A break in front of the video goes first, and starts the video when it is over.
+    const begin = () => {
+      if (!adsRef.current.beforeStart(start)) {
+        start();
+      }
     };
 
     if (Hls.isSupported()) {
@@ -630,7 +643,15 @@ export function Player({
       ['seeking', () => setTime(element.currentTime)],
       ['ratechange', () => setRate(element.playbackRate)],
       ['volumechange', onVolume],
-      ['ended', () => callbacks.current.onEnded()],
+      [
+        'ended',
+        () => {
+          // A break after the video comes before whatever follows it.
+          if (!adsRef.current.beforeEnd(() => callbacks.current.onEnded())) {
+            callbacks.current.onEnded();
+          }
+        },
+      ],
     ];
     for (const [name, handler] of handlers) {
       element.addEventListener(name, handler);
@@ -912,6 +933,10 @@ export function Player({
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
       if (event.ctrlKey || event.metaKey || event.altKey || isOwnedByControl(event)) {
+        return;
+      }
+      // While an ad plays, the film cannot be reached. Full screen still works.
+      if (adsRef.current.active && event.key.toLowerCase() !== 'f') {
         return;
       }
       const element = video.current;
@@ -1534,6 +1559,8 @@ export function Player({
           </p>
         </div>
       ) : null}
+
+      {ads.active ? <AdLayer active={ads.active} audio={readVolume()} onClose={ads.close} /> : null}
     </div>
   );
 }

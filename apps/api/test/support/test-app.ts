@@ -355,6 +355,7 @@ export async function createTestApp(
       await mailService.settled();
       mail.clear();
       queue.clear();
+      await prisma.adSource.deleteMany();
       await prisma.translationJob.deleteMany();
       await prisma.homeSection.deleteMany();
       await prisma.couponRedemption.deleteMany();

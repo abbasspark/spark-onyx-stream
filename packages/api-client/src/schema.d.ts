@@ -75,6 +75,98 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/ads/report": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Returns how the ads did: shown, watched to the end, skipped, clicked
+         * @description For an admin or an API key. Needs analytics:read.
+         */
+        get: operations["Ads_report"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/ads/settings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Returns when ads play, and whether there is a source to play them from
+         * @description For an admin or an API key. Needs settings:read.
+         */
+        get: operations["Ads_settings"];
+        /**
+         * Sets when ads play
+         * @description Ads stay off until they are switched on here. For an admin or an API key. Needs settings:write.
+         */
+        put: operations["Ads_saveSettings"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/ads/sources": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Lists the places ads come from
+         * @description For an admin or an API key. Needs settings:read.
+         */
+        get: operations["Ads_listSources"];
+        put?: never;
+        /**
+         * Adds a VAST tag or a video of the library as a source of ads
+         * @description For an admin or an API key. Needs settings:write.
+         */
+        post: operations["Ads_createSource"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/ads/sources/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Removes a source of ads, with its figures
+         * @description For an admin or an API key. Needs settings:write.
+         */
+        delete: operations["Ads_removeSource"];
+        options?: never;
+        head?: never;
+        /**
+         * Changes a source of ads
+         * @description For an admin or an API key. Needs settings:write.
+         */
+        patch: operations["Ads_updateSource"];
+        trace?: never;
+    };
     "/v1/analytics/now": {
         parameters: {
             query?: never;
@@ -1042,6 +1134,46 @@ export interface paths {
          * @description For an admin or an API key. Needs settings:write.
          */
         delete: operations["Branding_reset"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/catalog/ads/events": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Counts an ad that was shown, watched to a point, skipped, clicked or failed
+         * @description Open to everyone.
+         */
+        post: operations["AdsEvents_event"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/catalog/ads/resolve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Asks a source for the ad a break plays now
+         * @description Answers with the file to play and everyone to tell about it, or with null when there is no ad. Open to everyone.
+         */
+        post: operations["AdsEvents_resolve"];
+        delete?: never;
         options?: never;
         head?: never;
         patch?: never;
@@ -6655,6 +6787,18 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        AdBreakPlan: {
+            id: string;
+            /** @enum {string} */
+            position: "PRE" | "MID" | "POST";
+            /** @description Milliseconds from the start of the video, for a break in the middle. */
+            atMs: number | null;
+            /**
+             * @description The source this break takes its ad from. The player asks for the ad when
+             *     the break comes, so that what it gets is fresh.
+             */
+            sourceId: string;
+        };
         AddedSubtitleView: {
             track: components["schemas"]["SubtitleTrackView"];
             /** @description How many subtitles the file holds. */
@@ -6665,6 +6809,16 @@ export interface components {
             encoding: string;
             /** @description Something to check, when the file looks as if it belonged to another video. */
             warning: string | null;
+        };
+        AdFigures: {
+            impressions: number;
+            firstQuartile: number;
+            midpoint: number;
+            thirdQuartile: number;
+            completes: number;
+            skips: number;
+            clicks: number;
+            errors: number;
         };
         AdminMarkerView: {
             /** @description MANUAL: set by an admin. DETECTED: found by comparing episodes, and not checked by anyone yet. */
@@ -6717,6 +6871,69 @@ export interface components {
             createdAt: string;
             /** Format: date-time */
             updatedAt: string;
+        };
+        AdPlan: {
+            breaks: components["schemas"]["AdBreakPlan"][];
+        };
+        AdReport: {
+            days: number;
+            totals: components["schemas"]["AdFigures"];
+            /** @description One entry per day of the period, the oldest first, days without ads included. */
+            perDay: {
+                day: string;
+                impressions: number;
+                firstQuartile: number;
+                midpoint: number;
+                thirdQuartile: number;
+                completes: number;
+                skips: number;
+                clicks: number;
+                errors: number;
+            }[];
+            perSource: {
+                sourceId: string;
+                name: string;
+                impressions: number;
+                firstQuartile: number;
+                midpoint: number;
+                thirdQuartile: number;
+                completes: number;
+                skips: number;
+                clicks: number;
+                errors: number;
+            }[];
+        };
+        AdSettingsView: {
+            /** @description Whether a break would find a source to play now. */
+            hasActiveSource: boolean;
+            /** @description The master switch. Off, nobody sees an ad. */
+            enabled: boolean;
+            /** @description An ad before the video starts. */
+            preRoll: boolean;
+            /** @description An ad after the video ends. */
+            postRoll: boolean;
+            /** @description An ad every so many minutes of the video. Zero: no breaks in the middle. */
+            midRollEveryMinutes: number;
+            /** @description Videos shorter than this are not interrupted at all, in minutes. */
+            minDurationMinutes: number;
+        };
+        AdSourceView: {
+            id: string;
+            name: string;
+            /** @enum {string} */
+            kind: "VAST_TAG" | "HOUSE";
+            vastUrl: string | null;
+            /** @description The video of a house ad, with its name for the panel. */
+            asset: {
+                id: string;
+                title: string;
+            } | null;
+            clickUrl: string | null;
+            skipAfterSeconds: number | null;
+            weight: number;
+            isActive: boolean;
+            /** Format: date-time */
+            createdAt: string;
         };
         AlertSettings: {
             /** @description Whether the owners get an email when a problem appears. */
@@ -7100,7 +7317,7 @@ export interface components {
         };
         BulkResult: {
             /** @enum {string} */
-            action: "delete" | "categories" | "availability" | "collections" | "genres" | "publish" | "unpublish" | "archive" | "feature" | "age" | "translate";
+            action: "delete" | "genres" | "collections" | "categories" | "availability" | "publish" | "unpublish" | "archive" | "feature" | "age" | "translate";
             /** @description How many titles the selection meant. */
             matched: number;
             changed: number;
@@ -7961,10 +8178,10 @@ export interface components {
             kind: components["schemas"]["HomeSectionKind"];
             sort: components["schemas"]["HomeSort"];
             source: components["schemas"]["HomeSource"];
-            visible: boolean;
             layout: components["schemas"]["HomeLayout"];
             titleType: ("MOVIE" | "SERIES") | null;
             limit: number;
+            visible: boolean;
             /** Format: date-time */
             visibleFrom: string | null;
             /** Format: date-time */
@@ -8067,7 +8284,7 @@ export interface components {
         /** @enum {string} */
         JobStatus: "FAILED" | "RUNNING" | "CANCELLED" | "QUEUED" | "COMPLETED";
         /** @enum {string} */
-        JobType: "TRANSCODE" | "PROBE" | "REMUX" | "THUMBNAILS" | "AUDIO" | "MARKERS" | "CLEANUP" | "PACKAGE" | "SUBTITLES";
+        JobType: "TRANSCODE" | "PROBE" | "REMUX" | "THUMBNAILS" | "AUDIO" | "MARKERS" | "CLEANUP";
         JobView: {
             id: string;
             type: components["schemas"]["JobType"];
@@ -8095,7 +8312,7 @@ export interface components {
             titles: number;
         };
         /** @enum {string} */
-        LayoutPage: "SERIES" | "CATEGORY" | "GENRE" | "LIVE" | "HOME" | "MOVIES";
+        LayoutPage: "CATEGORY" | "GENRE" | "SERIES" | "LIVE" | "HOME" | "MOVIES";
         /** @enum {string} */
         LimitSource: "VIEWER" | "PLAN" | "SITE";
         ListItem: {
@@ -8306,7 +8523,7 @@ export interface components {
             /** @description The genres, people, keywords, studios or collections both have. Empty for the others. */
             names: string[];
             /** @enum {string} */
-            signal: "language" | "kind" | "categories" | "keywords" | "genres" | "collection" | "watched" | "cast" | "crew" | "era" | "studio";
+            signal: "language" | "kind" | "collection" | "genres" | "categories" | "keywords" | "watched" | "cast" | "crew" | "era" | "studio";
             /** @description What it gave, rounded to one decimal. */
             points: number;
             /** @description How many genres, keywords or people are shared, or profiles that watched both. */
@@ -8809,6 +9026,8 @@ export interface components {
              *     no limit.
              */
             maxStreams: number | null;
+            /** @description Whether subscribers watch without ads. */
+            removesAds: boolean;
         };
         PlayAnswer: {
             /** @constant */
@@ -8872,6 +9091,12 @@ export interface components {
              *     `POST /viewer/streams/{id}/beat`. Null for a visitor, a trailer or an extra.
              */
             stream: components["schemas"]["StreamTicket"] | null;
+            /**
+             * @description What the player does about ads while it plays this video: the breaks, and
+             *     where each one's ad comes from. Null when there are none: ads are off, the
+             *     viewer has a plan without ads or bought the title, or this is a trailer.
+             */
+            ads: components["schemas"]["AdPlan"] | null;
         };
         PlaybackInfo: {
             /** @constant */
@@ -9217,6 +9442,8 @@ export interface components {
              *     no limit.
              */
             maxStreams: number | null;
+            /** @description Whether subscribers watch without ads. */
+            removesAds: boolean;
         };
         PublicPlans: {
             /** @description Currency of all prices, as three letters such as "EUR". */
@@ -9738,6 +9965,27 @@ export interface components {
             /** Format: date-time */
             createdAt: string;
         };
+        ResolvedAd: {
+            mediaUrl: string;
+            /** @description "application/x-mpegURL" for HLS, otherwise the type of the file. */
+            mimeType: string;
+            durationMs: number | null;
+            /** @description After how many milliseconds the ad may be skipped. Null: it cannot be. */
+            skipOffsetMs: number | null;
+            clickThrough: string | null;
+            clickTracking: string[];
+            impressions: string[];
+            /** @description Addresses to call when the ad fails. They hold [ERRORCODE] where the code goes. */
+            errors: string[];
+            tracking: {
+                start: string[];
+                firstQuartile: string[];
+                midpoint: string[];
+                thirdQuartile: string[];
+                complete: string[];
+                skip: string[];
+            };
+        };
         RestoreResult: {
             /** @description How many things were brought back. */
             restored: number;
@@ -10004,10 +10252,10 @@ export interface components {
             weights: {
                 language: number;
                 kind: number;
+                collection: number;
+                genres: number;
                 categories: number;
                 keywords: number;
-                genres: number;
-                collection: number;
                 watched: number;
                 cast: number;
                 crew: number;
@@ -10223,7 +10471,7 @@ export interface components {
         };
         TermKindInfo: {
             /** @enum {string} */
-            kind: "categories" | "collections" | "genres" | "people";
+            kind: "genres" | "collections" | "categories" | "people";
             label: string;
             fields: components["schemas"]["TermField"][];
             /** @description How many terms of this kind there are. */
@@ -10233,9 +10481,9 @@ export interface components {
             language: string;
             /** @description Per kind, how many terms have a text in this language. */
             translated: {
-                categories: number;
-                collections: number;
                 genres: number;
+                collections: number;
+                categories: number;
                 people: number;
             };
             /** @description How many titles are translated into it. */
@@ -11406,6 +11654,380 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description Not signed in, or the sign-in ran out. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Signed in, but not allowed to do this. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description What the address names does not exist. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    Ads_report: {
+        parameters: {
+            query?: {
+                days?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The answer. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdReport"];
+                };
+            };
+            /** @description The input was refused. "issues" names every field. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Not signed in, or the sign-in ran out. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Signed in, but not allowed to do this. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    Ads_settings: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The answer. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdSettingsView"];
+                };
+            };
+            /** @description Not signed in, or the sign-in ran out. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Signed in, but not allowed to do this. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    Ads_saveSettings: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    enabled: boolean;
+                    preRoll: boolean;
+                    postRoll: boolean;
+                    midRollEveryMinutes: number;
+                    minDurationMinutes: number;
+                };
+            };
+        };
+        responses: {
+            /** @description The answer. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdSettingsView"];
+                };
+            };
+            /** @description The input was refused. "issues" names every field. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Not signed in, or the sign-in ran out. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Signed in, but not allowed to do this. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    Ads_listSources: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The answer. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdSourceView"][];
+                };
+            };
+            /** @description Not signed in, or the sign-in ran out. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Signed in, but not allowed to do this. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    Ads_createSource: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    name: string;
+                    /** @default 1 */
+                    weight?: number;
+                    /** @default true */
+                    isActive?: boolean;
+                    /** @constant */
+                    kind: "VAST_TAG";
+                    vastUrl: string;
+                } | {
+                    name: string;
+                    /** @default 1 */
+                    weight?: number;
+                    /** @default true */
+                    isActive?: boolean;
+                    /** @constant */
+                    kind: "HOUSE";
+                    /** Format: uuid */
+                    assetId: string;
+                    /** @default null */
+                    clickUrl?: string | null;
+                    /** @default null */
+                    skipAfterSeconds?: number | null;
+                };
+            };
+        };
+        responses: {
+            /** @description The answer. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdSourceView"];
+                };
+            };
+            /** @description The input was refused. "issues" names every field. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Not signed in, or the sign-in ran out. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Signed in, but not allowed to do this. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    Ads_removeSource: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Done. Nothing comes back. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Not signed in, or the sign-in ran out. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Signed in, but not allowed to do this. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description What the address names does not exist. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    Ads_updateSource: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    name?: string;
+                    weight?: number;
+                    isActive?: boolean;
+                    vastUrl?: string;
+                    /** Format: uuid */
+                    assetId?: string;
+                    clickUrl?: string | null;
+                    skipAfterSeconds?: number | null;
+                };
+            };
+        };
+        responses: {
+            /** @description The answer. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdSourceView"];
+                };
+            };
+            /** @description The input was refused. "issues" names every field. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
             };
             /** @description Not signed in, or the sign-in ran out. */
             401: {
@@ -14366,6 +14988,98 @@ export interface operations {
             };
             /** @description Signed in, but not allowed to do this. */
             403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    AdsEvents_event: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** Format: uuid */
+                    sourceId: string;
+                    /** @enum {string} */
+                    event: "IMPRESSION" | "FIRST_QUARTILE" | "MIDPOINT" | "THIRD_QUARTILE" | "COMPLETE" | "SKIP" | "CLICK" | "ERROR";
+                };
+            };
+        };
+        responses: {
+            /** @description Done. Nothing comes back. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description The input was refused. "issues" names every field. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Too many requests. "Retry-After" says when to try again. */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    AdsEvents_resolve: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** Format: uuid */
+                    sourceId: string;
+                };
+            };
+        };
+        responses: {
+            /** @description The answer. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        ad: components["schemas"]["ResolvedAd"] | null;
+                    };
+                };
+            };
+            /** @description The input was refused. "issues" names every field. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Too many requests. "Retry-After" says when to try again. */
+            429: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -22088,6 +22802,8 @@ export interface operations {
                     includesAll?: boolean;
                     /** @default null */
                     maxStreams?: number | null;
+                    /** @default true */
+                    removesAds?: boolean;
                     /** @default [] */
                     packageIds?: string[];
                 };
@@ -22201,6 +22917,7 @@ export interface operations {
                     isRecommended?: boolean;
                     includesAll?: boolean;
                     maxStreams?: number | null;
+                    removesAds?: boolean;
                     packageIds?: string[];
                 };
             };

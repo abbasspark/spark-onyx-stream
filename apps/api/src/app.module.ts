@@ -23,6 +23,7 @@ import { BackupsModule } from './backups/backups.module.js';
 import { DiagnosticsModule } from './diagnostics/diagnostics.module.js';
 import { ProcessBeaconModule } from './diagnostics/process-beacon.service.js';
 import { BillingModule } from './billing/billing.module.js';
+import { AdsModule } from './ads/ads.module.js';
 import { AppVersionsModule } from './app-versions/app-versions.module.js';
 import { BrandingModule } from './branding/branding.module.js';
 import { OpenApiModule } from './openapi/openapi.module.js';
@@ -67,6 +68,7 @@ const ROLE_MODULES: Record<AppRole, Type[]> = {
     CatalogModule,
     MailModule,
     BrandingModule,
+    AdsModule,
     AppVersionsModule,
     BillingModule,
     MetadataModule,

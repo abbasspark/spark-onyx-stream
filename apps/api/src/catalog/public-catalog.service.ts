@@ -14,6 +14,8 @@ import { type Prisma, PrismaClient, type TitleAccess } from '@onyx/database';
 import { SubscriptionsService } from '../billing/subscriptions.service.js';
 import { type Page, toPage, toSkipTake } from '../common/pagination.js';
 import { AppConfig } from '../config/app-config.js';
+import { AdsService } from '../ads/ads.service.js';
+import type { AdPlan } from '../ads/ads.views.js';
 import { type PlaybackInfo, PlaybackService } from '../playback/playback.service.js';
 import { opensTitle } from '../billing/entitlement.js';
 import { PurchasesService } from '../purchases/purchases.service.js';
@@ -74,6 +76,12 @@ export type PlayAnswer = PlaybackInfo & {
    * `POST /viewer/streams/{id}/beat`. Null for a visitor, a trailer or an extra.
    */
   stream: StreamTicket | null;
+  /**
+   * What the player does about ads while it plays this video: the breaks, and
+   * where each one's ad comes from. Null when there are none: ads are off, the
+   * viewer has a plan without ads or bought the title, or this is a trailer.
+   */
+  ads: AdPlan | null;
 };
 
 /** Who asks for playback: a signed-in viewer on one of their devices, or null for a visitor. */
@@ -136,6 +144,7 @@ export class PublicCatalogService {
     @Inject(PlaysService) private readonly plays: PlaysService,
     @Inject(StreamsService) private readonly streams: StreamsService,
     @Inject(QualityRecorder) private readonly quality: QualityRecorder,
+    @Inject(AdsService) private readonly ads: AdsService,
   ) {}
 
   /**
@@ -588,12 +597,13 @@ export class PublicCatalogService {
     if (!title) {
       throw new NotFoundException('Title not found');
     }
-    await this.assertMayPlay(watcher, title);
+    const grant = await this.assertMayPlay(watcher, title);
     if (title.type !== 'MOVIE' || !title.assetId) {
       throw new ConflictException('A series is played episode by episode');
     }
     return this.recorded(await this.playback.createPlayback(title.assetId, 'viewer'), {
       kind: 'MAIN',
+      purchased: grant.purchased,
       subject: title.name,
       titleId: title.id,
       assetId: title.assetId,
@@ -675,9 +685,10 @@ export class PublicCatalogService {
       throw new NotFoundException('Episode not found');
     }
     // An episode is as open as its series.
-    await this.assertMayPlay(watcher, episode.season.title);
+    const grant = await this.assertMayPlay(watcher, episode.season.title);
     return this.recorded(await this.playback.createPlayback(episode.assetId, 'viewer'), {
       kind: 'MAIN',
+      purchased: grant.purchased,
       subject: `${episode.season.title.name} S${episode.season.number} E${episode.number}`,
       titleId: episode.season.title.id,
       episodeId,
@@ -698,6 +709,8 @@ export class PublicCatalogService {
       kind: 'MAIN' | 'TRAILER' | 'EXTRA';
       /** What is played, for the list of what an account is playing. Set for the main video. */
       subject?: string;
+      /** The viewer rented or bought the title: no ads. */
+      purchased?: boolean;
       titleId: string;
       episodeId?: string;
       assetId: string;
@@ -733,7 +746,11 @@ export class PublicCatalogService {
       userAgent: play.client?.userAgent ?? null,
       playbackUrl: info.manifestUrl,
     });
-    return { ...info, playId, qualityId, stream };
+    const ads =
+      play.kind === 'MAIN' && !play.purchased && !(await this.removesAds(play.watcher))
+        ? await this.ads.planFor(play.assetId)
+        : null;
+    return { ...info, playId, qualityId, stream, ads };
   }
 
   /**
@@ -743,6 +760,11 @@ export class PublicCatalogService {
    * @throws UnauthorizedException when it needs a signed-in viewer and there is none.
    * @throws ForbiddenException when the viewer has yet to confirm their email address.
    */
+  /** Whether the viewer has a running plan that comes without ads. */
+  private async removesAds(watcher: Watcher): Promise<boolean> {
+    return watcher ? this.subscriptions.removesAds(watcher.viewerId) : false;
+  }
+
   /** @throws ForbiddenException when nothing is played on this installation. */
   private assertOpen(): void {
     if (this.config.catalogPlayback === 'off') {
@@ -755,12 +777,15 @@ export class PublicCatalogService {
    * of the installation. A paid title always needs a signed-in viewer with a
    * running subscription whose plan opens the title.
    */
-  private async assertMayPlay(watcher: Watcher, title: GatedTitle | null): Promise<void> {
+  private async assertMayPlay(
+    watcher: Watcher,
+    title: GatedTitle | null,
+  ): Promise<{ purchased: boolean }> {
     this.assertOpen();
     // Null stands for what is open like a free title: a trailer.
     const paid = title?.access === 'PAID';
     if (!paid && this.config.catalogPlayback !== 'viewers') {
-      return;
+      return { purchased: false };
     }
     if (!watcher) {
       throw new UnauthorizedException('Sign in to watch');
@@ -775,7 +800,7 @@ export class PublicCatalogService {
       });
     }
     if (!paid || !title) {
-      return;
+      return { purchased: false };
     }
     const access = await this.subscriptions.accessOf(watcher.viewerId);
     const throughPlan =
@@ -785,13 +810,13 @@ export class PublicCatalogService {
         title.packages.map((link) => link.packageId),
       );
     if (throughPlan) {
-      return;
+      return { purchased: false };
     }
     // Rented or bought: open whatever plan the viewer has. Playing a rental starts its hours.
     const owned = await this.purchases.validFor(watcher.viewerId, title.id);
     if (owned) {
       await this.purchases.markStarted(owned);
-      return;
+      return { purchased: true };
     }
     throw new HttpException(
       {

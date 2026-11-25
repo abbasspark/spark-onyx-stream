@@ -67,6 +67,14 @@ export class SubscriptionsService {
     return accessOf(running);
   }
 
+  /** Whether a running subscription of the viewer has a plan that comes without ads. */
+  async removesAds(viewerId: string): Promise<boolean> {
+    const count = await this.prisma.subscription.count({
+      where: { viewerId, ...runningAt(), plan: { removesAds: true } },
+    });
+    return count > 0;
+  }
+
   /** Whether the viewer paid online before. A free trial is offered once. */
   async paidBefore(viewerId: string): Promise<boolean> {
     const earlier = await this.prisma.subscription.count({
