@@ -2,7 +2,9 @@
 package de.sparksystem.onyx.mobile.ui.screens
 
 import android.app.Activity
+import android.content.Intent
 import android.content.pm.ActivityInfo
+import android.net.Uri
 import android.view.ViewGroup
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectTapGestures
@@ -37,6 +39,7 @@ import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -59,6 +62,8 @@ import de.sparksystem.onyx.mobile.ui.components.Trouble
 import de.sparksystem.onyx.mobile.ui.components.Waiting
 import de.sparksystem.onyx.mobile.ui.theme.LocalAccent
 import de.sparksystem.onyx.mobile.ui.theme.oneLine
+import de.sparksystem.onyx.data.skipState
+import de.sparksystem.onyx.ui.AdsPlayback
 import de.sparksystem.onyx.ui.PlayingState
 import de.sparksystem.onyx.ui.endOf
 import de.sparksystem.onyx.ui.runningMarker
@@ -127,25 +132,30 @@ fun PlayerScreen(
     /** Where the thumb is while the bar is being dragged, or -1 when it is not. */
     var dragging by remember { mutableFloatStateOf(-1f) }
 
-    DisposableEffect(playback.manifestUrl) {
-        player.setMediaItem(MediaItem.fromUri(playback.manifestUrl))
-        if (state.startAtMs > 0) {
-            player.seekTo(state.startAtMs)
-        }
-        player.prepare()
+    val scope = rememberCoroutineScope()
+    val ads = remember(playback.manifestUrl) {
+        AdsPlayback(
+            player = player,
+            director = state.ads,
+            contentUrl = playback.manifestUrl,
+            startAtMs = state.startAtMs,
+            scope = scope,
+            onContentEnded = onEnded,
+        )
+    }
+    val inAd = ads.current != null
+
+    DisposableEffect(ads) {
         val listener = object : Player.Listener {
             override fun onIsPlayingChanged(isPlaying: Boolean) {
                 playing = isPlaying
             }
-
-            override fun onPlaybackStateChanged(playbackState: Int) {
-                if (playbackState == Player.STATE_ENDED) {
-                    onEnded()
-                }
-            }
         }
         player.addListener(listener)
+        // The video, and the ads around it, start here.
+        ads.attach()
         onDispose {
+            ads.detach()
             player.removeListener(listener)
             player.release()
         }
@@ -158,7 +168,11 @@ fun PlayerScreen(
             }
             val length = player.duration
             duration = if (length == C.TIME_UNSET) 0L else length
-            onProgress(player.currentPosition, duration)
+            ads.tick()
+            // What an ad does is not what the viewer watched.
+            if (ads.current == null) {
+                onProgress(player.currentPosition, duration)
+            }
             delay(500)
         }
     }
@@ -173,7 +187,7 @@ fun PlayerScreen(
         shown = false
     }
 
-    val marker = runningMarker(playback.markers, position, duration)
+    val marker = if (inAd) null else runningMarker(playback.markers, position, duration)
 
     Box(
         modifier = Modifier
@@ -183,6 +197,7 @@ fun PlayerScreen(
                 detectTapGestures(
                     // A tap brings the controls up, or puts them away again.
                     onTap = {
+                        if (inAd) return@detectTapGestures
                         shown = !shown
                         if (shown) {
                             wake = System.currentTimeMillis()
@@ -191,6 +206,7 @@ fun PlayerScreen(
                     // A double tap on a side skips, the way every player on a
                     // phone does it, without having to find a small button.
                     onDoubleTap = { offset ->
+                        if (inAd) return@detectTapGestures
                         val forward = offset.x > size.width / 2
                         val to = if (forward) {
                             (player.currentPosition + SKIP_MS).coerceAtMost(maxOf(duration, 0L))
@@ -229,7 +245,11 @@ fun PlayerScreen(
             )
         }
 
-        if (shown) {
+        if (inAd) {
+            AdOverlay(ads = ads, onBack = onBack)
+        }
+
+        if (shown && !inAd) {
             // Top: what is playing, and the way out.
             Row(
                 modifier = Modifier
@@ -364,6 +384,74 @@ fun PlayerScreen(
                         text = clock(duration),
                         style = MaterialTheme.typography.labelMedium,
                         color = Onyx.smoke,
+                    )
+                }
+            }
+        }
+    }
+}
+
+/**
+ * What the viewer sees over an ad: that it is one, how long is left, a way
+ * out, and the two things an ad may offer: to skip it and to visit the
+ * advertiser. The video's own controls stay away until the ad is over.
+ */
+@Composable
+private fun AdOverlay(ads: AdsPlayback, onBack: () -> Unit) {
+    val context = LocalContext.current
+    val ready = ads.current ?: return
+    val skip = skipState(ready.ad.skipOffsetMs, ads.elapsedMs)
+    val link = ready.ad.clickThrough
+
+    Box(modifier = Modifier.fillMaxSize()) {
+        IconButton(
+            onClick = onBack,
+            modifier = Modifier.align(Alignment.TopStart).padding(8.dp).size(48.dp),
+        ) {
+            Icon(Icons.Default.ArrowBack, contentDescription = "Back", tint = Onyx.vein)
+        }
+        Text(
+            text = "Ad",
+            style = MaterialTheme.typography.labelLarge,
+            modifier = Modifier
+                .align(Alignment.TopEnd)
+                .padding(16.dp)
+                .background(Onyx.onyx.copy(alpha = 0.7f))
+                .padding(horizontal = 10.dp, vertical = 4.dp),
+        )
+        Row(
+            modifier = Modifier
+                .align(Alignment.BottomEnd)
+                .padding(16.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            if (link != null) {
+                AccentButton(
+                    text = "Visit advertiser",
+                    onClick = {
+                        ads.clickThrough()?.let { address ->
+                            runCatching {
+                                context.startActivity(
+                                    Intent(Intent.ACTION_VIEW, Uri.parse(address))
+                                        .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+                                )
+                            }
+                        }
+                    },
+                )
+            }
+            if (ready.ad.skipOffsetMs != null) {
+                if (skip.skippable) {
+                    AccentButton(text = "Skip ad", onClick = { ads.skip() })
+                } else {
+                    Text(
+                        text = "You can skip in ${skip.secondsLeft}",
+                        style = MaterialTheme.typography.labelLarge,
+                        color = Onyx.vein,
+                        modifier = Modifier
+                            .background(Onyx.onyx.copy(alpha = 0.7f))
+                            .padding(horizontal = 12.dp, vertical = 8.dp),
                     )
                 }
             }

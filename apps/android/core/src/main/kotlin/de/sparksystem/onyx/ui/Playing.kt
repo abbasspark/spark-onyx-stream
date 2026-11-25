@@ -24,6 +24,8 @@ data class PlayingState(
     val detail: String? = null,
     /** Where to start, in milliseconds. */
     val startAtMs: Long = 0,
+    /** Decides when ads play in this video. Null while nothing is playing. */
+    val ads: AdsDirector? = null,
 )
 
 /**
@@ -74,7 +76,13 @@ class PlayingModel(private val container: Container) : ViewModel() {
             }
             when (answer) {
                 is Answer.Ok -> {
-                    state.update { it.copy(loading = false, playback = answer.value) }
+                    state.update {
+                        it.copy(
+                            loading = false,
+                            playback = answer.value,
+                            ads = AdsDirector(answer.value.ads, container.api, viewModelScope),
+                        )
+                    }
                     startReporting()
                 }
                 is Answer.Refused -> state.update {

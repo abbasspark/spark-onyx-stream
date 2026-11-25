@@ -65,6 +65,8 @@ dependencies {
     api(libs.androidx.compose.ui)
     api(libs.androidx.datastore.preferences)
     api(libs.okhttp)
+    // The ads of a video are played through the same player as the video.
+    api(libs.media3.exoplayer)
     api(libs.kotlinx.serialization.json)
 
     coreLibraryDesugaring(libs.desugar.jdk.libs)
