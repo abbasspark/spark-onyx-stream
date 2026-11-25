@@ -37,6 +37,7 @@ export class AdminsController {
     @Inject(TwoFactorService) private readonly twoFactor: TwoFactorService,
   ) {}
 
+  /** Lists the admins, with the role of each. */
   @Get()
   @RequirePermissions('admins:read')
   list(
@@ -45,12 +46,14 @@ export class AdminsController {
     return this.admins.list(query);
   }
 
+  /** Returns one admin. */
   @Get(':id')
   @RequirePermissions('admins:read')
   get(@Param('id', ParseUUIDPipe) id: string): Promise<AdminView> {
     return this.admins.get(id);
   }
 
+  /** Creates a admin. */
   @Post()
   @AdminSessionOnly()
   @RequirePermissions('admins:write')
@@ -62,6 +65,7 @@ export class AdminsController {
     return this.admins.create(principal, body, requestInfo(request).ipAddress);
   }
 
+  /** Changes the name, role or status of an admin. */
   @Patch(':id')
   @AdminSessionOnly()
   @RequirePermissions('admins:write')

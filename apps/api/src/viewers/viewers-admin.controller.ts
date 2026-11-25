@@ -47,6 +47,7 @@ export class ViewersAdminController {
     @Inject(ViewerEmailService) private readonly emails: ViewerEmailService,
   ) {}
 
+  /** Lists the viewers. */
   @Get()
   @RequirePermissions('viewers:read')
   list(
@@ -55,12 +56,14 @@ export class ViewersAdminController {
     return this.viewers.list(query);
   }
 
+  /** Returns one viewer. */
   @Get(':id')
   @RequirePermissions('viewers:read')
   get(@Param('id', ParseUUIDPipe) id: string): Promise<ViewerAdminDetail> {
     return this.viewers.get(id);
   }
 
+  /** Creates a viewer. */
   @Post()
   @RequirePermissions('viewers:write')
   async create(
@@ -73,6 +76,7 @@ export class ViewersAdminController {
     return viewer;
   }
 
+  /** Changes a viewer. */
   @Patch(':id')
   @RequirePermissions('viewers:write')
   async update(
@@ -165,6 +169,7 @@ export class ViewersAdminController {
     await this.record('viewer.device_remove', id, principal, request, { device });
   }
 
+  /** Signs a viewer out of every device. */
   @Post(':id/sign-out')
   @RequirePermissions('viewers:write')
   @HttpCode(HttpStatus.OK)
@@ -178,6 +183,7 @@ export class ViewersAdminController {
     return { sessionsEnded };
   }
 
+  /** Deletes a viewer. */
   @Delete(':id')
   @RequirePermissions('viewers:write')
   @HttpCode(HttpStatus.NO_CONTENT)

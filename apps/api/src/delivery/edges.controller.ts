@@ -48,6 +48,7 @@ export class EdgesController {
     @Inject(DeliveryOverviewService) private readonly delivery: DeliveryOverviewService,
   ) {}
 
+  /** Lists the edge servers, with live figures. */
   @Get()
   @RequirePermissions('delivery:read')
   list(): Promise<EdgeView[]> {
@@ -72,6 +73,7 @@ export class EdgesController {
     return this.delivery.overview(query.range);
   }
 
+  /** Returns one edge server. */
   @Get(':id')
   @RequirePermissions('delivery:read')
   get(@Param('id', ParseUUIDPipe) id: string): Promise<EdgeView> {
@@ -91,6 +93,7 @@ export class EdgesController {
     return created;
   }
 
+  /** Changes the address, weight or content of an edge server. */
   @Patch(':id')
   @RequirePermissions('delivery:write')
   async update(
@@ -133,6 +136,7 @@ export class EdgesController {
     return edge;
   }
 
+  /** Removes an edge server. Viewers move to another one. */
   @Delete(':id')
   @HttpCode(HttpStatus.NO_CONTENT)
   @RequirePermissions('delivery:write')

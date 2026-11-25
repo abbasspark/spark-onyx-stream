@@ -53,12 +53,14 @@ export class CouponsController {
     @Inject(AuditService) private readonly audit: AuditService,
   ) {}
 
+  /** Lists the coupons. */
   @Get()
   @RequirePermissions('billing:read')
   list(): Promise<CouponView[]> {
     return this.coupons.list();
   }
 
+  /** Creates a coupon. */
   @Post()
   @RequirePermissions('billing:write')
   async create(
@@ -71,6 +73,7 @@ export class CouponsController {
     return created;
   }
 
+  /** Returns one coupon. */
   @Get(':id')
   @RequirePermissions('billing:read')
   get(@Param('id', ParseUUIDPipe) id: string): Promise<CouponView> {
@@ -87,6 +90,7 @@ export class CouponsController {
     return this.coupons.redemptions(id, query);
   }
 
+  /** Changes a coupon. */
   @Patch(':id')
   @RequirePermissions('billing:write')
   async update(
@@ -103,6 +107,7 @@ export class CouponsController {
     return updated;
   }
 
+  /** Deletes a coupon. */
   @Delete(':id')
   @RequirePermissions('billing:write')
   @HttpCode(HttpStatus.NO_CONTENT)

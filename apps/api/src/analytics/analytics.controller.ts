@@ -24,6 +24,7 @@ import {
 export class AnalyticsController {
   constructor(@Inject(AnalyticsService) private readonly analytics: AnalyticsService) {}
 
+  /** Returns viewing totals for a period, with a figure per day. */
   @Get('summary')
   @RequirePermissions('analytics:read')
   summary(
@@ -32,12 +33,14 @@ export class AnalyticsController {
     return this.analytics.summary(query);
   }
 
+  /** Returns who is watching right now, by title, device and quality. */
   @Get('now')
   @RequirePermissions('analytics:read')
   now(): Promise<WatchingNow> {
     return this.analytics.now();
   }
 
+  /** Ranks titles by how much they were watched in a period. */
   @Get('titles')
   @RequirePermissions('analytics:read')
   titles(
@@ -46,6 +49,7 @@ export class AnalyticsController {
     return this.analytics.titles(query);
   }
 
+  /** Returns the viewing statistics of one title, with a figure per day. */
   @Get('titles/:id')
   @RequirePermissions('analytics:read')
   title(

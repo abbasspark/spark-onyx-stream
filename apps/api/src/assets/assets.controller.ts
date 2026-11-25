@@ -43,6 +43,7 @@ export class AssetsController {
     @Inject(PlaybackService) private readonly playback: PlaybackService,
   ) {}
 
+  /** Lists the videos. */
   @Get()
   @RequirePermissions('assets:read')
   list(
@@ -51,6 +52,7 @@ export class AssetsController {
     return this.assets.list(query);
   }
 
+  /** Returns one video. */
   @Get(':id')
   @RequirePermissions('assets:read')
   get(@Param('id', ParseUUIDPipe) id: string): Promise<AssetView> {
@@ -75,6 +77,7 @@ export class AssetsController {
     return this.assets.create(principal, body, requestInfo(request).ipAddress);
   }
 
+  /** Changes the title or the peer-to-peer setting of a video. */
   @Patch(':id')
   @RequirePermissions('assets:write')
   update(
@@ -108,6 +111,7 @@ export class AssetsController {
     return this.playback.createPlayback(id);
   }
 
+  /** Deletes a video and, later, its files. */
   @Delete(':id')
   @RequirePermissions('assets:write')
   @HttpCode(HttpStatus.NO_CONTENT)

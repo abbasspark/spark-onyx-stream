@@ -204,6 +204,7 @@
         "tags": [
           "Admins"
         ],
+        "summary": "Lists the admins, with the role of each",
         "description": "For an admin or an API key. Needs admins:read.",
         "security": [
           {
@@ -292,6 +293,7 @@
         "tags": [
           "Admins"
         ],
+        "summary": "Creates a admin",
         "description": "For a signed-in admin, not for API keys. Needs admins:write.",
         "security": [
           {
@@ -474,6 +476,7 @@
         "tags": [
           "Admins"
         ],
+        "summary": "Returns one admin",
         "description": "For an admin or an API key. Needs admins:read.",
         "security": [
           {
@@ -549,6 +552,7 @@
         "tags": [
           "Admins"
         ],
+        "summary": "Changes the name, role or status of an admin",
         "description": "For a signed-in admin, not for API keys. Needs admins:write.",
         "security": [
           {
@@ -741,6 +745,7 @@
         "tags": [
           "Statistics"
         ],
+        "summary": "Returns who is watching right now, by title, device and quality",
         "description": "For an admin or an API key. Needs analytics:read.",
         "security": [
           {
@@ -797,6 +802,7 @@
         "tags": [
           "Playback quality"
         ],
+        "summary": "Returns how well playback went in a period: start times, stalls and failures",
         "description": "For an admin or an API key. Needs analytics:read.",
         "security": [
           {
@@ -1099,6 +1105,7 @@
         "tags": [
           "My list"
         ],
+        "summary": "Ranks titles by how many viewers saved them to their list",
         "description": "For an admin or an API key. Needs analytics:read.",
         "security": [
           {
@@ -1175,6 +1182,7 @@
         "tags": [
           "Statistics"
         ],
+        "summary": "Returns viewing totals for a period, with a figure per day",
         "description": "For an admin or an API key. Needs analytics:read.",
         "security": [
           {
@@ -1285,6 +1293,7 @@
         "tags": [
           "Statistics"
         ],
+        "summary": "Ranks titles by how much they were watched in a period",
         "description": "For an admin or an API key. Needs analytics:read.",
         "security": [
           {
@@ -1432,6 +1441,7 @@
         "tags": [
           "Statistics"
         ],
+        "summary": "Returns the viewing statistics of one title, with a figure per day",
         "description": "For an admin or an API key. Needs analytics:read.",
         "security": [
           {
@@ -1549,6 +1559,7 @@
         "tags": [
           "API keys"
         ],
+        "summary": "Lists the API keys",
         "description": "For an admin or an API key. Needs api-keys:read.",
         "security": [
           {
@@ -1731,7 +1742,8 @@
         "tags": [
           "API keys"
         ],
-        "description": "For a signed-in admin, not for API keys. Needs api-keys:write.",
+        "summary": "Revokes an API key",
+        "description": "It stops working at once. For a signed-in admin, not for API keys. Needs api-keys:write.",
         "security": [
           {
             "adminSession": []
@@ -2017,6 +2029,7 @@
         "tags": [
           "Videos"
         ],
+        "summary": "Lists the videos",
         "description": "For an admin or an API key. Needs assets:read.",
         "security": [
           {
@@ -3129,6 +3142,7 @@
         "tags": [
           "Subtitles"
         ],
+        "summary": "Removes a subtitle track from a video",
         "description": "For an admin or an API key. Needs assets:write.",
         "security": [
           {
@@ -3206,6 +3220,7 @@
         "tags": [
           "Subtitles"
         ],
+        "summary": "Renames a subtitle track or changes its language and flags",
         "description": "For an admin or an API key. Needs assets:write.",
         "security": [
           {
@@ -3414,6 +3429,7 @@
         "tags": [
           "Videos"
         ],
+        "summary": "Deletes a video and, later, its files",
         "description": "For an admin or an API key. Needs assets:write.",
         "security": [
           {
@@ -3482,6 +3498,7 @@
         "tags": [
           "Videos"
         ],
+        "summary": "Returns one video",
         "description": "For an admin or an API key. Needs assets:read.",
         "security": [
           {
@@ -3557,6 +3574,7 @@
         "tags": [
           "Videos"
         ],
+        "summary": "Changes the title or the peer-to-peer setting of a video",
         "description": "For an admin or an API key. Needs assets:write.",
         "security": [
           {
@@ -3941,6 +3959,7 @@
         "tags": [
           "Audit log"
         ],
+        "summary": "Lists what admins did, the newest first",
         "description": "For an admin or an API key. Needs audit:read.",
         "security": [
           {
@@ -4124,6 +4143,7 @@
         "tags": [
           "Admin sign-in"
         ],
+        "summary": "Signs the admin out of this session",
         "description": "For a signed-in admin, not for API keys.",
         "security": [
           {
@@ -4223,6 +4243,7 @@
         "tags": [
           "Admin sign-in"
         ],
+        "summary": "Changes the password of the signed-in admin and signs out their other sessions",
         "description": "For a signed-in admin, not for API keys.",
         "security": [
           {
@@ -4974,6 +4995,7 @@
         "tags": [
           "Backups"
         ],
+        "summary": "Deletes a backup and its file",
         "description": "For an admin or an API key. Needs settings:write.",
         "security": [
           {
@@ -5206,6 +5228,7 @@
         "tags": [
           "Backups"
         ],
+        "summary": "Sets when backups are made, how many are kept and where they go",
         "description": "For an admin or an API key. Needs settings:write.",
         "security": [
           {
@@ -5363,6 +5386,7 @@
         "tags": [
           "Billing"
         ],
+        "summary": "Returns the billing overview: subscribers, plans and what is owed",
         "description": "For an admin or an API key. Needs billing:read.",
         "security": [
           {
@@ -5419,6 +5443,7 @@
         "tags": [
           "Billing"
         ],
+        "summary": "Returns revenue for a period, with a figure per day",
         "description": "For an admin or an API key. Needs billing:read.",
         "security": [
           {
@@ -5794,6 +5819,7 @@
         "tags": [
           "Branding"
         ],
+        "summary": "Returns the name, logo and colours of the installation",
         "description": "For an admin or an API key. Needs settings:read.",
         "security": [
           {
@@ -5848,6 +5874,7 @@
         "tags": [
           "Branding"
         ],
+        "summary": "Sets the name, logo and colours of the installation",
         "description": "For an admin or an API key. Needs settings:write.",
         "security": [
           {
@@ -7812,6 +7839,7 @@
         "tags": [
           "Catalog"
         ],
+        "summary": "Lists the categories",
         "description": "For an admin or an API key. Needs catalog:read.",
         "security": [
           {
@@ -7869,6 +7897,7 @@
         "tags": [
           "Catalog"
         ],
+        "summary": "Creates a category",
         "description": "For an admin or an API key. Needs catalog:write.",
         "security": [
           {
@@ -7972,7 +8001,8 @@
         "tags": [
           "Catalog"
         ],
-        "description": "For an admin or an API key. Needs catalog:write.",
+        "summary": "Deletes a category",
+        "description": "Titles in it are kept. For an admin or an API key. Needs catalog:write.",
         "security": [
           {
             "adminSession": []
@@ -8040,6 +8070,7 @@
         "tags": [
           "Catalog"
         ],
+        "summary": "Changes a category",
         "description": "For an admin or an API key. Needs catalog:write.",
         "security": [
           {
@@ -8256,6 +8287,7 @@
         "tags": [
           "Live channels"
         ],
+        "summary": "Lists the channels",
         "description": "For an admin or an API key. Needs live:read.",
         "security": [
           {
@@ -8313,6 +8345,7 @@
         "tags": [
           "Live channels"
         ],
+        "summary": "Creates a channel",
         "description": "For an admin or an API key. Needs live:write.",
         "security": [
           {
@@ -8508,6 +8541,7 @@
         "tags": [
           "Programme guide"
         ],
+        "summary": "Lists the programmes of a channel in a time range",
         "description": "For an admin or an API key. Needs live:read.",
         "security": [
           {
@@ -8616,6 +8650,7 @@
         "tags": [
           "Programme guide"
         ],
+        "summary": "Adds a programme to a channel by hand",
         "description": "For an admin or an API key. Needs live:write.",
         "security": [
           {
@@ -8768,6 +8803,7 @@
         "tags": [
           "Live channels"
         ],
+        "summary": "Deletes a channel",
         "description": "For an admin or an API key. Needs live:write.",
         "security": [
           {
@@ -8836,6 +8872,7 @@
         "tags": [
           "Live channels"
         ],
+        "summary": "Returns one channel",
         "description": "For an admin or an API key. Needs live:read.",
         "security": [
           {
@@ -8911,6 +8948,7 @@
         "tags": [
           "Live channels"
         ],
+        "summary": "Changes a channel",
         "description": "For an admin or an API key. Needs live:write.",
         "security": [
           {
@@ -9269,6 +9307,7 @@
         "tags": [
           "Live channels"
         ],
+        "summary": "Restarts the live process of a channel",
         "description": "For an admin or an API key. Needs live:write.",
         "security": [
           {
@@ -9432,6 +9471,7 @@
         "tags": [
           "Live channels"
         ],
+        "summary": "Starts the live process of a channel",
         "description": "For an admin or an API key. Needs live:write.",
         "security": [
           {
@@ -9509,6 +9549,7 @@
         "tags": [
           "Live channels"
         ],
+        "summary": "Stops the live process of a channel",
         "description": "For an admin or an API key. Needs live:write.",
         "security": [
           {
@@ -9761,6 +9802,7 @@
         "tags": [
           "Catalog"
         ],
+        "summary": "Lists the collections",
         "description": "For an admin or an API key. Needs catalog:read.",
         "security": [
           {
@@ -9818,6 +9860,7 @@
         "tags": [
           "Catalog"
         ],
+        "summary": "Creates a collection",
         "description": "For an admin or an API key. Needs catalog:write.",
         "security": [
           {
@@ -9926,6 +9969,7 @@
         "tags": [
           "Catalog"
         ],
+        "summary": "Deletes a collection",
         "description": "For an admin or an API key. Needs catalog:write.",
         "security": [
           {
@@ -9994,6 +10038,7 @@
         "tags": [
           "Catalog"
         ],
+        "summary": "Returns one collection",
         "description": "For an admin or an API key. Needs catalog:read.",
         "security": [
           {
@@ -10069,6 +10114,7 @@
         "tags": [
           "Catalog"
         ],
+        "summary": "Changes a collection",
         "description": "For an admin or an API key. Needs catalog:write.",
         "security": [
           {
@@ -10210,6 +10256,7 @@
         "tags": [
           "Catalog"
         ],
+        "summary": "Replaces the titles of a collection and their order",
         "description": "For an admin or an API key. Needs catalog:write.",
         "security": [
           {
@@ -10415,6 +10462,7 @@
         "tags": [
           "Billing"
         ],
+        "summary": "Lists the coupons",
         "description": "For an admin or an API key. Needs billing:read.",
         "security": [
           {
@@ -10472,6 +10520,7 @@
         "tags": [
           "Billing"
         ],
+        "summary": "Creates a coupon",
         "description": "For an admin or an API key. Needs billing:write.",
         "security": [
           {
@@ -10681,6 +10730,7 @@
         "tags": [
           "Billing"
         ],
+        "summary": "Deletes a coupon",
         "description": "For an admin or an API key. Needs billing:write.",
         "security": [
           {
@@ -10749,6 +10799,7 @@
         "tags": [
           "Billing"
         ],
+        "summary": "Returns one coupon",
         "description": "For an admin or an API key. Needs billing:read.",
         "security": [
           {
@@ -10824,6 +10875,7 @@
         "tags": [
           "Billing"
         ],
+        "summary": "Changes a coupon",
         "description": "For an admin or an API key. Needs billing:write.",
         "security": [
           {
@@ -11227,6 +11279,7 @@
         "tags": [
           "Diagnostics"
         ],
+        "summary": "Sets who is emailed when a problem appears and whether to check for new versions",
         "description": "For an admin or an API key. Needs settings:write.",
         "security": [
           {
@@ -11749,6 +11802,7 @@
         "tags": [
           "Edge servers"
         ],
+        "summary": "Lists the edge servers, with live figures",
         "description": "For an admin or an API key. Needs delivery:read.",
         "security": [
           {
@@ -11927,7 +11981,8 @@
         "tags": [
           "Edge servers"
         ],
-        "description": "For an admin or an API key. Needs delivery:write.",
+        "summary": "Removes an edge server",
+        "description": "Viewers move to another one. For an admin or an API key. Needs delivery:write.",
         "security": [
           {
             "adminSession": []
@@ -11995,6 +12050,7 @@
         "tags": [
           "Edge servers"
         ],
+        "summary": "Returns one edge server",
         "description": "For an admin or an API key. Needs delivery:read.",
         "security": [
           {
@@ -12070,6 +12126,7 @@
         "tags": [
           "Edge servers"
         ],
+        "summary": "Changes the address, weight or content of an edge server",
         "description": "For an admin or an API key. Needs delivery:write.",
         "security": [
           {
@@ -12556,6 +12613,7 @@
         "tags": [
           "Encoding profiles"
         ],
+        "summary": "Lists the encoding profiles",
         "description": "For an admin or an API key. Needs encoding-profiles:read.",
         "security": [
           {
@@ -12613,6 +12671,7 @@
         "tags": [
           "Encoding profiles"
         ],
+        "summary": "Creates a encoding profile",
         "description": "For an admin or an API key. Needs encoding-profiles:write.",
         "security": [
           {
@@ -12770,6 +12829,7 @@
         "tags": [
           "Encoding profiles"
         ],
+        "summary": "Deletes a encoding profile",
         "description": "For an admin or an API key. Needs encoding-profiles:write.",
         "security": [
           {
@@ -12838,6 +12898,7 @@
         "tags": [
           "Encoding profiles"
         ],
+        "summary": "Returns one encoding profile",
         "description": "For an admin or an API key. Needs encoding-profiles:read.",
         "security": [
           {
@@ -12913,6 +12974,7 @@
         "tags": [
           "Encoding profiles"
         ],
+        "summary": "Changes a encoding profile",
         "description": "For an admin or an API key. Needs encoding-profiles:write.",
         "security": [
           {
@@ -13092,6 +13154,7 @@
         "tags": [
           "Catalog"
         ],
+        "summary": "Deletes an episode",
         "description": "For an admin or an API key. Needs catalog:write.",
         "security": [
           {
@@ -13167,6 +13230,7 @@
         "tags": [
           "Catalog"
         ],
+        "summary": "Changes an episode",
         "description": "For an admin or an API key. Needs catalog:write.",
         "security": [
           {
@@ -13389,6 +13453,7 @@
         "tags": [
           "Catalog"
         ],
+        "summary": "Deletes a trailer or clip of a title",
         "description": "For an admin or an API key. Needs catalog:write.",
         "security": [
           {
@@ -13457,6 +13522,7 @@
         "tags": [
           "Catalog"
         ],
+        "summary": "Changes a trailer or clip of a title",
         "description": "For an admin or an API key. Needs catalog:write.",
         "security": [
           {
@@ -13576,6 +13642,7 @@
         "tags": [
           "Catalog"
         ],
+        "summary": "Lists the genres",
         "description": "For an admin or an API key. Needs catalog:read.",
         "security": [
           {
@@ -13633,6 +13700,7 @@
         "tags": [
           "Catalog"
         ],
+        "summary": "Creates a genre",
         "description": "For an admin or an API key. Needs catalog:write.",
         "security": [
           {
@@ -13725,6 +13793,7 @@
         "tags": [
           "Catalog"
         ],
+        "summary": "Deletes a genre",
         "description": "For an admin or an API key. Needs catalog:write.",
         "security": [
           {
@@ -13793,6 +13862,7 @@
         "tags": [
           "Catalog"
         ],
+        "summary": "Changes a genre",
         "description": "For an admin or an API key. Needs catalog:write.",
         "security": [
           {
@@ -13985,6 +14055,7 @@
         "tags": [
           "Programme guide"
         ],
+        "summary": "Lists the XMLTV sources the guide is imported from",
         "description": "For an admin or an API key. Needs live:read.",
         "security": [
           {
@@ -14042,6 +14113,7 @@
         "tags": [
           "Programme guide"
         ],
+        "summary": "Adds an XMLTV source for the guide",
         "description": "For an admin or an API key. Needs live:write.",
         "security": [
           {
@@ -14135,6 +14207,7 @@
         "tags": [
           "Programme guide"
         ],
+        "summary": "Deletes a guide source and the programmes it brought",
         "description": "For an admin or an API key. Needs live:write.",
         "security": [
           {
@@ -14203,6 +14276,7 @@
         "tags": [
           "Programme guide"
         ],
+        "summary": "Changes a guide source",
         "description": "For an admin or an API key. Needs live:write.",
         "security": [
           {
@@ -14706,6 +14780,7 @@
         "tags": [
           "Jobs"
         ],
+        "summary": "Lists the processing jobs",
         "description": "For an admin or an API key. Needs jobs:read.",
         "security": [
           {
@@ -14772,9 +14847,9 @@
                 "TRANSCODE",
                 "PROBE",
                 "REMUX",
-                "PACKAGE",
                 "THUMBNAILS",
-                "SUBTITLES",
+                "AUDIO",
+                "MARKERS",
                 "CLEANUP"
               ]
             }
@@ -14830,6 +14905,7 @@
         "tags": [
           "Jobs"
         ],
+        "summary": "Returns one processing job",
         "description": "For an admin or an API key. Needs jobs:read.",
         "security": [
           {
@@ -15276,6 +15352,7 @@
         "tags": [
           "Page layout"
         ],
+        "summary": "Adds a section to a page of the viewer website",
         "description": "For an admin or an API key. Needs catalog:write.",
         "security": [
           {
@@ -15518,6 +15595,7 @@
         "tags": [
           "Page layout"
         ],
+        "summary": "Sets the order of the sections of a page",
         "description": "For an admin or an API key. Needs catalog:write.",
         "security": [
           {
@@ -15706,6 +15784,7 @@
         "tags": [
           "Page layout"
         ],
+        "summary": "Deletes a section from a page",
         "description": "For an admin or an API key. Needs catalog:write.",
         "security": [
           {
@@ -16101,6 +16180,7 @@
         "tags": [
           "Email"
         ],
+        "summary": "Returns whether email is set up and works",
         "description": "For an admin or an API key. Needs settings:read.",
         "security": [
           {
@@ -16644,6 +16724,7 @@
         "tags": [
           "Import of details"
         ],
+        "summary": "Searches TMDB for a movie or series to import",
         "description": "For an admin or an API key. Needs catalog:write.",
         "security": [
           {
@@ -16851,6 +16932,7 @@
         "tags": [
           "Notifications"
         ],
+        "summary": "Lists the notification campaigns, the newest first",
         "description": "For an admin or an API key. Needs viewers:read.",
         "security": [
           {
@@ -17105,6 +17187,7 @@
         "tags": [
           "Notifications"
         ],
+        "summary": "Deletes a notification campaign",
         "description": "For an admin or an API key. Needs viewers:write.",
         "security": [
           {
@@ -17173,6 +17256,7 @@
         "tags": [
           "Notifications"
         ],
+        "summary": "Returns one campaign with how many it reached",
         "description": "For an admin or an API key. Needs viewers:read.",
         "security": [
           {
@@ -17248,6 +17332,7 @@
         "tags": [
           "Notifications"
         ],
+        "summary": "Changes a campaign that has not been sent",
         "description": "For an admin or an API key. Needs viewers:write.",
         "security": [
           {
@@ -17934,6 +18019,7 @@
         "tags": [
           "Notifications"
         ],
+        "summary": "Returns whether push notifications are set up, and how many devices can receive them",
         "description": "For an admin or an API key. Needs viewers:read.",
         "security": [
           {
@@ -18216,6 +18302,7 @@
         "tags": [
           "Billing"
         ],
+        "summary": "Lists the packages",
         "description": "For an admin or an API key. Needs catalog:read.",
         "security": [
           {
@@ -18273,6 +18360,7 @@
         "tags": [
           "Billing"
         ],
+        "summary": "Creates a package",
         "description": "For an admin or an API key. Needs billing:write.",
         "security": [
           {
@@ -18368,6 +18456,7 @@
         "tags": [
           "Billing"
         ],
+        "summary": "Deletes a package",
         "description": "For an admin or an API key. Needs billing:write.",
         "security": [
           {
@@ -18436,6 +18525,7 @@
         "tags": [
           "Billing"
         ],
+        "summary": "Changes a package",
         "description": "For an admin or an API key. Needs billing:write.",
         "security": [
           {
@@ -18764,6 +18854,7 @@
         "tags": [
           "Billing"
         ],
+        "summary": "Lists payments, the newest first",
         "description": "For an admin or an API key. Needs billing:read.",
         "security": [
           {
@@ -19127,6 +19218,7 @@
         "tags": [
           "Catalog"
         ],
+        "summary": "Lists the people in the catalog, with search and paging",
         "description": "For an admin or an API key. Needs catalog:read.",
         "security": [
           {
@@ -19252,6 +19344,7 @@
         "tags": [
           "Catalog"
         ],
+        "summary": "Creates a person",
         "description": "For an admin or an API key. Needs catalog:write.",
         "security": [
           {
@@ -19372,6 +19465,7 @@
         "tags": [
           "Catalog"
         ],
+        "summary": "Deletes a person from the catalog",
         "description": "For an admin or an API key. Needs catalog:write.",
         "security": [
           {
@@ -19440,6 +19534,7 @@
         "tags": [
           "Catalog"
         ],
+        "summary": "Returns one person with their credits",
         "description": "For an admin or an API key. Needs catalog:read.",
         "security": [
           {
@@ -19515,6 +19610,7 @@
         "tags": [
           "Catalog"
         ],
+        "summary": "Changes a person",
         "description": "For an admin or an API key. Needs catalog:write.",
         "security": [
           {
@@ -19659,6 +19755,7 @@
         "tags": [
           "Billing"
         ],
+        "summary": "Lists the plans",
         "description": "For an admin or an API key. Needs billing:read.",
         "security": [
           {
@@ -19716,6 +19813,7 @@
         "tags": [
           "Billing"
         ],
+        "summary": "Creates a plan",
         "description": "For an admin or an API key. Needs billing:write.",
         "security": [
           {
@@ -19885,6 +19983,7 @@
         "tags": [
           "Billing"
         ],
+        "summary": "Deletes a plan that no viewer ever had",
         "description": "For an admin or an API key. Needs billing:write.",
         "security": [
           {
@@ -19953,6 +20052,7 @@
         "tags": [
           "Billing"
         ],
+        "summary": "Changes a plan",
         "description": "For an admin or an API key. Needs billing:write.",
         "security": [
           {
@@ -20394,6 +20494,7 @@
         "tags": [
           "Prepaid codes"
         ],
+        "summary": "Lists the batches of prepaid codes",
         "description": "For an admin or an API key. Needs billing:read.",
         "security": [
           {
@@ -20679,6 +20780,7 @@
         "tags": [
           "Prepaid codes"
         ],
+        "summary": "Returns one batch with its codes and which were used",
         "description": "For an admin or an API key. Needs billing:read.",
         "security": [
           {
@@ -21463,6 +21565,7 @@
         "tags": [
           "Programme guide"
         ],
+        "summary": "Deletes a programme",
         "description": "For an admin or an API key. Needs live:write.",
         "security": [
           {
@@ -21531,6 +21634,7 @@
         "tags": [
           "Programme guide"
         ],
+        "summary": "Changes a programme",
         "description": "For an admin or an API key. Needs live:write.",
         "security": [
           {
@@ -21872,6 +21976,7 @@
         "tags": [
           "Recordings"
         ],
+        "summary": "Lists the recordings",
         "description": "For an admin or an API key. Needs live:read.",
         "security": [
           {
@@ -21974,6 +22079,7 @@
         "tags": [
           "Recordings"
         ],
+        "summary": "Starts recording a programme or a time range of a channel into the library",
         "description": "For an admin or an API key. Needs live:write.",
         "security": [
           {
@@ -22078,6 +22184,7 @@
         "tags": [
           "Recordings"
         ],
+        "summary": "Deletes a recording",
         "description": "For an admin or an API key. Needs live:write.",
         "security": [
           {
@@ -22281,6 +22388,7 @@
         "tags": [
           "Roles"
         ],
+        "summary": "Creates a custom role with a list of permissions",
         "description": "For a signed-in admin, not for API keys. Needs admins:write.",
         "security": [
           {
@@ -22573,6 +22681,7 @@
         "tags": [
           "Roles"
         ],
+        "summary": "Changes the name or permissions of a custom role",
         "description": "For a signed-in admin, not for API keys. Needs admins:write.",
         "security": [
           {
@@ -22699,6 +22808,7 @@
         "tags": [
           "Catalog"
         ],
+        "summary": "Deletes a season with its episodes",
         "description": "For an admin or an API key. Needs catalog:write.",
         "security": [
           {
@@ -22774,6 +22884,7 @@
         "tags": [
           "Catalog"
         ],
+        "summary": "Changes a season",
         "description": "For an admin or an API key. Needs catalog:write.",
         "security": [
           {
@@ -22923,6 +23034,7 @@
         "tags": [
           "Catalog"
         ],
+        "summary": "Adds an episode to a season",
         "description": "For an admin or an API key. Needs catalog:write.",
         "security": [
           {
@@ -23437,6 +23549,7 @@
         "tags": [
           "Storage"
         ],
+        "summary": "Lists the storage pools",
         "description": "For an admin or an API key. Needs storage:read.",
         "security": [
           {
@@ -23494,6 +23607,7 @@
         "tags": [
           "Storage"
         ],
+        "summary": "Creates a storage pool",
         "description": "For a signed-in admin, not for API keys. Needs storage:write.",
         "security": [
           {
@@ -23697,6 +23811,7 @@
         "tags": [
           "Storage"
         ],
+        "summary": "Returns one storage pool with how much it holds",
         "description": "For an admin or an API key. Needs storage:read.",
         "security": [
           {
@@ -23772,6 +23887,7 @@
         "tags": [
           "Storage"
         ],
+        "summary": "Changes a storage pool",
         "description": "For a signed-in admin, not for API keys. Needs storage:write.",
         "security": [
           {
@@ -23982,6 +24098,7 @@
         "tags": [
           "Billing"
         ],
+        "summary": "Changes a subscription: grants, extends or ends it by hand",
         "description": "For an admin or an API key. Needs billing:write.",
         "security": [
           {
@@ -24261,6 +24378,7 @@
         "tags": [
           "Catalog"
         ],
+        "summary": "Lists movies and series, with filters, search and paging",
         "description": "For an admin or an API key. Needs catalog:read.",
         "security": [
           {
@@ -24540,6 +24658,7 @@
         "tags": [
           "Catalog"
         ],
+        "summary": "Creates a movie or a series",
         "description": "For an admin or an API key. Needs catalog:write.",
         "security": [
           {
@@ -24640,6 +24759,7 @@
         "tags": [
           "Catalog"
         ],
+        "summary": "Deletes a title with its seasons and episodes",
         "description": "For an admin or an API key. Needs catalog:write.",
         "security": [
           {
@@ -24708,6 +24828,7 @@
         "tags": [
           "Catalog"
         ],
+        "summary": "Returns one title with its seasons, episodes and artwork",
         "description": "For an admin or an API key. Needs catalog:read.",
         "security": [
           {
@@ -24783,6 +24904,7 @@
         "tags": [
           "Catalog"
         ],
+        "summary": "Changes a title, and publishes or hides it",
         "description": "For an admin or an API key. Needs catalog:write.",
         "security": [
           {
@@ -25504,6 +25626,7 @@
         "tags": [
           "Catalog"
         ],
+        "summary": "Adds a trailer or clip to a title",
         "description": "For an admin or an API key. Needs catalog:write.",
         "security": [
           {
@@ -25633,6 +25756,7 @@
         "tags": [
           "Catalog"
         ],
+        "summary": "Sets the order of the extras of a title",
         "description": "For an admin or an API key. Needs catalog:write.",
         "security": [
           {
@@ -25747,6 +25871,7 @@
         "tags": [
           "Title history"
         ],
+        "summary": "Lists the changes made to a title, the newest first",
         "description": "For an admin or an API key. Needs catalog:read.",
         "security": [
           {
@@ -26214,6 +26339,7 @@
         "tags": [
           "Catalog"
         ],
+        "summary": "Adds a season to a series",
         "description": "For an admin or an API key. Needs catalog:write.",
         "security": [
           {
@@ -26340,6 +26466,7 @@
         "tags": [
           "Similar titles"
         ],
+        "summary": "Returns titles viewers of this one also watched",
         "description": "For an admin or an API key. Needs catalog:read.",
         "security": [
           {
@@ -26648,6 +26775,7 @@
         "tags": [
           "Catalog"
         ],
+        "summary": "Lists the translations of a title, a season or an episode",
         "description": "For an admin or an API key. Needs catalog:read.",
         "security": [
           {
@@ -26728,6 +26856,7 @@
         "tags": [
           "Catalog"
         ],
+        "summary": "Deletes one language of a title",
         "description": "For an admin or an API key. Needs catalog:write.",
         "security": [
           {
@@ -26804,6 +26933,7 @@
         "tags": [
           "Catalog"
         ],
+        "summary": "Sets the text of a title in one language",
         "description": "For an admin or an API key. Needs catalog:write.",
         "security": [
           {
@@ -27553,6 +27683,7 @@
         "tags": [
           "Bulk actions"
         ],
+        "summary": "Lists the translation jobs",
         "description": "For an admin or an API key. Needs catalog:read.",
         "security": [
           {
@@ -27636,6 +27767,7 @@
         "tags": [
           "Bulk actions"
         ],
+        "summary": "Cancels a translation job that is still running",
         "description": "For an admin or an API key. Needs catalog:write.",
         "security": [
           {
@@ -27830,6 +27962,7 @@
         "tags": [
           "Catalog"
         ],
+        "summary": "Lists genres, categories, collections or people with their translations",
         "description": "For an admin or an API key. Needs catalog:read.",
         "security": [
           {
@@ -33251,6 +33384,7 @@
         "tags": [
           "Viewers"
         ],
+        "summary": "Lists the viewers",
         "description": "For an admin or an API key. Needs viewers:read.",
         "security": [
           {
@@ -33401,6 +33535,7 @@
         "tags": [
           "Viewers"
         ],
+        "summary": "Creates a viewer",
         "description": "For an admin or an API key. Needs viewers:write.",
         "security": [
           {
@@ -33541,6 +33676,7 @@
         "tags": [
           "Viewers"
         ],
+        "summary": "Deletes a viewer",
         "description": "For an admin or an API key. Needs viewers:write.",
         "security": [
           {
@@ -33609,6 +33745,7 @@
         "tags": [
           "Viewers"
         ],
+        "summary": "Returns one viewer",
         "description": "For an admin or an API key. Needs viewers:read.",
         "security": [
           {
@@ -33684,6 +33821,7 @@
         "tags": [
           "Viewers"
         ],
+        "summary": "Changes a viewer",
         "description": "For an admin or an API key. Needs viewers:write.",
         "security": [
           {
@@ -33893,6 +34031,7 @@
         "tags": [
           "My list"
         ],
+        "summary": "Lists the titles a viewer saved",
         "description": "For an admin or an API key. Needs viewers:read.",
         "security": [
           {
@@ -34142,6 +34281,7 @@
         "tags": [
           "Billing"
         ],
+        "summary": "Lists the payments of one viewer",
         "description": "For an admin or an API key. Needs billing:read.",
         "security": [
           {
@@ -34433,6 +34573,7 @@
         "tags": [
           "Purchases"
         ],
+        "summary": "Lists what a viewer bought or rented",
         "description": "For an admin or an API key. Needs billing:read.",
         "security": [
           {
@@ -34658,6 +34799,7 @@
         "tags": [
           "Viewers"
         ],
+        "summary": "Signs a viewer out of every device",
         "description": "For an admin or an API key. Needs viewers:write.",
         "security": [
           {
@@ -34743,6 +34885,7 @@
         "tags": [
           "Streams"
         ],
+        "summary": "Lists what a viewer is playing right now",
         "description": "For an admin or an API key. Needs viewers:read.",
         "security": [
           {
@@ -35197,6 +35340,7 @@
         "tags": [
           "Watching"
         ],
+        "summary": "Lists what a viewer has started watching, with their progress",
         "description": "For an admin or an API key. Needs viewers:read.",
         "security": [
           {
@@ -35274,6 +35418,7 @@
         "tags": [
           "Watched locations"
         ],
+        "summary": "Lists the files found in watched locations and what became of each",
         "description": "For an admin or an API key. Needs catalog:read.",
         "security": [
           {
@@ -35402,6 +35547,7 @@
         "tags": [
           "Watched locations"
         ],
+        "summary": "Sets a found file aside",
         "description": "For an admin or an API key. Needs catalog:write.",
         "security": [
           {
@@ -35479,6 +35625,7 @@
         "tags": [
           "Watched locations"
         ],
+        "summary": "Says which title or episode a found file is",
         "description": "For an admin or an API key. Needs catalog:write.",
         "security": [
           {
@@ -35604,6 +35751,7 @@
         "tags": [
           "Watched locations"
         ],
+        "summary": "Tries a failed file again",
         "description": "For an admin or an API key. Needs catalog:write.",
         "security": [
           {
@@ -35799,6 +35947,7 @@
         "tags": [
           "Watched locations"
         ],
+        "summary": "Lists the watched folders and buckets",
         "description": "For an admin or an API key. Needs storage:read.",
         "security": [
           {
@@ -35856,6 +36005,7 @@
         "tags": [
           "Watched locations"
         ],
+        "summary": "Adds a watched folder or bucket",
         "description": "For an admin or an API key. Needs storage:write.",
         "security": [
           {
@@ -36158,6 +36308,7 @@
         "tags": [
           "Watched locations"
         ],
+        "summary": "Stops watching a folder or bucket",
         "description": "For an admin or an API key. Needs storage:write.",
         "security": [
           {
@@ -36226,6 +36377,7 @@
         "tags": [
           "Watched locations"
         ],
+        "summary": "Returns one watched location",
         "description": "For an admin or an API key. Needs storage:read.",
         "security": [
           {
@@ -36301,6 +36453,7 @@
         "tags": [
           "Watched locations"
         ],
+        "summary": "Changes a watched location",
         "description": "For an admin or an API key. Needs storage:write.",
         "security": [
           {
@@ -36470,6 +36623,7 @@
         "tags": [
           "Watched locations"
         ],
+        "summary": "Looks through a watched location now",
         "description": "For an admin or an API key. Needs catalog:write.",
         "security": [
           {
@@ -36708,6 +36862,7 @@
         "tags": [
           "Watched locations"
         ],
+        "summary": "Returns how many files wait, import, conflict or failed",
         "description": "For an admin or an API key. Needs catalog:read.",
         "security": [
           {
@@ -36764,6 +36919,7 @@
         "tags": [
           "Webhooks"
         ],
+        "summary": "Lists the webhooks",
         "description": "For an admin or an API key. Needs settings:read.",
         "security": [
           {
@@ -36821,6 +36977,7 @@
         "tags": [
           "Webhooks"
         ],
+        "summary": "Creates a webhook",
         "description": "For a signed-in admin, not for API keys. Needs settings:write.",
         "security": [
           {
@@ -36918,6 +37075,7 @@
         "tags": [
           "Webhooks"
         ],
+        "summary": "Deletes a webhook",
         "description": "For an admin or an API key. Needs settings:write.",
         "security": [
           {
@@ -36986,6 +37144,7 @@
         "tags": [
           "Webhooks"
         ],
+        "summary": "Returns one webhook",
         "description": "For an admin or an API key. Needs settings:read.",
         "security": [
           {
@@ -37061,6 +37220,7 @@
         "tags": [
           "Webhooks"
         ],
+        "summary": "Changes a webhook",
         "description": "For an admin or an API key. Needs settings:write.",
         "security": [
           {
@@ -37261,6 +37421,7 @@
         "tags": [
           "Webhooks"
         ],
+        "summary": "Lists the messages sent to a webhook, with what became of each",
         "description": "For an admin or an API key. Needs settings:read.",
         "security": [
           {
@@ -37392,6 +37553,7 @@
         "tags": [
           "Webhooks"
         ],
+        "summary": "Returns one delivery with what was sent and what the address answered",
         "description": "For an admin or an API key. Needs settings:read.",
         "security": [
           {
@@ -43385,12 +43547,12 @@
           "TRANSCODE",
           "PROBE",
           "REMUX",
-          "PACKAGE",
           "THUMBNAILS",
-          "SUBTITLES",
-          "CLEANUP",
           "AUDIO",
-          "MARKERS"
+          "MARKERS",
+          "CLEANUP",
+          "PACKAGE",
+          "SUBTITLES"
         ]
       },
       "JobView": {

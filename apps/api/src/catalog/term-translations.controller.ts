@@ -78,6 +78,7 @@ export class TermTranslationsController {
     return this.terms.overview();
   }
 
+  /** Lists genres, categories, collections or people with their translations. */
   @Get(':kind')
   @RequirePermissions('catalog:read')
   list(

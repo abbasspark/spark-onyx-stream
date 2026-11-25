@@ -74,6 +74,7 @@ export class AuthController {
     return this.auth.login(body, requestInfo(request));
   }
 
+  /** Signs the admin out of this session. */
   @AdminSessionOnly()
   @AllowWithoutTwoFactor()
   @Post('logout')
@@ -92,6 +93,7 @@ export class AuthController {
     return principal;
   }
 
+  /** Changes the password of the signed-in admin and signs out their other sessions. */
   @AdminSessionOnly()
   @AllowWithoutTwoFactor()
   @Post('password')

@@ -69,12 +69,14 @@ export class PeopleController {
 
   // --- Genres -------------------------------------------------------------------
 
+  /** Lists the genres. */
   @Get('genres')
   @RequirePermissions('catalog:read')
   listGenres(): Promise<GenreView[]> {
     return this.people.listGenres();
   }
 
+  /** Creates a genre. */
   @Post('genres')
   @RequirePermissions('catalog:write')
   async createGenre(
@@ -87,6 +89,7 @@ export class PeopleController {
     return genre;
   }
 
+  /** Changes a genre. */
   @Patch('genres/:id')
   @RequirePermissions('catalog:write')
   async updateGenre(
@@ -100,6 +103,7 @@ export class PeopleController {
     return genre;
   }
 
+  /** Deletes a genre. */
   @Delete('genres/:id')
   @HttpCode(HttpStatus.NO_CONTENT)
   @RequirePermissions('catalog:write')
@@ -117,6 +121,7 @@ export class PeopleController {
 
   // --- People -------------------------------------------------------------------
 
+  /** Lists the people in the catalog, with search and paging. */
   @Get('people')
   @RequirePermissions('catalog:read')
   listPeople(
@@ -125,12 +130,14 @@ export class PeopleController {
     return this.people.listPeople(query);
   }
 
+  /** Returns one person with their credits. */
   @Get('people/:id')
   @RequirePermissions('catalog:read')
   getPerson(@Param('id', ParseUUIDPipe) id: string): Promise<PersonDetail> {
     return this.people.getPerson(id);
   }
 
+  /** Creates a person. */
   @Post('people')
   @RequirePermissions('catalog:write')
   async createPerson(
@@ -145,6 +152,7 @@ export class PeopleController {
     return person;
   }
 
+  /** Changes a person. */
   @Patch('people/:id')
   @RequirePermissions('catalog:write')
   async updatePerson(
@@ -161,6 +169,7 @@ export class PeopleController {
     return person;
   }
 
+  /** Deletes a person from the catalog. */
   @Delete('people/:id')
   @HttpCode(HttpStatus.NO_CONTENT)
   @RequirePermissions('catalog:write')

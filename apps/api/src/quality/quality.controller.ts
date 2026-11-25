@@ -61,6 +61,7 @@ export class PlaybackReportsController {
 export class QualityController {
   constructor(@Inject(QualityService) private readonly quality: QualityService) {}
 
+  /** Returns how well playback went in a period: start times, stalls and failures. */
   @Get()
   @RequirePermissions('analytics:read')
   summary(

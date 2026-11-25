@@ -59,6 +59,7 @@ export class PaymentsAdminController {
     @Inject(AuditService) private readonly audit: AuditService,
   ) {}
 
+  /** Returns revenue for a period, with a figure per day. */
   @Get('billing/revenue')
   @RequirePermissions('billing:read')
   revenue(
@@ -67,6 +68,7 @@ export class PaymentsAdminController {
     return this.payments.revenue(query);
   }
 
+  /** Lists payments, the newest first. */
   @Get('payments')
   @RequirePermissions('billing:read')
   list(
@@ -123,6 +125,7 @@ export class PaymentsAdminController {
     return result;
   }
 
+  /** Lists the payments of one viewer. */
   @Get('viewers/:id/payments')
   @RequirePermissions('billing:read')
   async forViewer(@Param('id', ParseUUIDPipe) id: string): Promise<{ items: PaymentAdminView[] }> {

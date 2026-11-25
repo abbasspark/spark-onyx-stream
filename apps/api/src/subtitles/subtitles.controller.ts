@@ -124,6 +124,7 @@ export class SubtitlesController {
     return { ...added, track: toView(added.track) };
   }
 
+  /** Renames a subtitle track or changes its language and flags. */
   @Patch(':trackId')
   @RequirePermissions('assets:write')
   async update(
@@ -145,6 +146,7 @@ export class SubtitlesController {
     return toView(track);
   }
 
+  /** Removes a subtitle track from a video. */
   @Delete(':trackId')
   @RequirePermissions('assets:write')
   @HttpCode(HttpStatus.NO_CONTENT)

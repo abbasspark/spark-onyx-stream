@@ -60,6 +60,7 @@ export class MetadataController {
     return this.metadata.status();
   }
 
+  /** Searches TMDB for a movie or series to import. */
   @Get('metadata/search')
   @RequirePermissions('catalog:write')
   @RateLimit(LOOKUPS)

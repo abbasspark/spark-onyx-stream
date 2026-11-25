@@ -166,6 +166,7 @@ export class HomeController {
     await this.record('layout.reset', principal, request, undefined, { page, sections });
   }
 
+  /** Adds a section to a page of the viewer website. */
   @Post(':page/sections')
   @RequirePermissions('catalog:write')
   async create(
@@ -183,6 +184,7 @@ export class HomeController {
     return this.section(view);
   }
 
+  /** Sets the order of the sections of a page. */
   @Put(':page/sections/order')
   @RequirePermissions('catalog:write')
   async order(
@@ -213,6 +215,7 @@ export class HomeController {
     return this.section(view);
   }
 
+  /** Deletes a section from a page. */
   @Delete('sections/:id')
   @RequirePermissions('catalog:write')
   @HttpCode(HttpStatus.NO_CONTENT)

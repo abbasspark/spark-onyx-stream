@@ -83,12 +83,14 @@ export class CatalogController {
 
   // --- Categories ----------------------------------------------------------------
 
+  /** Lists the categories. */
   @Get('categories')
   @RequirePermissions('catalog:read')
   listCategories(): Promise<CategoryView[]> {
     return this.categories.list();
   }
 
+  /** Creates a category. */
   @Post('categories')
   @RequirePermissions('catalog:write')
   async createCategory(
@@ -118,6 +120,7 @@ export class CatalogController {
     return this.categories.reorder(body);
   }
 
+  /** Changes a category. */
   @Patch('categories/:id')
   @RequirePermissions('catalog:write')
   async updateCategory(
@@ -139,6 +142,7 @@ export class CatalogController {
     return category;
   }
 
+  /** Deletes a category. Titles in it are kept. */
   @Delete('categories/:id')
   @HttpCode(HttpStatus.NO_CONTENT)
   @RequirePermissions('catalog:write')
@@ -162,6 +166,7 @@ export class CatalogController {
 
   // --- Titles ----------------------------------------------------------------------
 
+  /** Lists movies and series, with filters, search and paging. */
   @Get('titles')
   @RequirePermissions('catalog:read')
   listTitles(
@@ -170,6 +175,7 @@ export class CatalogController {
     return this.titles.list(query);
   }
 
+  /** Creates a movie or a series. */
   @Post('titles')
   @RequirePermissions('catalog:write')
   async createTitle(
@@ -216,12 +222,14 @@ export class CatalogController {
     return result;
   }
 
+  /** Returns one title with its seasons, episodes and artwork. */
   @Get('titles/:id')
   @RequirePermissions('catalog:read')
   getTitle(@Param('id', ParseUUIDPipe) id: string): Promise<TitleDetail> {
     return this.titles.get(id);
   }
 
+  /** Changes a title, and publishes or hides it. */
   @Patch('titles/:id')
   @RequirePermissions('catalog:write')
   async updateTitle(
@@ -266,6 +274,7 @@ export class CatalogController {
     return title;
   }
 
+  /** Deletes a title with its seasons and episodes. */
   @Delete('titles/:id')
   @HttpCode(HttpStatus.NO_CONTENT)
   @RequirePermissions('catalog:write')
@@ -290,6 +299,7 @@ export class CatalogController {
 
   // --- Seasons and episodes --------------------------------------------------------
 
+  /** Adds a season to a series. */
   @Post('titles/:id/seasons')
   @RequirePermissions('catalog:write')
   async createSeason(
@@ -302,6 +312,7 @@ export class CatalogController {
     return title;
   }
 
+  /** Changes a season. */
   @Patch('seasons/:id')
   @RequirePermissions('catalog:write')
   async updateSeason(
@@ -314,6 +325,7 @@ export class CatalogController {
     return title;
   }
 
+  /** Deletes a season with its episodes. */
   @Delete('seasons/:id')
   @RequirePermissions('catalog:write')
   async removeSeason(
@@ -335,6 +347,7 @@ export class CatalogController {
     return title;
   }
 
+  /** Adds an episode to a season. */
   @Post('seasons/:id/episodes')
   @RequirePermissions('catalog:write')
   async createEpisode(
@@ -347,6 +360,7 @@ export class CatalogController {
     return episode;
   }
 
+  /** Changes an episode. */
   @Patch('episodes/:id')
   @RequirePermissions('catalog:write')
   async updateEpisode(
@@ -369,6 +383,7 @@ export class CatalogController {
     return episode;
   }
 
+  /** Deletes an episode. */
   @Delete('episodes/:id')
   @RequirePermissions('catalog:write')
   async removeEpisode(

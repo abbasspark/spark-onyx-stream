@@ -102,6 +102,7 @@ export class WatchlistController {
 export class ViewerListAdminController {
   constructor(@Inject(WatchlistService) private readonly watchlist: WatchlistService) {}
 
+  /** Lists the titles a viewer saved. */
   @Get(':id/list')
   @RequirePermissions('viewers:read')
   forViewer(@Param('id', ParseUUIDPipe) id: string): Promise<ViewerListAdminView> {
@@ -114,6 +115,7 @@ export class ViewerListAdminController {
 export class SavedTitlesController {
   constructor(@Inject(WatchlistService) private readonly watchlist: WatchlistService) {}
 
+  /** Ranks titles by how many viewers saved them to their list. */
   @Get('saved')
   @RequirePermissions('analytics:read')
   saved(@Query(new ZodValidationPipe(savedSchema)) query: SavedInput): Promise<SavedTitles> {

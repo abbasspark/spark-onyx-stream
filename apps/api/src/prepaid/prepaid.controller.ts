@@ -113,6 +113,7 @@ export class PrepaidController {
     return this.prepaid.summary();
   }
 
+  /** Lists the batches of prepaid codes. */
   @Get('batches')
   @RequirePermissions('billing:read')
   list(
@@ -139,6 +140,7 @@ export class PrepaidController {
     return batch;
   }
 
+  /** Returns one batch with its codes and which were used. */
   @Get('batches/:id')
   @RequirePermissions('billing:read')
   get(@Param('id', ParseUUIDPipe) id: string): Promise<BatchView> {
