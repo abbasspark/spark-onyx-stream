@@ -183,6 +183,8 @@ data class Playback(
     val audio: List<AudioTrack> = emptyList(),
     val subtitles: List<SubtitleTrack> = emptyList(),
     val markers: List<Marker> = emptyList(),
+    /** Where ads play in this video. Null: none, for this viewer or this video. */
+    val ads: AdPlan? = null,
 )
 
 // --- Signing in ------------------------------------------------------------

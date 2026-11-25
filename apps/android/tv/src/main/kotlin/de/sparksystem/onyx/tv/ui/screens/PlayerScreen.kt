@@ -22,6 +22,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -45,6 +46,8 @@ import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
 import de.sparksystem.onyx.Remote
 import de.sparksystem.onyx.isPress
+import de.sparksystem.onyx.data.skipState
+import de.sparksystem.onyx.ui.AdsPlayback
 import de.sparksystem.onyx.ui.PlayingState
 import de.sparksystem.onyx.tv.ui.components.AccentButton
 import de.sparksystem.onyx.tv.ui.components.Trouble
@@ -122,25 +125,29 @@ fun PlayerScreen(
     var wake by remember { mutableLongStateOf(0L) }
     val focus = remember { FocusRequester() }
 
-    DisposableEffect(playback.manifestUrl) {
-        player.setMediaItem(MediaItem.fromUri(playback.manifestUrl))
-        if (state.startAtMs > 0) {
-            player.seekTo(state.startAtMs)
-        }
-        player.prepare()
+    val scope = rememberCoroutineScope()
+    val ads = remember(playback.manifestUrl) {
+        AdsPlayback(
+            player = player,
+            director = state.ads,
+            contentUrl = playback.manifestUrl,
+            startAtMs = state.startAtMs,
+            scope = scope,
+            onContentEnded = onEnded,
+        )
+    }
+
+    DisposableEffect(ads) {
         val listener = object : Player.Listener {
             override fun onIsPlayingChanged(isPlaying: Boolean) {
                 playing = isPlaying
             }
-
-            override fun onPlaybackStateChanged(playbackState: Int) {
-                if (playbackState == Player.STATE_ENDED) {
-                    onEnded()
-                }
-            }
         }
         player.addListener(listener)
+        // The video, and the ads around it, start here.
+        ads.attach()
         onDispose {
+            ads.detach()
             player.removeListener(listener)
             player.release()
         }
@@ -154,7 +161,11 @@ fun PlayerScreen(
             buffered = player.bufferedPosition
             val length = player.duration
             duration = if (length == C.TIME_UNSET) 0L else length
-            onProgress(position, duration)
+            ads.tick()
+            // What an ad does is not what the viewer watched.
+            if (ads.current == null) {
+                onProgress(position, duration)
+            }
             delay(500)
         }
     }
@@ -172,7 +183,8 @@ fun PlayerScreen(
 
     LaunchedEffect(Unit) { focus.requestFocus() }
 
-    val marker = runningMarker(playback.markers, position, duration)
+    val inAd = ads.current != null
+    val marker = if (inAd) null else runningMarker(playback.markers, position, duration)
 
     Box(
         modifier = Modifier
@@ -185,7 +197,19 @@ fun PlayerScreen(
                 val forward = listOf(Key.DirectionRight, Remote.forward)
                 val back = listOf(Key.DirectionLeft, Remote.rewind)
                 when {
-                    event.isPress(playPause) -> {
+                // During an ad the remote does two things: leave, and skip when allowed.
+                inAd -> when {
+                    event.isPress(listOf(Remote.stop, Key.Back)) -> {
+                        onBack()
+                        true
+                    }
+                    event.isPress(playPause + listOf(Remote.next)) -> {
+                        ads.skip()
+                        true
+                    }
+                    else -> true
+                }
+                event.isPress(playPause) -> {
                         if (player.isPlaying) player.pause() else player.play()
                         wake = System.currentTimeMillis()
                         true
@@ -242,7 +266,18 @@ fun PlayerScreen(
             )
         }
 
-        if (controlsShown) {
+        ads.current?.let { ready ->
+            AdBadge(
+                skipOffsetMs = ready.ad.skipOffsetMs,
+                elapsedMs = ads.elapsedMs,
+                remainingMs = (duration - position).coerceAtLeast(0L),
+            )
+        }
+        if (ads.waiting) {
+            Waiting("")
+        }
+
+        if (controlsShown && !inAd) {
             Controls(
                 heading = state.heading,
                 detail = state.detail,
@@ -358,5 +393,38 @@ private fun SeekBar(position: Long, duration: Long, buffered: Long) {
                 .height(6.dp)
                 .background(LocalAccent.current),
         )
+    }
+}
+
+/**
+ * What the viewer sees over an ad: that it is one, how long is left, and when
+ * the remote can skip it. Nothing else answers during an ad, so nothing else
+ * is drawn.
+ */
+@OptIn(ExperimentalTvMaterial3Api::class)
+@Composable
+private fun AdBadge(skipOffsetMs: Long?, elapsedMs: Long, remainingMs: Long) {
+    val skip = skipState(skipOffsetMs, elapsedMs)
+    Box(modifier = Modifier.fillMaxSize()) {
+        Column(
+            modifier = Modifier
+                .align(Alignment.BottomEnd)
+                .padding(end = Safe.horizontal, bottom = Safe.vertical)
+                .background(Onyx.onyx.copy(alpha = 0.78f))
+                .padding(horizontal = 18.dp, vertical = 12.dp),
+            horizontalAlignment = Alignment.End,
+        ) {
+            Text(
+                text = "Ad · ${clock(remainingMs)}",
+                style = MaterialTheme.typography.labelLarge,
+            )
+            if (skipOffsetMs != null) {
+                Text(
+                    text = if (skip.skippable) "Press OK to skip" else "You can skip in ${skip.secondsLeft}",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = if (skip.skippable) LocalAccent.current else Onyx.smoke,
+                )
+            }
+        }
     }
 }

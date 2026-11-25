@@ -51,10 +51,19 @@ Your own house ads are served from your own installation and need no entry.
 
 Players report started, quarter, half, three quarters, complete, skip, click and error for each source. The panel shows these per day and per source. They are what players say happened, so a viewer who closes the tab during an ad is counted as having started it and nothing more. Counts are never used to bill anyone.
 
+## In the Android apps
+
+The television and the phone app follow the same plan and the same rules as the website. The server resolves the ad, and the app plays the file in the player that plays the video: the video is swapped for the ad and loaded again where it stopped. No ad SDK is used.
+
+- On the phone an ad shows **Visit advertiser**, which opens the link in the browser, and **Skip ad** once the ad allows it.
+- On the television the remote can only skip. There is no browser to open a link in, so an ad's link is not offered and clicks are not counted there.
+- An ad that does not start within eight seconds, or cannot be read, is dropped and the video goes on.
+
+None of this has been run on a device or an emulator. It compiles and the rules are covered by unit tests, but how Media3 behaves when it changes from one file to another on real hardware is not verified.
+
 ## What is not built
 
 - **Live channels.** An ad in a live stream has to be spliced into the stream on the server, so that every viewer's player sees one continuous stream. That is a larger piece of work than the player-side ads here.
-- **Android apps.** They ignore the ad plan today, so on them viewers see no ads. Media3 with the IMA extension is the way to add them.
 - **Per-title opt-out and hand-placed breaks.** Breaks are placed by the settings above only.
 - **Tests against a real ad network.** The player and the VAST handling have been run against a local ad server and a local video, in Chrome, not against Google Ad Manager or another network, and not in Safari.
 - **Replay.** Watching again from the end of the video does not show the ad before the video a second time.

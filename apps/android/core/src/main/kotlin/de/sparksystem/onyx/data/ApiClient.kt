@@ -295,6 +295,42 @@ class ApiClient(
         ),
     )
 
+    // --- Ads ------------------------------------------------------------------
+
+    /** Asks for the ad of a source when its break comes. The ad is null when there is none. */
+    suspend fun resolveAd(sourceId: String): Answer<ResolvedAdAnswer> = call(
+        method = "POST",
+        path = "catalog/ads/resolve",
+        body = json.encodeToString(AdSourceBody.serializer(), AdSourceBody(sourceId)),
+        withToken = false,
+    )
+
+    /** Counts what happened to an ad at our own server. Nothing depends on the answer. */
+    suspend fun countAd(sourceId: String, event: AdEvent) {
+        call<Unit>(
+            method = "POST",
+            path = "catalog/ads/events",
+            body = json.encodeToString(
+                AdEventBody.serializer(),
+                AdEventBody(sourceId, event.wire),
+            ),
+            withToken = false,
+        )
+    }
+
+    /**
+     * Tells an ad server that something happened. A plain request with no
+     * sign-in and no answer read: the address belongs to somebody else.
+     */
+    suspend fun ping(address: String) = withContext(Dispatchers.IO) {
+        val url = address.toHttpUrlOrNull() ?: return@withContext
+        try {
+            http.newCall(Request.Builder().url(url).get().build()).execute().close()
+        } catch (_: IOException) {
+            // An ad that cannot say it was shown is still shown.
+        }
+    }
+
     companion object {
         fun defaultHttp(): OkHttpClient = OkHttpClient.Builder()
             // A television on a slow line still has to give up eventually, or
