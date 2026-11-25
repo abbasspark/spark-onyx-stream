@@ -53,6 +53,7 @@ Players report started, quarter, half, three quarters, complete, skip, click and
 
 ## What is not built
 
+- **The Samsung and LG app.** It ignores the ad plan, so viewers there see no ads.
 - **Live channels.** An ad in a live stream has to be spliced into the stream on the server, so that every viewer's player sees one continuous stream. That is a larger piece of work than the player-side ads here.
 - **Android apps.** They ignore the ad plan today, so on them viewers see no ads. Media3 with the IMA extension is the way to add them.
 - **Per-title opt-out and hand-placed breaks.** Breaks are placed by the settings above only.

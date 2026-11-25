@@ -22,6 +22,7 @@
 | [api.md](api.md)                                   | The API described for programs, generated clients, and app versions                  |
 | [phase-7-apps.md](phase-7-apps.md)                 | The television app: how it is built, how it signs in, what a remote control does     |
 | [ads.md](ads.md)                                   | Ads in video on demand: who sees them, where breaks fall, sources, what is counted   |
+| [tv-web.md](tv-web.md)                             | The app for Samsung and LG televisions: how it is served, packaged and what it lacks |
 | [extension-points.md](extension-points.md)         | Interfaces that let features be added without changing the core                      |
 
 These documents describe the plan. Where code and documents disagree, the code is right and the document needs an update.

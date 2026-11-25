@@ -2,16 +2,16 @@
 
 The project is built in phases. Each phase ends with something that works end to end.
 
-| Phase                         | Delivers                                                                            | Status              |
-| ----------------------------- | ----------------------------------------------------------------------------------- | ------------------- |
-| 1. Media engine core          | Upload, probe, copy or transcode, HLS packaging, signed playback, basic admin panel | Done                |
-| 2. Catalog and viewer website | Titles, series, metadata import, viewer accounts and profiles, player with resume   | Done                |
-| 3. Billing                    | Plans, payments, entitlements, coupons. First complete VOD service                  | Done, coupons later |
-| 4. Live                       | Ingest, copy and transcode channels, DVR, EPG, channels in the catalog              | Done                |
-| 5. Edges and P2P              | Edge agent, tracker, P2P in the player, offload statistics                          | Done                |
-| 6. Operations                 | Installer, updates with rollback, backup and restore, diagnostics                   | Done                |
-| 7. Apps                       | Android mobile and Android TV                                                       | Built, never run    |
-| 8. Advanced                   | Ads, further apps (DRM is deferred)                                                 | Ads built for VOD   |
+| Phase                         | Delivers                                                                            | Status                        |
+| ----------------------------- | ----------------------------------------------------------------------------------- | ----------------------------- |
+| 1. Media engine core          | Upload, probe, copy or transcode, HLS packaging, signed playback, basic admin panel | Done                          |
+| 2. Catalog and viewer website | Titles, series, metadata import, viewer accounts and profiles, player with resume   | Done                          |
+| 3. Billing                    | Plans, payments, entitlements, coupons. First complete VOD service                  | Done, coupons later           |
+| 4. Live                       | Ingest, copy and transcode channels, DVR, EPG, channels in the catalog              | Done                          |
+| 5. Edges and P2P              | Edge agent, tracker, P2P in the player, offload statistics                          | Done                          |
+| 6. Operations                 | Installer, updates with rollback, backup and restore, diagnostics                   | Done                          |
+| 7. Apps                       | Android mobile and Android TV                                                       | Built, never run              |
+| 8. Advanced                   | Ads, further apps (DRM is deferred)                                                 | Ads built, Samsung/LG started |
 
 ## Phase 1 in steps
 

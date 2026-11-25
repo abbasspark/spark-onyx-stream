@@ -1161,3 +1161,17 @@ This replaces the "plain CSS without a component library" part of D-018.
 **Why:** the usual way to play VAST is a library in the page, which fetches the tag from the viewer's browser. That needs the ad server to allow cross-origin requests, hands viewers' addresses to every wrapper in the chain, widens the content security policy to scripts of other companies, and puts the tag, which is often a secret of the account, in view of anyone who opens the network tab. Resolving on the server costs a fetch per break and gives all of that back: one allowlist, one place that checks addresses, and nothing in the page but a video file and some tracking pictures. Asking for the ad at the break, not at the start, is what keeps it fresh and keeps the plan small enough to cache. Deciding who is spared in the playback answer, not in the player, means a modified page cannot claim it.
 
 **Consequence:** the server needs to reach the ad network, and a slow network costs the viewer up to four seconds at a break before the film goes on without an ad. Scripts that networks use to prove an ad was seen (viewability, VPAID) cannot run, so networks that require them cannot be used. The counts are what players say, and an ad blocker that blocks the tracking pictures shows as ads that never completed. Not run against a real ad network, in Safari, or in the Android apps.
+
+## D-087 The television app for Samsung and LG is one web app, served by the gateway
+
+**Date:** 2026-11-25
+
+- **One app for Tizen and webOS,** a React app in `apps/tv-web`, not one per maker.
+- **It is served at `/tv/` by the gateway,** and the package on the television only opens that address.
+- **It is built for the browsers of 2021 televisions** and nothing older.
+- **It uses the television's own HLS player,** and loads hls.js only in a desktop browser for development.
+- **Signing in is by code,** as on Android TV.
+
+**Why:** both makers run web apps in a Chromium of their own, so one codebase covers both and the differences are a few key codes and two manifests. A packaged app that carries its files has to call the API from another origin, and that needs the server to name the television as a trusted origin, which for a file on a television is the origin "null" and cannot be named safely. Serving the app from the server removes the problem and means an update is a server update, which matters because a store review takes days. The cost is that the television must reach the server to start the app at all, which it must do anyway to play anything. Lowering to 2021 is a trade: older models are a large share of installed televisions, but their Chromium (53 to 69) cannot run the framework without a second build and a pile of polyfills that nobody could test without the televisions.
+
+**Consequence:** the app has no offline start. The gateway's content security policy for `/tv/` lets pictures and video come from any host, because the video of a title may be delivered by an edge on another address, and what it plays is only ever an address the API has signed. Not run on a television: key codes, the back key and native HLS on both makers are from documentation. Search, live channels, PIN profiles and ads are not in it yet.

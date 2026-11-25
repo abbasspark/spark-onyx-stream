@@ -1,0 +1,139 @@
+<!doctype html>
+<!-- SPDX-License-Identifier: AGPL-3.0-only -->
+<!--
+  The package on the television holds only this page. It opens the app from
+  your own server, so the app is always the version your server has and a new
+  version needs no new package.
+
+  The address is put in when the package is made. Without one, the page asks
+  for it once and remembers it.
+-->
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Onyx Stream</title>
+    <style>
+      html {
+        font-size: calc(100vw / 120);
+      }
+      body {
+        margin: 0;
+        min-height: 100vh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-direction: column;
+        background: #0b0d12;
+        color: #f1f4fa;
+        font-family: Arial, sans-serif;
+        text-align: center;
+      }
+      h1 {
+        font-size: 3rem;
+        margin: 0 0 1.5rem;
+      }
+      p {
+        font-size: 1.5rem;
+        color: #9aa6bb;
+        margin: 0 0 1.5rem;
+        max-width: 50rem;
+      }
+      input {
+        font-size: 1.8rem;
+        width: 40rem;
+        padding: 0.8rem 1.2rem;
+        border-radius: 0.5rem;
+        border: 0.2rem solid #1d2431;
+        background: #151a23;
+        color: #f1f4fa;
+      }
+      input:focus {
+        outline: 0.3rem solid #6d8cff;
+      }
+      button {
+        margin-top: 1.5rem;
+        font-size: 1.6rem;
+        padding: 0.8rem 2.4rem;
+        border: 0;
+        border-radius: 0.5rem;
+        background: #6d8cff;
+        color: #0b1020;
+        font-weight: 600;
+      }
+      button:focus {
+        outline: 0.3rem solid #f1f4fa;
+      }
+      #error {
+        color: #ff8a8a;
+        min-height: 2rem;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Onyx Stream</h1>
+    <p id="text">Connecting…</p>
+    <form id="form" hidden>
+      <input
+        id="address"
+        type="url"
+        inputmode="url"
+        placeholder="https://tv.example.com"
+        autocomplete="off"
+      />
+      <div><button type="submit">Connect</button></div>
+    </form>
+    <p id="error"></p>
+    <script>
+      (function () {
+        // Replaced when the package is made. Empty: ask on the television.
+        var configured = '__SERVER_URL__';
+        var kept = null;
+        try {
+          kept = window.localStorage.getItem('onyx.server');
+        } catch (e) {
+          /* storage is off */
+        }
+
+        function clean(value) {
+          var text = String(value || '')
+            .replace(/^\s+|\s+$/g, '')
+            .replace(/\/+$/, '');
+          if (text && !/^https?:\/\//i.test(text)) {
+            text = 'https://' + text;
+          }
+          return /^https?:\/\/[^\/\s]+$/i.test(text) ? text : null;
+        }
+
+        function open(address) {
+          window.location.replace(address + '/tv/');
+        }
+
+        var address = clean(configured.indexOf('__') === 0 ? '' : configured) || clean(kept);
+        if (address) {
+          open(address);
+          return;
+        }
+
+        document.getElementById('text').textContent = 'Enter the address of your service.';
+        var form = document.getElementById('form');
+        form.hidden = false;
+        document.getElementById('address').focus();
+        form.addEventListener('submit', function (event) {
+          event.preventDefault();
+          var typed = clean(document.getElementById('address').value);
+          if (!typed) {
+            document.getElementById('error').textContent = 'That is not a web address.';
+            return;
+          }
+          try {
+            window.localStorage.setItem('onyx.server', typed);
+          } catch (e) {
+            /* asked again next time */
+          }
+          open(typed);
+        });
+      })();
+    </script>
+  </body>
+</html>
