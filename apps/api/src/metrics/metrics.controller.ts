@@ -12,7 +12,6 @@ import {
 import type { Request, Response } from 'express';
 import { Public } from '../auth/auth.decorators.js';
 import { AppConfig } from '../config/app-config.js';
-import { RateLimit } from '../rate-limit/rate-limit.guard.js';
 import { MetricsService } from './metrics.service.js';
 
 const BEARER = /^Bearer (.+)$/;
@@ -41,8 +40,7 @@ export class MetricsController {
 
   /** Answers with the numbers in the Prometheus text format, to a request that carries the token. */
   @Get()
-  // A scraper asks every few seconds. This only slows down someone guessing the token.
-  @RateLimit({ name: 'metrics', limit: 600, windowSeconds: 600 })
+  // No rate limit: its counters live in Redis, and this is the address to ask when Redis is down.
   async scrape(@Req() request: Request, @Res() response: Response): Promise<void> {
     if (!this.metrics.enabled) {
       throw new NotFoundException();

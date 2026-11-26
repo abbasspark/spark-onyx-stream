@@ -21190,15 +21190,6 @@ export interface operations {
                 };
                 content?: never;
             };
-            /** @description Too many requests. "Retry-After" says when to try again. */
-            429: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Problem"];
-                };
-            };
         };
     };
     PushAdmin_setAutomatic: {
