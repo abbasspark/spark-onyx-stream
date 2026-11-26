@@ -317,6 +317,40 @@ describe.skipIf(!TEST_DATABASE_URL)('Watch history (e2e)', () => {
     );
   });
 
+  it('offers the next episode once one is finished and nothing else of the series is begun', async () => {
+    const series = await createSeries('Slow Tide');
+    const { cookie } = await register();
+
+    await report(cookie, [
+      { title: series.slug, episodeId: series.pilot, position: 88, duration: 90 },
+    ]).expect(200);
+
+    // The draft is skipped; the second episode stands at its start.
+    const [offered, ...rest] = await watching(cookie);
+    expect(rest).toEqual([]);
+    expect(offered).toMatchObject({
+      id: series.second,
+      title: { slug: series.slug },
+      episode: { id: series.second, number: 2 },
+      position: 0,
+    });
+    expect(offered?.duration).toBeGreaterThan(0);
+
+    // Once the second is begun it takes the place of the offer.
+    await report(cookie, [
+      { title: series.slug, episodeId: series.second, position: 30, duration: 90 },
+    ]).expect(200);
+    expect(await watching(cookie)).toEqual([
+      expect.objectContaining({ id: series.second, position: 30 }),
+    ]);
+
+    // Finishing the last one leaves nothing to offer.
+    await report(cookie, [
+      { title: series.slug, episodeId: series.second, position: 88, duration: 90 },
+    ]).expect(200);
+    expect(await watching(cookie)).toEqual([]);
+  });
+
   it('forgets a video that was begun and is back at its start', async () => {
     const movie = await createMovie('Night Train');
     const { id, cookie } = await register();
