@@ -55,7 +55,7 @@ Players report started, quarter, half, three quarters, complete, skip, click and
 
 - **The Samsung and LG app.** It ignores the ad plan, so viewers there see no ads.
 - **Live channels.** An ad in a live stream has to be spliced into the stream on the server, so that every viewer's player sees one continuous stream. That is a larger piece of work than the player-side ads here.
-- **Android apps.** They ignore the ad plan today, so on them viewers see no ads. Media3 with the IMA extension is the way to add them.
+- **A real device.** The Android apps play ads the same way the website does, but they have not been run on a television or phone.
 - **Per-title opt-out and hand-placed breaks.** Breaks are placed by the settings above only.
 - **Tests against a real ad network.** The player and the VAST handling have been run against a local ad server and a local video, in Chrome, not against Google Ad Manager or another network, and not in Safari.
 - **Replay.** Watching again from the end of the video does not show the ad before the video a second time.

@@ -1,11 +1,13 @@
 # Phase 7: the apps
 
 A platform people install on their own server needs clients they can give to
-their viewers. There are two: one for the television, because that is where a
-VOD service is actually watched, and one for the phone.
+their viewers. There are three: one for Android TV, because that is where a
+VOD service is actually watched, one for the phone, and a web app for Samsung
+and LG televisions.
 
-They live in `apps/android`, with a README of its own for building them. This
-document is about the decisions behind them.
+The two Android apps live in `apps/android`, with a README of its own for
+building them. This document is about the decisions behind them. The Samsung
+and LG app is a separate web project, described in [tv-web.md](tv-web.md).
 
 ## One project, two apps, one core
 
@@ -99,20 +101,39 @@ three metres away.
 
 ## What is built, and what is not
 
-Built: the address, signing in by code, profiles with their PINs, the home
-page with its opening and rows, "Continue watching", a title with its seasons
-and episodes, and the player — HLS through Media3, resume, progress reported
-back every half minute, and the opening and credits skippable.
+Built, in both Android apps: the address, signing in (by code on the
+television, by email and password on the phone), profiles with their PINs, the
+home page with its opening and rows, "Continue watching", a title with its
+seasons and episodes, search, the list a viewer saves, a settings screen, live
+channels with the lineup, now and next, and going back in what a channel
+keeps, and the player (HLS through Media3, resume, progress reported back
+every half minute, and the opening and credits skippable). Both follow the ad
+plan the server sends with a video and play ads before, during and after
+movies and episodes. The television adds tuning by number, channel keys, the
+channel banner and the guide over the picture.
 
-Not built: live channels, search, the list a viewer saves, and a settings
-screen. The phone app has not been started.
+Not built:
+
+- Ads in live channels, which need the ad spliced into the stream on the
+  server.
+- Selling inside the apps. Viewers are sent to the website; roadmap item 10
+  ("To decide") covers whether that changes.
+- P2P delivery in the apps.
+- An iOS or tvOS app.
+- DRM, which is deferred.
+
+The Samsung and LG app has fewer features: no search, saved list, profile
+choice and PIN entry, live channels, subtitle and audio choice, markers or
+ads. See [tv-web.md](tv-web.md).
 
 ## What has been checked
 
-The app compiles, passes Android Lint with no errors, and its unit tests
-pass. It has not been run: an emulator needs hardware virtualisation, which
-the environment it was written in does not have, and there is no television
-here. Everything about how it behaves on a real device — focus order, how
-Media3 handles a particular stream, how a given launcher treats the banner —
-is unverified, and the first install should be treated as the first real
-test.
+The Android apps compile, pass Android Lint with no errors, and their unit
+tests pass; CI runs both on every pull request. They have not been run: an
+emulator needs hardware virtualisation, which the environment they were
+written in does not have, and there is no television or phone to hand.
+Everything about how they behave on a real device — focus order, how Media3
+handles a particular stream, how a given launcher treats the banner, and how
+the phone behaves when it is turned — is unverified, and the first install
+should be treated as the first real test. Ads were run against a local ad
+server only, not a real ad network.
