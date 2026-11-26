@@ -128,12 +128,8 @@ ads. See [tv-web.md](tv-web.md).
 
 ## What has been checked
 
-The Android apps compile, pass Android Lint with no errors, and their unit
-tests pass; CI runs both on every pull request. They have not been run: an
-emulator needs hardware virtualisation, which the environment they were
-written in does not have, and there is no television or phone to hand.
-Everything about how they behave on a real device — focus order, how Media3
-handles a particular stream, how a given launcher treats the banner, and how
-the phone behaves when it is turned — is unverified, and the first install
-should be treated as the first real test. Ads were run against a local ad
-server only, not a real ad network.
+The Android apps compile, pass Android Lint, and their unit tests pass; CI runs both on every pull request. They have been run on an Android 14 phone emulator and an Android 13 TV emulator against a local server: signing in (by code on the television), the home page, a title and playing a video.
+
+That first run found three faults that made both apps unusable, and no test or build could have shown them: the apps sent the server a description of the device it refused, so nobody could sign in; the session was read from a copy that was only filled at start-up, so the first request after signing in carried no token and the app then wiped it; and the server's addresses are paths that a browser reads against its site but a player reads as files. Each is fixed and has a test, the first two of them on a device. See the [Android README](../apps/android/README.md#what-has-been-checked).
+
+They have not been run on a real television or phone. Live channels, search, the saved list, settings, PINs and ads were not tried on the emulators, and how a real remote, launcher or screen behaves is unverified. Release builds also cannot reach a server over plain HTTP, which a household without a certificate would need: see [Plain HTTP](../apps/android/README.md#plain-http).
