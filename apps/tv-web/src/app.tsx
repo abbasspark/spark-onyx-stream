@@ -2,9 +2,11 @@
 import { useCallback, useState } from 'react';
 import { Home, type Opening } from '@/screens/home';
 import { Player } from '@/screens/player';
+import { Profiles } from '@/screens/profiles';
 import { SignIn } from '@/screens/sign-in';
 import { type Playing, Title } from '@/screens/title';
 import { token, whenSignedOut } from '@/lib/api';
+import { chosenProfile, forgetProfile } from '@/lib/profiles';
 import { detectPlatform, exitApp } from '@/lib/platform';
 import { useRemote } from '@/lib/remote';
 
@@ -20,16 +22,24 @@ const platform = detectPlatform(navigator.userAgent);
  */
 export function App() {
   const [signedIn, setSignedIn] = useState(token() !== null);
+  const [profile, setProfile] = useState(chosenProfile());
   const [stack, setStack] = useState<Screen[]>([{ kind: 'home' }]);
 
   whenSignedOut(() => {
     setSignedIn(false);
+    setProfile(null);
     setStack([{ kind: 'home' }]);
   });
 
   const push = useCallback((screen: Screen) => setStack((now) => [...now, screen]), []);
   const pop = useCallback(() => {
     setStack((now) => (now.length > 1 ? now.slice(0, -1) : now));
+  }, []);
+
+  const switchProfile = useCallback(() => {
+    forgetProfile();
+    setProfile(null);
+    setStack([{ kind: 'home' }]);
   }, []);
 
   useRemote((key) => {
@@ -45,7 +55,17 @@ export function App() {
   });
 
   if (!signedIn) {
-    return <SignIn onSignedIn={() => setSignedIn(true)} />;
+    return (
+      <SignIn
+        onSignedIn={() => {
+          setProfile(chosenProfile());
+          setSignedIn(true);
+        }}
+      />
+    );
+  }
+  if (!profile) {
+    return <Profiles onChosen={(chosen) => setProfile({ id: chosen.id, name: chosen.name })} />;
   }
 
   const top = stack[stack.length - 1] as Screen;
@@ -61,6 +81,12 @@ export function App() {
     case 'player':
       return <Player playing={top.playing} onBack={pop} />;
     default:
-      return <Home onOpen={(opening: Opening) => push({ kind: 'title', slug: opening.slug })} />;
+      return (
+        <Home
+          profileName={profile.name}
+          onSwitchProfile={switchProfile}
+          onOpen={(opening: Opening) => push({ kind: 'title', slug: opening.slug })}
+        />
+      );
   }
 }

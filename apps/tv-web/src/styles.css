@@ -427,3 +427,122 @@ p {
   color: var(--muted);
   font-variant-numeric: tabular-nums;
 }
+
+/* --- Profiles ------------------------------------------------------------ */
+
+.who {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: var(--margin);
+}
+
+.who h1 {
+  font-size: 3rem;
+  font-weight: 600;
+}
+
+.people {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 2.4rem;
+  margin-top: 3rem;
+}
+
+.person {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 14rem;
+  padding: 1rem;
+  text-align: center;
+}
+
+.person .face {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 9rem;
+  height: 9rem;
+  border-radius: 50%;
+  font-size: 4rem;
+  font-weight: 700;
+  color: var(--accent-ink);
+}
+
+.person .name {
+  margin-top: 1rem;
+  font-size: 1.7rem;
+}
+
+.person .lock {
+  margin-top: 0.4rem;
+  font-size: 1.2rem;
+  letter-spacing: 0.1rem;
+  color: var(--muted);
+}
+
+.dots {
+  display: flex;
+  gap: 1.2rem;
+  margin-top: 2rem;
+}
+
+.dot {
+  width: 1.6rem;
+  height: 1.6rem;
+  border-radius: 50%;
+  border: 0.2rem solid var(--muted);
+}
+
+.dot.filled {
+  background: var(--text);
+  border-color: var(--text);
+}
+
+.who .trouble {
+  min-height: 2rem;
+  margin-top: 1.2rem;
+  font-size: 1.4rem;
+  color: #ff9b8a;
+}
+
+.pad {
+  display: grid;
+  grid-template-columns: repeat(3, 9rem);
+  gap: 1rem;
+  margin-top: 1rem;
+}
+
+.pad .button {
+  padding: 1rem 0;
+  text-align: center;
+}
+
+.who .hint {
+  margin-top: 1.6rem;
+  font-size: 1.3rem;
+  color: var(--muted);
+}
+
+.bar {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 1.6rem;
+  padding: 0 var(--margin) 1.4rem 0;
+}
+
+.bar .who-am-i {
+  font-size: 1.5rem;
+  color: var(--muted);
+}
+
+.bar .button {
+  padding: 0.5rem 1.6rem;
+  font-size: 1.3rem;
+}

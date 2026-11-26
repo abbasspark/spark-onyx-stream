@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 import type { Schemas } from '@onyx/api-client';
 import { clientName, deviceName, detectPlatform } from './platform';
+import { forgetProfile } from './profiles';
 import { installationId, storage } from './storage';
 
 export const APP_VERSION = '0.1.0';
@@ -13,6 +14,8 @@ export type Playback = Schemas['PlayAnswer'];
 export type WatchingItem = Schemas['WatchingItem'];
 export type DeviceCodeStart = Schemas['StartedDeviceCode'];
 export type DeviceCodePoll = Schemas['DeviceCodePoll'];
+export type Profile = Schemas['ProfileView'];
+export type ProfilesView = Schemas['ProfilesView'];
 
 /** What a call that went wrong says, for the screen to show. */
 export class ApiError extends Error {
@@ -73,6 +76,7 @@ async function call<T>(
   } | null;
   if (response.status === 401 && signed && kept) {
     storage.remove('token');
+    forgetProfile();
     onSignedOut();
   }
   throw new ApiError(
@@ -89,6 +93,14 @@ export const api = {
   playTitle: (slug: string) =>
     call<Playback>('POST', `catalog/titles/${encodeURIComponent(slug)}/playback`),
   playEpisode: (id: string) => call<Playback>('POST', `catalog/episodes/${id}/playback`),
+  profiles: () => call<ProfilesView>('GET', 'viewer/profiles'),
+  /** Takes a profile into use on this device. The PIN is asked for where one is set. */
+  selectProfile: (id: string, pin: string | null) =>
+    call<Profile>(
+      'POST',
+      `viewer/profiles/${encodeURIComponent(id)}/select`,
+      pin === null ? {} : { pin },
+    ),
   startDeviceCode: () =>
     call<DeviceCodeStart>(
       'POST',

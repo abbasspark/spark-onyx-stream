@@ -10,7 +10,15 @@ export interface Opening {
 }
 
 /** The first screen: the viewer's started videos, then the rows of the site. */
-export function Home({ onOpen }: { onOpen: (opening: Opening) => void }) {
+export function Home({
+  profileName,
+  onSwitchProfile,
+  onOpen,
+}: {
+  profileName: string;
+  onSwitchProfile: () => void;
+  onOpen: (opening: Opening) => void;
+}) {
   const [state, setState] = useState<
     | { kind: 'loading' }
     | { kind: 'ready'; home: HomeData; watching: WatchingItem[] }
@@ -71,6 +79,10 @@ export function Home({ onOpen }: { onOpen: (opening: Opening) => void }) {
 
   return (
     <div className="home">
+      <div className="bar">
+        <span className="who-am-i">{profileName}</span>
+        <Button onClick={onSwitchProfile}>Switch profile</Button>
+      </div>
       {watching.length > 0 ? (
         <section className="row">
           <h2>Continue watching</h2>
