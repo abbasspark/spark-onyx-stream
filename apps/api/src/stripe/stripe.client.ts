@@ -124,6 +124,13 @@ export class StripeClient {
     );
   }
 
+  /** Tells Stripe the viewer's new address, so receipts and reminders go to it. */
+  updateCustomerEmail(id: string, email: string): Promise<StripeCustomer> {
+    return this.request<StripeCustomer>('POST', `/v1/customers/${encodeURIComponent(id)}`, {
+      email,
+    });
+  }
+
   retrieveCustomer(id: string): Promise<StripeCustomer> {
     return this.request<StripeCustomer>('GET', `/v1/customers/${encodeURIComponent(id)}`);
   }

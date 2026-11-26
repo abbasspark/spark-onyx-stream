@@ -241,6 +241,18 @@ export const viewerApi = {
   resetPassword: (token: string, newPassword: string) =>
     call<void>('POST', '/password/reset', { token, newPassword }),
   verifyEmail: (token: string) => call<{ email: string }>('POST', '/email/verify', { token }),
+  /**
+   * Asks to use another address. With email set up a link goes to the new address and
+   * nothing changes until it is opened ("confirmation_sent"); without, it changes at once.
+   */
+  changeEmail: (newEmail: string, password: string) =>
+    call<{ status: 'confirmation_sent' | 'changed'; email: string }>('POST', '/email/change', {
+      newEmail,
+      password,
+    }),
+  /** Uses the new address with the token of the link sent to it. */
+  confirmEmailChange: (token: string) =>
+    call<{ email: string }>('POST', '/email/change/confirm', { token }),
   /** Sends the link to confirm the address again. */
   sendVerification: () => call<void>('POST', '/email/send'),
 };

@@ -5239,6 +5239,46 @@ export interface paths {
         patch: operations["ViewerDevices_rename"];
         trace?: never;
     };
+    "/v1/viewer/email/change": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Asks to use another email address, with the password of the account
+         * @description With email set up, a link goes to the new address and nothing changes until it is opened. Without, the address changes at once. For a signed-in viewer.
+         */
+        post: operations["ViewerAuth_changeEmail"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/viewer/email/change/confirm": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Uses the new address with the token of the link sent to it
+         * @description Needs no sign-in: the link is often opened on another device. Open to everyone.
+         */
+        post: operations["ViewerAuth_confirmEmailChange"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/viewer/email/send": {
         parameters: {
             query?: never;
@@ -8042,6 +8082,12 @@ export interface components {
         EdgeWithToken: {
             edge: components["schemas"]["EdgeView"];
             token: string;
+        };
+        EmailChangeResult: {
+            /** @enum {string} */
+            status: "confirmation_sent" | "changed";
+            /** @description The address that was asked for. */
+            email: string;
         };
         EncoderSettings: {
             streamKey: string;
@@ -27957,6 +28003,106 @@ export interface operations {
             };
             /** @description What the address names does not exist. */
             404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Too many requests. "Retry-After" says when to try again. */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    ViewerAuth_changeEmail: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    newEmail: string;
+                    password: string;
+                };
+            };
+        };
+        responses: {
+            /** @description The answer. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EmailChangeResult"];
+                };
+            };
+            /** @description The input was refused. "issues" names every field. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Not signed in, or the sign-in ran out. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Too many requests. "Retry-After" says when to try again. */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    ViewerAuth_confirmEmailChange: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    token: string;
+                };
+            };
+        };
+        responses: {
+            /** @description The answer. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        email: string;
+                    };
+                };
+            };
+            /** @description The input was refused. "issues" names every field. */
+            400: {
                 headers: {
                     [name: string]: unknown;
                 };

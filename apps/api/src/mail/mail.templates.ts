@@ -135,6 +135,49 @@ export function verificationMail({ siteName, displayName, url, validMinutes }: L
   };
 }
 
+/** Sent to the new address a viewer wants to use. Nothing changes until the link is opened. */
+export function emailChangeMail({ siteName, displayName, url, validMinutes }: LinkMail): Content {
+  return {
+    subject: oneLine(`Confirm your new email address for ${siteName}`),
+    ...layout({
+      siteName,
+      heading: 'Confirm your new email address',
+      intro: [
+        `Hello ${displayName},`,
+        `you asked to use this address for your account on ${siteName}. Confirm that it is yours, and it replaces the old one.`,
+      ],
+      action: { label: 'Use this email address', url },
+      notes: [
+        `The link works once, for ${describeLifetime(validMinutes)}. Until you open it, the old address stays.`,
+        'If you did not ask for this, ignore this email.',
+      ],
+    }),
+  };
+}
+
+/** Sent to the address an account had, once it was replaced. */
+export function emailChangedMail(options: {
+  siteName: string;
+  displayName: string;
+  newEmail: string;
+}): Content {
+  const { siteName, displayName, newEmail } = options;
+  return {
+    subject: oneLine(`The email address of your ${siteName} account was changed`),
+    ...layout({
+      siteName,
+      heading: 'Your email address was changed',
+      intro: [
+        `Hello ${displayName},`,
+        `the email address of your account on ${siteName} was changed to ${newEmail}. From now on you sign in with the new address, and mail goes there.`,
+      ],
+      notes: [
+        'If this was not you, the account may be in someone else’s hands. Contact the people who run the site right away.',
+      ],
+    }),
+  };
+}
+
 export function passwordChangedMail(options: { siteName: string; displayName: string }): Content {
   const { siteName, displayName } = options;
   return {

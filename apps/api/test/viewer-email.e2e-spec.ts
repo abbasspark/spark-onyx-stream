@@ -199,6 +199,156 @@ describe.skipIf(!TEST_DATABASE_URL)('Viewer emails (e2e)', () => {
     });
   });
 
+  describe('changing the address', () => {
+    const NEW = 'anna.new@example.com';
+    const ask = (cookie: string, body: object = { newEmail: NEW, password: ANNA.password }) =>
+      http().post('/v1/viewer/email/change').set('Cookie', cookie).send(body);
+    const me = (cookie: string) => http().get('/v1/viewer/me').set('Cookie', cookie).expect(200);
+
+    it('sends a link to the new address, and changes nothing until it is opened', async () => {
+      const { id, cookie } = await register();
+      await ageLinks(id);
+      const before = (await outbox()).length;
+
+      const answer = await ask(cookie).expect(200);
+      expect(answer.body).toEqual({ status: 'confirmation_sent', email: NEW });
+      expect(answer.headers['cache-control']).toBe('no-store');
+
+      const messages = await outbox();
+      expect(messages).toHaveLength(before + 1);
+      const message = messages[before] as { to: string; subject: string; text: string };
+      expect(message.to).toBe(NEW);
+      expect(message.subject).toBe('Confirm your new email address for Night Cinema');
+      const token = tokenIn(message, '/confirm-email-change');
+
+      // The token is stored as a hash, for the new address.
+      const stored = await testApp.prisma.viewerToken.findFirstOrThrow({
+        where: { viewerId: id, kind: 'EMAIL_CHANGE' },
+      });
+      expect(stored.tokenHash).toBe(hashToken(token));
+      expect(stored.email).toBe(NEW);
+      expect((await me(cookie)).body.email).toBe(ANNA.email);
+
+      // Opened on another device: no sign-in needed.
+      const done = await http().post('/v1/viewer/email/change/confirm').send({ token }).expect(200);
+      expect(done.body).toEqual({ email: NEW });
+      expect(done.headers['cache-control']).toBe('no-store');
+
+      const after = (await me(cookie)).body;
+      expect(after.email).toBe(NEW);
+      expect(after.emailVerified).toBe(true);
+      // Still signed in. The new address signs in, the old one does not.
+      await http()
+        .post('/v1/viewer/login')
+        .send({ email: NEW, password: ANNA.password })
+        .expect(200);
+      await http()
+        .post('/v1/viewer/login')
+        .send({ email: ANNA.email, password: ANNA.password })
+        .expect(401);
+
+      // The old address hears of it.
+      const notice = (await outbox()).at(-1) as { to: string; subject: string; text: string };
+      expect(notice.to).toBe(ANNA.email);
+      expect(notice.subject).toBe('The email address of your Night Cinema account was changed');
+      expect(notice.text).toContain(NEW);
+
+      // The link works once, and leaves no other links behind.
+      await http().post('/v1/viewer/email/change/confirm').send({ token }).expect(400);
+      expect(await testApp.prisma.viewerToken.count()).toBe(0);
+    });
+
+    it('needs the password, a new address, and a signed-in viewer', async () => {
+      const { id, cookie } = await register();
+      await ageLinks(id);
+      const sent = (await outbox()).length;
+
+      const wrong = await ask(cookie, { newEmail: NEW, password: 'not-the-password' }).expect(400);
+      expect(wrong.body.message).toBe('Password is incorrect');
+      await ask(cookie, { newEmail: ANNA.email, password: ANNA.password }).expect(400);
+      await ask(cookie, { newEmail: 'not an address', password: ANNA.password }).expect(400);
+      await ask(cookie, { newEmail: NEW }).expect(400);
+      await http()
+        .post('/v1/viewer/email/change')
+        .send({ newEmail: NEW, password: ANNA.password })
+        .expect(401);
+
+      expect(await outbox()).toHaveLength(sent);
+      expect(await testApp.prisma.viewerToken.count({ where: { kind: 'EMAIL_CHANGE' } })).toBe(0);
+    });
+
+    it('does not take an address another viewer uses, when asking or when confirming', async () => {
+      const anna = await register();
+      await register(testApp, {
+        email: 'bea@example.com',
+        displayName: 'Bea',
+        password: 'correct-horse',
+      });
+      await ageLinks(anna.id);
+
+      const taken = await ask(anna.cookie, {
+        newEmail: 'bea@example.com',
+        password: ANNA.password,
+      }).expect(409);
+      expect(taken.body.message).toBe('Another viewer already uses this email address');
+
+      // Free when asked for, taken before the link is opened.
+      await ask(anna.cookie).expect(200);
+      const token = tokenIn((await outbox()).at(-1) as { text: string }, '/confirm-email-change');
+      await register(testApp, { email: NEW, displayName: 'Cy', password: 'correct-horse' });
+      await http().post('/v1/viewer/email/change/confirm').send({ token }).expect(409);
+      expect((await me(anna.cookie)).body.email).toBe(ANNA.email);
+    });
+
+    it('sends one link at a time, and only the latest works', async () => {
+      const { id, cookie } = await register();
+      await ageLinks(id);
+      await ask(cookie).expect(200);
+      const first = tokenIn((await outbox()).at(-1) as { text: string }, '/confirm-email-change');
+
+      const tooSoon = await ask(cookie, {
+        newEmail: 'other@example.com',
+        password: ANNA.password,
+      }).expect(429);
+      expect(tooSoon.body.code).toBe('mail_recently_sent');
+
+      await ageLinks(id);
+      await ask(cookie, { newEmail: 'other@example.com', password: ANNA.password }).expect(200);
+      const second = tokenIn((await outbox()).at(-1) as { text: string }, '/confirm-email-change');
+
+      await http().post('/v1/viewer/email/change/confirm').send({ token: first }).expect(400);
+      const done = await http()
+        .post('/v1/viewer/email/change/confirm')
+        .send({ token: second })
+        .expect(200);
+      expect(done.body.email).toBe('other@example.com');
+    });
+
+    it('refuses a link that expired, is made up, or is of another kind', async () => {
+      const { id, cookie } = await register();
+      await ageLinks(id);
+      await ask(cookie).expect(200);
+      const token = tokenIn((await outbox()).at(-1) as { text: string }, '/confirm-email-change');
+      const confirm = (value: string) =>
+        http().post('/v1/viewer/email/change/confirm').send({ token: value });
+
+      await confirm('onyx_mail_' + 'x'.repeat(40)).expect(400);
+      await confirm('short').expect(400);
+
+      // A link to confirm an address is not a link to change it, and the other way round.
+      const verification = tokenIn((await outbox())[0] as { text: string }, '/verify-email');
+      await confirm(verification).expect(400);
+      await http().post('/v1/viewer/email/verify').send({ token }).expect(400);
+
+      await testApp.prisma.viewerToken.updateMany({
+        where: { viewerId: id, kind: 'EMAIL_CHANGE' },
+        data: { expiresAt: new Date(Date.now() - 1000) },
+      });
+      await confirm(token).expect(400);
+      expect((await me(cookie)).body.email).toBe(ANNA.email);
+    });
+  });
+
   describe('forgot password', () => {
     const forgot = (email: string) => http().post('/v1/viewer/password/forgot').send({ email });
 
@@ -475,6 +625,24 @@ describe.skipIf(!TEST_DATABASE_URL)('Viewer emails (e2e)', () => {
 
     afterAll(async () => {
       await plainApp.close();
+    });
+
+    it('changes the address at once, unconfirmed, when email is off', async () => {
+      const { cookie } = await register(plainApp);
+      const ask = (body: object) =>
+        plainApp.http().post('/v1/viewer/email/change').set('Cookie', cookie).send(body);
+
+      await ask({ newEmail: 'anna.new@example.com', password: 'wrong-password' }).expect(400);
+      const answer = await ask({
+        newEmail: 'anna.new@example.com',
+        password: ANNA.password,
+      }).expect(200);
+      expect(answer.body).toEqual({ status: 'changed', email: 'anna.new@example.com' });
+
+      const me = await plainApp.http().get('/v1/viewer/me').set('Cookie', cookie).expect(200);
+      expect(me.body).toMatchObject({ email: 'anna.new@example.com', emailVerified: false });
+      expect(plainApp.mail.outbox).toHaveLength(0);
+      await plainApp.resetDatabase();
     });
 
     it('says so, sends nothing, and still creates accounts', async () => {
