@@ -3203,6 +3203,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/metrics": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Answers with the numbers in the Prometheus text format, to a request that carries the token
+         * @description Open to everyone.
+         */
+        get: operations["Metrics_scrape"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/notifications/automatic": {
         parameters: {
             query?: never;
@@ -21142,6 +21162,33 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["Problem"];
                 };
+            };
+            /** @description Too many requests. "Retry-After" says when to try again. */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    Metrics_scrape: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The answer is written by the server as it goes: a file, a stream or a redirect. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Too many requests. "Retry-After" says when to try again. */
             429: {

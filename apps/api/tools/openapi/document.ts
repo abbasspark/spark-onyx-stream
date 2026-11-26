@@ -12,6 +12,10 @@ export const API_PREFIX = 'v1';
 /** What the folders of the source are called for people who read the description. */
 const AREAS: Record<string, { name: string; description: string }> = {
   health: { name: 'Health', description: 'Whether the server is up.' },
+  metrics: {
+    name: 'Metrics',
+    description: 'Numbers for a monitoring system, behind a token of their own.',
+  },
   openapi: { name: 'This description', description: 'The API described for programs.' },
   'app-versions': {
     name: 'Apps',

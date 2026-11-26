@@ -26,6 +26,7 @@ more than the table can: [billing](phase-3-billing.md),
 | `API_HOST`         | `0.0.0.0`     | Address the HTTP server listens on.                                                                                                                                                                                               |
 | `API_PORT`         | `3000`        | Port the HTTP server listens on.                                                                                                                                                                                                  |
 | `TRUST_PROXY_HOPS` | `0`           | How many proxies stand in front of the API. The address of the viewer is read from this, and the audit log, the sign-in limit and every rate limit go by it. The gateway is one; `docker-compose.tls.yml` makes it two by itself. |
+| `METRICS_TOKEN`    | empty         | Bearer token that opens `/v1/metrics`, the numbers for a monitoring system. At least 32 characters. Empty switches the endpoint off and it answers 404. See [monitoring.md](monitoring.md).                                       |
 | `CORS_ORIGINS`     | empty         | Web origins allowed to call the API from a browser, separated by commas, for example https://admin.example.com. Empty allows same-origin requests only.                                                                           |
 
 ## What it connects to

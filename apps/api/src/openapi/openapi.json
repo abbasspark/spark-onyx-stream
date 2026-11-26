@@ -21,6 +21,10 @@
       "description": "Whether the server is up."
     },
     {
+      "name": "Metrics",
+      "description": "Numbers for a monitoring system, behind a token of their own."
+    },
+    {
       "name": "This description",
       "description": "The API described for programs."
     },
@@ -17672,6 +17676,37 @@
                 }
               }
             }
+          },
+          "429": {
+            "description": "Too many requests. \"Retry-After\" says when to try again.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/metrics": {
+      "get": {
+        "operationId": "Metrics_scrape",
+        "tags": [
+          "Metrics"
+        ],
+        "summary": "Answers with the numbers in the Prometheus text format, to a request that carries the token",
+        "description": "Open to everyone.",
+        "security": [],
+        "x-onyx-access": {
+          "kind": "public",
+          "permissions": [],
+          "sessionOnly": false
+        },
+        "responses": {
+          "200": {
+            "description": "The answer is written by the server as it goes: a file, a stream or a redirect."
           },
           "429": {
             "description": "Too many requests. \"Retry-After\" says when to try again.",

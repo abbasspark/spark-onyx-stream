@@ -470,6 +470,19 @@ export const envSchema = z
     TRUST_PROXY_HOPS: z.coerce.number().int().min(0).max(10).default(0),
 
     /**
+     * Bearer token a monitoring system sends to read /v1/metrics. Empty switches
+     * the endpoint off, and it then answers 404.
+     */
+    METRICS_TOKEN: z
+      .string()
+      .default('')
+      .transform((value) => value.trim())
+      .refine((value) => value === '' || value.length >= 32, {
+        message:
+          'METRICS_TOKEN must be at least 32 characters. Generate one with: openssl rand -hex 32',
+      }),
+
+    /**
      * Web origins allowed to call the API from a browser, separated by commas,
      * for example "https://admin.example.com". Empty allows same-origin requests only.
      */

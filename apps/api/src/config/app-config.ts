@@ -42,6 +42,8 @@ export class AppConfig {
   readonly corsOrigins: readonly string[];
   /** Reverse proxies in front of the API whose X-Forwarded-For entry is trusted. */
   readonly trustProxyHops: number;
+  /** Bearer token that opens /v1/metrics. Empty: the endpoint is off. */
+  readonly metricsToken: string;
   readonly ffmpegPath: string;
   readonly ffprobePath: string;
   /** Absolute path of the directory for working files of processing jobs. */
@@ -154,6 +156,7 @@ export class AppConfig {
     this.streamLimit = env.STREAM_LIMIT;
     this.corsOrigins = env.CORS_ORIGINS;
     this.trustProxyHops = env.TRUST_PROXY_HOPS;
+    this.metricsToken = env.METRICS_TOKEN;
     this.ffmpegPath = env.FFMPEG_PATH;
     this.ffprobePath = env.FFPROBE_PATH;
     this.processingTempPath = path.resolve(baseDirectory, env.PROCESSING_TEMP_PATH);

@@ -13,6 +13,7 @@ import { ARTWORK_ROUTE } from './catalog/catalog.views.js';
 import { PUBLIC_CATALOG_ROUTE } from './catalog/public-catalog.controller.js';
 import { LIVE_ROUTE } from './live/live-playback.service.js';
 import { MEDIA_ROUTE } from './playback/playback.service.js';
+import { MetricsService } from './metrics/metrics.service.js';
 import { securityHeaders } from './security/security-headers.js';
 
 /** Version prefix of every HTTP route. */
@@ -65,6 +66,7 @@ async function bootstrap(): Promise<void> {
     app.set('trust proxy', config.trustProxyHops);
     app.enableShutdownHooks();
     app.use(securityHeaders());
+    app.use(app.get(MetricsService).httpMiddleware());
 
     app.enableCors((request: { url?: string }, callback: CorsCallback) => {
       // Media files are opened by players on any site. Their signed URL is the authorization.
