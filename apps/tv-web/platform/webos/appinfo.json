@@ -1,0 +1,13 @@
+{
+  "id": "__APP_ID__",
+  "version": "__VERSION__",
+  "vendor": "__VENDOR__",
+  "type": "web",
+  "main": "index.html",
+  "title": "__DISPLAY_NAME__",
+  "icon": "icon.png",
+  "largeIcon": "largeIcon.png",
+  "bgColor": "#0b0d12",
+  "resolution": "1920x1080",
+  "disableBackHistoryAPI": true
+}

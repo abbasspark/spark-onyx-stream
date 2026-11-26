@@ -1,0 +1,429 @@
+/* SPDX-License-Identifier: AGPL-3.0-only */
+
+/*
+ * Written for the browsers of 2021 televisions (Chromium 76 and 79): no flex
+ * gap, no aspect-ratio, no :focus-visible, no inset. Sizes are in rem, and
+ * the root size follows the width of the screen, so the layout is the same on
+ * a 720p and a 4K panel: 1rem is 16 px at 1920 px wide.
+ */
+
+:root {
+  --ink: #0b0d12;
+  --panel: #151a23;
+  --raised: #1d2431;
+  --text: #f1f4fa;
+  --muted: #9aa6bb;
+  --accent: #6d8cff;
+  --accent-ink: #0b1020;
+  --margin: 4rem;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  font-size: calc(100vw / 120);
+  background: var(--ink);
+}
+
+body {
+  margin: 0;
+  color: var(--text);
+  background: var(--ink);
+  font-family: 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  font-size: 1.5rem;
+  line-height: 1.35;
+  overflow: hidden;
+}
+
+button {
+  font: inherit;
+  color: inherit;
+  background: none;
+  border: 0;
+  padding: 0;
+  text-align: left;
+  cursor: pointer;
+}
+
+/* The focus is the one thing a viewer must always be able to find. */
+[data-focus]:focus {
+  outline: 0.3rem solid var(--accent);
+  outline-offset: 0.25rem;
+}
+
+#root {
+  height: 100vh;
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+h1,
+h2,
+p {
+  margin: 0;
+}
+
+/* --- Messages and waiting ------------------------------------------------ */
+
+.message,
+.sign-in {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: var(--margin);
+}
+
+.message h1,
+.sign-in h1 {
+  font-size: 3rem;
+  font-weight: 600;
+}
+
+.message p,
+.sign-in .lead {
+  margin-top: 1.2rem;
+  font-size: 1.6rem;
+  color: var(--muted);
+  max-width: 50rem;
+}
+
+.message .actions {
+  display: block;
+  margin-top: 2.4rem;
+}
+
+.sign-in strong {
+  color: var(--text);
+}
+
+.code {
+  margin-top: 2.5rem;
+  padding: 1.4rem 3rem;
+  font-size: 5.5rem;
+  font-weight: 700;
+  letter-spacing: 0.4rem;
+  background: var(--panel);
+  border: 0.2rem solid var(--raised);
+  border-radius: 1rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.sign-in .hint {
+  margin-top: 2rem;
+  font-size: 1.3rem;
+  color: var(--muted);
+}
+
+.spinner {
+  width: 4rem;
+  height: 4rem;
+  border: 0.4rem solid var(--raised);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: turn 0.9s linear infinite;
+}
+
+.spinner.centre {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  margin: -2rem 0 0 -2rem;
+}
+
+@keyframes turn {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.button {
+  display: inline-block;
+  padding: 0.9rem 2.6rem;
+  font-size: 1.6rem;
+  font-weight: 600;
+  border-radius: 0.6rem;
+  background: var(--raised);
+}
+
+.button.primary {
+  background: var(--accent);
+  color: var(--accent-ink);
+}
+
+/* --- Home ---------------------------------------------------------------- */
+
+.home {
+  padding: 3rem 0 4rem var(--margin);
+}
+
+.row {
+  margin-bottom: 3rem;
+}
+
+.row h2 {
+  font-size: 2rem;
+  font-weight: 600;
+  margin-bottom: 1.2rem;
+}
+
+.cards {
+  display: flex;
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding: 0.6rem var(--margin) 0.6rem 0.6rem;
+  margin-left: -0.6rem;
+}
+
+.cards::-webkit-scrollbar {
+  display: none;
+}
+
+.card {
+  flex: 0 0 auto;
+  width: 15rem;
+  margin-right: 1.6rem;
+  border-radius: 0.8rem;
+}
+
+.card.wide {
+  width: 26rem;
+}
+
+.card .picture {
+  position: relative;
+  display: block;
+  width: 100%;
+  height: 0;
+  padding-top: 150%;
+  overflow: hidden;
+  border-radius: 0.8rem;
+  background: var(--panel);
+}
+
+.card.wide .picture {
+  padding-top: 56.25%;
+}
+
+.card img,
+.card .blank {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.card .blank {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  text-align: center;
+  color: var(--muted);
+  font-size: 1.4rem;
+}
+
+.card .tag {
+  position: absolute;
+  top: 0.6rem;
+  right: 0.6rem;
+  padding: 0.1rem 0.6rem;
+  border-radius: 0.3rem;
+  font-size: 1.1rem;
+  background: rgba(11, 13, 18, 0.8);
+}
+
+.card .progress {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 0.4rem;
+  background: rgba(255, 255, 255, 0.25);
+}
+
+.card .progress span {
+  display: block;
+  height: 100%;
+  background: var(--accent);
+}
+
+.card .name {
+  display: block;
+  margin-top: 0.7rem;
+  font-size: 1.3rem;
+  color: var(--muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.card:focus .name {
+  color: var(--text);
+}
+
+/* --- Title --------------------------------------------------------------- */
+
+.title {
+  position: relative;
+  min-height: 100vh;
+}
+
+.title .backdrop {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  opacity: 0.35;
+}
+
+.title .body {
+  position: relative;
+  padding: 6rem var(--margin) 4rem;
+  max-width: 85rem;
+}
+
+.title h1 {
+  font-size: 4.2rem;
+  font-weight: 700;
+}
+
+.title .meta {
+  margin-top: 0.8rem;
+  font-size: 1.5rem;
+  color: var(--muted);
+}
+
+.title .synopsis {
+  margin-top: 1.6rem;
+  font-size: 1.6rem;
+  max-width: 62rem;
+  display: -webkit-box;
+  -webkit-line-clamp: 5;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.title .actions {
+  margin-top: 2.4rem;
+}
+
+.seasons {
+  margin-top: 3rem;
+}
+
+.chip {
+  display: inline-block;
+  margin: 0 1rem 1rem 0;
+  padding: 0.5rem 1.6rem;
+  border-radius: 2rem;
+  font-size: 1.4rem;
+  background: var(--panel);
+}
+
+.chip.on {
+  background: var(--raised);
+  font-weight: 600;
+}
+
+.episodes {
+  margin-top: 1.2rem;
+}
+
+.episode {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  margin-bottom: 0.8rem;
+  padding: 1rem 1.6rem;
+  border-radius: 0.6rem;
+  background: rgba(21, 26, 35, 0.9);
+}
+
+.episode .number {
+  flex: 0 0 4rem;
+  font-size: 1.8rem;
+  color: var(--muted);
+}
+
+.episode .text {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.episode .episode-name {
+  display: block;
+  font-size: 1.6rem;
+}
+
+.episode .episode-time {
+  display: block;
+  font-size: 1.2rem;
+  color: var(--muted);
+}
+
+/* --- Player -------------------------------------------------------------- */
+
+.player {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: #000;
+}
+
+.player video {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  background: #000;
+}
+
+.player .controls {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  padding: 8rem var(--margin) 3rem;
+  background: linear-gradient(to bottom, rgba(0, 0, 0, 0), rgba(0, 0, 0, 0.88));
+}
+
+.player .controls h1 {
+  font-size: 2.6rem;
+  font-weight: 600;
+}
+
+.player .controls p {
+  font-size: 1.4rem;
+  color: var(--muted);
+}
+
+.player .bar {
+  margin-top: 1.4rem;
+  height: 0.5rem;
+  background: rgba(255, 255, 255, 0.25);
+}
+
+.player .bar span {
+  display: block;
+  height: 100%;
+  background: var(--accent);
+}
+
+.player .times {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 0.8rem;
+  font-size: 1.3rem;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}

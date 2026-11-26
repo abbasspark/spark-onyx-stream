@@ -26,12 +26,13 @@ ENV PNPM_HOME=/pnpm \
 RUN npm install --global pnpm@${PNPM_VERSION} && npm cache clean --force
 WORKDIR /repo
 
-# --- Build: compile the API, the database package and the admin panel ----------
+# --- Build: compile the API, the database package, the admin panel and the TV app ---
 FROM base AS build
 # Package manifests first, so dependencies are installed again only when they change.
 COPY pnpm-lock.yaml pnpm-workspace.yaml package.json ./
 COPY apps/api/package.json apps/api/
 COPY apps/admin/package.json apps/admin/
+COPY apps/tv-web/package.json apps/tv-web/
 COPY packages/database/package.json packages/database/
 COPY packages/api-client/package.json packages/api-client/
 RUN --mount=type=cache,id=pnpm-store,target=/pnpm/store \
@@ -43,12 +44,14 @@ COPY packages/database packages/database
 COPY packages/api-client packages/api-client
 COPY apps/api apps/api
 COPY apps/admin apps/admin
+COPY apps/tv-web apps/tv-web
 # Generating the database client reads the configuration, which asks for a
 # database address. Nothing connects to it during the build.
 # The gateway serves the panel under /admin/. The root is the viewer website.
 RUN DATABASE_URL=postgresql://build:build@localhost:5432/build pnpm db:generate \
  && pnpm --filter @onyx/api build \
- && ADMIN_BASE_PATH=/admin/ pnpm --filter @onyx/admin build
+ && ADMIN_BASE_PATH=/admin/ pnpm --filter @onyx/admin build \
+ && TV_BASE_PATH=/tv/ pnpm --filter @onyx/tv-web build
 
 # --- Production dependencies only ----------------------------------------------
 FROM base AS prod-deps
@@ -135,9 +138,10 @@ CMD ["node", "apps/web/server.js"]
 
 # --- gateway: Nginx with the admin panel -----------------------------------------
 FROM ${NGINX_IMAGE} AS gateway
-COPY deploy/nginx/nginx.conf deploy/nginx/proxy-api.conf deploy/nginx/proxy-web.conf deploy/nginx/security-headers.conf /etc/nginx/
+COPY deploy/nginx/nginx.conf deploy/nginx/proxy-api.conf deploy/nginx/proxy-web.conf deploy/nginx/security-headers.conf deploy/nginx/security-headers-tv.conf /etc/nginx/
 COPY deploy/nginx/njs /etc/nginx/njs
 COPY --from=build /repo/apps/admin/dist /usr/share/nginx/html/admin
+COPY --from=build /repo/apps/tv-web/dist /usr/share/nginx/html/tv
 # The official image can run without root: all writable paths are under /tmp.
 USER nginx
 EXPOSE 8080
