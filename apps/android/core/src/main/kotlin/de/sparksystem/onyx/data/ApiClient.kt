@@ -4,6 +4,7 @@ package de.sparksystem.onyx.data
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.decodeFromJsonElement
 import okhttp3.HttpUrl
 import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 import okhttp3.MediaType.Companion.toMediaType
@@ -123,7 +124,10 @@ class ApiClient(
                         @Suppress("UNCHECKED_CAST")
                         Answer.Ok(Unit as T)
                     } else {
-                        Answer.Ok(json.decodeFromString<T>(text))
+                        // Addresses in the answer are paths, which a player cannot open.
+                        Answer.Ok(
+                            json.decodeFromJsonElement<T>(absoluteUrls(json.parseToJsonElement(text), address)),
+                        )
                     }
                 }
                 val failure = runCatching { json.decodeFromString<ApiError>(text) }.getOrNull()
@@ -213,12 +217,16 @@ class ApiClient(
 
     // --- Signing in ------------------------------------------------------------
 
+    /** Read on a background thread: the first time, it is made and written. */
+    private suspend fun installation(): String =
+        withContext(Dispatchers.IO) { session.installationId() }
+
     suspend fun startDeviceCode(name: String, model: String?): Answer<DeviceCodeStart> = call(
         method = "POST",
         path = "viewer/device-codes",
         body = json.encodeToString(
             DeviceStart.serializer(),
-            DeviceStart(DeviceDescription(name, "TV", "android-tv", model)),
+            DeviceStart(tvDevice(installation(), name, model)),
         ),
         withToken = false,
     )
@@ -240,7 +248,7 @@ class ApiClient(
         path = "viewer/login",
         body = json.encodeToString(
             LoginBody.serializer(),
-            LoginBody(email, password, DeviceDescription(deviceName, "PHONE", "android", null)),
+            LoginBody(email, password, phoneDevice(installation(), deviceName)),
         ),
         withToken = false,
     )
@@ -375,13 +383,25 @@ fun serverAddressOf(raw: String): HttpUrl? {
 @kotlinx.serialization.Serializable
 private data class DeviceStart(val device: DeviceDescription)
 
+/**
+ * What a device says about itself when it signs in. The server needs the
+ * installation id, and reads the kind as one of TV, MOBILE, TABLET, DESKTOP or
+ * OTHER: anything else is refused with "Validation failed".
+ */
 @kotlinx.serialization.Serializable
-private data class DeviceDescription(
+internal data class DeviceDescription(
+    val installationId: String,
     val name: String,
     val kind: String,
     val platform: String,
     val model: String?,
 )
+
+internal fun tvDevice(installationId: String, name: String, model: String?) =
+    DeviceDescription(installationId, name, "TV", "android-tv", model)
+
+internal fun phoneDevice(installationId: String, name: String) =
+    DeviceDescription(installationId, name, "MOBILE", "android", null)
 
 @kotlinx.serialization.Serializable
 private data class DeviceCodeBody(val deviceCode: String)

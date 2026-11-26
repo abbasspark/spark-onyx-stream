@@ -2,7 +2,7 @@
 
 Open-source, self-hosted streaming platform for video on demand and live TV, with hybrid peer-to-peer delivery.
 
-> **Status: feature-complete for video on demand and live TV, not yet released.** The server, the admin panel, the viewer website, live channels, edges with P2P, billing, the installer and the Android apps are built, and the checks in CI pass. The Android and Samsung/LG apps have never been run on a real device, ads cover video on demand only, and DRM is deferred. See the [roadmap](docs/roadmap.md) for exactly what is done and what is not.
+> **Status: feature-complete for video on demand and live TV, not yet released.** The server, the admin panel, the viewer website, live channels, edges with P2P, billing, the installer and the Android apps are built, and the checks in CI pass. The Android apps have run only on emulators and the Samsung/LG app only in a desktop browser, never on a real device, ads cover video on demand only, and DRM is deferred. See the [roadmap](docs/roadmap.md) for exactly what is done and what is not.
 
 ## What it is
 
