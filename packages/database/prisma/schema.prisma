@@ -2376,6 +2376,8 @@ model EdgeServer {
   enabled    Boolean @default(true)
   /// Its share of viewers compared with the other edges, 1 to 100.
   weight     Int     @default(10)
+  /// What it may send at most, in megabits per second. Over it, it gets no new viewers.
+  maxMbps    Int?
   serveVideo Boolean @default(true)
   serveLive  Boolean @default(true)
 

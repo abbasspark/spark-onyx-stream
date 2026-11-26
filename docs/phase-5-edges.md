@@ -75,6 +75,7 @@ When a viewer starts a video or a channel, the API chooses a server for that ses
 - **A video goes to one of two edges,** always the same two for the same video. Copies of a video are then on two edges instead of thinly on all of them. Which two follows from the video and the edges alone (weighted rendezvous hashing), so adding or removing an edge moves only the videos of that edge.
 - **A live channel goes to any edge,** by weight. What is kept of a channel is small and short-lived, and a popular channel needs every edge.
 - **Weight** is an edge's share: one with weight 20 gets twice the viewers of one with weight 10.
+- **A bandwidth limit** is optional, in megabits per second. An edge that sent 90 % of it or more between its last two reports gets no new viewers until it is below that again; they go to the other edges, or to the main server when all are full. It is a limit on new viewers, not a cap on the line: viewers already watching are not cut off, and the edge itself sends as much as it is asked for. The figure is an average over the span between two reports, about ten seconds.
 - **Admins always watch from the main server,** so a preview in the panel shows what is stored and does not depend on an edge.
 - **Pictures** (posters, backdrops) stay on the main server.
 
@@ -251,7 +252,7 @@ What these figures are, and are not:
 
 ## Not built yet
 
-- Sending viewers to the nearest edge by country or network, and limits per edge (bandwidth, connections)
+- Sending viewers to the nearest edge by country or network, and a limit on connections per edge
 - Filling the copies of an edge ahead of a premiere, and emptying one video only
 - Traffic per title and per country, and what the main server itself delivered
 - Edges that fetch from other edges, and edges for pictures

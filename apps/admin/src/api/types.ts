@@ -1498,6 +1498,8 @@ export interface EdgeServer {
   enabled: boolean;
   /** Its share of viewers compared with the other edges, 1 to 100. */
   weight: number;
+  /** The most it should send, in megabits per second. Null for no limit. */
+  maxMbps: number | null;
   serveVideo: boolean;
   serveLive: boolean;
   status: EdgeStatus;
@@ -1538,6 +1540,7 @@ export interface EdgeInput {
   publicUrl: string;
   location: string | null;
   weight: number;
+  maxMbps: number | null;
   serveVideo: boolean;
   serveLive: boolean;
   enabled: boolean;

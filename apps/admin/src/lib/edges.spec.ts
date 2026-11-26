@@ -37,6 +37,7 @@ function edge(more: Partial<EdgeServer> = {}, now: Partial<NonNullable<EdgeServe
     location: null,
     enabled: true,
     weight: 10,
+    maxMbps: null,
     serveVideo: true,
     serveLive: true,
     status: 'ONLINE',
