@@ -337,3 +337,71 @@ export function VerifyEmailScreen() {
     </Screen>
   );
 }
+
+/** Opens the link sent to a new address, and the account uses it from then on. */
+export function ConfirmEmailChangeScreen() {
+  const token = useLinkToken();
+  const [result, setResult] = useState<Verification>({ state: 'working' });
+  // A link works once, so it is used once, however often this runs.
+  const used = useRef(false);
+
+  useEffect(() => {
+    if (token === undefined || used.current) {
+      return;
+    }
+    used.current = true;
+    if (token === null) {
+      setResult({
+        state: 'failed',
+        message: 'The link is incomplete. Open it from the email again, or copy the whole address.',
+      });
+      return;
+    }
+    viewerApi
+      .confirmEmailChange(token)
+      .then(({ email }) => setResult({ state: 'done', email }))
+      .catch((caught: unknown) => setResult({ state: 'failed', message: asError(caught).message }));
+  }, [token]);
+
+  if (result.state === 'working') {
+    return (
+      <Screen heading="Changing your email address">
+        <div role="status" className="mt-8">
+          <Loader2 className="size-10 animate-[player-spin_0.9s_linear_infinite]" />
+          <span className="sr-only">One moment</span>
+        </div>
+      </Screen>
+    );
+  }
+
+  if (result.state === 'done') {
+    return (
+      <Screen heading="Your email address was changed">
+        <p className="mt-6 flex items-center gap-3 text-lg text-smoke">
+          <MailCheck className="size-6 shrink-0 text-sard" aria-hidden="true" />
+          <span className="text-vein">{result.email}</span>
+        </p>
+        <p className="mt-4 text-sm text-smoke">
+          From now on you sign in with this address. We told the old one about the change.
+        </p>
+        {/* A whole page load, so that a signed-in tab learns the new address. */}
+        <a href="/account" className="button button-play mt-8">
+          Go to my account
+        </a>
+      </Screen>
+    );
+  }
+
+  return (
+    <Screen heading="This link does not work">
+      <p className="mt-6 text-lg text-smoke">{result.message}</p>
+      <p className="mt-4 text-sm text-smoke">
+        You can ask for a new link from your account page. Your address stays as it is until a link
+        is opened.
+      </p>
+      <Link href="/account" className="button button-play mt-8">
+        Go to my account
+      </Link>
+    </Screen>
+  );
+}

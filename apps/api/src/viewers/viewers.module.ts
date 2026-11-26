@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 import { Module } from '@nestjs/common';
+import { StripeModule } from '../stripe/stripe.module.js';
 import { APP_INTERCEPTOR } from '@nestjs/core';
 import { AudienceInterceptor } from './audience.interceptor.js';
 import { DeviceCodesService } from './device-codes.service.js';
@@ -24,6 +25,7 @@ import { ViewersAdminService } from './viewers-admin.service.js';
  * is watching.
  */
 @Module({
+  imports: [StripeModule],
   controllers: [
     ViewerAuthController,
     ViewersAdminController,

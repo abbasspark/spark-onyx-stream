@@ -24,6 +24,8 @@ import { ZodValidationPipe } from '../common/zod-validation.pipe.js';
 import { RateLimit } from '../rate-limit/rate-limit.guard.js';
 import { VIEWER_COOKIE, viewerCookieOptions } from './cookies.js';
 import {
+  type ChangeViewerEmailInput,
+  changeViewerEmailSchema,
   type ChangeViewerPasswordInput,
   changeViewerPasswordSchema,
   type DeleteOwnViewerInput,
@@ -50,7 +52,7 @@ import {
   ViewerAuthService,
   type ViewerSignIn,
 } from './viewer-auth.service.js';
-import { ViewerEmailService } from './viewer-email.service.js';
+import { type EmailChangeResult, ViewerEmailService } from './viewer-email.service.js';
 import {
   type ProfileView,
   toProfileView,
@@ -259,6 +261,41 @@ export class ViewerAuthController {
   @HttpCode(HttpStatus.NO_CONTENT)
   async sendVerification(@CurrentViewer() identity: ViewerIdentity): Promise<void> {
     await this.emails.sendVerification(identity.viewer);
+  }
+
+  /**
+   * Asks to use another email address, with the password of the account. With
+   * email set up, a link goes to the new address and nothing changes until it is
+   * opened. Without, the address changes at once.
+   */
+  @ViewerOnly()
+  @RateLimit(MAIL_REQUESTS)
+  @Post('email/change')
+  @HttpCode(HttpStatus.OK)
+  @Header('Cache-Control', 'no-store')
+  async changeEmail(
+    @CurrentViewer() identity: ViewerIdentity,
+    @Body(new ZodValidationPipe(changeViewerEmailSchema)) body: ChangeViewerEmailInput,
+  ): Promise<EmailChangeResult> {
+    // An account is managed from a profile without a limit.
+    assertUnrestricted();
+    await this.auth.assertPassword(identity, body.password);
+    return this.emails.requestChange(identity.viewer, body.newEmail);
+  }
+
+  /**
+   * Uses the new address with the token of the link sent to it. Needs no
+   * sign-in: the link is often opened on another device.
+   */
+  @Public()
+  @RateLimit(LINK_USES)
+  @Post('email/change/confirm')
+  @HttpCode(HttpStatus.OK)
+  @Header('Cache-Control', 'no-store')
+  confirmEmailChange(
+    @Body(new ZodValidationPipe(verifyViewerEmailSchema)) body: VerifyViewerEmailInput,
+  ): Promise<{ email: string }> {
+    return this.emails.confirmChange(body.token);
   }
 
   /** The devices the viewer is signed in on. */

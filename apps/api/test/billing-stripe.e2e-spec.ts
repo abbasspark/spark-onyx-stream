@@ -327,6 +327,24 @@ describe.skipIf(!TEST_DATABASE_URL)('Billing with Stripe (e2e)', () => {
       expect(stripe.requests).toHaveLength(0);
     });
 
+    it('tells Stripe the new address when a viewer who paid changes their email', async () => {
+      const anna = await register();
+      const plan = await createPlan();
+      await checkout(anna.cookie, { planId: plan.id, interval: 'MONTH' }).expect(200);
+      const [customer] = [...stripe.customers.values()];
+      expect(customer?.email).toBe(ANNA.email);
+
+      // No email is set up in this test, so the address changes at once.
+      await http()
+        .post('/v1/viewer/email/change')
+        .set('Cookie', anna.cookie)
+        .send({ newEmail: 'anna.new@example.com', password: ANNA.password })
+        .expect(200);
+
+      expect(stripe.calls('POST', `/v1/customers/${customer?.id}`)).toHaveLength(1);
+      expect(stripe.customers.get(customer?.id as string)?.email).toBe('anna.new@example.com');
+    });
+
     it('opens Stripe for the chosen plan and price', async () => {
       const anna = await register();
       const plan = await createPlan({ trialDays: 7 });

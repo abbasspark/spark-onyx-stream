@@ -376,9 +376,40 @@ function EmailSection({
   canSend: boolean;
   required: boolean;
 }) {
+  const { updateViewer } = useViewerSession();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<ViewerApiError | null>(null);
   const [sentAt, setSentAt] = useState(0);
+  const [changing, setChanging] = useState(false);
+  const [newEmail, setNewEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [changeBusy, setChangeBusy] = useState(false);
+  const [changeError, setChangeError] = useState<ViewerApiError | null>(null);
+  /** What the last request for another address led to, to tell the viewer. */
+  const [asked, setAsked] = useState<{
+    status: 'confirmation_sent' | 'changed';
+    email: string;
+  } | null>(null);
+
+  const change = async (event: FormEvent) => {
+    event.preventDefault();
+    setChangeBusy(true);
+    setChangeError(null);
+    try {
+      const answer = await viewerApi.changeEmail(newEmail.trim(), password);
+      if (answer.status === 'changed') {
+        updateViewer((current) => ({ ...current, email: answer.email, emailVerified: false }));
+      }
+      setAsked(answer);
+      setChanging(false);
+      setNewEmail('');
+      setPassword('');
+    } catch (caught) {
+      setChangeError(asError(caught));
+    } finally {
+      setChangeBusy(false);
+    }
+  };
 
   const send = async () => {
     setBusy(true);
@@ -439,6 +470,88 @@ function EmailSection({
           ) : null}
         </>
       )}
+      <div className="mt-6">
+        {asked?.status === 'confirmation_sent' ? (
+          <p role="status" className="mb-4 text-smoke">
+            We sent a link to <span className="text-vein break-all">{asked.email}</span>. Open it
+            there to use that address. Until then you sign in with {email}.
+          </p>
+        ) : asked ? (
+          <p role="status" className="mb-4 text-smoke">
+            Your address is now <span className="text-vein break-all">{asked.email}</span>.
+          </p>
+        ) : null}
+        {changing ? (
+          <form onSubmit={(event) => void change(event)} className="grid gap-5">
+            <FormField
+              label="New email"
+              type="email"
+              name="new-email"
+              autoComplete="email"
+              inputMode="email"
+              autoCapitalize="none"
+              spellCheck={false}
+              required
+              maxLength={254}
+              hint={
+                canSend
+                  ? 'We send a link to this address. The old one stays until you open it.'
+                  : 'This site does not send email, so the address changes at once.'
+              }
+              value={newEmail}
+              error={changeError?.fields.newEmail}
+              onValue={setNewEmail}
+            />
+            <FormField
+              label="Your password"
+              type="password"
+              name="current-password"
+              autoComplete="current-password"
+              required
+              maxLength={128}
+              value={password}
+              error={
+                changeError?.fields.password ??
+                (changeError && Object.keys(changeError.fields).length === 0
+                  ? changeError.message
+                  : undefined)
+              }
+              onValue={setPassword}
+            />
+            <div className="flex flex-wrap items-center gap-4">
+              <button
+                type="submit"
+                className="button button-quiet"
+                disabled={changeBusy || !newEmail || !password}
+              >
+                {changeBusy ? <Spinner /> : <Mail />}
+                {canSend ? 'Send the link' : 'Change the address'}
+              </button>
+              <button
+                type="button"
+                className="button button-quiet"
+                onClick={() => {
+                  setChanging(false);
+                  setChangeError(null);
+                }}
+              >
+                Cancel
+              </button>
+            </div>
+          </form>
+        ) : (
+          <button
+            type="button"
+            className="button button-quiet"
+            onClick={() => {
+              setAsked(null);
+              setChanging(true);
+            }}
+          >
+            Use another address
+          </button>
+        )}
+      </div>
     </Section>
   );
 }

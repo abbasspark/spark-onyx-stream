@@ -224,6 +224,17 @@ export class ViewerAuthService {
   }
 
   /** Changes the password and signs out every other device. */
+  /**
+   * Asks for the password again before something that changes how one signs in.
+   *
+   * @throws BadRequestException when it is not the password of the account.
+   */
+  async assertPassword(identity: ViewerIdentity, password: string): Promise<void> {
+    if (!(await verifyPassword(password, identity.viewer.passwordHash))) {
+      throw new BadRequestException('Password is incorrect');
+    }
+  }
+
   async changePassword(identity: ViewerIdentity, input: ChangeViewerPasswordInput): Promise<void> {
     if (!(await verifyPassword(input.currentPassword, identity.viewer.passwordHash))) {
       throw new BadRequestException('Current password is incorrect');

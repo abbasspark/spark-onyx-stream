@@ -56,31 +56,33 @@ A private service for invited people is `VIEWER_REGISTRATION=closed` with `CATAL
 
 All under `/v1/viewer`. Answers about a person are never cached.
 
-| Method and path                             | Purpose                                                                                          |
-| ------------------------------------------- | ------------------------------------------------------------------------------------------------ |
-| `GET /config`                               | What is open: registration and playback. No sign-in needed                                       |
-| `POST /register`                            | Create an account and sign in                                                                    |
-| `POST /login`, `POST /logout`               | Sign in and out                                                                                  |
-| `GET /session`                              | Who is signed in, or nobody. Never an error, so a page can ask every time                        |
-| `GET /me`, `PATCH /me`                      | The viewer's own account, and changing the name                                                  |
-| `POST /password`                            | Change the password                                                                              |
-| `GET /sessions`, `DELETE /sessions/{id}`    | The devices signed in, and signing one out                                                       |
-| `POST /delete`                              | Delete the own account. Asks for the password again                                              |
-| `POST /password/forgot`                     | Ask for a link to set a new password. The same answer for every address                          |
-| `POST /password/reset`                      | Set a new password with the token of the link                                                    |
-| `POST /email/verify`                        | Confirm the address with the token of the link. No sign-in needed                                |
-| `POST /email/send`                          | Send the link to confirm again                                                                   |
-| `GET /watching`                             | "Continue watching": videos begun and not finished, the latest first                             |
-| `GET /watching/titles/{slug}`               | Progress in the videos of one title, finished ones included                                      |
-| `PUT /watching`                             | Report positions: `{ items: [{ title, episodeId?, position, duration, watchedAt? }] }`, up to 50 |
-| `DELETE /watching/{id}`, `DELETE /watching` | Forget one video, or everything                                                                  |
-| `GET /streams`                              | What the devices of the account are playing right now, and how many may                          |
-| `POST /streams/{id}/beat`                   | The player says it is still playing. `410` tells it to stop                                      |
-| `DELETE /streams/{id}`                      | Ends a stream: the player's own on leaving, or another device's to make room                     |
-| `GET /list`                                 | "My list": the saved titles as cards, the last added first, and how many more it takes           |
-| `GET /list/ids`                             | Only the ids of the saved titles, to mark them on any page                                       |
-| `PUT /list/{slug}`, `DELETE /list/{slug}`   | Put a title on the list, or take it off. Both are safe to repeat                                 |
-| `DELETE /list`                              | Empty the list                                                                                   |
+| Method and path                             | Purpose                                                                                                 |
+| ------------------------------------------- | ------------------------------------------------------------------------------------------------------- |
+| `GET /config`                               | What is open: registration and playback. No sign-in needed                                              |
+| `POST /register`                            | Create an account and sign in                                                                           |
+| `POST /login`, `POST /logout`               | Sign in and out                                                                                         |
+| `GET /session`                              | Who is signed in, or nobody. Never an error, so a page can ask every time                               |
+| `GET /me`, `PATCH /me`                      | The viewer's own account, and changing the name                                                         |
+| `POST /password`                            | Change the password                                                                                     |
+| `GET /sessions`, `DELETE /sessions/{id}`    | The devices signed in, and signing one out                                                              |
+| `POST /delete`                              | Delete the own account. Asks for the password again                                                     |
+| `POST /password/forgot`                     | Ask for a link to set a new password. The same answer for every address                                 |
+| `POST /password/reset`                      | Set a new password with the token of the link                                                           |
+| `POST /email/verify`                        | Confirm the address with the token of the link. No sign-in needed                                       |
+| `POST /email/send`                          | Send the link to confirm again                                                                          |
+| `POST /email/change`                        | Ask to use another address: `{ newEmail, password }`. See [Changing the address](#changing-the-address) |
+| `POST /email/change/confirm`                | Use the new address with the token of the link sent to it. No sign-in needed                            |
+| `GET /watching`                             | "Continue watching": videos begun and not finished, the latest first                                    |
+| `GET /watching/titles/{slug}`               | Progress in the videos of one title, finished ones included                                             |
+| `PUT /watching`                             | Report positions: `{ items: [{ title, episodeId?, position, duration, watchedAt? }] }`, up to 50        |
+| `DELETE /watching/{id}`, `DELETE /watching` | Forget one video, or everything                                                                         |
+| `GET /streams`                              | What the devices of the account are playing right now, and how many may                                 |
+| `POST /streams/{id}/beat`                   | The player says it is still playing. `410` tells it to stop                                             |
+| `DELETE /streams/{id}`                      | Ends a stream: the player's own on leaving, or another device's to make room                            |
+| `GET /list`                                 | "My list": the saved titles as cards, the last added first, and how many more it takes                  |
+| `GET /list/ids`                             | Only the ids of the saved titles, to mark them on any page                                              |
+| `PUT /list/{slug}`, `DELETE /list/{slug}`   | Put a title on the list, or take it off. Both are safe to repeat                                        |
+| `DELETE /list`                              | Empty the list                                                                                          |
 
 Playback (`POST /v1/catalog/…/playback`) answers 401 with "Sign in to watch" when `CATALOG_PLAYBACK=viewers` and no viewer is signed in.
 
@@ -112,13 +114,15 @@ The **Viewers** page shows what the installation lets the public do (sign-up and
 
 ## Email
 
-Email is off until a mail server is set (`SMTP_URL`). With it on, viewers get three emails:
+Email is off until a mail server is set (`SMTP_URL`). With it on, viewers get these emails:
 
-| Email                      | Sent                                                                                | Link works for |
-| -------------------------- | ----------------------------------------------------------------------------------- | -------------- |
-| Confirm your email address | After sign-up on the website, and when the viewer or an admin asks for it again     | 3 days         |
-| Set a new password         | When "Forgot your password?" is used with the address of an account, or by an admin | 1 hour         |
-| Your password was changed  | After a new password was set with a link                                            | no link        |
+| Email                          | Sent                                                                                | Link works for |
+| ------------------------------ | ----------------------------------------------------------------------------------- | -------------- |
+| Confirm your email address     | After sign-up on the website, and when the viewer or an admin asks for it again     | 3 days         |
+| Confirm your new email address | To the new address, when the viewer asks to use another one                         | 1 day          |
+| Your email address was changed | To the old address, once the new one was confirmed                                  | no link        |
+| Set a new password             | When "Forgot your password?" is used with the address of an account, or by an admin | 1 hour         |
+| Your password was changed      | After a new password was set with a link                                            | no link        |
 
 - **A link carries a random token of which only a hash is stored.** It works once, and a newer link of the same kind replaces the older ones.
 - **The token rides in the fragment of the address** (`#token=…`), which browsers send to no server and which ends in no access log. The page takes it out of the address bar when it opens.
@@ -130,6 +134,18 @@ Email is off until a mail server is set (`SMTP_URL`). With it on, viewers get th
 - **A viewer an admin creates counts as confirmed,** unless the admin says otherwise. An address an admin changes counts as not confirmed.
 - **With `VIEWER_EMAIL_VERIFICATION=required`,** playback that needs a viewer answers 403 with the code `email_unverified` until the address is confirmed. Browsing, signing in and the account page work as before.
 - Emails are plain: text and simple HTML, no pictures, no tracking. Logs never contain an address or the content of an email.
+
+### Changing the address
+
+A viewer changes the address of the account from the account page, with their password. The address is how they sign in, so it is not changed on a say-so:
+
+- **A link goes to the new address, and nothing changes until it is opened.** That shows the address is theirs, and a typing mistake cannot lock them out. The old address keeps working in the meantime. A newer request replaces the older link, and one request can be made every two minutes.
+- **Opening the link needs no sign-in,** since it is often opened on another device. It uses the new address and counts it as confirmed, because reading that mail is the proof. The other links of the account are deleted with it. Devices stay signed in.
+- **The old address is told afterwards,** with the new one named, in case the account was not in its owner's hands.
+- **An address another viewer uses is refused,** when asking and again when the link is opened, in case it was taken in between.
+- **Stripe is told the new address** for a viewer who paid online, so receipts go there. If Stripe cannot be reached the change still happens.
+- **On a site without email** the address changes at once, as not confirmed, with the password as the only check.
+- **A profile with an age limit cannot do it,** like everything else about the account.
 
 The panel has an **Email** page: how email is set up (never the password of the mail server), what the mail server said to the last email, and a test email that waits for the server's answer. On the **Viewers** page an admin sees which addresses are confirmed, can mark one as confirmed or not, and can send both links.
 
@@ -327,7 +343,6 @@ The address a device shows is the site address of the installation (`SITE_URL`) 
 
 ## Not built yet
 
-- Changing the email address by the viewer. An admin can change it
 - Emails in other languages, and editing their text in the panel
 - A picture of one's own for a profile
 - A "watch next" row that offers the following episode of a series
