@@ -2,6 +2,7 @@
 import { useEffect, useState } from 'react';
 import { Button, Message, Spinner } from '@/components/ui';
 import { type DeviceCodeStart, api } from '@/lib/api';
+import { rememberProfile } from '@/lib/profiles';
 import { focusFirst } from '@/lib/remote';
 import { storage } from '@/lib/storage';
 
@@ -53,6 +54,10 @@ export function SignIn({ onSignedIn }: { onSignedIn: () => void }) {
               }
               if (answer.status === 'approved') {
                 storage.set('token', answer.token);
+                // A main profile with a PIN means the viewer has to choose before anything shows.
+                if (!answer.chooseProfile) {
+                  rememberProfile(answer.profile);
+                }
                 onSignedIn();
               } else if (answer.status === 'denied') {
                 fail('The sign-in was turned down on the other device.');

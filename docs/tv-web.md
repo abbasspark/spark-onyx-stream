@@ -13,15 +13,16 @@ The app is served by the gateway under `/tv/`, on the same address as the API. T
 ## What it does
 
 - Signs in with a code: the television shows a short code, the viewer enters it on a phone or computer.
+- Choosing a profile: "Who is watching?" after signing in and from a "Switch profile" button on the home screen. A profile with a PIN asks for it on a pad of buttons, four to six digits, and shows what the server says when the PIN is wrong or the profile is closed for a while. A single profile without a PIN is taken without asking. The choice is kept, so a restart does not ask again.
 - Home screen with "Continue watching" and the rows of the site.
 - Title pages, with seasons and episodes for series.
 - Playback of HLS through the television's own player, with resume, skip of 10 seconds, pause, the back key, saving of the place every 30 seconds, and the heartbeat that holds the account's place among devices playing at once.
 
 ## What it does not do yet
 
-- Search, saved list, profile choice and PIN entry, live channels and the guide, subtitle and audio choice, skipping intros and credits, and ads. The Android TV app has most of these.
-- Profiles with a PIN. A viewer whose main profile has a PIN cannot sign in on this app yet.
-- None of it has been run on a television. It was run in Chrome at 1920 by 1080 with a keyboard standing in for the remote, against a stand-in server. The remote key codes, the back key on both makers' systems and native HLS on both are taken from their documentation, not from a device.
+- Search, saved list, live channels and the guide, subtitle and audio choice, skipping intros and credits, and ads. The Android TV app has most of these.
+- The number keys of a remote for the PIN. The pad is used with the arrows and OK.
+- None of it has been run on a television. It was run in Chrome at 1920 by 1080 with a keyboard standing in for the remote, against a stand-in server. The profile screens were also run against the real API, with a PIN on the main profile. The remote key codes, the back key on both makers' systems and native HLS on both are taken from their documentation, not from a device.
 
 ## Making the packages
 
