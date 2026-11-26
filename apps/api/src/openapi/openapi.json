@@ -17707,16 +17707,6 @@
         "responses": {
           "200": {
             "description": "The answer is written by the server as it goes: a file, a stream or a redirect."
-          },
-          "429": {
-            "description": "Too many requests. \"Retry-After\" says when to try again.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
           }
         }
       }
