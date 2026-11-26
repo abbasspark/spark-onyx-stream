@@ -168,6 +168,149 @@ describe.skipIf(!TEST_DATABASE_URL)('Billing with Stripe (e2e)', () => {
     await rm(workDirectory, { recursive: true, force: true });
   });
 
+  describe('changing the plan', () => {
+    const change = (cookie: string, body: Record<string, unknown>) =>
+      http().post('/v1/viewer/subscription/change').set('Cookie', cookie).send(body);
+    const premium = () =>
+      createPlan({ name: 'Premium', monthlyAmount: 1299, yearlyAmount: 12990, includesAll: true });
+
+    it('moves a subscription to another plan and interval, charged now, and records it', async () => {
+      const anna = await subscribe();
+      const other = await premium();
+      const [line] = stripe.subscriptions.get(anna.remote.id)?.items.data ?? [];
+
+      const answer = await change(anna.cookie, { planId: other.id, interval: 'YEAR' }).expect(200);
+      expect(answer.headers['cache-control']).toBe('no-store');
+      expect(answer.body.subscription).toMatchObject({
+        plan: { id: other.id, name: 'Premium' },
+        interval: 'YEAR',
+        online: true,
+      });
+
+      // Stripe was told to swap the price of the line, to bill the difference at once and to
+      // refuse the whole change when the card cannot pay it.
+      const [request] = stripe.calls('POST', `/v1/subscriptions/${anna.remote.id}`);
+      expect(request?.form).toMatchObject({
+        'items[0][id]': line?.id,
+        'items[0][price_data][unit_amount]': '12990',
+        'items[0][price_data][currency]': 'eur',
+        'items[0][price_data][recurring][interval]': 'year',
+        'items[0][price_data][product]': `onyx_${other.id.replace(/-/g, '')}`,
+        proration_behavior: 'always_invoice',
+        payment_behavior: 'error_if_incomplete',
+        'metadata[planId]': other.id,
+      });
+
+      const stored = await testApp.prisma.subscription.findFirstOrThrow({
+        where: { externalId: anna.remote.id },
+      });
+      expect(stored).toMatchObject({ planId: other.id, interval: 'YEAR', amount: 12990 });
+      expect((await own(anna.cookie)).subscription).toMatchObject({ plan: { id: other.id } });
+    });
+
+    it('lets the same plan be billed per year instead of per month', async () => {
+      const anna = await subscribe();
+
+      await change(anna.cookie, { planId: anna.plan.id, interval: 'YEAR' }).expect(200);
+      const stored = await testApp.prisma.subscription.findFirstOrThrow({
+        where: { externalId: anna.remote.id },
+      });
+      expect(stored).toMatchObject({ planId: anna.plan.id, interval: 'YEAR', amount: 7990 });
+    });
+
+    it('refuses the plan and interval the viewer has, without asking Stripe', async () => {
+      const anna = await subscribe();
+      const before = stripe.requests.length;
+
+      const refused = await change(anna.cookie, {
+        planId: anna.plan.id,
+        interval: 'MONTH',
+      }).expect(400);
+      expect(refused.body.message).toBe('You are on this plan already');
+      expect(stripe.requests).toHaveLength(before);
+    });
+
+    it('changes nothing when the card cannot pay the difference', async () => {
+      const anna = await subscribe();
+      const other = await premium();
+      stripe.declineChanges = true;
+
+      const refused = await change(anna.cookie, { planId: other.id, interval: 'MONTH' }).expect(
+        402,
+      );
+      expect(refused.body.code).toBe('payment_failed');
+      const stored = await testApp.prisma.subscription.findFirstOrThrow({
+        where: { externalId: anna.remote.id },
+      });
+      expect(stored).toMatchObject({ planId: anna.plan.id, interval: 'MONTH', amount: 799 });
+    });
+
+    it('does not move to a plan that is off, or not sold for the interval', async () => {
+      const anna = await subscribe();
+      const hidden = await createPlan({ name: 'Hidden', isOffered: false });
+      const monthlyOnly = await createPlan({ name: 'Monthly', yearlyAmount: null });
+      const before = stripe.requests.length;
+
+      await change(anna.cookie, { planId: hidden.id, interval: 'MONTH' }).expect(404);
+      await change(anna.cookie, { planId: monthlyOnly.id, interval: 'YEAR' }).expect(400);
+      await change(anna.cookie, { planId: 'not-an-id', interval: 'MONTH' }).expect(400);
+      expect(stripe.requests).toHaveLength(before);
+    });
+
+    it('needs a subscription paid online that is running and not set to end', async () => {
+      const other = await premium();
+      const body = { planId: other.id, interval: 'MONTH' };
+
+      // No subscription at all, and no sign-in.
+      const visitor = await register();
+      const none = await change(visitor.cookie, body).expect(409);
+      expect(none.body.code).toBe('no_online_subscription');
+      await http().post('/v1/viewer/subscription/change').send(body).expect(401);
+
+      // One an admin granted is not Stripe's to change.
+      const granted = await register({ ...ANNA, email: 'bea@example.com', displayName: 'Bea' });
+      await http()
+        .post(`/v1/viewers/${granted.id}/subscriptions`)
+        .set(admin())
+        .send({ planId: other.id, endsAt: null })
+        .expect(201);
+      const manual = await change(granted.cookie, { planId: other.id, interval: 'YEAR' }).expect(
+        409,
+      );
+      expect(manual.body.code).toBe('no_online_subscription');
+
+      // One that ends at the period's end has to be resumed first.
+      const anna = await subscribe({ ...ANNA, email: 'cy@example.com', displayName: 'Cy' });
+      await testApp.prisma.subscription.updateMany({
+        where: { externalId: anna.remote.id },
+        data: { cancelAtPeriodEnd: true },
+      });
+      const ending = await change(anna.cookie, body).expect(409);
+      expect(ending.body.code).toBe('subscription_ending');
+
+      // And one whose payment failed needs the card put right first.
+      await testApp.prisma.subscription.updateMany({
+        where: { externalId: anna.remote.id },
+        data: { cancelAtPeriodEnd: false, status: 'PAST_DUE' },
+      });
+      const failed = await change(anna.cookie, body).expect(409);
+      expect(failed.body.code).toBe('payment_failed');
+    });
+
+    it('says so when Stripe cannot be reached, and changes nothing', async () => {
+      const anna = await subscribe();
+      const other = await premium();
+      stripe.failWith = 500;
+
+      const down = await change(anna.cookie, { planId: other.id, interval: 'MONTH' }).expect(502);
+      expect(down.body.code).toBe('payment_provider_error');
+      const stored = await testApp.prisma.subscription.findFirstOrThrow({
+        where: { externalId: anna.remote.id },
+      });
+      expect(stored.planId).toBe(anna.plan.id);
+    });
+  });
+
   describe('the payment page', () => {
     it('tells the website that viewers can pay online', async () => {
       await createPlan();

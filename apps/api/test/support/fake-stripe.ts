@@ -28,6 +28,7 @@ export interface FakeSubscription {
   start_date: number;
   items: {
     data: {
+      id: string;
       current_period_end: number;
       price: { unit_amount: number; recurring: { interval: string } };
     }[];
@@ -101,6 +102,8 @@ export interface FakeStripe {
   invoices: Map<string, FakeInvoice>;
   /** Makes every request answer with this status. */
   failWith: number | null;
+  /** Changes of a subscription's plan are refused, as a card that cannot pay the difference. */
+  declineChanges: boolean;
   /** The most invoices one page of a list holds. Lowered by tests of paging. */
   pageSize: number;
   /** The viewer pays: the session completes and its subscription starts. */
@@ -172,6 +175,7 @@ export async function startFakeStripe(): Promise<FakeStripe> {
     subscriptions: new Map(),
     invoices: new Map(),
     failWith: null,
+    declineChanges: false,
     pageSize: 100,
     pay(sessionId) {
       const session = fake.sessions.get(sessionId);
@@ -204,6 +208,7 @@ export async function startFakeStripe(): Promise<FakeStripe> {
         items: {
           data: [
             {
+              id: next('si'),
               current_period_end: periodEnd,
               price: {
                 unit_amount: Number(session.form['line_items[0][price_data][unit_amount]'] ?? 0),
@@ -350,6 +355,7 @@ export async function startFakeStripe(): Promise<FakeStripe> {
       refunded.clear();
       idempotent.clear();
       fake.failWith = null;
+      fake.declineChanges = false;
       fake.pageSize = 100;
     },
     close: () => new Promise((resolve) => server.close(() => resolve())),
@@ -562,6 +568,36 @@ export async function startFakeStripe(): Promise<FakeStripe> {
       const subscription = fake.subscriptions.get(id);
       if (!subscription) {
         return missing(`subscription: '${id}'`);
+      }
+      if (method === 'POST') {
+        // A change of plan: the line is named, and a new price replaces its price.
+        const item = subscription.items.data[0];
+        if (fake.declineChanges) {
+          return {
+            status: 402,
+            body: {
+              error: {
+                type: 'card_error',
+                code: 'card_declined',
+                message: 'Your card was declined.',
+              },
+            },
+          };
+        }
+        if (!item || form['items[0][id]'] !== item.id) {
+          return {
+            status: 400,
+            body: { error: { type: 'invalid_request_error', message: 'No such line' } },
+          };
+        }
+        item.price = {
+          unit_amount: Number(form['items[0][price_data][unit_amount]']),
+          recurring: { interval: form['items[0][price_data][recurring][interval]'] ?? 'month' },
+        };
+        if (form['metadata[planId]']) {
+          subscription.metadata.planId = form['metadata[planId]'];
+        }
+        return { status: 200, body: subscription };
       }
       if (method === 'DELETE') {
         const now = nowSeconds();

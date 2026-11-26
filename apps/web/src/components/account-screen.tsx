@@ -52,6 +52,7 @@ import {
   type OwnPayment,
   type OwnSubscription,
   type Plans,
+  priceOf,
 } from '@/lib/plans';
 import { type Profile, profilesApi } from '@/lib/profiles';
 import { describeKind, type DeviceRef, devicesApi } from '@/lib/devices';
@@ -917,8 +918,166 @@ function PlayingSection() {
 }
 
 /** The plan the account watches through, if any. */
+/** A plan and an interval the viewer could switch to. */
+interface Choice {
+  planId: string;
+  planName: string;
+  interval: 'MONTH' | 'YEAR';
+  amount: number;
+}
+
+/** Every plan on offer, at every interval it is sold for. */
+function choicesOf(plans: Plans): Choice[] {
+  return plans.plans.flatMap((plan) =>
+    (['MONTH', 'YEAR'] as const).flatMap((interval) => {
+      const amount = priceOf(plan, interval === 'MONTH' ? 'month' : 'year');
+      return amount === null ? [] : [{ planId: plan.id, planName: plan.name, interval, amount }];
+    }),
+  );
+}
+
+/** Switching to another plan, or the same plan billed per month or per year, now. */
+function ChangePlan({
+  own,
+  plans,
+  onChanged,
+}: {
+  own: OwnSubscription;
+  plans: Plans;
+  onChanged: (result: Awaited<ReturnType<typeof viewerApi.changePlan>>) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [chosen, setChosen] = useState<Choice | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [problem, setProblem] = useState<string | null>(null);
+  const choices = choicesOf(plans);
+  const isCurrent = (choice: Choice) =>
+    choice.planId === own.plan.id && choice.interval === own.interval;
+
+  // Nothing to switch to when the plan the viewer has is the only one on offer.
+  if (choices.filter((choice) => !isCurrent(choice)).length === 0) {
+    return null;
+  }
+
+  const confirm = async () => {
+    if (!chosen) {
+      return;
+    }
+    setBusy(true);
+    setProblem(null);
+    try {
+      onChanged(await viewerApi.changePlan(chosen.planId, chosen.interval));
+      setOpen(false);
+      setChosen(null);
+    } catch (caught) {
+      setProblem(asError(caught).message);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  if (!open) {
+    return (
+      <button type="button" className="button button-quiet mt-3" onClick={() => setOpen(true)}>
+        Change plan
+      </button>
+    );
+  }
+
+  return (
+    <div className="mt-5 border-t border-line pt-5">
+      <p className="mb-3 text-smoke">Choose the plan to switch to.</p>
+      <ul className="grid gap-2">
+        {choices.map((choice) => {
+          const current = isCurrent(choice);
+          const picked = chosen?.planId === choice.planId && chosen.interval === choice.interval;
+          return (
+            <li
+              key={`${choice.planId}-${choice.interval}`}
+              className="flex flex-wrap items-center justify-between gap-3"
+            >
+              <span>
+                <span className="font-medium">{choice.planName}</span>{' '}
+                <span className="text-smoke">
+                  {formatMoney(choice.amount, plans.currency)} per{' '}
+                  {choice.interval === 'MONTH' ? 'month' : 'year'}
+                </span>
+              </span>
+              {current ? (
+                <span className="text-sm text-sard">Your plan</span>
+              ) : (
+                <button
+                  type="button"
+                  className={`button ${picked ? 'button-play' : 'button-quiet'}`}
+                  aria-pressed={picked}
+                  disabled={busy}
+                  onClick={() => {
+                    setChosen(choice);
+                    setProblem(null);
+                  }}
+                >
+                  Choose
+                </button>
+              )}
+            </li>
+          );
+        })}
+      </ul>
+      {chosen ? (
+        <div className="mt-5">
+          <p className="text-smoke">
+            Switch to <span className="text-vein">{chosen.planName}</span> at{' '}
+            {formatMoney(chosen.amount, plans.currency)} per{' '}
+            {chosen.interval === 'MONTH' ? 'month' : 'year'}? It starts now. The time left on your
+            current plan is credited, and the difference for the rest of this period is charged to
+            your card on file.
+          </p>
+          <div className="mt-4 flex flex-wrap items-center gap-3">
+            <button
+              type="button"
+              className="button button-play"
+              disabled={busy}
+              aria-busy={busy}
+              onClick={() => void confirm()}
+            >
+              {busy ? <Spinner /> : null}
+              Switch now
+            </button>
+            <button
+              type="button"
+              className="button button-quiet"
+              disabled={busy}
+              onClick={() => setChosen(null)}
+            >
+              Not now
+            </button>
+          </div>
+        </div>
+      ) : null}
+      {problem ? (
+        <p role="alert" className="mt-3 text-sm text-alarm">
+          {problem}
+        </p>
+      ) : null}
+      <button
+        type="button"
+        className="mt-4 text-sm text-dust underline"
+        disabled={busy}
+        onClick={() => {
+          setOpen(false);
+          setChosen(null);
+          setProblem(null);
+        }}
+      >
+        Keep my plan
+      </button>
+    </div>
+  );
+}
+
 function SubscriptionSection() {
-  const { entitled, opens } = useViewerSession();
+  const { entitled, opens, setSubscription } = useViewerSession();
+  const [offer, setOffer] = useState<Plans | null>(null);
   const [own, setOwn] = useState<OwnSubscription | null | undefined>(undefined);
   const [plansOffered, setPlansOffered] = useState(false);
   // Set while Stripe's page for the subscription is being opened.
@@ -932,6 +1091,7 @@ function SubscriptionSection() {
       .then((offer) => {
         if (current) {
           setPlansOffered((offer?.plans.length ?? 0) > 0);
+          setOffer(offer);
         }
       })
       .catch(() => {
@@ -1029,6 +1189,18 @@ function SubscriptionSection() {
               <p className="mt-3 text-sm text-dust">
                 Opens a page of Stripe: change the card, read your invoices, or cancel.
               </p>
+              {offer &&
+              !own.cancelAtPeriodEnd &&
+              (own.status === 'ACTIVE' || own.status === 'TRIALING') ? (
+                <ChangePlan
+                  own={own}
+                  plans={offer}
+                  onChanged={(result) => {
+                    setSubscription(result);
+                    setOwn(result.subscription);
+                  }}
+                />
+              ) : null}
               {problem ? (
                 <p role="alert" className="mt-3 text-sm text-alarm">
                   {problem}

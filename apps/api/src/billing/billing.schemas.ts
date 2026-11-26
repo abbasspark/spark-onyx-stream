@@ -124,6 +124,13 @@ export const startCheckoutSchema = z.object({
 });
 export type StartCheckoutInput = z.infer<typeof startCheckoutSchema>;
 
+/** What a subscribed viewer chooses on the account page: another plan, or the same one billed otherwise. */
+export const changePlanSchema = z.object({
+  planId: z.uuid(),
+  interval: z.enum(['MONTH', 'YEAR']),
+});
+export type ChangePlanInput = z.infer<typeof changePlanSchema>;
+
 /** The payment a viewer returns from, as Stripe names it in the address. */
 export const confirmCheckoutSchema = z.object({
   sessionId: z

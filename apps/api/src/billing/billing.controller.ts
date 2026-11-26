@@ -25,6 +25,8 @@ import { ZodValidationPipe } from '../common/zod-validation.pipe.js';
 import { CurrentViewer, ViewerOnly } from '../viewers/viewer-auth.guard.js';
 import type { ViewerIdentity } from '../viewers/viewer-session.service.js';
 import {
+  type ChangePlanInput,
+  changePlanSchema,
   type ChangeSubscriptionInput,
   changeSubscriptionSchema,
   type ConfirmCheckoutInput,
@@ -135,6 +137,26 @@ export class PublicBillingController {
     @Body(new ZodValidationPipe(confirmCheckoutSchema)) body: ConfirmCheckoutInput,
   ): Promise<OwnSubscription> {
     await this.checkout.confirm(identity.viewer, body.sessionId);
+    return this.ownOf(identity);
+  }
+
+  /**
+   * Moves the viewer's online subscription to another plan, or the same plan billed per
+   * month or per year, now. The difference is charged at once, with credit for the time
+   * left on the old plan. If the card cannot pay it, nothing changes.
+   */
+  @ViewerOnly()
+  @RateLimit(CHECKOUT_LIMIT)
+  @Post('viewer/subscription/change')
+  @HttpCode(HttpStatus.OK)
+  @Header('Cache-Control', 'no-store')
+  async changePlan(
+    @CurrentViewer() identity: ViewerIdentity,
+    @Body(new ZodValidationPipe(changePlanSchema)) body: ChangePlanInput,
+  ): Promise<OwnSubscription> {
+    // A child's profile does not spend the account's money.
+    assertUnrestricted();
+    await this.checkout.changePlan(identity.viewer, body);
     return this.ownOf(identity);
   }
 

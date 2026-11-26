@@ -90,6 +90,17 @@ export interface PaymentCheckoutParams {
 }
 
 /** Talks to Stripe. Knows its addresses and its errors, nothing of viewers or plans. */
+export interface ChangePlanParams {
+  subscriptionId: string;
+  /** The line of the subscription that holds the price. */
+  itemId: string;
+  planId: string;
+  productId: string;
+  currency: string;
+  amount: number;
+  interval: 'month' | 'year';
+}
+
 @Injectable()
 export class StripeClient {
   constructor(@Inject(AppConfig) private readonly config: AppConfig) {}
@@ -293,6 +304,37 @@ export class StripeClient {
 
   retrieveSubscription(id: string): Promise<StripeSubscription> {
     return this.request<StripeSubscription>('GET', `/v1/subscriptions/${encodeURIComponent(id)}`);
+  }
+
+  /**
+   * Moves a running subscription to another plan or interval, now. The time left
+   * on the old price is credited and the new price is charged for what is left of
+   * the period, in one invoice that is paid at once. If the payment fails nothing
+   * changes: a viewer is never left half on one plan and half on the other.
+   */
+  changeSubscriptionPlan(params: ChangePlanParams): Promise<StripeSubscription> {
+    const tax = this.setup().automaticTax;
+    return this.request<StripeSubscription>(
+      'POST',
+      `/v1/subscriptions/${encodeURIComponent(params.subscriptionId)}`,
+      {
+        items: [
+          {
+            id: params.itemId,
+            price_data: {
+              currency: params.currency.toLowerCase(),
+              product: params.productId,
+              unit_amount: params.amount,
+              recurring: { interval: params.interval },
+              ...(tax ? { tax_behavior: 'inclusive' } : {}),
+            },
+          },
+        ],
+        proration_behavior: 'always_invoice',
+        payment_behavior: 'error_if_incomplete',
+        metadata: { planId: params.planId },
+      },
+    );
   }
 
   /** Ends a subscription now. Money already paid is not returned by this. */

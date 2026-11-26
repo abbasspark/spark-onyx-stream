@@ -6047,6 +6047,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/viewer/subscription/change": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Moves the viewer's online subscription to another plan, or the same plan billed per month or per year, now
+         * @description The difference is charged at once, with credit for the time left on the old plan. If the card cannot pay it, nothing changes. For a signed-in viewer.
+         */
+        post: operations["PublicBilling_changePlan"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/viewer/watching": {
         parameters: {
             query?: never;
@@ -30063,6 +30083,62 @@ export interface operations {
             };
             /** @description Not signed in, or the sign-in ran out. */
             401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    PublicBilling_changePlan: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** Format: uuid */
+                    planId: string;
+                    /** @enum {string} */
+                    interval: "MONTH" | "YEAR";
+                };
+            };
+        };
+        responses: {
+            /** @description The answer. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OwnSubscription"];
+                };
+            };
+            /** @description The input was refused. "issues" names every field. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Not signed in, or the sign-in ran out. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Too many requests. "Retry-After" says when to try again. */
+            429: {
                 headers: {
                     [name: string]: unknown;
                 };
