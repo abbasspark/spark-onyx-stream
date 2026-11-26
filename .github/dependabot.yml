@@ -1,0 +1,58 @@
+# Weekly pull requests for updates to what the project depends on. Minor and
+# patch updates come together in one pull request per kind of dependency, so
+# that a week of them is one review. A major update gets a pull request of its
+# own, because it may need changes.
+version: 2
+
+updates:
+  # The Node workspace: the API, the panel, the website, the television app
+  # and the packages. One entry covers the lock file at the root.
+  - package-ecosystem: npm
+    directories: ['/', '/apps/*', '/packages/*']
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    groups:
+      npm-minor-and-patch:
+        update-types: [minor, patch]
+
+  - package-ecosystem: gomod
+    directories: ['/services/edge-agent', '/services/tracker']
+    schedule:
+      interval: weekly
+      day: monday
+    groups:
+      go-minor-and-patch:
+        update-types: [minor, patch]
+
+  # The Android apps, from the version catalogue.
+  - package-ecosystem: gradle
+    directory: '/apps/android'
+    schedule:
+      interval: weekly
+      day: monday
+    groups:
+      gradle-minor-and-patch:
+        update-types: [minor, patch]
+
+  - package-ecosystem: docker
+    directories: ['/', '/services/edge-agent', '/services/tracker']
+    schedule:
+      interval: weekly
+      day: monday
+
+  - package-ecosystem: docker-compose
+    directories: ['/deploy/compose', '/deploy/edge', '/deploy/dev']
+    schedule:
+      interval: weekly
+      day: monday
+
+  - package-ecosystem: github-actions
+    directory: '/'
+    schedule:
+      interval: weekly
+      day: monday
+    groups:
+      actions-minor-and-patch:
+        update-types: [minor, patch]
