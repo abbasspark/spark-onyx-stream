@@ -30,7 +30,7 @@ jobs:
           - language: javascript-typescript
             build-mode: none
           - language: java-kotlin
-            build-mode: none
+            build-mode: manual
           - language: actions
             build-mode: none
           - language: go
@@ -42,6 +42,11 @@ jobs:
         with:
           go-version-file: services/tracker/go.mod
           cache: false
+      - uses: actions/setup-java@v4
+        if: matrix.language == 'java-kotlin'
+        with:
+          distribution: temurin
+          java-version: '17'
       - uses: github/codeql-action/init@v3
         with:
           languages: ${{ matrix.language }}
@@ -52,6 +57,12 @@ jobs:
           for service in services/edge-agent services/tracker; do
             (cd "$service" && go build ./...)
           done
+      # Kotlin is only seen while it is compiled. Everything is rebuilt, because
+      # a task that is up to date compiles nothing for CodeQL to look at.
+      - name: Build the Android apps
+        if: matrix.language == 'java-kotlin'
+        working-directory: apps/android
+        run: ./gradlew assembleDebug --no-daemon --no-build-cache --rerun-tasks
       - uses: github/codeql-action/analyze@v3
         with:
           category: /language:${{ matrix.language }}
