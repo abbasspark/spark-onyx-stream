@@ -55,7 +55,10 @@ export class WatchingService {
     @Inject(AppConfig) private readonly config: AppConfig,
   ) {}
 
-  /** What the profile began and did not finish, the latest first. */
+  /**
+   * What the profile can go on with, the latest first: videos begun and not finished, and for
+   * a series that has nothing begun, the episode after the last one finished.
+   */
   async list({ profileId }: WatchScope): Promise<WatchingItem[]> {
     const rows = await this.prisma.watchProgress.findMany({
       where: { profileId, ...resumable() },
@@ -67,7 +70,7 @@ export class WatchingService {
       },
     });
     const base = this.config.mediaBaseUrl;
-    return rows.map((row) => ({
+    const begun: WatchingItem[] = rows.map((row) => ({
       id: row.itemId,
       title: { slug: row.title.slug, name: row.title.name, type: row.title.type },
       episode: row.episode
@@ -83,6 +86,94 @@ export class WatchingService {
       duration: row.durationSeconds,
       watchedAt: row.watchedAt,
     }));
+    const next = await this.upNext(
+      profileId,
+      rows.map((row) => row.titleId),
+    );
+    return [...begun, ...next]
+      .sort((a, b) => b.watchedAt.getTime() - a.watchedAt.getTime())
+      .slice(0, WATCHING_LIMIT);
+  }
+
+  /**
+   * The episode after the last one finished, for each series the profile has nothing begun in.
+   * It stands at its start, dated like the episode that led to it.
+   */
+  private async upNext(profileId: string, begunTitleIds: string[]): Promise<WatchingItem[]> {
+    const finished = await this.prisma.watchProgress.findMany({
+      where: {
+        profileId,
+        completedAt: { not: null },
+        episodeId: { not: null },
+        titleId: { notIn: begunTitleIds },
+        title: visibleTitle(),
+      },
+      orderBy: [{ watchedAt: 'desc' }, { id: 'desc' }],
+      take: WATCHING_LIMIT * 3,
+      include: { episode: { select: { number: true, season: { select: { number: true } } } } },
+    });
+    const latest = new Map<string, (typeof finished)[number]>();
+    for (const row of finished) {
+      if (row.episode && !latest.has(row.titleId)) {
+        latest.set(row.titleId, row);
+      }
+    }
+
+    const base = this.config.mediaBaseUrl;
+    const items = await Promise.all(
+      [...latest.values()]
+        .slice(0, WATCHING_LIMIT)
+        .map(async (row): Promise<WatchingItem | null> => {
+          const from = row.episode;
+          if (!from) {
+            return null;
+          }
+          const episode = await this.prisma.episode.findFirst({
+            where: {
+              ...VISIBLE_EPISODE,
+              season: { titleId: row.titleId },
+              OR: [
+                { season: { number: { gt: from.season.number } } },
+                { season: { number: from.season.number }, number: { gt: from.number } },
+              ],
+            },
+            orderBy: [{ season: { number: 'asc' } }, { number: 'asc' }],
+            include: {
+              still: true,
+              season: { select: { number: true } },
+              asset: { select: { durationMs: true } },
+            },
+          });
+          if (!episode) {
+            return null;
+          }
+          const e = episode;
+          // Already watched, out of order: nothing to offer.
+          const seen = await this.prisma.watchProgress.count({
+            where: { profileId, itemId: e.id },
+          });
+          if (seen > 0) {
+            return null;
+          }
+          const title = await this.prisma.title.findUniqueOrThrow({
+            where: { id: row.titleId },
+            include: { backdrop: true, poster: true },
+          });
+          const seconds = e.asset?.durationMs
+            ? Math.round(e.asset.durationMs / 1000)
+            : (e.runtimeMinutes ?? 0) * 60;
+          return {
+            id: e.id,
+            title: { slug: title.slug, name: title.name, type: title.type },
+            episode: { id: e.id, seasonNumber: e.season.number, number: e.number, name: e.name },
+            image: toPublicImage(e.still ?? title.backdrop ?? title.poster, base),
+            position: 0,
+            duration: Math.max(seconds, 1),
+            watchedAt: row.watchedAt,
+          };
+        }),
+    );
+    return items.filter((item): item is WatchingItem => item !== null);
   }
 
   /**

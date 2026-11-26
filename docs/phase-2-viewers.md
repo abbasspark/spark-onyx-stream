@@ -72,7 +72,7 @@ All under `/v1/viewer`. Answers about a person are never cached.
 | `POST /email/send`                          | Send the link to confirm again                                                                          |
 | `POST /email/change`                        | Ask to use another address: `{ newEmail, password }`. See [Changing the address](#changing-the-address) |
 | `POST /email/change/confirm`                | Use the new address with the token of the link sent to it. No sign-in needed                            |
-| `GET /watching`                             | "Continue watching": videos begun and not finished, the latest first                                    |
+| `GET /watching`                             | "Continue watching": videos begun and not finished, and the next episode of a series, the latest first  |
 | `GET /watching/titles/{slug}`               | Progress in the videos of one title, finished ones included                                             |
 | `PUT /watching`                             | Report positions: `{ items: [{ title, episodeId?, position, duration, watchedAt? }] }`, up to 50        |
 | `DELETE /watching/{id}`, `DELETE /watching` | Forget one video, or everything                                                                         |
@@ -231,6 +231,7 @@ Each profile of an account remembers where it is in each video, so "Continue wat
 
 - **One entry per profile and video.** A video is a movie or an episode.
 - **The rules are applied by the API,** so every device agrees: the first 15 seconds do not count as begun, and from 95 % on the video counts as watched. A watched video leaves "Continue watching" and keeps a "Watched" mark. Watching it again brings it back and keeps the mark.
+- **The next episode waits in the same row.** When a series has nothing begun and an episode was finished, the row offers the one after it, in season and episode order, skipping what viewers cannot watch yet. It stands at its start, dated like the episode that led to it, and goes away once it is begun, or when the series has no later episode.
 - **The later report wins,** whichever arrives first. A device that was offline hands over its positions with the time they were noted. A time in the future is not believed.
 - **Positions for something viewers cannot watch are left out without an error.** While a title is unpublished its entries are hidden, and they return with it.
 - **The player reports about every 15 seconds,** and at once when the viewer leaves the video.
@@ -345,7 +346,6 @@ The address a device shows is the site address of the installation (`SITE_URL`) 
 
 - Emails in other languages, and editing their text in the panel
 - A picture of one's own for a profile
-- A "watch next" row that offers the following episode of a series
 - Subscriptions and payments
 - A limit on devices or on streams at the same time
 - Sign-in with Google, Apple or similar
