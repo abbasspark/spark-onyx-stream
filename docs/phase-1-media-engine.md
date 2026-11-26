@@ -227,6 +227,8 @@ Any tus client library works, for example `tus-js-client` or Uppy in the browser
 
 ### Browser access
 
+Every response of the API carries security headers from Helmet: a content policy that lets nothing load from it, no framing, no MIME sniffing, no referrer, and HTTPS for six months (without subdomains). Media and artwork are marked readable from any site, because players on other sites open them. The address of the viewer is taken from `TRUST_PROXY_HOPS` proxies in front of the API; see [settings.md](settings.md).
+
 A browser on another origin than the API needs that origin listed in `CORS_ORIGINS`. The API then answers preflight requests and exposes the tus headers.
 
 ### Not built yet
@@ -434,7 +436,6 @@ These events are recorded with actor, target, time and IP address: setup, sign-i
 ### Not built yet
 
 - Cookie-based sessions for the admin panel. Bearer tokens are used for now.
-- A setting for trusted proxies. Until it exists, the recorded IP address is that of the nearest proxy when the API runs behind one.
 
 ## Open questions
 
