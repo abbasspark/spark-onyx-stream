@@ -1,14 +1,20 @@
-# Weekly pull requests for updates to what the project depends on. Minor and
-# patch updates come together in one pull request per kind of dependency, so
-# that a week of them is one review. A major update gets a pull request of its
-# own, because it may need changes.
+# Weekly pull requests for updates to what the project depends on.
+#
+# Minor and patch updates come together in one pull request per kind of
+# dependency, so that a week of them is one review. Major updates are not
+# proposed for code dependencies: they may need changes, and are done by hand
+# when someone decides to. GitHub Actions are the exception, since a new major
+# version of an action is usually a change of the runtime it needs, and they
+# all come together in one pull request.
 version: 2
 
 updates:
   # The Node workspace: the API, the panel, the website, the television app
-  # and the packages. One entry covers the lock file at the root.
+  # and the packages. The root holds the one lock file, and an update there
+  # changes every package that uses the dependency, so the packages are not
+  # listed one by one. Listing them would open the same update once for each.
   - package-ecosystem: npm
-    directories: ['/', '/apps/*', '/packages/*']
+    directory: '/'
     schedule:
       interval: weekly
       day: monday
@@ -16,6 +22,9 @@ updates:
     groups:
       npm-minor-and-patch:
         update-types: [minor, patch]
+    ignore:
+      - dependency-name: '*'
+        update-types: ['version-update:semver-major']
 
   - package-ecosystem: gomod
     directories: ['/services/edge-agent', '/services/tracker']
@@ -25,6 +34,9 @@ updates:
     groups:
       go-minor-and-patch:
         update-types: [minor, patch]
+    ignore:
+      - dependency-name: '*'
+        update-types: ['version-update:semver-major']
 
   # The Android apps, from the version catalogue.
   - package-ecosystem: gradle
@@ -35,18 +47,29 @@ updates:
     groups:
       gradle-minor-and-patch:
         update-types: [minor, patch]
+    ignore:
+      - dependency-name: '*'
+        update-types: ['version-update:semver-major']
 
+  # Base images. A new major version of PostgreSQL, Node or nginx is a decision
+  # about a data format or a runtime, not an update.
   - package-ecosystem: docker
     directories: ['/', '/services/edge-agent', '/services/tracker']
     schedule:
       interval: weekly
       day: monday
+    ignore:
+      - dependency-name: '*'
+        update-types: ['version-update:semver-major']
 
   - package-ecosystem: docker-compose
     directories: ['/deploy/compose', '/deploy/edge', '/deploy/dev']
     schedule:
       interval: weekly
       day: monday
+    ignore:
+      - dependency-name: '*'
+        update-types: ['version-update:semver-major']
 
   - package-ecosystem: github-actions
     directory: '/'
@@ -54,5 +77,5 @@ updates:
       interval: weekly
       day: monday
     groups:
-      actions-minor-and-patch:
-        update-types: [minor, patch]
+      actions:
+        patterns: ['*']
