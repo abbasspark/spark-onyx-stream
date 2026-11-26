@@ -17,12 +17,12 @@
     "openapi": "OPENAPI_WRITE=1 vitest run tools/openapi"
   },
   "dependencies": {
-    "@aws-sdk/client-s3": "^3.1172.0",
-    "@aws-sdk/lib-storage": "^3.1172.0",
+    "@aws-sdk/client-s3": "^3.1175.0",
+    "@aws-sdk/lib-storage": "^3.1175.0",
     "@nestjs/bullmq": "^12.0.2",
-    "@nestjs/common": "^12.0.1",
-    "@nestjs/core": "^12.0.1",
-    "@nestjs/platform-express": "^12.0.1",
+    "@nestjs/common": "^12.6.0",
+    "@nestjs/core": "^12.6.0",
+    "@nestjs/platform-express": "^12.6.0",
     "@onyx/database": "workspace:*",
     "@tus/file-store": "^2.1.2",
     "@tus/server": "^2.4.7",
@@ -37,9 +37,9 @@
     "zod": "^4.6.7"
   },
   "devDependencies": {
-    "@nestjs/cli": "^12.0.0",
-    "@nestjs/schematics": "^12.0.0",
-    "@nestjs/testing": "^12.0.1",
+    "@nestjs/cli": "^12.0.15",
+    "@nestjs/schematics": "^12.0.16",
+    "@nestjs/testing": "^12.6.0",
     "@types/express": "^5.0.0",
     "@types/node": "^24.0.0",
     "@types/nodemailer": "^8.0.2",
