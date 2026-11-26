@@ -17,6 +17,7 @@
 | [playback-quality.md](playback-quality.md)         | What players report about how playback went, and how to read it                      |
 | [player.md](player.md)                             | The player: what it does, what a viewer sets, the keys, the gestures, the figures    |
 | [monitoring.md](monitoring.md)                     | The metrics endpoint: how to switch it on, what it reports, and a Prometheus setup   |
+| [releasing.md](releasing.md)                       | How to make a release, and which images it publishes                                 |
 | [settings.md](settings.md)                         | Every setting of an installation, what it does and what it is by default             |
 | [notifications.md](notifications.md)               | Notifications to browsers and apps, what is sent by itself, and the list of a viewer |
 | [prepaid-codes.md](prepaid-codes.md)               | Prepaid codes: batches, what entering a code does, what clients call, what is kept   |
