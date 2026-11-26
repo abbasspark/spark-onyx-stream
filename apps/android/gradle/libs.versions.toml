@@ -4,7 +4,7 @@
 # building their own copy can see what goes into it.
 
 [versions]
-agp = "8.7.3"
+agp = "9.5.3"
 kotlin = "2.0.21"
 coreKtx = "1.15.0"
 lifecycle = "2.8.7"
