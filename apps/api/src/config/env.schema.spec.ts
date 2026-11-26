@@ -26,6 +26,16 @@ describe('validateEnv', () => {
     expect(env.APP_ROLE).toEqual(['api', 'worker']);
   });
 
+  it('leaves the metrics endpoint off unless a long enough token is set', () => {
+    expect(validateEnv(validEnv).METRICS_TOKEN).toBe('');
+    expect(validateEnv({ ...validEnv, METRICS_TOKEN: 'm'.repeat(32) }).METRICS_TOKEN).toBe(
+      'm'.repeat(32),
+    );
+    expect(() => validateEnv({ ...validEnv, METRICS_TOKEN: 'short' })).toThrow(
+      /METRICS_TOKEN must be at least 32 characters/,
+    );
+  });
+
   it('reports every problem at once', () => {
     const run = () =>
       validateEnv({

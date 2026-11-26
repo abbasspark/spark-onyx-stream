@@ -76,6 +76,7 @@ x-app: &app
     CORS_ORIGINS: ${CORS_ORIGINS:-}
     # The gateway is the one proxy in front of the API.
     TRUST_PROXY_HOPS: ${TRUST_PROXY_HOPS:-1}
+    METRICS_TOKEN: ${METRICS_TOKEN:-}
 
 services:
   postgres:

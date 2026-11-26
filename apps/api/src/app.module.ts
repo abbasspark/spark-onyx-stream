@@ -15,6 +15,7 @@ import { EventsModule } from './events/events.module.js';
 import { HealthModule } from './health/health.module.js';
 import { ProcessingApiModule, ProcessingCoreModule } from './processing/processing.module.js';
 import { QueueModule } from './queue/queue.module.js';
+import { MetricsModule } from './metrics/metrics.module.js';
 import { RateLimitModule } from './rate-limit/rate-limit.module.js';
 import { RedisModule } from './redis/redis.module.js';
 import { StatsModule } from './stats/stats.module.js';
@@ -88,6 +89,7 @@ const ROLE_MODULES: Record<AppRole, Type[]> = {
     DiagnosticsModule,
     EventStreamModule,
     HealthModule,
+    MetricsModule,
     OpenApiModule,
   ],
   worker: [WorkerRoleModule],
