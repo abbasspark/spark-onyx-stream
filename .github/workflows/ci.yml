@@ -17,6 +17,9 @@ jobs:
     name: Format, types, lint, unit tests
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    env:
+      # Prisma needs the variable to generate its client, but never connects.
+      DATABASE_URL: postgresql://onyx:unused@localhost:5432/onyx
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
