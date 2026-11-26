@@ -46,7 +46,7 @@ To sell plans that differ in what they open:
 - A package that a plan names cannot be deleted. Take it out of the plan first.
 - Deleting a package keeps its titles. They lose only that membership.
 - A free title can be in a package. It matters once the title needs a subscription.
-- A viewer who wants another plan cancels and subscribes again. Changing plans in place is not built.
+- A viewer who pays online switches to another plan, or bills the same plan per year instead of per month, from the account page. See [Changing plan](#changing-plan).
 - The page of plans tells viewers what each plan opens, by the names of its packages.
 
 ## Renting and buying
@@ -194,18 +194,19 @@ All under `/v1`.
 
 ### For everyone
 
-| Method and path                   | Purpose                                                                                        |
-| --------------------------------- | ---------------------------------------------------------------------------------------------- |
-| `GET /catalog/plans`              | The plans on offer, the currency, and whether one can pay online. Cached like the catalog      |
-| `GET /viewer/subscription`        | The signed-in viewer's own subscription, and whether paid titles are open to them              |
-| `POST /viewer/checkout`           | Opens Stripe's payment page for a plan and an interval. Answers with the address to go to      |
-| `POST /viewer/coupons/check`      | What a code does: to a plan (`planId`, `interval`), a title (`titleId`, `kind`) or all `plans` |
-| `POST /viewer/checkout/confirm`   | Called on return from the payment page. Records the subscription or the title at once          |
-| `POST /viewer/billing-portal`     | Opens Stripe's customer portal. Answers with the address to go to                              |
-| `POST /billing/stripe/webhook`    | Where Stripe reports to. Trusted by the signature of each message alone                        |
-| `GET /viewer/payments`            | The signed-in viewer's own payments, with the address of each invoice                          |
-| `POST /viewer/purchases/checkout` | Opens Stripe's payment page for renting or buying a title: `titleId`, `kind` (`RENT` or `BUY`) |
-| `GET /viewer/purchases`           | The viewer's rented and bought titles                                                          |
+| Method and path                    | Purpose                                                                                        |
+| ---------------------------------- | ---------------------------------------------------------------------------------------------- |
+| `GET /catalog/plans`               | The plans on offer, the currency, and whether one can pay online. Cached like the catalog      |
+| `GET /viewer/subscription`         | The signed-in viewer's own subscription, and whether paid titles are open to them              |
+| `POST /viewer/checkout`            | Opens Stripe's payment page for a plan and an interval. Answers with the address to go to      |
+| `POST /viewer/coupons/check`       | What a code does: to a plan (`planId`, `interval`), a title (`titleId`, `kind`) or all `plans` |
+| `POST /viewer/checkout/confirm`    | Called on return from the payment page. Records the subscription or the title at once          |
+| `POST /viewer/subscription/change` | Moves the subscription paid online to another plan or interval, now: `{ planId, interval }`    |
+| `POST /viewer/billing-portal`      | Opens Stripe's customer portal. Answers with the address to go to                              |
+| `POST /billing/stripe/webhook`     | Where Stripe reports to. Trusted by the signature of each message alone                        |
+| `GET /viewer/payments`             | The signed-in viewer's own payments, with the address of each invoice                          |
+| `POST /viewer/purchases/checkout`  | Opens Stripe's payment page for renting or buying a title: `titleId`, `kind` (`RENT` or `BUY`) |
+| `GET /viewer/purchases`            | The viewer's rented and bought titles                                                          |
 
 `POST /viewer/checkout` and `POST /viewer/purchases/checkout` take an optional `code`. A code that cannot be used is answered with `404` and `coupon_unknown`, or with `409` and one of `coupon_ended`, `coupon_used_up`, `coupon_already_used`, `coupon_new_customers`, `coupon_not_for_this` and `coupon_too_much`, each with a sentence for the viewer.
 
@@ -272,9 +273,20 @@ A title's access is part of the title: `access`, `packageIds`, `rentAmount`, `bu
 - **The player explains itself:** it asks a visitor to sign in, and a viewer without a subscription to subscribe, each with the way there and back.
 - **Account** page: the plan, when it is paid next or until when it runs, a failed payment, the way to Stripe's portal, the titles rented and bought with what is left of each, and the payments with a link to each invoice.
 
+## Changing plan
+
+A viewer with a subscription paid online changes it on the account page: another plan, or the same plan per year instead of per month. It takes effect at once.
+
+- **The difference is paid now.** Stripe credits the time left on the old price, charges the new price for what is left of the period, and bills the balance in one invoice paid with the card on file. A change to a cheaper plan leaves a credit that Stripe takes off the next invoice.
+- **If the card cannot pay, nothing changes.** The answer is `402` with the code `payment_failed`, and the viewer stays on the plan they had. They are never left half on one plan and half on the other.
+- **Only a subscription paid online that is active or in its trial can be changed.** One an admin granted or a prepaid code gave answers `409` with `no_online_subscription`. One set to end answers `409` with `subscription_ending`: it has to be resumed first. One whose payment failed answers `409` with `payment_failed`: the card has to be put right first.
+- **The plan and interval the viewer has already** answer `400`. A plan that is not on offer answers `404`, and one not sold for the interval `400`.
+- **A free trial goes on** when a viewer in their trial switches plans. Stripe does not charge for a trial.
+- **A code of this site does not apply to a change.** A discount that is already on the subscription stays on it.
+- **The change is recorded when it is made,** without waiting for Stripe's own message, and that message arrives afterwards and finds nothing to change. A profile with an age limit cannot change the plan, like everything else that spends the account's money.
+
 ## Not built yet
 
-- Changing from one plan to another while subscribed
 - Emails of this site about payments. Stripe sends receipts and, if turned on there, reminders
 - Gift codes that open something without a payment page, and batches of single-use codes
 - A code on a payment an admin writes down by hand

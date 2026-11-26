@@ -43,6 +43,7 @@ export interface StripePortalSession {
 }
 
 export interface StripeSubscriptionItem {
+  id?: string;
   /** Where the billing period is from API version 2025-03-31 on. */
   current_period_end?: number | null;
   price?: {

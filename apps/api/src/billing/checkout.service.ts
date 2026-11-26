@@ -3,6 +3,7 @@ import {
   BadGatewayException,
   BadRequestException,
   ConflictException,
+  HttpException,
   Inject,
   Injectable,
   Logger,
@@ -16,7 +17,7 @@ import type { StartPurchaseInput } from '../purchases/purchases.schemas.js';
 import { type CheckoutDiscount, StripeClient, StripeError } from '../stripe/stripe.client.js';
 import { StripeSyncService } from '../stripe/stripe-sync.service.js';
 import { idOf } from '../stripe/stripe.types.js';
-import type { StartCheckoutInput } from './billing.schemas.js';
+import type { ChangePlanInput, StartCheckoutInput } from './billing.schemas.js';
 import type { CheckCouponInput } from './coupons.schemas.js';
 import { type AcceptedCoupon, CouponsService, type CouponTarget } from './coupons.service.js';
 import type { CouponPlansQuote, CouponPrice, CouponQuote } from './coupons.views.js';
@@ -178,6 +179,103 @@ export class CheckoutService {
       }
       return { url: session.url };
     });
+  }
+
+  /**
+   * Moves the viewer's online subscription to another plan, or the same plan
+   * billed per month or per year, now. What is left of the paid time is
+   * credited, the rest of the period is charged at the new price, and the
+   * difference is paid with the card on file. If that fails nothing changes.
+   *
+   * @throws NotFoundException when the plan is not on offer.
+   * @throws BadRequestException when it is not sold for the interval, or is the one the viewer has.
+   * @throws ConflictException when there is no subscription paid online that can be changed.
+   * @throws HttpException 402 when the card could not pay the difference.
+   * @throws BadGatewayException when Stripe refuses or cannot be reached.
+   */
+  async changePlan(viewer: Viewer, input: ChangePlanInput): Promise<void> {
+    const plan = await this.prisma.plan.findUnique({ where: { id: input.planId } });
+    if (!plan || !plan.isOffered) {
+      throw new NotFoundException('This plan is not on offer');
+    }
+    const amount = input.interval === 'MONTH' ? plan.monthlyAmount : plan.yearlyAmount;
+    if (amount === null) {
+      throw new BadRequestException(
+        `This plan is not sold per ${input.interval === 'MONTH' ? 'month' : 'year'}`,
+      );
+    }
+    const current = await this.prisma.subscription.findFirst({
+      where: { viewerId: viewer.id, ...runningAt() },
+      orderBy: { createdAt: 'desc' },
+    });
+    if (!current || current.source !== 'STRIPE' || !current.externalId) {
+      throw new ConflictException({
+        statusCode: 409,
+        error: 'Conflict',
+        code: 'no_online_subscription',
+        message: 'There is no subscription paid online on this account to change.',
+      });
+    }
+    if (current.cancelAtPeriodEnd) {
+      throw new ConflictException({
+        statusCode: 409,
+        error: 'Conflict',
+        code: 'subscription_ending',
+        message:
+          'Your subscription is set to end. Resume it on the subscription page, then change the plan.',
+      });
+    }
+    if (current.status !== 'ACTIVE' && current.status !== 'TRIALING') {
+      throw new ConflictException({
+        statusCode: 409,
+        error: 'Conflict',
+        code: 'payment_failed',
+        message: 'The last payment did not go through. Update your card before changing the plan.',
+      });
+    }
+    if (current.planId === plan.id && current.interval === input.interval) {
+      throw new BadRequestException('You are on this plan already');
+    }
+
+    const subscriptionId = current.externalId;
+    const remote = await this.withStripe('change the plan', async () => {
+      const [live, productId] = await Promise.all([
+        this.stripe.retrieveSubscription(subscriptionId),
+        this.stripe.ensureProduct(plan),
+      ]);
+      const itemId = live.items?.data?.[0]?.id;
+      if (!itemId) {
+        throw new StripeError('The subscription has no line to change', 502, null, null);
+      }
+      try {
+        return await this.stripe.changeSubscriptionPlan({
+          subscriptionId,
+          itemId,
+          planId: plan.id,
+          productId,
+          currency: this.config.billingCurrency,
+          amount,
+          interval: input.interval === 'MONTH' ? 'month' : 'year',
+        });
+      } catch (error) {
+        if (error instanceof StripeError && error.type === 'card_error') {
+          this.logger.warn(`Stripe: the card could not pay a change of plan: ${error.message}`);
+          throw new HttpException(
+            {
+              statusCode: 402,
+              error: 'Payment Required',
+              code: 'payment_failed',
+              message:
+                'Your card could not pay the difference, so your plan was not changed. Update your card on the subscription page and try again.',
+            },
+            402,
+          );
+        }
+        throw error;
+      }
+    });
+    // Recorded now, without waiting for Stripe's own message about it.
+    await this.sync.apply(remote);
   }
 
   /**

@@ -203,6 +203,17 @@ export const viewerApi = {
       trialUsed?: boolean;
       purchases?: OwnedTitle[];
     }>('GET', '/subscription'),
+  /**
+   * Moves the online subscription to another plan, or the same plan billed per month or
+   * per year, now. The difference is charged at once, with credit for the time left.
+   */
+  changePlan: (planId: string, interval: 'MONTH' | 'YEAR') =>
+    call<{
+      subscription: OwnSubscription | null;
+      entitled: boolean;
+      access?: Opens;
+      purchases?: OwnedTitle[];
+    }>('POST', '/subscription/change', { planId, interval }),
   /** The viewer's own payments, newest first. */
   payments: () => call<{ items: OwnPayment[] }>('GET', '/payments'),
   /** Opens the payment page for a plan. Answers with the address to go to. */

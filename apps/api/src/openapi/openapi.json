@@ -33891,6 +33891,99 @@
         }
       }
     },
+    "/v1/viewer/subscription/change": {
+      "post": {
+        "operationId": "PublicBilling_changePlan",
+        "tags": [
+          "Billing"
+        ],
+        "summary": "Moves the viewer's online subscription to another plan, or the same plan billed per month or per year, now",
+        "description": "The difference is charged at once, with credit for the time left on the old plan. If the card cannot pay it, nothing changes. For a signed-in viewer.",
+        "security": [
+          {
+            "viewerSession": []
+          },
+          {
+            "viewerCookie": []
+          }
+        ],
+        "x-onyx-access": {
+          "kind": "viewer",
+          "permissions": [],
+          "sessionOnly": false
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "planId": {
+                    "type": "string",
+                    "format": "uuid",
+                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                  },
+                  "interval": {
+                    "type": "string",
+                    "enum": [
+                      "MONTH",
+                      "YEAR"
+                    ]
+                  }
+                },
+                "required": [
+                  "planId",
+                  "interval"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The answer.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OwnSubscription"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The input was refused. \"issues\" names every field.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or the sign-in ran out.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests. \"Retry-After\" says when to try again.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/v1/viewer/watching": {
       "delete": {
         "operationId": "Watching_clear",
