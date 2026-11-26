@@ -30479,6 +30479,171 @@
         }
       }
     },
+    "/v1/viewer/email/change": {
+      "post": {
+        "operationId": "ViewerAuth_changeEmail",
+        "tags": [
+          "Viewers"
+        ],
+        "summary": "Asks to use another email address, with the password of the account",
+        "description": "With email set up, a link goes to the new address and nothing changes until it is opened. Without, the address changes at once. For a signed-in viewer.",
+        "security": [
+          {
+            "viewerSession": []
+          },
+          {
+            "viewerCookie": []
+          }
+        ],
+        "x-onyx-access": {
+          "kind": "viewer",
+          "permissions": [],
+          "sessionOnly": false
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "newEmail": {
+                    "type": "string"
+                  },
+                  "password": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 128
+                  }
+                },
+                "required": [
+                  "newEmail",
+                  "password"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The answer.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EmailChangeResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The input was refused. \"issues\" names every field.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or the sign-in ran out.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests. \"Retry-After\" says when to try again.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/viewer/email/change/confirm": {
+      "post": {
+        "operationId": "ViewerAuth_confirmEmailChange",
+        "tags": [
+          "Viewers"
+        ],
+        "summary": "Uses the new address with the token of the link sent to it",
+        "description": "Needs no sign-in: the link is often opened on another device. Open to everyone.",
+        "security": [],
+        "x-onyx-access": {
+          "kind": "public",
+          "permissions": [],
+          "sessionOnly": false
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "token": {
+                    "type": "string",
+                    "minLength": 20,
+                    "maxLength": 200
+                  }
+                },
+                "required": [
+                  "token"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The answer.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "email": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "email"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The input was refused. \"issues\" names every field.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests. \"Retry-After\" says when to try again.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/v1/viewer/email/send": {
       "post": {
         "operationId": "ViewerAuth_sendVerification",
@@ -43709,6 +43874,26 @@
         "required": [
           "edge",
           "token"
+        ]
+      },
+      "EmailChangeResult": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "confirmation_sent",
+              "changed"
+            ]
+          },
+          "email": {
+            "type": "string",
+            "description": "The address that was asked for."
+          }
+        },
+        "required": [
+          "status",
+          "email"
         ]
       },
       "EncoderSettings": {

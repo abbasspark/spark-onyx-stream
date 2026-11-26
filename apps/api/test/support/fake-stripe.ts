@@ -392,6 +392,9 @@ export async function startFakeStripe(): Promise<FakeStripe> {
         return { status: 200, body: customer };
       }
       const customer = id ? fake.customers.get(id) : undefined;
+      if (customer && method === 'POST') {
+        customer.email = form.email ?? customer.email;
+      }
       return customer ? { status: 200, body: customer } : missing(`customer: '${id}'`);
     }
     if (resource === 'products' && method === 'POST') {

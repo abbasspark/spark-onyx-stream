@@ -143,6 +143,13 @@ export const resetViewerPasswordByMailSchema = z.object({
 });
 export type ResetViewerPasswordByMailInput = z.infer<typeof resetViewerPasswordByMailSchema>;
 
+/** Asking to use another email address. The password is asked for again: the address is how one signs in. */
+export const changeViewerEmailSchema = z.object({
+  newEmail: emailSchema,
+  password: z.string().min(1, 'Enter your password').max(MAX_PASSWORD_LENGTH),
+});
+export type ChangeViewerEmailInput = z.infer<typeof changeViewerEmailSchema>;
+
 export const verifyViewerEmailSchema = z.object({ token: mailTokenSchema });
 export type VerifyViewerEmailInput = z.infer<typeof verifyViewerEmailSchema>;
 

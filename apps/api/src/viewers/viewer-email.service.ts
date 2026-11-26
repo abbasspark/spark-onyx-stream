@@ -6,6 +6,7 @@ import {
   HttpStatus,
   Inject,
   Injectable,
+  Logger,
   ServiceUnavailableException,
 } from '@nestjs/common';
 import { PrismaClient, type Viewer, type ViewerTokenKind } from '@onyx/database';
@@ -15,16 +16,31 @@ import { BrandingService } from '../branding/branding.service.js';
 import { AppConfig } from '../config/app-config.js';
 import { MailService } from '../mail/mail.service.js';
 import {
+  emailChangedMail,
+  emailChangeMail,
   passwordChangedMail,
   passwordResetMail,
   verificationMail,
 } from '../mail/mail.templates.js';
+import { StripeClient } from '../stripe/stripe.client.js';
 import { ViewerSessionService } from './viewer-session.service.js';
+
+/**
+ * What asking for another address led to: a link was sent to it and the old
+ * address stays until it is opened, or, on a site without email, it changed at once.
+ */
+export interface EmailChangeResult {
+  status: 'confirmation_sent' | 'changed';
+  /** The address that was asked for. */
+  email: string;
+}
 
 /** A link to set a new password is a key to the account, so it is short-lived. */
 export const RESET_VALID_MINUTES = 60;
 /** A link to confirm an address opens nothing, and people read mail late. */
 export const VERIFICATION_VALID_MINUTES = 3 * 24 * 60;
+/** A link to use a new address changes how one signs in, but people read mail late. */
+export const EMAIL_CHANGE_VALID_MINUTES = 24 * 60;
 /**
  * The shortest time between two emails of one kind to one viewer. Without it
  * anyone who knows an address could fill its inbox.
@@ -33,15 +49,18 @@ export const MIN_SECONDS_BETWEEN_MAILS = 120;
 
 /** Pages of the viewer website the links lead to. The token rides in the fragment. */
 const PAGES: Record<ViewerTokenKind, string> = {
+  EMAIL_CHANGE: '/confirm-email-change',
   PASSWORD_RESET: '/reset-password',
   EMAIL_VERIFICATION: '/verify-email',
 };
 
 const LIFETIMES: Record<ViewerTokenKind, number> = {
+  EMAIL_CHANGE: EMAIL_CHANGE_VALID_MINUTES,
   PASSWORD_RESET: RESET_VALID_MINUTES,
   EMAIL_VERIFICATION: VERIFICATION_VALID_MINUTES,
 };
 
+const EMAIL_TAKEN = 'Another viewer already uses this email address';
 const INVALID_LINK = 'This link has expired or was already used. Ask for a new one.';
 
 /**
@@ -51,12 +70,15 @@ const INVALID_LINK = 'This link has expired or was already used. Ask for a new o
  */
 @Injectable()
 export class ViewerEmailService {
+  private readonly logger = new Logger(ViewerEmailService.name);
+
   constructor(
     @Inject(PrismaClient) private readonly prisma: PrismaClient,
     @Inject(MailService) private readonly mail: MailService,
     @Inject(ViewerSessionService) private readonly sessions: ViewerSessionService,
     @Inject(AppConfig) private readonly config: AppConfig,
     @Inject(BrandingService) private readonly branding: BrandingService,
+    @Inject(StripeClient) private readonly stripe: StripeClient,
   ) {}
 
   get enabled(): boolean {
@@ -98,7 +120,7 @@ export class ViewerEmailService {
    * @throws BadRequestException when the link does not work (any more).
    */
   async resetPassword(token: string, newPassword: string): Promise<void> {
-    const viewer = await this.redeem(token, 'PASSWORD_RESET');
+    const { viewer } = await this.redeem(token, 'PASSWORD_RESET');
     await this.prisma.viewer.update({
       where: { id: viewer.id },
       data: {
@@ -154,7 +176,7 @@ export class ViewerEmailService {
    * @throws BadRequestException when the link does not work (any more).
    */
   async verifyEmail(token: string): Promise<{ email: string }> {
-    const viewer = await this.redeem(token, 'EMAIL_VERIFICATION');
+    const { viewer } = await this.redeem(token, 'EMAIL_VERIFICATION');
     if (!viewer.emailVerifiedAt) {
       await this.prisma.viewer.update({
         where: { id: viewer.id },
@@ -162,6 +184,92 @@ export class ViewerEmailService {
       });
     }
     return { email: viewer.email };
+  }
+
+  /**
+   * Starts a change of the address. With email set up, a link goes to the new
+   * address and nothing changes until it is opened: that proves the address is
+   * the viewer's, and keeps a typing mistake from locking them out. Without
+   * email the address changes at once, unconfirmed. The caller has checked the
+   * password.
+   *
+   * @throws BadRequestException when it is the address of the account already.
+   * @throws ConflictException when another viewer uses the address.
+   * @throws HttpException 429 when a link was sent a moment ago.
+   */
+  async requestChange(viewer: Viewer, newEmail: string): Promise<EmailChangeResult> {
+    if (newEmail === viewer.email) {
+      throw new BadRequestException('This is the email address of your account already');
+    }
+    await this.assertFree(newEmail, viewer.id);
+    if (!this.mail.enabled) {
+      await this.applyChange(viewer, newEmail, null);
+      return { status: 'changed', email: newEmail };
+    }
+    await this.sendLink(viewer, 'EMAIL_CHANGE', { quietWhenTooSoon: false, to: newEmail });
+    return { status: 'confirmation_sent', email: newEmail };
+  }
+
+  /**
+   * Uses the new address, with the token of the link sent to it. Reading that
+   * mail is what confirms the address, so it counts as confirmed.
+   *
+   * @returns the new address, to show it.
+   * @throws BadRequestException when the link does not work (any more).
+   * @throws ConflictException when somebody took the address in the meantime.
+   */
+  async confirmChange(token: string): Promise<{ email: string }> {
+    const { viewer, email } = await this.redeem(token, 'EMAIL_CHANGE');
+    await this.assertFree(email, viewer.id);
+    await this.applyChange(viewer, email, new Date());
+    return { email };
+  }
+
+  private async assertFree(email: string, viewerId: string): Promise<void> {
+    const other = await this.prisma.viewer.findUnique({ where: { email }, select: { id: true } });
+    if (other && other.id !== viewerId) {
+      throw new ConflictException(EMAIL_TAKEN);
+    }
+  }
+
+  private async applyChange(viewer: Viewer, email: string, verifiedAt: Date | null): Promise<void> {
+    try {
+      await this.prisma.$transaction([
+        this.prisma.viewer.update({
+          where: { id: viewer.id },
+          data: { email, emailVerifiedAt: verifiedAt },
+        }),
+        // Links sent to the old address have no use now, and must not work.
+        this.prisma.viewerToken.deleteMany({ where: { viewerId: viewer.id } }),
+      ]);
+    } catch (error) {
+      if ((error as { code?: string }).code === 'P2002') {
+        // Taken between the check and the change.
+        throw new ConflictException(EMAIL_TAKEN);
+      }
+      throw error;
+    }
+    if (viewer.stripeCustomerId) {
+      // Payments go on without it, so this is not worth failing the change for.
+      await this.stripe
+        .updateCustomerEmail(viewer.stripeCustomerId, email)
+        .catch((error: unknown) =>
+          this.logger.warn(
+            `Stripe was not told the new address of viewer ${viewer.id}: ${String(error)}`,
+          ),
+        );
+    }
+    if (this.mail.enabled) {
+      // The old address hears of it, in case the account is not in its owner's hands.
+      this.mail.send({
+        to: viewer.email,
+        ...emailChangedMail({
+          siteName: await this.branding.siteName(),
+          displayName: viewer.displayName,
+          newEmail: email,
+        }),
+      });
+    }
   }
 
   private assertEnabled(): void {
@@ -173,8 +281,10 @@ export class ViewerEmailService {
   private async sendLink(
     viewer: Viewer,
     kind: ViewerTokenKind,
-    { quietWhenTooSoon }: { quietWhenTooSoon: boolean },
+    { quietWhenTooSoon, to }: { quietWhenTooSoon: boolean; to?: string },
   ): Promise<void> {
+    // A link to use a new address goes to that address, and is good only for it.
+    const address = to ?? viewer.email;
     const latest = await this.prisma.viewerToken.findFirst({
       where: { viewerId: viewer.id, kind },
       orderBy: { createdAt: 'desc' },
@@ -210,7 +320,7 @@ export class ViewerEmailService {
           viewerId: viewer.id,
           kind,
           tokenHash,
-          email: viewer.email,
+          email: address,
           expiresAt: new Date(Date.now() + validMinutes * 60_000),
         },
       }),
@@ -223,17 +333,23 @@ export class ViewerEmailService {
       url: `${this.config.siteUrl}${PAGES[kind]}#token=${token}`,
       validMinutes,
     };
-    this.mail.send({
-      to: viewer.email,
-      ...(kind === 'PASSWORD_RESET' ? passwordResetMail(link) : verificationMail(link)),
-    });
+    const content =
+      kind === 'PASSWORD_RESET'
+        ? passwordResetMail(link)
+        : kind === 'EMAIL_CHANGE'
+          ? emailChangeMail(link)
+          : verificationMail(link);
+    this.mail.send({ to: address, ...content });
   }
 
   /**
    * Uses up a token and returns the viewer it belongs to. All links of the
    * kind go with it.
    */
-  private async redeem(token: string, kind: ViewerTokenKind): Promise<Viewer> {
+  private async redeem(
+    token: string,
+    kind: ViewerTokenKind,
+  ): Promise<{ viewer: Viewer; email: string }> {
     if (!token.startsWith(MAIL_TOKEN_PREFIX)) {
       throw new BadRequestException(INVALID_LINK);
     }
@@ -245,8 +361,9 @@ export class ViewerEmailService {
       !found ||
       found.kind !== kind ||
       found.expiresAt.getTime() <= Date.now() ||
-      // The address was changed after the link was sent.
-      found.email !== found.viewer.email ||
+      // The address was changed after the link was sent. A link to change it is for
+      // the address that is to be new, which is not the account's yet.
+      (kind !== 'EMAIL_CHANGE' && found.email !== found.viewer.email) ||
       found.viewer.status !== 'ACTIVE'
     ) {
       throw new BadRequestException(INVALID_LINK);
@@ -257,6 +374,6 @@ export class ViewerEmailService {
       throw new BadRequestException(INVALID_LINK);
     }
     await this.prisma.viewerToken.deleteMany({ where: { viewerId: found.viewerId, kind } });
-    return found.viewer;
+    return { viewer: found.viewer, email: found.email };
   }
 }
