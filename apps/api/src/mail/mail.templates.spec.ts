@@ -4,6 +4,7 @@ import {
   describeLifetime,
   escapeHtml,
   passwordChangedMail,
+  paymentFailedMail,
   passwordResetMail,
   testMail,
   verificationMail,
@@ -46,6 +47,18 @@ describe('the emails', () => {
       'If you did not create an account on Night Cinema, ignore this email.',
     );
     expect(passwordChangedMail(LINK).text).toContain('If this was not you');
+  });
+
+  it('tell a viewer their payment failed, with a way to the account when there is one', () => {
+    const base = { siteName: 'Night Cinema', displayName: 'Anna' };
+    const linked = paymentFailedMail({ ...base, accountUrl: 'https://watch.example.com/account' });
+    expect(linked.subject).toBe('Your payment to Night Cinema did not go through');
+    expect(linked.text).toContain('Hello Anna,');
+    expect(linked.text).toContain('https://watch.example.com/account');
+    expect(linked.html).toContain('Open your account</a>');
+
+    const plain = paymentFailedMail({ ...base, accountUrl: '' });
+    expect(plain.text).not.toContain('Open your account');
   });
 
   it('do not let a name become markup or a second header line', () => {

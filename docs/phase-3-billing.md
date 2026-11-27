@@ -109,7 +109,7 @@ With a Stripe key set, the page of plans gets a button per plan. Without one, no
 - **Every message is checked** against the signing secret of the endpoint, and refused when it is older than five minutes. Each is handled once.
 - **A lost message is caught.** The scheduler asks Stripe about every subscription whose renewal or end is overdue by an hour.
 - **A renewing subscription lets its viewer watch three days past the next payment date.** Nobody who paid is locked out because a message was late. A subscription that ended at Stripe ends here at once.
-- **A failed payment** leaves access open while Stripe tries again, and closes it when Stripe gives up. How often and how long Stripe tries is set in Stripe under Billing, "Revenue recovery".
+- **A failed payment** leaves access open while Stripe tries again, and closes it when Stripe gives up. The viewer gets one email from this site when the payment first fails, with a link to the account page, if email is set up; Stripe repeating its report does not send another. How often and how long Stripe tries is set in Stripe under Billing, "Revenue recovery".
 - **A cancelled subscription** runs until the end of what was paid.
 - **The free trial of a plan is given once per viewer,** on the first subscription paid online.
 - **A viewer manages the subscription in Stripe's customer portal,** opened from the account page: the card, the invoices, cancelling and resuming.
@@ -287,7 +287,7 @@ A viewer with a subscription paid online changes it on the account page: another
 
 ## Not built yet
 
-- Emails of this site about payments. Stripe sends receipts and, if turned on there, reminders
+- Emails of this site about other payments. Stripe sends receipts and, if turned on there, reminders
 - Gift codes that open something without a payment page, and batches of single-use codes
 - A code on a payment an admin writes down by hand
 - Payment providers other than Stripe
