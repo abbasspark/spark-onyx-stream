@@ -12,6 +12,7 @@ import {
   type EdgeCommand,
   edgeCommandsKey,
   hourOf,
+  isFull,
   type EdgeReport,
   type EdgeSample,
   type EdgeState,
@@ -38,6 +39,8 @@ export interface RoutableEdge {
   secretHash: string;
   serveVideo: boolean;
   serveLive: boolean;
+  /** At its bandwidth limit: it takes no new viewers until it is below it. */
+  full: boolean;
 }
 
 /** How long a signed-in edge is remembered, to spare a query for every file it fetches. */
@@ -265,11 +268,21 @@ export class EdgeRegistry {
         secretHash: true,
         serveVideo: true,
         serveLive: true,
+        maxMbps: true,
       },
       orderBy: { id: 'asc' },
     });
-    this.routable = { edges, until: now + ROUTABLE_FOR_MS };
-    return edges;
+    // Only an edge with a limit needs its last report looked at.
+    const limited = edges.filter((edge) => edge.maxMbps !== null);
+    const states = new Map(
+      await Promise.all(limited.map(async (edge) => [edge.id, await this.state(edge.id)] as const)),
+    );
+    const routable = edges.map(({ maxMbps, ...edge }) => ({
+      ...edge,
+      full: isFull(states.get(edge.id)?.bitsPerSecond ?? null, maxMbps),
+    }));
+    this.routable = { edges: routable, until: now + ROUTABLE_FOR_MS };
+    return routable;
   }
 }
 

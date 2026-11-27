@@ -8060,6 +8060,8 @@ export interface components {
             location: string | null;
             enabled: boolean;
             weight: number;
+            /** @description The most it should send, in megabits per second. Null for no limit. */
+            maxMbps: number | null;
             serveVideo: boolean;
             serveLive: boolean;
             status: components["schemas"]["EdgeStatus"];
@@ -18435,6 +18437,8 @@ export interface operations {
                     location?: string | null;
                     /** @default 10 */
                     weight?: number;
+                    /** @default null */
+                    maxMbps?: number | null;
                     /** @default true */
                     serveVideo?: boolean;
                     /** @default true */
@@ -18595,6 +18599,7 @@ export interface operations {
                     publicUrl?: string;
                     location?: string | null;
                     weight?: number;
+                    maxMbps?: number | null;
                     serveVideo?: boolean;
                     serveLive?: boolean;
                     enabled?: boolean;

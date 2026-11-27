@@ -625,6 +625,7 @@ const EMPTY: EdgeInput = {
   publicUrl: '',
   location: null,
   weight: 10,
+  maxMbps: null,
   serveVideo: true,
   serveLive: true,
   enabled: true,
@@ -634,6 +635,7 @@ function EdgeDialog({ editing, onClose, onCreated, onSaved }: EdgeDialogProps) {
   const existing = editing !== null && editing !== 'new' ? editing : null;
   const [form, setForm] = useState<EdgeInput>(EMPTY);
   const [weightText, setWeightText] = useState('10');
+  const [limitText, setLimitText] = useState('');
   const set = (change: Partial<EdgeInput>) => setForm((current) => ({ ...current, ...change }));
 
   useEffect(() => {
@@ -648,12 +650,14 @@ function EdgeDialog({ editing, onClose, onCreated, onSaved }: EdgeDialogProps) {
             publicUrl: editing.publicUrl,
             location: editing.location,
             weight: editing.weight,
+            maxMbps: editing.maxMbps,
             serveVideo: editing.serveVideo,
             serveLive: editing.serveLive,
             enabled: editing.enabled,
           };
     setForm(start);
     setWeightText(String(start.weight));
+    setLimitText(start.maxMbps === null ? '' : String(start.maxMbps));
   }, [editing]);
 
   const urlProblem = publicUrlProblem(form.publicUrl);
@@ -663,6 +667,12 @@ function EdgeDialog({ editing, onClose, onCreated, onSaved }: EdgeDialogProps) {
       ? null
       : 'A whole number from 1 to 100.';
 
+  const limit = limitText.trim() === '' ? null : Number(limitText);
+  const limitProblem =
+    limit === null || (Number.isInteger(limit) && limit >= 1 && limit <= 1_000_000)
+      ? null
+      : 'A whole number of megabits per second, or empty.';
+
   const save = useMutation({
     mutationFn: async () => {
       const body: EdgeInput = {
@@ -671,6 +681,7 @@ function EdgeDialog({ editing, onClose, onCreated, onSaved }: EdgeDialogProps) {
         publicUrl: form.publicUrl.trim(),
         location: form.location?.trim() || null,
         weight,
+        maxMbps: limit,
       };
       if (existing) {
         onSaved(await edgesApi.update(existing.id, body));
@@ -757,6 +768,25 @@ function EdgeDialog({ editing, onClose, onCreated, onSaved }: EdgeDialogProps) {
               An edge with weight 20 gets twice the viewers of one with weight 10. Give a server
               with more bandwidth more weight.
             </p>
+            <Field
+              label="Bandwidth limit (Mbit/s)"
+              hint={
+                limitProblem ??
+                'Empty for no limit. At 90 % of it the edge gets no new viewers until it is below.'
+              }
+            >
+              {(id) => (
+                <Input
+                  id={id}
+                  type="number"
+                  min={1}
+                  placeholder="No limit"
+                  aria-invalid={limitProblem !== null}
+                  value={limitText}
+                  onChange={(event) => setLimitText(event.target.value)}
+                />
+              )}
+            </Field>
 
             <ToggleRow
               label="Video on demand"
@@ -790,7 +820,8 @@ function EdgeDialog({ editing, onClose, onCreated, onSaved }: EdgeDialogProps) {
                 form.name.trim() === '' ||
                 form.publicUrl.trim() === '' ||
                 urlProblem !== null ||
-                weightProblem !== null
+                weightProblem !== null ||
+                limitProblem !== null
               }
             >
               {existing ? 'Save' : 'Add and get the token'}

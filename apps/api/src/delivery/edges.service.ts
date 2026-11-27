@@ -27,6 +27,8 @@ export interface EdgeView {
   location: string | null;
   enabled: boolean;
   weight: number;
+  /** The most it should send, in megabits per second. Null for no limit. */
+  maxMbps: number | null;
   serveVideo: boolean;
   serveLive: boolean;
   status: EdgeStatus;
@@ -244,6 +246,7 @@ export class EdgesService {
       location: edge.location,
       enabled: edge.enabled,
       weight: edge.weight,
+      maxMbps: edge.maxMbps,
       serveVideo: edge.serveVideo,
       serveLive: edge.serveLive,
       status,

@@ -589,6 +589,29 @@ describe.skipIf(!TEST_DATABASE_URL)('Delivery through edges (e2e)', () => {
       expect(shown).toMatchObject({ status: 'OFFLINE', now: null });
     });
 
+    it('sends no new viewers to an edge that is at its bandwidth limit', async () => {
+      const channel = await channelOnAir();
+      const { edge, token } = await createEdge({ maxMbps: 1 });
+      const viaEdge = /^https:\/\/edge1\.example\.com\//;
+      expect((await http().get(`/v1/edges/${edge.id}`).set(admin()).expect(200)).body.maxMbps).toBe(
+        1,
+      );
+
+      await beat(token).expect(200);
+      // About a megabyte since the last report is 8 Mbit/s: over a limit of 1.
+      await beat(token, {
+        counters: { ...report().counters, bytesSent: 1_000_000, requests: 5 },
+      }).expect(200);
+      expect(await watch(channel.slug)).not.toMatch(viaEdge);
+
+      // Raising the limit, or taking it away, lets viewers back in.
+      await http().patch(`/v1/edges/${edge.id}`).set(admin()).send({ maxMbps: 100 }).expect(200);
+      expect(await watch(channel.slug)).toMatch(viaEdge);
+      await http().patch(`/v1/edges/${edge.id}`).set(admin()).send({ maxMbps: null }).expect(200);
+      expect(await watch(channel.slug)).toMatch(viaEdge);
+      await http().patch(`/v1/edges/${edge.id}`).set(admin()).send({ maxMbps: 0 }).expect(400);
+    });
+
     it('gives a player whose edge went away another server', async () => {
       const channel = await channelOnAir();
       const first = await createEdge();

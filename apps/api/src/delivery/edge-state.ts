@@ -59,6 +59,14 @@ export interface EdgeState {
   hitRatio: number | null;
 }
 
+/** Share of its limit at which an edge counts as full. Leaves room for a burst. */
+export const FULL_AT = 0.9;
+
+/** Whether an edge sends as much as it may, going by its last report. */
+export function isFull(bitsPerSecond: number | null, maxMbps: number | null): boolean {
+  return maxMbps !== null && bitsPerSecond !== null && bitsPerSecond >= maxMbps * 1e6 * FULL_AT;
+}
+
 /** One point of the traffic history: [time in seconds, bits per second, requests per second]. */
 export type EdgeSample = [number, number, number];
 

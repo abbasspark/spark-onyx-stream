@@ -50,6 +50,8 @@ export class DeliveryRouter {
         online.filter(
           (candidate) =>
             (kind === 'live' ? candidate.serveLive : candidate.serveVideo) &&
+            // At its bandwidth limit: the others, or the main server, take the viewer.
+            !candidate.full &&
             // The viewer's player just failed on this one.
             candidate.publicUrl !== avoid,
         ),

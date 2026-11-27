@@ -12759,6 +12759,19 @@
                     "minimum": 1,
                     "maximum": 100
                   },
+                  "maxMbps": {
+                    "default": null,
+                    "anyOf": [
+                      {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 1000000
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
                   "serveVideo": {
                     "default": true,
                     "type": "boolean"
@@ -13034,6 +13047,18 @@
                     "type": "integer",
                     "minimum": 1,
                     "maximum": 100
+                  },
+                  "maxMbps": {
+                    "anyOf": [
+                      {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 1000000
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
                   },
                   "serveVideo": {
                     "type": "boolean"
@@ -43772,6 +43797,13 @@
           "weight": {
             "type": "number"
           },
+          "maxMbps": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "description": "The most it should send, in megabits per second. Null for no limit."
+          },
           "serveVideo": {
             "type": "boolean"
           },
@@ -43939,6 +43971,7 @@
           "location",
           "enabled",
           "weight",
+          "maxMbps",
           "serveVideo",
           "serveLive",
           "status",

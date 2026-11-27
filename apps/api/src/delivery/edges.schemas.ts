@@ -23,12 +23,15 @@ const location = z
   .nullable();
 
 const weight = z.number().int().min(1).max(100);
+/** Megabits per second. Empty means no limit. */
+const maxMbps = z.number().int().min(1).max(1_000_000).nullable();
 
 export const createEdgeSchema = z.object({
   name,
   publicUrl,
   location: location.default(null),
   weight: weight.default(10),
+  maxMbps: maxMbps.default(null),
   serveVideo: z.boolean().default(true),
   serveLive: z.boolean().default(true),
   enabled: z.boolean().default(true),
@@ -41,6 +44,7 @@ export const updateEdgeSchema = z
     publicUrl,
     location,
     weight,
+    maxMbps,
     serveVideo: z.boolean(),
     serveLive: z.boolean(),
     enabled: z.boolean(),
