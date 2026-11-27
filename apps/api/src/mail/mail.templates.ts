@@ -178,6 +178,30 @@ export function emailChangedMail(options: {
   };
 }
 
+/** Sent when the payment for a subscription failed and Stripe is trying again. */
+export function paymentFailedMail(options: {
+  siteName: string;
+  displayName: string;
+  /** Where the viewer puts the payment method right. Empty when the site has no address. */
+  accountUrl: string;
+}): Content {
+  const { siteName, displayName, accountUrl } = options;
+  return {
+    subject: oneLine(`Your payment to ${siteName} did not go through`),
+    ...layout({
+      siteName,
+      heading: 'Your payment did not go through',
+      intro: [
+        `Hello ${displayName},`,
+        `the last payment for your subscription to ${siteName} failed. Your access stays open while the payment is tried again, but it ends if it keeps failing.`,
+        'The usual cause is a card that ran out or has no funds left. Please check the payment method.',
+      ],
+      ...(accountUrl ? { action: { label: 'Open your account', url: accountUrl } } : {}),
+      notes: ['If you have already put it right, you can ignore this message.'],
+    }),
+  };
+}
+
 export function passwordChangedMail(options: { siteName: string; displayName: string }): Content {
   const { siteName, displayName } = options;
   return {

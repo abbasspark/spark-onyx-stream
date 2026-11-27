@@ -652,6 +652,46 @@ describe.skipIf(!TEST_DATABASE_URL)('Billing with Stripe (e2e)', () => {
       });
     });
 
+    it('emails the viewer once when a payment fails, and not again while it stays failed', async () => {
+      const mailing = await createTestApp(MODULES, {
+        ...env,
+        SITE_URL: 'https://watch.example.com',
+        SITE_NAME: 'Night Cinema',
+        SMTP_URL: 'smtps://mailer:secret-password@smtp.example.com:465',
+        MAIL_FROM: 'Night Cinema <no-reply@example.com>',
+        STRIPE_SECRET_KEY: stripe.secretKey,
+        STRIPE_WEBHOOK_SECRET: stripe.webhookSecret,
+        STRIPE_API_URL: stripe.apiUrl,
+      });
+      try {
+        const anna = await subscribe();
+        const deliverTo = (message: { body: string; signature: string | null }) =>
+          mailing
+            .http()
+            .post(WEBHOOK)
+            .set('Content-Type', 'application/json')
+            .set('Stripe-Signature', message.signature ?? '')
+            .send(message.body);
+        const failures = async () => {
+          await mailing.mailSettled();
+          return mailing.mail.outbox.filter((mail) => mail.subject.includes('did not go through'));
+        };
+
+        stripe.change(anna.remote.id, { status: 'past_due' });
+        await deliverTo(stripe.event('customer.subscription.updated', anna.remote)).expect(200);
+        const [first, ...others] = await failures();
+        expect(others).toEqual([]);
+        expect(first).toMatchObject({ to: ANNA.email });
+        expect(first?.text).toContain('https://watch.example.com/account');
+
+        // Stripe reports again while the payment is still failing: no second email.
+        await deliverTo(stripe.event('customer.subscription.updated', anna.remote)).expect(200);
+        expect(await failures()).toHaveLength(1);
+      } finally {
+        await mailing.close();
+      }
+    });
+
     it('keeps access while a failed payment is retried, and ends it when Stripe gives up', async () => {
       const movie = await createPaidMovie();
       const anna = await subscribe();

@@ -2,7 +2,10 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { type Payment, PrismaClient, type Purchase, type Subscription } from '@onyx/database';
 import { isUniqueViolation } from '../common/prisma-errors.js';
+import { BrandingService } from '../branding/branding.service.js';
 import { AppConfig } from '../config/app-config.js';
+import { MailService } from '../mail/mail.service.js';
+import { paymentFailedMail } from '../mail/mail.templates.js';
 import { rentalDeadline } from '../purchases/purchase-rules.js';
 import { StripeClient, StripeError } from './stripe.client.js';
 import { mapInvoice, mapSubscription, refundState } from './stripe.mapper.js';
@@ -42,6 +45,8 @@ export class StripeSyncService {
     @Inject(WebhookDeliveryService) private readonly webhooks: WebhookDeliveryService,
     @Inject(StripeClient) private readonly stripe: StripeClient,
     @Inject(AppConfig) private readonly config: AppConfig,
+    @Inject(MailService) private readonly mail: MailService,
+    @Inject(BrandingService) private readonly branding: BrandingService,
   ) {}
 
   /**
@@ -122,7 +127,37 @@ export class StripeSyncService {
     } else if (ran(existing.status) && !ran(saved.status)) {
       await this.webhooks.announceSubscription('subscription.ended', saved.id);
     }
+    // Stripe says so on every change, but the viewer hears of a failed payment once.
+    if (existing && existing.status !== 'PAST_DUE' && saved.status === 'PAST_DUE') {
+      await this.tellPaymentFailed(saved.viewerId);
+    }
     return saved;
+  }
+
+  /** Emails the viewer that a payment failed. Never fails: the state is recorded either way. */
+  private async tellPaymentFailed(viewerId: string): Promise<void> {
+    if (!this.mail.enabled) {
+      return;
+    }
+    try {
+      const viewer = await this.prisma.viewer.findUnique({
+        where: { id: viewerId },
+        select: { email: true, displayName: true },
+      });
+      if (!viewer) {
+        return;
+      }
+      this.mail.send({
+        to: viewer.email,
+        ...paymentFailedMail({
+          siteName: await this.branding.siteName(),
+          displayName: viewer.displayName,
+          accountUrl: this.config.siteUrl ? `${this.config.siteUrl}/account` : '',
+        }),
+      });
+    } catch (error) {
+      this.logger.warn(`Could not tell a viewer of a failed payment: ${String(error)}`);
+    }
   }
 
   /**
